@@ -332,6 +332,15 @@
 // emotionalShift has only ever appeared inside a combined co-occurrence check [elevated-tone-vs-
 // negative-shift]; none of the three shared-library trio modes has ever isolated this valence on
 // its own).
+//
+// Wave 823 additions: VOICE_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative'
+// absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave
+// 809; peak mode conventionally skipped for this categorical field), VOICE_TURNING_POINT_ZONE_
+// CLUSTER (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose
+// value has never appeared anywhere in this file; distinct from VOICE_TURN_ZONE_CLUSTER [Wave 795],
+// which audits the dramaticTurn free-text field, not this purpose enum value), VOICE_INTRODUCE_
+// CONFLICT_ZONE_CLUSTER (distribution/timing × purpose === 'introduce_conflict' × structural
+// thirds — likewise a virgin field, never referenced in this file before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4965,6 +4974,73 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r809c.maxZoneCount / r809c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r809c.zoneNames[r809c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the story's voice carries its emotional cost in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a negative-emotion scene outside the ${r809c.zoneNames[r809c.maxZoneIdx]} third so the story's voice registers its emotional cost more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 823: VOICE_NEGATIVE_EMOTION_DROUGHT_RUN, VOICE_TURNING_POINT_ZONE_CLUSTER,
+  //              VOICE_INTRODUCE_CONFLICT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no negative-emotion charge reaches 6.
+  // Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave 809
+  // (peak mode conventionally skipped for this categorical field).
+  {
+    const r823a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r823a.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r823a.longestRun} consecutive scenes`,
+        rule: 'VOICE_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r823a.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r823a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the story's voice with no emotional cost to speak through for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r823a.longestRun}-scene stretch so the story's voice keeps an emotional cost to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never appeared anywhere in this file — a virgin field for all three
+  // shared-library trio modes, distinct from VOICE_TURN_ZONE_CLUSTER (Wave 795), which audits the
+  // dramaticTurn free-text field, not this purpose enum value.
+  {
+    const r823b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r823b.fires) {
+      issues.push({
+        location: `${r823b.zoneNames[r823b.maxZoneIdx]} third — ${r823b.maxZoneCount} of ${r823b.count} turning-point scenes`,
+        rule: 'VOICE_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r823b.maxZoneCount / r823b.count) * 100)}% of the story's turning-point scenes cluster in the ${r823b.zoneNames[r823b.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the story's voice has no redirection to speak through anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r823b.zoneNames[r823b.maxZoneIdx]} third as a turning point so the story's voice keeps a redirection to speak through more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. Also a virgin field — 'introduce_conflict' has never appeared
+  // anywhere in this file before this wave.
+  {
+    const r823c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r823c.fires) {
+      issues.push({
+        location: `${r823c.zoneNames[r823c.maxZoneIdx]} third — ${r823c.maxZoneCount} of ${r823c.count} conflict-introducing scenes`,
+        rule: 'VOICE_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r823c.maxZoneCount / r823c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r823c.zoneNames[r823c.maxZoneIdx]} third. When every new conflict lands in the same structural window, the story's voice has no fresh friction to speak through anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r823c.zoneNames[r823c.maxZoneIdx]} third to introduce conflict so the story's voice keeps fresh friction to speak through more evenly across the story.`,
       });
     }
   }
