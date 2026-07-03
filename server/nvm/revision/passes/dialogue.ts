@@ -425,6 +425,13 @@
 // checkDroughtRun) but have never been audited by it: DIALOGUE_COMPLICATE_ZONE_IMBALANCE (purpose
 // === 'complicate'), DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict'),
 // and DIALOGUE_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point').
+//
+// Wave 924 additions (opens the twenty-fifth rotation cycle): continuing the checkZoneImbalance
+// rollout, this wave applies the 4-zone bloat+empty-zone mode to three more signals that each
+// already have a complete 3-zone/run-based trio but had never been audited by it: DIALOGUE_
+// CHARACTER_MOMENT_ZONE_IMBALANCE (purpose === 'character_moment'), DIALOGUE_STAKES_ZONE_IMBALANCE
+// (purpose === 'raise_stakes'), and DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift ===
+// 'negative', a valence signal with a complete 3-zone/run trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5394,6 +5401,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r910c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName910c} contains ${r910c.counts[r910c.bloatZoneIdx]} of them (${Math.round((r910c.counts[r910c.bloatZoneIdx] / r910c.totalCount) * 100)}%) while ${emptyNames910c} contains none. Dialogue voices a pivot in one quarter and none elsewhere, giving its shifts of direction an uneven structural rhythm.`,
         suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) -- ${emptyNames910c} -- so dialogue voices the story's pivots across the whole story, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE -- Underweight/bloat x purpose === 'character_moment'
+  // x four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 896. n>=10, >=4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds >=50%
+  // of the total. Distinct from the existing 3-zone DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN -- the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r924a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r924a.fires) {
+      const emptyNames924a = r924a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName924a = FOUR_ZONE_NAMES[r924a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames924a} empty; ${bloatName924a} has ${r924a.counts[r924a.bloatZoneIdx]}/${r924a.totalCount} character-moment scenes`,
+        rule: 'DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r924a.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName924a} contains ${r924a.counts[r924a.bloatZoneIdx]} of them (${Math.round((r924a.counts[r924a.bloatZoneIdx] / r924a.totalCount) * 100)}%) while ${emptyNames924a} contains none. Dialogue gets a quiet character beat to voice in one quarter and none elsewhere, giving its intimate register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) -- ${emptyNames924a} -- so dialogue's intimate register recurs across the whole story, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAKES_ZONE_IMBALANCE -- Underweight/bloat x purpose === 'raise_stakes' x four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 896. n>=10, >=4 stakes-raising scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds >=50% of
+  // the total. Distinct from the existing 3-zone DIALOGUE_STAKES_ZONE_CLUSTER and run-based
+  // DIALOGUE_STAKES_DROUGHT_RUN -- the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r924b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r924b.fires) {
+      const emptyNames924b = r924b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName924b = FOUR_ZONE_NAMES[r924b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames924b} empty; ${bloatName924b} has ${r924b.counts[r924b.bloatZoneIdx]}/${r924b.totalCount} stakes-raising scenes`,
+        rule: 'DIALOGUE_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r924b.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName924b} contains ${r924b.counts[r924b.bloatZoneIdx]} of them (${Math.round((r924b.counts[r924b.bloatZoneIdx] / r924b.totalCount) * 100)}%) while ${emptyNames924b} contains none. Dialogue voices rising stakes in one quarter and none elsewhere, giving its urgency an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) -- ${emptyNames924b} -- so dialogue's urgency rises across the whole story, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE -- Underweight/bloat x emotionalShift === 'negative'
+  // x four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n>=10, >=4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds >=50% of the total. Distinct from the existing 3-zone DIALOGUE_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN -- the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r924c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r924c.fires) {
+      const emptyNames924c = r924c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName924c = FOUR_ZONE_NAMES[r924c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames924c} empty; ${bloatName924c} has ${r924c.counts[r924c.bloatZoneIdx]}/${r924c.totalCount} negative-shift scenes`,
+        rule: 'DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r924c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName924c} contains ${r924c.counts[r924c.bloatZoneIdx]} of them (${Math.round((r924c.counts[r924c.bloatZoneIdx] / r924c.totalCount) * 100)}%) while ${emptyNames924c} contains none. Dialogue turns dark in one quarter and stays even elsewhere, giving its emotional register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) -- ${emptyNames924c} -- so dialogue's darker register recurs across the whole story, not only the quarter currently carrying most of them.`,
       });
     }
   }

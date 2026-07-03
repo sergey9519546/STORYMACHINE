@@ -1598,6 +1598,73 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 924 — dialoguePass: dialogue character_moment zone imbalance, dialogue stakes zone imbalance, dialogue negative_emotion zone imbalance', async () => {
+    const makeRec924 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes924 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD924 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE fires when character-moment scenes cluster in two zones and two are empty', async () => {
+      const records924a = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'character_moment' } : {}));
+      const res = await runD924(buildScenes924(10), records924a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const records924an = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 3, 5, 8].includes(i) ? { purpose: 'character_moment' } : {}));
+      const res = await runD924(buildScenes924(10), records924an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'DIALOGUE_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_STAKES_ZONE_IMBALANCE fires when stakes-raising scenes cluster in two zones and two are empty', async () => {
+      const records924b = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'raise_stakes' } : {}));
+      const res = await runD924(buildScenes924(10), records924b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_ZONE_IMBALANCE'), 'DIALOGUE_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const records924bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 3, 5, 8].includes(i) ? { purpose: 'raise_stakes' } : {}));
+      const res = await runD924(buildScenes924(10), records924bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_ZONE_IMBALANCE'), 'DIALOGUE_STAKES_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when negative-shift scenes cluster in two zones and two are empty', async () => {
+      const records924c = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'negative' } : {}));
+      const res = await runD924(buildScenes924(10), records924c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const records924cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec924(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'negative' } : {}));
+      const res = await runD924(buildScenes924(10), records924cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 910 — dialoguePass: dialogue complicate zone imbalance, dialogue introduce_conflict zone imbalance, dialogue turning_point zone imbalance', async () => {
     const makeRec910 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
