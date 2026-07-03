@@ -1136,6 +1136,72 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 778 — rhythmPass: rhythm suspense drought run, rhythm curiosity zone cluster, rhythm revelation drought run', async () => {
+    const runR778 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs778a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR778(recs778a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_DROUGHT_RUN'), 'RHYTHM_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs778an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR778(recs778an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_DROUGHT_RUN'), 'RHYTHM_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs778b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR778(recs778b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_ZONE_CLUSTER'), 'RHYTHM_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs778bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR778(recs778bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_ZONE_CLUSTER'), 'RHYTHM_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs778c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runR778(recs778c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_DROUGHT_RUN'), 'RHYTHM_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs778cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runR778(recs778cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_DROUGHT_RUN'), 'RHYTHM_REVELATION_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 764 — rhythmPass: rhythm suspense zone cluster, rhythm curiosity drought run, rhythm revelation peak uncaused', async () => {
     const runR764 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

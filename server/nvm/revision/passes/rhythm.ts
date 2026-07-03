@@ -301,6 +301,13 @@
 // trio modes has ever been applied to revelation itself as the primary signal. hasCause here
 // deliberately references only dramaticTurn, never revelation, to avoid a circular/self-referential
 // audit).
+// Wave 778 additions: RHYTHM_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 764
+// applied the zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to
+// it), RHYTHM_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence ×
+// structural thirds — Wave 764 applied the run-based drought mode to curiosityDelta; the
+// zone-cluster mode has never been applied to it), RHYTHM_REVELATION_DROUGHT_RUN (run-based ×
+// revelation absence — Wave 764 applied the backward-cause peak mode to revelation; the
+// run-based drought mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3846,6 +3853,70 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Scene ${r764c.peakIdx + 1} is the earliest of ${r764c.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the rhythm's momentum flat right before the reveal.`,
         suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r764c.peakIdx + 1} so the rhythm builds momentum into the revelation instead of arriving flat.`,
+      });
+    }
+  }
+
+  // ── Wave 778: RHYTHM_SUSPENSE_DROUGHT_RUN, RHYTHM_CURIOSITY_ZONE_CLUSTER,
+  //              RHYTHM_REVELATION_DROUGHT_RUN ──────────────────────────────────────
+
+  // RHYTHM_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no rising tension reaches 6. Wave 764 applied the
+  // zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to it.
+  {
+    const r778a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r778a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r778a.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r778a.longestRun} consecutive scenes with no rise in suspense at all, even though ${r778a.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the story's rhythm flat without mounting pressure for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r778a.longestRun}-scene stretch so the rhythm keeps mounting pressure punctuating that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 764 applied
+  // the run-based drought mode to curiosityDelta; the zone-cluster mode has never been applied to
+  // it.
+  {
+    const r778b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r778b.fires) {
+      issues.push({
+        location: `${r778b.zoneNames[r778b.maxZoneIdx]} third — ${r778b.maxZoneCount} of ${r778b.count} curiosity-positive scenes`,
+        rule: 'RHYTHM_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r778b.maxZoneCount / r778b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r778b.zoneNames[r778b.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the story's rhythm goes quiet on fresh questions for the rest of the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r778b.zoneNames[r778b.maxZoneIdx]} third so the rhythm keeps generating fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Wave 764 applied the backward-cause
+  // peak mode to revelation; the run-based drought mode has never been applied to it.
+  {
+    const r778c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r778c.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r778c.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r778c.longestRun} consecutive scenes with no revelation at all, even though ${r778c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the story's rhythm without a disclosure to punctuate it for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r778c.longestRun}-scene stretch so the rhythm keeps a disclosure punctuating that stretch.`,
       });
     }
   }
