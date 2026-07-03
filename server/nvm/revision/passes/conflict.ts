@@ -352,6 +352,15 @@
 // 'introduce_conflict' × structural thirds — this purpose value has never been referenced
 // anywhere in this pass despite being thematically central to it; none of the three
 // shared-library trio modes has ever been applied to it).
+// Wave 814 additions: CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completing 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 800; peak mode conventionally skipped for this categorical
+// field), CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; none of the three shared-library trio modes has ever been applied to
+// it), CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment'
+// absence — completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in this same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4734,6 +4743,73 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r800c.maxZoneCount / r800c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r800c.zoneNames[r800c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the story stops introducing fresh sources of friction anywhere else across its full shape.`,
         suggestedFix: `Purpose at least one scene outside the ${r800c.zoneNames[r800c.maxZoneIdx]} third to introduce conflict so the story keeps opening fresh friction more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // ── Wave 814: CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN, CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER,
+  //              CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN ──────────────────────────────────────
+
+  // CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 800 (peak mode conventionally skipped for
+  // this categorical field).
+  {
+    const r814a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r814a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict introduced: ${r814a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r814a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r814a.presentCount} scenes elsewhere open new fronts. A long unbroken stretch with nothing new stirred up leaves the conflict coasting without fresh friction for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r814a.longestRun}-scene stretch to introduce conflict so the story keeps opening fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has never been referenced anywhere in this pass; none
+  // of the three shared-library trio modes has ever been applied to it.
+  {
+    const r814b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r814b.fires) {
+      issues.push({
+        location: `${r814b.zoneNames[r814b.maxZoneIdx]} third — ${r814b.maxZoneCount} of ${r814b.count} character-moment scenes`,
+        rule: 'CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r814b.maxZoneCount / r814b.count) * 100)}% of the story's character-moment scenes cluster in the ${r814b.zoneNames[r814b.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the conflict has no room to let its cost register on the characters anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r814b.zoneNames[r814b.maxZoneIdx]} third as a character moment so the conflict keeps room for its cost to register more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes with no character-moment purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r814c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r814c.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r814c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r814c.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r814c.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with nothing but escalation leaves the conflict without a beat to let its cost register on the characters for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r814c.longestRun}-scene stretch as a character moment so the conflict keeps registering its cost on the characters throughout that stretch.`,
       });
     }
   }

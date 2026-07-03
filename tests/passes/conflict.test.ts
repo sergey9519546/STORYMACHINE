@@ -1535,6 +1535,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 814 — conflictPass: conflict introduce conflict drought run, conflict character moment zone cluster, conflict character moment drought run', async () => {
+    const makeRec814 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF814 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict introduced', async () => {
+      const recs814a = Array.from({ length: 10 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runCF814(recs814a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs814an = Array.from({ length: 10 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runCF814(recs814an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'CONFLICT_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs814b = Array.from({ length: 9 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runCF814(recs814b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER'), 'CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs814bn = Array.from({ length: 9 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runCF814(recs814bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER'), 'CONFLICT_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs814c = Array.from({ length: 10 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runCF814(recs814c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN'), 'CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs814cn = Array.from({ length: 10 }, (_, i) => makeRec814(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runCF814(recs814cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN'), 'CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 800 — conflictPass: conflict negative emotion zone cluster, conflict negative emotion drought run, conflict introduce conflict zone cluster', async () => {
     const makeRec800 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
