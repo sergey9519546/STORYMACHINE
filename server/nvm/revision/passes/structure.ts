@@ -363,6 +363,17 @@
 // emotionalShift === 'positive' × structural thirds — mirrors the completed negative-valence
 // trio; the positive valence has never been isolated by any of the three shared-library trio
 // modes in this pass).
+//
+// Wave 849 additions: STRUCTURE_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'positive' absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode
+// added in Wave 835; peak mode conventionally skipped for this categorical field),
+// STRUCTURE_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has only ever appeared inside the setupPurposes
+// composite set [union with 'character_moment']; it has never been audited as its own standalone
+// signal by any of the three shared-library trio modes), STRUCTURE_CLIMAX_ZONE_CLUSTER
+// (distribution/timing × purpose === 'climax' × structural thirds — this purpose value has only
+// ever appeared inside the payoffPurposes composite set [union with 'resolution',
+// 'turning_point'] or the presence-only PURPOSE_CLIMAX_ABSENT check; a virgin standalone signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4674,6 +4685,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r835c.maxZoneCount / r835c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r835c.zoneNames[r835c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the story's architecture carries its emotional payoff in only one part of the story instead of throughout its full shape.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r835c.zoneNames[r835c.maxZoneIdx]} third so the structure delivers its emotional payoff more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // ── Wave 849: STRUCTURE_POSITIVE_EMOTION_DROUGHT_RUN, STRUCTURE_ESTABLISH_WORLD_ZONE_CLUSTER,
+  //              STRUCTURE_CLIMAX_ZONE_CLUSTER ──────────────────────────────────────
+
+  // STRUCTURE_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 835 (peak mode conventionally skipped for this categorical field).
+  {
+    const r849a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r849a.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r849a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r849a.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r849a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the story's architecture without an emotional payoff for an extended run.`,
+        suggestedFix: `Give the story a moment of relief within the ${r849a.longestRun}-scene stretch so the structure keeps delivering an emotional payoff throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has only ever appeared inside the setupPurposes composite set
+  // (union with 'character_moment'); it has never been audited as its own standalone signal by
+  // any of the three shared-library trio modes.
+  {
+    const r849b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r849b.fires) {
+      issues.push({
+        location: `${r849b.zoneNames[r849b.maxZoneIdx]} third — ${r849b.maxZoneCount} of ${r849b.count} world-establishing scenes`,
+        rule: 'STRUCTURE_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r849b.maxZoneCount / r849b.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r849b.zoneNames[r849b.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the story's architecture has no fresh ground to build from anywhere else across its full shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r849b.zoneNames[r849b.maxZoneIdx]} third to establish the world so the structure keeps fresh ground to build from more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has only ever appeared inside the payoffPurposes composite set (union with
+  // 'resolution', 'turning_point') or the presence-only PURPOSE_CLIMAX_ABSENT check; a virgin
+  // standalone signal.
+  {
+    const r849c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r849c.fires) {
+      issues.push({
+        location: `${r849c.zoneNames[r849c.maxZoneIdx]} third — ${r849c.maxZoneCount} of ${r849c.count} climax-purposed scenes`,
+        rule: 'STRUCTURE_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r849c.maxZoneCount / r849c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r849c.zoneNames[r849c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the story's architecture builds toward its payoff in only one part of the story instead of throughout its full shape.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r849c.zoneNames[r849c.maxZoneIdx]} third so the structure builds toward its payoff more evenly across its full shape.`,
       });
     }
   }
