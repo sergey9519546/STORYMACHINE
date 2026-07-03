@@ -424,6 +424,13 @@
 // purpose values with complete 3-zone/run-based trios: ORIGINALITY_CLIMAX_ZONE_IMBALANCE
 // (purpose === 'climax') and ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose ===
 // 'establish_world').
+//
+// Wave 900 additions: purpose === 'complicate' has never been referenced anywhere in this pass --
+// a genuinely virgin field. This wave adds ORIGINALITY_COMPLICATE_ZONE_CLUSTER and ORIGINALITY_
+// COMPLICATE_DROUGHT_RUN (peak mode conventionally skipped for this categorical field), plus
+// ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE, continuing the checkZoneImbalance rollout begun in
+// Wave 886: purpose === 'turning_point' already has a complete 3-zone/run-based trio but has never
+// been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5456,6 +5463,73 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r886c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName886c} contains ${r886c.counts[r886c.bloatZoneIdx]} of them (${Math.round((r886c.counts[r886c.bloatZoneIdx] / r886c.totalCount) * 100)}%) while ${emptyNames886c} contains none — a predictable concentration the audience can learn to anticipate rather than world-building distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames886c} — so world-building stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // purpose === 'complicate' has never been referenced anywhere in this pass — a genuinely virgin
+  // field for all three shared-library trio modes.
+  {
+    const r900a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r900a.fires) {
+      issues.push({
+        location: `${r900a.zoneNames[r900a.maxZoneIdx]} third — ${r900a.maxZoneCount} of ${r900a.count} complicating scenes`,
+        rule: 'ORIGINALITY_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r900a.maxZoneCount / r900a.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r900a.zoneNames[r900a.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than fresh trouble distributed unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r900a.zoneNames[r900a.maxZoneIdx]} third to complicate the story so new trouble stays less predictable across the whole shape of the story.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6. Completes
+  // 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave
+  // (peak mode conventionally skipped for this categorical field).
+  {
+    const r900b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r900b.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r900b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r900b.longestRun} consecutive scenes with no complicating purpose at all, even though ${r900b.presentCount} scenes elsewhere deepen the trouble — a long, predictable stretch without any new complication the audience can learn to anticipate.`,
+        suggestedFix: `Purpose at least one scene within the ${r900b.longestRun}-scene stretch to complicate the story so new trouble stays unpredictable throughout that stretch rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 886. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone ORIGINALITY_TURNING_POINT_ZONE_CLUSTER and
+  // run-based ORIGINALITY_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r900c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r900c.fires) {
+      const emptyNames900c = r900c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName900c = FOUR_ZONE_NAMES[r900c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames900c} empty; ${bloatName900c} has ${r900c.counts[r900c.bloatZoneIdx]}/${r900c.totalCount} turning-point scenes`,
+        rule: 'ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r900c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName900c} contains ${r900c.counts[r900c.bloatZoneIdx]} of them (${Math.round((r900c.counts[r900c.bloatZoneIdx] / r900c.totalCount) * 100)}%) while ${emptyNames900c} contains none — a predictable concentration the audience can learn to anticipate rather than pivots distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames900c} — so the story's pivots stay less predictable across its whole shape.`,
       });
     }
   }

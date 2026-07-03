@@ -1210,6 +1210,101 @@ He sits at his desk.
   });
 
 
+  describe('Wave 900 — originalityPass: originality complicate zone cluster, originality complicate drought run, originality turning point zone imbalance', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830/844/858/872/886
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const EMOTION_POOL_900 = ['neutral', 'neutral', 'neutral'];
+    const PURPOSE_POOL_900 = ['raise_stakes', 'character_moment', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_900 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor900 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec900 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor900(idx),
+      emotionalShift: EMOTION_POOL_900[idx % EMOTION_POOL_900.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_900[idx % PURPOSE_POOL_900.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain900 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor900(i)}\n\n${SENTENCE_POOL_900[i % SENTENCE_POOL_900.length]}`).join('\n\n');
+    const runO900 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain900(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_COMPLICATE_ZONE_CLUSTER fire: n=9, 3 thirds; complicate at 0,1,2 (opening
+    // third) → 3/3 = 100% > 75%.
+    it('ORIGINALITY_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs900a = Array.from({ length: 9 }, (_, i) => makeRec900(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'complicate' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_COMPLICATE_ZONE_CLUSTER'), 'ORIGINALITY_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs900an = Array.from({ length: 9 }, (_, i) => makeRec900(i, {
+        purpose: (i === 0 || i === 4 || i === 8) ? 'complicate' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_COMPLICATE_ZONE_CLUSTER'), 'ORIGINALITY_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_COMPLICATE_DROUGHT_RUN fire: n=10; complicate at 0,1,2 only, then a run of 7
+    // consecutive scenes (3-9) with none.
+    it('ORIGINALITY_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs900b = Array.from({ length: 10 }, (_, i) => makeRec900(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'complicate' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_COMPLICATE_DROUGHT_RUN'), 'ORIGINALITY_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs900bn = Array.from({ length: 10 }, (_, i) => makeRec900(i, {
+        purpose: (i === 0 || i === 3 || i === 6 || i === 9) ? 'complicate' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_COMPLICATE_DROUGHT_RUN'), 'ORIGINALITY_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE fire: n=10, 4 zones (Z0={0,1,2}, Z1={3,4},
+    // Z2={5,6,7}, Z3={8,9}); turning_point at 0,1,2,8,9 → Z0 has 3/5=60% (bloat, >=50%), Z1 and
+    // Z2 are empty.
+    it('ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs900c = Array.from({ length: 10 }, (_, i) => makeRec900(i, {
+        purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE'), 'ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs900cn = Array.from({ length: 10 }, (_, i) => makeRec900(i, {
+        purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : PURPOSE_POOL_900[i % PURPOSE_POOL_900.length],
+      }));
+      const res = await runO900(recs900cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE'), 'ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 886 — originalityPass: originality resolution drought run, originality climax zone imbalance, originality establish world zone imbalance', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830/844/858/872
     // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
