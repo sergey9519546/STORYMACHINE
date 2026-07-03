@@ -931,6 +931,61 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 962 — themePass: theme curiosity zone imbalance, theme revelation zone imbalance, theme relationship zone imbalance', async () => {
+    const runT962 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('THEME_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs962a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runT962(recs962a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_ZONE_IMBALANCE'), 'THEME_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs962an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runT962(recs962an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_ZONE_IMBALANCE'), 'THEME_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs962b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runT962(recs962b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_ZONE_IMBALANCE'), 'THEME_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs962bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runT962(recs962bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_ZONE_IMBALANCE'), 'THEME_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs962c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runT962(recs962c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_ZONE_IMBALANCE'), 'THEME_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs962cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runT962(recs962cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_ZONE_IMBALANCE'), 'THEME_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 948 — themePass: theme positive emotion zone imbalance, theme suspense zone imbalance, theme seed zone imbalance', async () => {
     const runT948 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

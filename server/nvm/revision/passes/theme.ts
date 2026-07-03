@@ -429,6 +429,12 @@
 // (suspenseDelta > 0 — tension-delta magnitude), and THEME_SEED_ZONE_IMBALANCE (seededClueIds.length
 // > 0 — a seededClueIds array field distinct from the already-audited unresolvedClues/visualBeats/
 // payoffSetupIds imbalances).
+// Wave 962 additions: continuing the non-purpose 4-zone rollout with three more trio-complete signals
+// spanning three distinct classes: THEME_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — the question-
+// raising delta beside Wave 948's suspense one), THEME_REVELATION_ZONE_IMBALANCE (revelation != null —
+// the revelation string field, distinct from the purpose-enum THEME_REVELATION_PURPOSE one), and
+// THEME_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts.length > 0 — a relationshipShifts array field
+// distinct from all four already-audited array imbalances: unresolvedClues/visualBeats/payoff/seed).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5449,6 +5455,82 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r948c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName948c} contains ${r948c.counts[r948c.bloatZoneIdx]} of them (${Math.round((r948c.counts[r948c.bloatZoneIdx] / r948c.totalCount) * 100)}%) while ${emptyNames948c} contains none. Thematic setups bloat in one structural quarter and never get planted in another, so the motifs the theme later reprises are seeded in only part of the story.`,
         suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames948c} — so the theme's motifs are seeded across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone THEME_CURIOSITY_
+  // ZONE_CLUSTER and run-based THEME_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on question-
+  // raising change rather than the suspense delta audited in Wave 948.
+  {
+    const r962a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r962a.fires) {
+      const emptyNames962a = r962a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName962a = FOUR_ZONE_NAMES[r962a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames962a} empty; ${bloatName962a} has ${r962a.counts[r962a.bloatZoneIdx]}/${r962a.totalCount} curiosity-raising scenes`,
+        rule: 'THEME_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r962a.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName962a} contains ${r962a.counts[r962a.bloatZoneIdx]} of them (${Math.round((r962a.counts[r962a.bloatZoneIdx] / r962a.totalCount) * 100)}%) while ${emptyNames962a} contains none. New questions bloat in one structural quarter and never open in another, so the questions the theme keeps alive drive only part of the story.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames962a} — so the theme keeps its central question open across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone THEME_REVELATION_ZONE_
+  // CLUSTER and run-based THEME_REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+
+  // empty-zone mode to the revelation STRING field (revelation != null), and distinct from THEME_
+  // REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation' enum value.
+  {
+    const r962b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r962b.fires) {
+      const emptyNames962b = r962b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName962b = FOUR_ZONE_NAMES[r962b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames962b} empty; ${bloatName962b} has ${r962b.counts[r962b.bloatZoneIdx]}/${r962b.totalCount} revelation scenes`,
+        rule: 'THEME_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r962b.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName962b} contains ${r962b.counts[r962b.bloatZoneIdx]} of them (${Math.round((r962b.counts[r962b.bloatZoneIdx] / r962b.totalCount) * 100)}%) while ${emptyNames962b} contains none. Disclosures bloat in one structural quarter and never land in another, so the truths that deepen the theme surface in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames962b} — so the theme keeps deepening through new truth across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // THEME_RELATIONSHIP_ZONE_CLUSTER and run-based THEME_RELATIONSHIP_DROUGHT_RUN, and distinct from the
+  // other array-field imbalances in this pass — THEME_UNRESOLVED_CLUE (unresolvedClues), THEME_VISUAL_
+  // BEAT (visualBeats), THEME_PAYOFF (payoffSetupIds), THEME_SEED (seededClueIds) — as it keys on the
+  // relationshipShifts field, a genuinely different array from all four.
+  {
+    const r962c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r962c.fires) {
+      const emptyNames962c = r962c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName962c = FOUR_ZONE_NAMES[r962c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames962c} empty; ${bloatName962c} has ${r962c.counts[r962c.bloatZoneIdx]}/${r962c.totalCount} relationship-shift scenes`,
+        rule: 'THEME_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r962c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName962c} contains ${r962c.counts[r962c.bloatZoneIdx]} of them (${Math.round((r962c.counts[r962c.bloatZoneIdx] / r962c.totalCount) * 100)}%) while ${emptyNames962c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the theme is dramatized through relationships in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames962c} — a relationship shift so the theme keeps being dramatized through bonds across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
