@@ -1136,6 +1136,71 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 820 — rhythmPass: rhythm character moment drought run, rhythm turning point zone cluster, rhythm turning point drought run', async () => {
+    const runR820 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs820a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runR820(recs820a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN'), 'RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs820an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runR820(recs820an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN'), 'RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs820b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runR820(recs820b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_TURNING_POINT_ZONE_CLUSTER'), 'RHYTHM_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs820bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runR820(recs820bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_TURNING_POINT_ZONE_CLUSTER'), 'RHYTHM_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_TURNING_POINT_DROUGHT_RUN fire:
+    // n=10; turning_point at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_TURNING_POINT_DROUGHT_RUN fires when a long run has no turning point', async () => {
+      const recs820c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runR820(recs820c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_TURNING_POINT_DROUGHT_RUN'), 'RHYTHM_TURNING_POINT_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_TURNING_POINT_DROUGHT_RUN does not fire when turning points are evenly spread', async () => {
+      const recs820cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runR820(recs820cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_TURNING_POINT_DROUGHT_RUN'), 'RHYTHM_TURNING_POINT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 806 — rhythmPass: rhythm negative emotion zone cluster, rhythm negative emotion drought run, rhythm character moment zone cluster', async () => {
     const runR806 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
