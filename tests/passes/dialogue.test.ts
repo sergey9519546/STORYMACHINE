@@ -1598,6 +1598,83 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 812 — dialoguePass: dialogue stakes zone cluster, dialogue stakes drought run, dialogue turning point zone cluster', async () => {
+    const makeRec812 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes812 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD812 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; raise_stakes scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs812a = Array.from({ length: 9 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runD812(buildScenes812(9), recs812a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_STAKES_ZONE_CLUSTER'), 'DIALOGUE_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes spread across thirds', async () => {
+      const recs812an = Array.from({ length: 9 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runD812(buildScenes812(9), recs812an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_STAKES_ZONE_CLUSTER'), 'DIALOGUE_STAKES_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_STAKES_DROUGHT_RUN fire:
+    // n=10; raise_stakes at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_STAKES_DROUGHT_RUN fires when a long run has no stakes-raising scene', async () => {
+      const recs812b = Array.from({ length: 10 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runD812(buildScenes812(10), recs812b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_STAKES_DROUGHT_RUN'), 'DIALOGUE_STAKES_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are evenly spread', async () => {
+      const recs812bn = Array.from({ length: 10 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runD812(buildScenes812(10), recs812bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_STAKES_DROUGHT_RUN'), 'DIALOGUE_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs812c = Array.from({ length: 9 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'turning_point' } : {}
+      ));
+      const res = await runD812(buildScenes812(9), recs812c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_TURNING_POINT_ZONE_CLUSTER'), 'DIALOGUE_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs812cn = Array.from({ length: 9 }, (_, i) => makeRec812(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'turning_point' } : {}
+      ));
+      const res = await runD812(buildScenes812(9), recs812cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_TURNING_POINT_ZONE_CLUSTER'), 'DIALOGUE_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 798 — dialoguePass: dialogue revelation drought run, dialogue revelation peak uncaused, dialogue character moment zone cluster', async () => {
     const makeRec798 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

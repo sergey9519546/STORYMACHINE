@@ -348,6 +348,17 @@
 // four named acts, not the general thirds-based >75%-concentration test; completing the trio for
 // this categorical field alongside the pre-existing drought-run mode, peak conventionally
 // skipped).
+// Wave 812 additions (opens the seventeenth rotation cycle): DIALOGUE_STAKES_ZONE_CLUSTER
+// (distribution/timing × purpose === 'raise_stakes' × structural thirds — this purpose value has
+// only ever served as an isTrigger condition for an aftermath check
+// [RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID]; none of the three shared-library trio modes
+// has ever been applied to it as the primary distributional signal), DIALOGUE_STAKES_
+// DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — completing 2 of 3 slots for this
+// purpose value alongside the zone-cluster mode added in this same wave; peak mode
+// conventionally skipped for this categorical field), DIALOGUE_TURNING_POINT_ZONE_CLUSTER
+// (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose value
+// has only ever appeared combined with 'climax' inside a co-occurrence-decoupling check; it has
+// never been audited as its own standalone signal by any of the three shared-library trio modes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4771,6 +4782,74 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r798c.maxZoneCount / r798c.count) * 100)}% of the story's character-moment scenes cluster in the ${r798c.zoneNames[r798c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, dialogue has no room to voice the protagonist's inner life anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r798c.zoneNames[r798c.maxZoneIdx]} third as a character moment so dialogue keeps room to voice interior reflection more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 812: DIALOGUE_STAKES_ZONE_CLUSTER, DIALOGUE_STAKES_DROUGHT_RUN,
+  //              DIALOGUE_TURNING_POINT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // DIALOGUE_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has only ever served as an isTrigger condition for an aftermath check; none of the
+  // three shared-library trio modes has ever been applied to it as the primary distributional
+  // signal.
+  {
+    const r812a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r812a.fires) {
+      issues.push({
+        location: `${r812a.zoneNames[r812a.maxZoneIdx]} third — ${r812a.maxZoneCount} of ${r812a.count} stakes-raising scenes`,
+        rule: 'DIALOGUE_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r812a.maxZoneCount / r812a.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r812a.zoneNames[r812a.maxZoneIdx]} third. When every escalation lands in the same structural window, dialogue has no mounting pressure to voice anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r812a.zoneNames[r812a.maxZoneIdx]} third to raise stakes so dialogue keeps voicing mounting pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r812b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r812b.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising scene: ${r812b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r812b.longestRun} consecutive scenes with no stakes-raising purpose at all, even though ${r812b.presentCount} scenes elsewhere escalate. A long unbroken stretch with nothing raising the stakes leaves dialogue with no mounting pressure to voice for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r812b.longestRun}-scene stretch to raise stakes so dialogue keeps mounting pressure to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has only ever appeared combined with 'climax' inside a
+  // co-occurrence-decoupling check; it has never been audited as its own standalone signal by
+  // any of the three shared-library trio modes.
+  {
+    const r812c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r812c.fires) {
+      issues.push({
+        location: `${r812c.zoneNames[r812c.maxZoneIdx]} third — ${r812c.maxZoneCount} of ${r812c.count} turning-point scenes`,
+        rule: 'DIALOGUE_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r812c.maxZoneCount / r812c.count) * 100)}% of the story's turning-point scenes cluster in the ${r812c.zoneNames[r812c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, dialogue has no room to voice reaction to a pivot anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r812c.zoneNames[r812c.maxZoneIdx]} third as a turning point so dialogue keeps voicing reaction to redirections more evenly across the story.`,
       });
     }
   }
