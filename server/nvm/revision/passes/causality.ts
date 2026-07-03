@@ -227,6 +227,14 @@
 // signal), VISUAL_BEAT_PEAK_UNCAUSED (backward-cause × visualBeats-density peak × dramaticTurn/
 // revelation cause — the file's central "backward-cause" analytical lens applied to physical
 // staging for the first time).
+// Wave 629 additions (built on the shared checks library, audit M2.2): CAUSAL_HIGHLIGHT_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first
+// pairing of these two fields in this 111-rule pass, despite each being extensively paired with
+// other channels), VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath ×
+// visualBeats trigger → dialogueHighlights absence — first pairing of these two fields),
+// CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four structural
+// zones — Waves 601/615 applied this template to dialogueHighlights and visualBeats;
+// unresolvedClues itself has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3669,6 +3677,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The scene with the story's single densest physical staging (${r615c.peakMagnitude} visual beats, out of ${r615c.qualifyingCount} scenes with any staging at all) has no dramatic turn and no revelation in itself or in either of the 2 scenes before it. The moment the story invests most heavily in physical description and action arrives with no pivot or disclosure explaining why — the staging is dense but causally unmotivated.`,
         suggestedFix: `Add a dramatic turn or a revelation in the scene with the densest physical staging, or in one of the two scenes before it. The audience should understand why this particular moment earns its heavy physical attention, not just observe that it happens to be busy.`,
+      });
+    }
+  }
+
+  // ── Wave 629: CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED, VISUAL_BEAT_DIALOGUE_HIGHLIGHT_
+  //              AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE ───────────────────────
+
+  // CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 scenes carrying outstanding clue-debt. Zero overlap
+  // → fire. First pairing of these two fields in this 111-rule pass, despite each already being
+  // extensively paired with revelation, dramaticTurn, and other channels. A scene the story
+  // itself flags as verbally memorable never coincides with a scene where a mystery sits open —
+  // the audience's most quotable moments never land while a question is actively unresolved.
+  {
+    const r629a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r629a.fires) {
+      issues.push({
+        location: `${r629a.aCount} dialogue-highlight scene(s), ${r629a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r629a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r629a.bCount} scenes carrying outstanding clue-debt — the story's most memorable dialogue and its open mysteries run on separate tracks. A line worth remembering often lands hardest when a character is actively wrestling with an unresolved question, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one standout line of dialogue land in a scene that is also carrying open clue-debt — a character voicing suspicion or pressing on what hasn't been explained, giving the story's most memorable dialogue a causal tie to its live mysteries.`,
+      });
+    }
+  }
+
+  // VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × visualBeats trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying visually-staged scenes (visualBeats.length≥2, pos<n-2), ≥3 scenes anywhere with
+  // a dialogue highlight, a 2-scene lookahead window. Fires when every heavily staged scene's
+  // two-scene aftermath contains no highlighted dialogue, while such scenes do occur elsewhere.
+  // First pairing of visualBeats with dialogueHighlights in this pass — a scene dense with
+  // physical action should give way to a voiced reaction nearby, not pass in verbal silence.
+  {
+    const r629b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r629b.fires) {
+      issues.push({
+        location: `${r629b.triggerCount} visually-staged scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r629b.triggerCount} heavily staged scenes is followed by two scenes with no highlighted dialogue, even though ${r629b.aftermathCount} such scenes exist elsewhere in the script. Dense physical action often needs a voiced reaction nearby — a character naming what just happened or how it changed things — but that verbal follow-through consistently doesn't come.`,
+        suggestedFix: `After at least one heavily staged scene, let one of the following two scenes carry a line worth remembering — a character's verbal reaction to what was just physically shown, giving the staging a causal aftermath in speech.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Waves 601 and 615 applied this template to
+  // dialogueHighlights and visualBeats respectively; unresolvedClues itself has never been
+  // zone-audited in this file, despite being used extensively in co-occurrence and aftermath modes.
+  {
+    const r629c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r629c.fires) {
+      const emptyNames629c = r629c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName629c = FOUR_ZONE_NAMES[r629c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames629c} empty; ${bloatName629c} has ${r629c.counts[r629c.bloatZoneIdx]}/${r629c.totalCount} debt-carrying scenes`,
+        rule: 'CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r629c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName629c} contains ${r629c.counts[r629c.bloatZoneIdx]} of them (${Math.round((r629c.counts[r629c.bloatZoneIdx] / r629c.totalCount) * 100)}%) while ${emptyNames629c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's causal chain of open questions an uneven structural rhythm.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames629c} — so every structural quarter carries some causal pressure from an unanswered question.`,
       });
     }
   }

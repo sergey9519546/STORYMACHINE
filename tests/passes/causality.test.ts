@@ -1247,6 +1247,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 629 — causalityPass: causal highlight open thread decoupled, visual beat dialogue highlight aftermath void, causality open thread zone imbalance', async () => {
+    const runCA629 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no debt); debt at 4,5 (no highlight) → zero overlap → fires
+    it('CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when dialogue-highlight scenes and open-thread scenes never overlap', async () => {
+      const recs629a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs629a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs629a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs629a[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs629a[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runCA629(recs629a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and open debt → overlap exists
+    it('CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs629an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs629an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'], unresolvedClues: ['unpaid-clue'] });
+      recs629an[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs629an[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runCA629(recs629an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; staged triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no visually-staged scene is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs629b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs629b[0] = makeSharedRecord(0, { visualBeats: ['grabs the phone', 'checks the screen'] });
+      recs629b[1] = makeSharedRecord(1, { visualBeats: ['grabs the phone', 'checks the screen'] });
+      recs629b[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs629b[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs629b[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runCA629(recs629b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs629bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs629bn[0] = makeSharedRecord(0, { visualBeats: ['grabs the phone', 'checks the screen'] });
+      recs629bn[1] = makeSharedRecord(1, { visualBeats: ['grabs the phone', 'checks the screen'] });
+      recs629bn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs629bn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs629bn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs629bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runCA629(recs629bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VISUAL_BEAT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); debt at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty of open-thread scenes while another is bloated', async () => {
+      const recs629c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs629c[6] = makeSharedRecord(6, { unresolvedClues: ['a'] });
+      recs629c[7] = makeSharedRecord(7, { unresolvedClues: ['b'] });
+      recs629c[8] = makeSharedRecord(8, { unresolvedClues: ['c'] });
+      recs629c[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runCA629(recs629c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE'), 'CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE no-fire:
+    // one open-thread scene per zone (1,4,7,10) → no zone is empty
+    it('CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes are spread across all zones', async () => {
+      const recs629cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs629cn[1] = makeSharedRecord(1, { unresolvedClues: ['a'] });
+      recs629cn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs629cn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      recs629cn[10] = makeSharedRecord(10, { unresolvedClues: ['d'] });
+      const res = await runCA629(recs629cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE'), 'CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 615 — causalityPass: visual beat causality zone imbalance, open thread dramatic turn decoupled, visual beat peak uncaused', async () => {
     const runCA615 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
