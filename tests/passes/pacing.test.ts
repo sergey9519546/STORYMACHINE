@@ -934,6 +934,74 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 789 — pacingPass: pacing emotion zone cluster, pacing revelation zone cluster, pacing revelation drought run', async () => {
+    const runP789 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally charged scenes at 0,1,2 → 100% opening third
+    it('PACING_EMOTION_ZONE_CLUSTER fires when >75% of emotionally charged scenes cluster in one third', async () => {
+      const recs789a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runP789(recs789a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_EMOTION_ZONE_CLUSTER'), 'PACING_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_EMOTION_ZONE_CLUSTER does not fire when emotionally charged scenes spread across thirds', async () => {
+      const recs789an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runP789(recs789an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_EMOTION_ZONE_CLUSTER'), 'PACING_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('PACING_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs789b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runP789(recs789b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_REVELATION_ZONE_CLUSTER'), 'PACING_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs789bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runP789(recs789bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_REVELATION_ZONE_CLUSTER'), 'PACING_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs789c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runP789(recs789c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_REVELATION_DROUGHT_RUN'), 'PACING_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs789cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runP789(recs789cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_REVELATION_DROUGHT_RUN'), 'PACING_REVELATION_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 775 — pacingPass: pacing suspense zone cluster, pacing curiosity drought run, pacing staging zone cluster', async () => {
     const runP775 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

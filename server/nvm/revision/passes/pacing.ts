@@ -318,6 +318,15 @@
 // (distribution/timing × visualBeats presence × structural thirds — PACING_STAGING_PEAK_UNCAUSED
 // and PACING_STAGING_DROUGHT_RUN [Wave 761] completed the peak/drought half of the trio; the
 // zone-cluster mode has never been applied to it, completing the trio).
+// Wave 789 additions: PACING_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift !==
+// 'neutral' presence × structural thirds — the hand-rolled EMOTIONAL_FLATLINE_RUN [Wave 453]
+// already covers the run-based drought mode; the zone-cluster mode has never been applied to it,
+// completing the trio), PACING_REVELATION_ZONE_CLUSTER (distribution/timing × revelation ×
+// structural thirds — existing revelation checks are scene-length, aftermath, and fixed-
+// middle-zone-absence [REVELATION_MIDDLE_ZONE_ABSENT]; none of the three shared-library trio
+// modes has ever been applied to it), PACING_REVELATION_DROUGHT_RUN (run-based × revelation
+// absence — completing 2 of 3 slots for revelation alongside the zone-cluster mode added in this
+// same wave).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4447,6 +4456,71 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r775c.maxZoneCount / r775c.count) * 100)}% of the story's staging-heavy scenes cluster in the ${r775c.zoneNames[r775c.maxZoneIdx]} third. When every burst of visual staging lands in the same structural window, pacing has no visual texture anchoring it anywhere else across the story.`,
         suggestedFix: `Add staging detail to at least one scene outside the ${r775c.zoneNames[r775c.maxZoneIdx]} third so pacing keeps visual texture more evenly distributed across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 789: PACING_EMOTION_ZONE_CLUSTER, PACING_REVELATION_ZONE_CLUSTER,
+  //              PACING_REVELATION_DROUGHT_RUN ──────────────────────────────────────
+
+  // PACING_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // emotionally charged scenes, fires when more than 75% of those scenes cluster in a single
+  // third. The hand-rolled EMOTIONAL_FLATLINE_RUN already covers the run-based drought mode; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r789a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r789a.fires) {
+      issues.push({
+        location: `${r789a.zoneNames[r789a.maxZoneIdx]} third — ${r789a.maxZoneCount} of ${r789a.count} emotionally charged scenes`,
+        rule: 'PACING_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r789a.maxZoneCount / r789a.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r789a.zoneNames[r789a.maxZoneIdx]} third. When every emotional shift lands in the same structural window, pacing has no felt texture anchoring it anywhere else across the story.`,
+        suggestedFix: `Give at least one scene outside the ${r789a.zoneNames[r789a.maxZoneIdx]} third an emotional charge so pacing keeps felt texture more evenly distributed across the story.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Existing revelation checks are
+  // scene-length, aftermath, and fixed-middle-zone-absence; none of the three shared-library trio
+  // modes has ever been applied to it.
+  {
+    const r789b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r789b.fires) {
+      issues.push({
+        location: `${r789b.zoneNames[r789b.maxZoneIdx]} third — ${r789b.maxZoneCount} of ${r789b.count} revelation scenes`,
+        rule: 'PACING_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r789b.maxZoneCount / r789b.count) * 100)}% of the story's revelation scenes cluster in the ${r789b.zoneNames[r789b.maxZoneIdx]} third. When every disclosure lands in the same structural window, pacing has no fresh truth reshaping momentum anywhere else across the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r789b.zoneNames[r789b.maxZoneIdx]} third so pacing keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Completing 2 of 3 slots for
+  // revelation alongside the zone-cluster mode added in this same wave.
+  {
+    const r789c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r789c.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r789c.longestRun} consecutive scenes`,
+        rule: 'PACING_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r789c.longestRun} consecutive scenes with no revelation at all, even though ${r789c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves pacing with no fresh disclosure reshaping momentum for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r789c.longestRun}-scene stretch so pacing keeps being reshaped by new disclosures throughout that stretch.`,
       });
     }
   }
