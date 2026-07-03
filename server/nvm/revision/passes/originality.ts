@@ -213,10 +213,17 @@
 // SEED_TURN_DECOUPLED (co-occurrence/decoupling × seededClueIds × dramaticTurn — first use of
 // seededClueIds anywhere in this pass), CLOCK_DELTA_FLATLINE (average/aggregate × clockDelta
 // variety — first use of clockDelta anywhere in this pass).
+// Wave 634 additions (built on the shared checks library, audit M2.2): ORIGINALITY_HIGHLIGHT_
+// STAGING_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × visualBeats — first pairing
+// of these two fields in this 111-rule pass), ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID
+// (sequence/aftermath × heavy unresolvedClues debt trigger → dialogueHighlights absence — first
+// pairing of these two fields), ORIGINALITY_SEED_ZONE_IMBALANCE (underweight/bloat ×
+// seededClueIds × four structural zones — Wave 606/620 applied this template to visualBeats and
+// payoffSetupIds; seededClueIds itself has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
@@ -3908,6 +3915,82 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Vary how sharply the clock advances — let some scenes compress time only slightly while others compress it sharply, so the deadline's rhythm feels earned rather than metronomic.`,
         });
       }
+    }
+  }
+
+  // ── Wave 634: ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED, ORIGINALITY_OPEN_THREAD_HIGHLIGHT_
+  //              AFTERMATH_VOID, ORIGINALITY_SEED_ZONE_IMBALANCE ─────────────────────────────
+
+  // ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // visualBeats. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 visually-staged scenes (visualBeats.length≥2). Zero
+  // overlap → fire. First pairing of these two fields in this 111-rule pass. When the story's
+  // verbal high points and its most physically staged moments never share a scene, each register
+  // develops on a predictable, mutually exclusive schedule — the audience learns which scenes to
+  // expect a memorable line in and which to expect only staged action.
+  {
+    const r634a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r634a.fires) {
+      issues.push({
+        location: `${r634a.aCount} dialogue-highlight scene(s), ${r634a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r634a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r634a.bCount} scenes leaning heavily on physical staging — the story's verbal and physical high points run on entirely separate tracks. Once the audience notices the pattern, memorable dialogue reads as guaranteed to arrive in unstaged scenes and vice versa, each becoming easier to predict in isolation.`,
+        suggestedFix: `Let at least one heavily staged scene also carry a line worth remembering — pairing physical presence with verbal weight in the same beat so the two registers occasionally converge rather than always alternating predictably.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-
+  // clue-debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥3
+  // scenes anywhere with a dialogue highlight, a 2-scene lookahead window. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such scenes do
+  // occur elsewhere. First pairing of these two fields in this pass. A predictable pattern where
+  // accumulated mystery never earns a memorable line nearby is itself a learnable absence.
+  {
+    const r634b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r634b.fires) {
+      issues.push({
+        location: `${r634b.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r634b.triggerCount} instances) is followed by two full scenes with no highlighted dialogue, even though ${r634b.aftermathCount} such scenes occur elsewhere in the story. Once the audience notices the pattern, they learn that accumulated mystery never earns a memorable line nearby — a predictable, avoidable absence.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line worth remembering — voicing frustration at what's unresolved or pressing on the stakes of not knowing, breaking the learnable silence.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_ZONE_IMBALANCE — Underweight/bloat × seededClueIds × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seed scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero seeds while
+  // another holds ≥50% of the total. Waves 606 and 620 applied this template to visualBeats and
+  // payoffSetupIds respectively; seededClueIds itself has never been zone-audited in this file,
+  // despite already being used in a co-occurrence check (Wave 620's SEED_TURN_DECOUPLED). Clue-
+  // planting clustered entirely in one structural quarter is a learnable placement pattern.
+  {
+    const r634c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r634c.fires) {
+      const emptyNames634c = r634c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName634c = FOUR_ZONE_NAMES[r634c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames634c} empty; ${bloatName634c} has ${r634c.counts[r634c.bloatZoneIdx]}/${r634c.totalCount} seed scenes`,
+        rule: 'ORIGINALITY_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r634c.totalCount} clue-planting scenes are unevenly distributed across its four structural zones: ${bloatName634c} contains ${r634c.counts[r634c.bloatZoneIdx]} of them (${Math.round((r634c.counts[r634c.bloatZoneIdx] / r634c.totalCount) * 100)}%) while ${emptyNames634c} contains none. Foreshadowing bloats in one structural quarter and vanishes from another, giving the audience a learnable window for when new clues arrive rather than a genuinely unpredictable rhythm.`,
+        suggestedFix: `Redistribute clue-planting: move at least one seed from ${bloatName634c} into the empty zone(s) — ${emptyNames634c} — so foreshadowing can arrive unpredictably throughout the story rather than only in one learnable stretch.`,
+      });
     }
   }
 

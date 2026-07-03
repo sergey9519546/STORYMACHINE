@@ -1210,6 +1210,113 @@ He sits at his desk.
   });
 
 
+  describe('Wave 634 — originalityPass: originality highlight staging decoupled, originality open thread highlight aftermath void, originality seed zone imbalance', async () => {
+    // Same truncation pitfall as Waves 592/606/620 above — every fixture cycles
+    // purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated 'major'
+    // rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_634 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_634 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_634 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor634 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec634 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor634(idx),
+      emotionalShift: EMOTION_POOL_634[idx % EMOTION_POOL_634.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_634[idx % PURPOSE_POOL_634.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain634 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor634(i)}\n\n${SENTENCE_POOL_634[i % SENTENCE_POOL_634.length]}`).join('\n\n');
+    const runO634 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain634(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no staging); staged at 4,5 (no highlight) → zero overlap → fires
+    it('ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED fires when dialogue highlights and visually-staged scenes never overlap', async () => {
+      const recs634a = Array.from({ length: 6 }, (_, i) => makeRec634(i, {
+        dialogueHighlights: (i === 0 || i === 1) ? ['alice: believes X'] : [],
+        visualBeats: (i === 4 || i === 5) ? ['opens the drawer', 'reads the note'] : [],
+      }));
+      const res = await runO634(recs634a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED'), 'ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED should fire');
+    });
+
+    // ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and visual staging → overlap exists
+    it('ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs634an = Array.from({ length: 6 }, (_, i) => makeRec634(i, {
+        dialogueHighlights: (i === 0 || i === 1) ? ['alice: believes X'] : [],
+        visualBeats: (i === 0 || i === 5) ? ['opens the drawer', 'reads the note'] : [],
+      }));
+      const res = await runO634(recs634an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED'), 'ORIGINALITY_HIGHLIGHT_STAGING_DECOUPLED should not fire');
+    });
+
+    // ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // dialogue highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a dialogue highlight', async () => {
+      const recs634b = Array.from({ length: 8 }, (_, i) => makeRec634(i, {
+        unresolvedClues: (i === 0 || i === 1) ? ['c1', 'c2', 'c3'] : [],
+        dialogueHighlights: (i === 5 || i === 6 || i === 7) ? ['alice: believes X'] : [],
+      }));
+      const res = await runO634(recs634b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs634bn = Array.from({ length: 8 }, (_, i) => makeRec634(i, {
+        unresolvedClues: (i === 0 || i === 1) ? ['c1', 'c2', 'c3'] : [],
+        dialogueHighlights: (i === 3 || i === 5 || i === 6 || i === 7) ? ['alice: believes X'] : [],
+      }));
+      const res = await runO634(recs634bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    // ORIGINALITY_SEED_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); seeds at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('ORIGINALITY_SEED_ZONE_IMBALANCE fires when one zone is empty of seeds while another is bloated', async () => {
+      const recs634c = Array.from({ length: 12 }, (_, i) => makeRec634(i, {
+        seededClueIds: (i === 6 || i === 7 || i === 8 || i === 9) ? ['clue'] : [],
+      }));
+      const res = await runO634(recs634c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_ZONE_IMBALANCE'), 'ORIGINALITY_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    // ORIGINALITY_SEED_ZONE_IMBALANCE no-fire:
+    // one seed per zone (1,4,7,10) → no zone is empty
+    it('ORIGINALITY_SEED_ZONE_IMBALANCE does not fire when seeds are spread across all zones', async () => {
+      const recs634cn = Array.from({ length: 12 }, (_, i) => makeRec634(i, {
+        seededClueIds: (i === 1 || i === 4 || i === 7 || i === 10) ? ['clue'] : [],
+      }));
+      const res = await runO634(recs634cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_ZONE_IMBALANCE'), 'ORIGINALITY_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 620 — originalityPass: payoff placement zone imbalance, seed turn decoupled, clock delta flatline', async () => {
     // Same truncation pitfall as Wave 606 above (originalityPass caps issues to the top 8 by
     // severity) — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
