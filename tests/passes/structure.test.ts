@@ -1006,6 +1006,74 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 765 — structurePass: structure suspense zone cluster, structure curiosity zone cluster, structure curiosity peak uncaused', async () => {
+    const runST765 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspenseDelta>0 scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs765a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST765(recs765a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_ZONE_CLUSTER'), 'STRUCTURE_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs765an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST765(recs765an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_ZONE_CLUSTER'), 'STRUCTURE_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosityDelta>0 scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs765b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST765(recs765b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_ZONE_CLUSTER'), 'STRUCTURE_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs765bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST765(recs765bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_ZONE_CLUSTER'), 'STRUCTURE_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation/clockRaised at indices 0 or 1 (2-scene lookback).
+    it('STRUCTURE_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs765c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs765c[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs765c[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runST765(recs765c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED'), 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('STRUCTURE_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs765cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs765cn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs765cn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs765cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runST765(recs765cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED'), 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 751 — structurePass: structure clock delta zone cluster, structure turn drought run, structure stakes drought run', async () => {
     const runST751 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

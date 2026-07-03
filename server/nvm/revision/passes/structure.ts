@@ -292,6 +292,21 @@
 // applied to it), STRUCTURE_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence —
 // Wave 681 applied the zone-cluster mode to this signal; the drought-run mode has never been
 // applied to it).
+// Wave 765 additions: STRUCTURE_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0
+// presence × structural thirds — existing suspense checks in this pass are average/aggregate
+// [OPENING_SUSPENSE_FLATLINE], zone-imbalance [ACT2A/ACT2B_SUSPENSE_VOID], presence-run
+// [SUSPENSE_RUN], co-occurrence-at-the-peak [PEAK_SUSPENSE_EMOTIONAL_VACUUM,
+// PEAK_SUSPENSE_CURIOSITY_VOID], and a hand-rolled backward-cause check restricted to the climax
+// zone [CLIMAX_UNPREPARED]; the shared-library thirds-based >75%-cluster mode has never been
+// applied to suspenseDelta across the whole story), STRUCTURE_CURIOSITY_ZONE_CLUSTER
+// (distribution/timing × curiosityDelta>0 presence × structural thirds — existing curiosity
+// checks are average/aggregate, zone-scoped absence [ACT1/ACT2A/ACT2B_CURIOSITY_*], and
+// presence-run [CURIOSITY_RUN]; the shared-library zone-cluster mode has never been applied to
+// it), STRUCTURE_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityDelta-as-magnitude × 2-scene
+// lookback — the existing curiosity-peak checks [CURIOSITY_PEAK_EMOTIONAL_VOID,
+// PEAK_SUSPENSE_CURIOSITY_VOID] audit the co-occurring channel AT the peak scene itself; none
+// looks backward from the peak for a preparing cause, so the shared-library backward-cause mode
+// has never been applied to curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4188,6 +4203,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r751c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r751c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the story's structure flat without mounting pressure for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r751c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the structure under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 765: STRUCTURE_SUSPENSE_ZONE_CLUSTER, STRUCTURE_CURIOSITY_ZONE_CLUSTER,
+  //              STRUCTURE_CURIOSITY_PEAK_UNCAUSED ─────────────────────────────────────
+
+  // STRUCTURE_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Existing suspense
+  // checks in this pass are average/aggregate, zone-imbalance, presence-run, co-occurrence-at-the-
+  // peak, and a hand-rolled backward-cause check restricted to the climax zone; the shared-library
+  // thirds-based cluster mode has never been applied to suspenseDelta across the whole story.
+  {
+    const r765a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r765a.fires) {
+      issues.push({
+        location: `${r765a.zoneNames[r765a.maxZoneIdx]} third — ${r765a.maxZoneCount} of ${r765a.count} suspense-positive scenes`,
+        rule: 'STRUCTURE_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r765a.maxZoneCount / r765a.count) * 100)}% of the scenes where tension rises cluster in the ${r765a.zoneNames[r765a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the story's architecture has no rising pressure testing it anywhere else across the whole shape of the piece.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r765a.zoneNames[r765a.maxZoneIdx]} third so tension keeps pressurizing the structure more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // curiosity-positive scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Existing curiosity checks are average/aggregate, zone-scoped absence, and presence-run; the
+  // shared-library zone-cluster mode has never been applied to it.
+  {
+    const r765b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r765b.fires) {
+      issues.push({
+        location: `${r765b.zoneNames[r765b.maxZoneIdx]} third — ${r765b.maxZoneCount} of ${r765b.count} curiosity-positive scenes`,
+        rule: 'STRUCTURE_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r765b.maxZoneCount / r765b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r765b.zoneNames[r765b.maxZoneIdx]} third. When every question the story raises lands in the same structural window, the architecture has no fresh mystery pulling the audience through the rest of the piece.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r765b.zoneNames[r765b.maxZoneIdx]} third so questions keep pulling the audience through the structure more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn, revelation, or
+  // clock raise in the 2 scenes preceding it. The existing curiosity-peak checks
+  // (CURIOSITY_PEAK_EMOTIONAL_VOID, PEAK_SUSPENSE_CURIOSITY_VOID) audit the co-occurring channel
+  // AT the peak scene itself; none looks backward from the peak for a preparing cause, so the
+  // shared-library backward-cause mode has never been applied to curiosityDelta.
+  {
+    const r765c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.curiosityDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null || r.clockRaised === true,
+    });
+    if (r765c.fires) {
+      issues.push({
+        location: `scene ${r765c.peakIdx} (peak curiosityDelta ${r765c.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'STRUCTURE_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r765c.peakIdx}, curiosityDelta ${r765c.peakMagnitude}) arrives with no dramatic turn, revelation, or clock raise in the 2 scenes leading into it, even though ${r765c.qualifyingCount} scenes elsewhere do spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the structure hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn, revelation, or clock raise in one of the 2 scenes before scene ${r765c.peakIdx} so the structure earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }
