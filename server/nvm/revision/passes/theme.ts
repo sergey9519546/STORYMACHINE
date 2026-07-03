@@ -319,6 +319,18 @@
 // audits whether the peak scene ITSELF carries thematic resonance; this looks backward from the
 // peak for a structural cause, a wholly different analytical claim, so the shared-library
 // backward-cause mode has never been applied to curiosityDelta, completing the trio).
+// Wave 794 additions: THEME_REVELATION_ZONE_CLUSTER (distribution/timing × revelation ×
+// structural thirds — existing revelation checks in this pass are co-occurrence
+// [THEME_REVELATION_DECOUPLED], zone-scoped-and-scene-scoped absence [THEME_REVELATION_SILENT],
+// and aftermath [THEME_REVELATION_AFTERMATH_SILENT]; none of the three shared-library trio modes
+// has ever been applied to revelation as the primary signal), THEME_REVELATION_DROUGHT_RUN
+// (run-based × revelation absence — completing 2 of 3 slots for revelation alongside the
+// zone-cluster mode added in this same wave), THEME_NEGATIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift='negative' × structural thirds — existing negative-
+// emotion checks in this pass are decoupling [THEME_POSITIVE_EMOTION_DECOUPLED is the positive
+// mirror], aftermath [THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT], and average/aggregate
+// [THEME_RESONANCE_EMOTIONALLY_LOPSIDED]; the shared-library thirds-based cluster mode has never
+// been applied to emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4495,6 +4507,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single highest-curiosity scene (Scene ${r780c.peakIdx}, curiosityDelta ${r780c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r780c.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
         suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r780c.peakIdx} so the theme earns its peak curiosity instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // ── Wave 794: THEME_REVELATION_ZONE_CLUSTER, THEME_REVELATION_DROUGHT_RUN,
+  //              THEME_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // THEME_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when
+  // more than 75% of them fall in a single structural third. Existing revelation checks in this
+  // pass are co-occurrence (THEME_REVELATION_DECOUPLED), zone/scene-scoped absence
+  // (THEME_REVELATION_SILENT), and aftermath (THEME_REVELATION_AFTERMATH_SILENT); none of the
+  // shared-library trio modes has ever been applied to revelation as the primary signal.
+  {
+    const r794a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r794a.fires) {
+      issues.push({
+        location: `${r794a.zoneNames[r794a.maxZoneIdx]} third — ${r794a.maxZoneCount} of ${r794a.count} revelation scenes`,
+        rule: 'THEME_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r794a.maxZoneCount / r794a.count) * 100)}% of the story's revelation scenes cluster in the ${r794a.zoneNames[r794a.maxZoneIdx]} third. When every disclosure lands in the same structural window, the theme has no fresh truth reshaping it anywhere else across the story.`,
+        suggestedFix: `Move at least one revelation outside the ${r794a.zoneNames[r794a.maxZoneIdx]} third so the theme keeps being reframed by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Completes 2 of 3 trio slots for
+  // revelation alongside the zone-cluster mode added in this same wave.
+  {
+    const r794b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r794b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r794b.longestRun} consecutive scenes`,
+        rule: 'THEME_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r794b.longestRun} consecutive scenes with no revelation at all, even though ${r794b.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the theme with no fresh disclosure reshaping it for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r794b.longestRun}-scene stretch so the theme keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift='negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Existing negative-emotion checks in this pass are decoupling (the positive-mirror
+  // THEME_POSITIVE_EMOTION_DECOUPLED), aftermath (THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT), and
+  // average/aggregate (THEME_RESONANCE_EMOTIONALLY_LOPSIDED); the shared-library thirds-based
+  // cluster mode has never been applied to emotionalShift.
+  {
+    const r794c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r794c.fires) {
+      issues.push({
+        location: `${r794c.zoneNames[r794c.maxZoneIdx]} third — ${r794c.maxZoneCount} of ${r794c.count} negative-emotion scenes`,
+        rule: 'THEME_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r794c.maxZoneCount / r794c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r794c.zoneNames[r794c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the theme carries its emotional cost in only one part of the story instead of resonating through its full shape.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r794c.zoneNames[r794c.maxZoneIdx]} third so the theme's emotional cost resonates more evenly across the story.`,
       });
     }
   }

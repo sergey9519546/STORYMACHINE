@@ -931,6 +931,71 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 794 — themePass: theme revelation zone cluster, theme revelation drought run, theme negative emotion zone cluster', async () => {
+    const runT794 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('THEME_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs794a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runT794(recs794a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_ZONE_CLUSTER'), 'THEME_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs794an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runT794(recs794an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_ZONE_CLUSTER'), 'THEME_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs794b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runT794(recs794b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_DROUGHT_RUN'), 'THEME_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs794bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runT794(recs794bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_DROUGHT_RUN'), 'THEME_REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('THEME_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs794c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runT794(recs794c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'THEME_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs794cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runT794(recs794cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'THEME_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 780 — themePass: theme suspense drought run, theme curiosity drought run, theme curiosity peak uncaused', async () => {
     const runT780 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
