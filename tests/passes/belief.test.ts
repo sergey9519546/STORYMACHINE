@@ -1204,6 +1204,66 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 880 — beliefPass: belief climax zone imbalance, belief establish world zone imbalance, belief resolution zone imbalance', async () => {
+    const runBF880 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('BELIEF_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs880a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runBF880(recs880a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLIMAX_ZONE_IMBALANCE'), 'BELIEF_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs880an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runBF880(recs880an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLIMAX_ZONE_IMBALANCE'), 'BELIEF_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs880b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runBF880(recs880b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs880bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runBF880(recs880bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // BELIEF_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('BELIEF_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs880c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runBF880(recs880c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ZONE_IMBALANCE'), 'BELIEF_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs880cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runBF880(recs880cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ZONE_IMBALANCE'), 'BELIEF_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 866 — beliefPass: belief establish world drought run, belief climax drought run, belief resolution drought run', async () => {
     const runBF866 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

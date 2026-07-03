@@ -387,6 +387,17 @@
 // the zone-cluster mode added in Wave 852; distinct from the pre-existing BELIEF_RESOLUTION_
 // ABSENT, which audits witnessed-revelation timing rather than the purpose field; peak mode
 // conventionally skipped for this categorical field).
+//
+// Wave 880 additions: with climax, establish_world, and resolution now all trio-complete via
+// checkDroughtRun/checkZoneCluster, this wave applies the distinct 4-zone checkZoneImbalance
+// mode (act-based buckets, fires on an empty zone plus a >=50%-share bloat zone -- categorically
+// different from checkZoneCluster's 3-zone >75%-concentration test) to those same three purpose
+// values, which have never been audited by it: BELIEF_CLIMAX_ZONE_IMBALANCE (purpose ===
+// 'climax'), BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
+// BELIEF_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution' -- distinct from the pre-existing
+// BELIEF_RESOLUTION_ABSENT, which audits witnessed-revelation timing rather than this purpose
+// enum value). Only unresolvedClues, visualBeats, and character_moment had ever been audited by
+// this analytical mode before this wave.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4851,6 +4862,85 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r866c.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r866c.presentCount} scenes elsewhere are. A long unbroken stretch without any settling beat leaves the belief-tracking layer with no room to affirm convictions for an extended run.`,
         suggestedFix: `Purpose a scene within the ${r866c.longestRun}-scene stretch to resolve part of the story, so the belief-tracking layer keeps affirming convictions throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // ── Wave 880: BELIEF_CLIMAX_ZONE_IMBALANCE, BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              BELIEF_RESOLUTION_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // BELIEF_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing
+  // BELIEF_CLIMAX_ZONE_CLUSTER (3-zone >75%-concentration test) and BELIEF_CLIMAX_DROUGHT_RUN
+  // (run-based absence) — the first application of the 4-zone bloat+empty-zone mode to this
+  // purpose value.
+  {
+    const r880a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r880a.fires) {
+      const emptyNames880a = r880a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName880a = FOUR_ZONE_NAMES[r880a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames880a} empty; ${bloatName880a} has ${r880a.counts[r880a.bloatZoneIdx]}/${r880a.totalCount} climax-purposed scenes`,
+        rule: 'BELIEF_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r880a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName880a} contains ${r880a.counts[r880a.bloatZoneIdx]} of them (${Math.round((r880a.counts[r880a.bloatZoneIdx] / r880a.totalCount) * 100)}%) while ${emptyNames880a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the belief-tracking layer's biggest tests an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames880a} — so every structural quarter carries some capacity for the belief-tracking layer's biggest test, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from
+  // the existing BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER (3-zone >75%-concentration test) and
+  // BELIEF_ESTABLISH_WORLD_DROUGHT_RUN (run-based absence) — the first application of the
+  // 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r880b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r880b.fires) {
+      const emptyNames880b = r880b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName880b = FOUR_ZONE_NAMES[r880b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames880b} empty; ${bloatName880b} has ${r880b.counts[r880b.bloatZoneIdx]}/${r880b.totalCount} world-establishing scenes`,
+        rule: 'BELIEF_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r880b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName880b} contains ${r880b.counts[r880b.bloatZoneIdx]} of them (${Math.round((r880b.counts[r880b.bloatZoneIdx] / r880b.totalCount) * 100)}%) while ${emptyNames880b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the belief-tracking layer's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames880b} — so every structural quarter carries some fresh ground for the belief-tracking layer to build from, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from
+  // the pre-existing BELIEF_RESOLUTION_ABSENT (which audits witnessed-revelation timing rather
+  // than this purpose enum value) and from BELIEF_RESOLUTION_ZONE_CLUSTER/BELIEF_RESOLUTION_
+  // DROUGHT_RUN (3-zone concentration and run-based absence respectively) — the first
+  // application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r880c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r880c.fires) {
+      const emptyNames880c = r880c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName880c = FOUR_ZONE_NAMES[r880c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames880c} empty; ${bloatName880c} has ${r880c.counts[r880c.bloatZoneIdx]}/${r880c.totalCount} resolution-purposed scenes`,
+        rule: 'BELIEF_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r880c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName880c} contains ${r880c.counts[r880c.bloatZoneIdx]} of them (${Math.round((r880c.counts[r880c.bloatZoneIdx] / r880c.totalCount) * 100)}%) while ${emptyNames880c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the belief-tracking layer's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames880c} — so every structural quarter carries some capacity to affirm convictions, not only the quarter currently carrying most of them.`,
       });
     }
   }
