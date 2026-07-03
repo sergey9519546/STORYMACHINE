@@ -376,6 +376,15 @@
 // skipped for this categorical field), VOICE_COMPLICATE_ZONE_CLUSTER (distribution/timing x
 // purpose === 'complicate' x structural thirds -- this purpose value has never been referenced
 // anywhere in this file; a virgin field).
+//
+// Wave 893 additions: VOICE_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 879; peak mode conventionally skipped for this categorical field). Also, no
+// purpose value had ever been audited by the distinct 4-zone checkZoneImbalance mode in this
+// file (only revelation, visualBeats, relationshipShifts, and curiosityDelta had); this wave
+// applies it to two purpose values with complete 3-zone/run-based trios: VOICE_CLIMAX_
+// ZONE_IMBALANCE (purpose === 'climax') and VOICE_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose ===
+// 'establish_world').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5340,6 +5349,79 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r879c.maxZoneCount / r879c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r879c.zoneNames[r879c.maxZoneIdx]} third. When every complication lands in the same structural window, the story's voice stops reacting to fresh trouble anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r879c.zoneNames[r879c.maxZoneIdx]} third to complicate the story so the voice keeps reacting to fresh trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 893: VOICE_COMPLICATE_DROUGHT_RUN, VOICE_CLIMAX_ZONE_IMBALANCE,
+  //              VOICE_ESTABLISH_WORLD_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // VOICE_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 879 (peak mode conventionally skipped for this categorical field).
+  {
+    const r893a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r893a.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r893a.longestRun} consecutive scenes`,
+        rule: 'VOICE_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r893a.longestRun} consecutive scenes with no complicating purpose at all, even though ${r893a.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the story's voice with no fresh trouble to react to for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r893a.longestRun}-scene stretch to complicate the story so the voice keeps reacting to fresh trouble throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // VOICE_CLIMAX_ZONE_CLUSTER and run-based VOICE_CLIMAX_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r893b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r893b.fires) {
+      const emptyNames893b = r893b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName893b = FOUR_ZONE_NAMES[r893b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames893b} empty; ${bloatName893b} has ${r893b.counts[r893b.bloatZoneIdx]}/${r893b.totalCount} climax-purposed scenes`,
+        rule: 'VOICE_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r893b.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName893b} contains ${r893b.counts[r893b.bloatZoneIdx]} of them (${Math.round((r893b.counts[r893b.bloatZoneIdx] / r893b.totalCount) * 100)}%) while ${emptyNames893b} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the story's voice an uneven register-raising rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames893b} — so the voice raises its register more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone VOICE_ESTABLISH_WORLD_ZONE_CLUSTER and run-based VOICE_ESTABLISH_WORLD_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r893c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r893c.fires) {
+      const emptyNames893c = r893c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName893c = FOUR_ZONE_NAMES[r893c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames893c} empty; ${bloatName893c} has ${r893c.counts[r893c.bloatZoneIdx]}/${r893c.totalCount} world-establishing scenes`,
+        rule: 'VOICE_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r893c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName893c} contains ${r893c.counts[r893c.bloatZoneIdx]} of them (${Math.round((r893c.counts[r893c.bloatZoneIdx] / r893c.totalCount) * 100)}%) while ${emptyNames893c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the voice's ground to speak through an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames893c} — so the voice keeps fresh ground to speak through more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
