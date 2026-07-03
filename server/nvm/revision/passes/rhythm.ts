@@ -289,6 +289,18 @@
 // the drought-run mode has never been applied to it), RHYTHM_TURN_DROUGHT_RUN (run-based ×
 // dramaticTurn !== 'nothing' absence — Wave 666 applied the zone-cluster mode to this signal; the
 // drought-run mode has never been applied to it).
+// Wave 764 additions: RHYTHM_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 presence
+// × structural thirds — suspenseDelta has only ever anchored the average/aggregate flatline check
+// (SUSPENSE_SIGNAL_FLATLINE) in this pass; none of the three shared-library trio modes has ever
+// been applied to it), RHYTHM_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence —
+// curiosityDelta has only ever anchored the average/aggregate flatline check and served as the
+// secondary signal in a co-occurrence-decoupling check; none of the three shared-library trio
+// modes has ever been applied to it), RHYTHM_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude × 2-scene lookback — revelation has only ever served as a hasCause
+// predicate for other signals' peak-uncaused checks in this pass; none of the three shared-library
+// trio modes has ever been applied to revelation itself as the primary signal. hasCause here
+// deliberately references only dramaticTurn, never revelation, to avoid a circular/self-referential
+// audit).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3764,6 +3776,76 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r750c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r750c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the story's rhythm coasting without a structural pivot for an extended run.`,
         suggestedFix: `Introduce a dramatic turn somewhere within the ${r750c.longestRun}-scene stretch so the rhythm keeps a structural pivot to punctuate that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 764: RHYTHM_SUSPENSE_ZONE_CLUSTER, RHYTHM_CURIOSITY_DROUGHT_RUN,
+  //              RHYTHM_REVELATION_PEAK_UNCAUSED ──────────────────────────────────────
+
+  // RHYTHM_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. suspenseDelta has
+  // only ever anchored the average/aggregate flatline check in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r764a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r764a.fires) {
+      issues.push({
+        location: `${r764a.zoneNames[r764a.maxZoneIdx]} third — ${r764a.maxZoneCount} of ${r764a.count} suspense-positive scenes`,
+        rule: 'RHYTHM_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r764a.maxZoneCount / r764a.count) * 100)}% of the scenes where tension rises cluster in the ${r764a.zoneNames[r764a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the story's rhythm has no rising pulse testing it anywhere else in the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r764a.zoneNames[r764a.maxZoneIdx]} third so tension keeps punctuating the rhythm more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no curiosity rise reaches 6. curiosityDelta has only
+  // ever anchored the average/aggregate flatline check and served as the secondary signal in a
+  // co-occurrence-decoupling check in this pass; none of the three shared-library trio modes has
+  // ever been applied to it.
+  {
+    const r764b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r764b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r764b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r764b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r764b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the story's rhythm flat with no question driving it for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r764b.longestRun}-scene stretch so the rhythm keeps a live question punctuating that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude × 2-scene lookback.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation scenes, fires
+  // when the peak (earliest, on magnitude ties) revelation scene has no dramatic turn in the 2
+  // scenes preceding it. revelation has only ever served as a hasCause predicate for other
+  // signals' peak-uncaused checks in this pass; none of the three shared-library trio modes has
+  // ever been applied to revelation itself as the primary signal. hasCause deliberately references
+  // only dramaticTurn, never revelation, to avoid a circular/self-referential audit.
+  {
+    const r764c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r764c.fires) {
+      issues.push({
+        location: `scene ${r764c.peakIdx + 1} — the story's peak revelation scene`,
+        rule: 'RHYTHM_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r764c.peakIdx + 1} is the earliest of ${r764c.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the rhythm's momentum flat right before the reveal.`,
+        suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r764c.peakIdx + 1} so the rhythm builds momentum into the revelation instead of arriving flat.`,
       });
     }
   }

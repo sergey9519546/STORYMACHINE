@@ -1136,6 +1136,74 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 764 — rhythmPass: rhythm suspense zone cluster, rhythm curiosity drought run, rhythm revelation peak uncaused', async () => {
+    const runR764 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspenseDelta>0 scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs764a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR764(recs764a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_ZONE_CLUSTER'), 'RHYTHM_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs764an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR764(recs764an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_ZONE_CLUSTER'), 'RHYTHM_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs764b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR764(recs764b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_DROUGHT_RUN'), 'RHYTHM_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs764bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runR764(recs764bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_DROUGHT_RUN'), 'RHYTHM_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 (peak, earliest) and 5; no dramaticTurn at 0 or 1 (the 2 scenes
+    // before the peak at index 2).
+    it('RHYTHM_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs764c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs764c[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs764c[5] = makeSharedRecord(5, { revelation: 'second truth revealed' });
+      const res = await runR764(recs764c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PEAK_UNCAUSED'), 'RHYTHM_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('RHYTHM_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation', async () => {
+      const recs764cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs764cn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs764cn[5] = makeSharedRecord(5, { revelation: 'second truth revealed' });
+      recs764cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runR764(recs764cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PEAK_UNCAUSED'), 'RHYTHM_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 750 — rhythmPass: rhythm clock zone cluster, rhythm emotion drought run, rhythm turn drought run', async () => {
     const runR750 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
