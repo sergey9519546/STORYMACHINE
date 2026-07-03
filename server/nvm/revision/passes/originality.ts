@@ -445,6 +445,12 @@
 // 'character_moment'), ORIGINALITY_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes'), and
 // ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence signal with
 // a complete 3-zone/run trio).
+// Wave 942 additions: extending the checkZoneImbalance rollout to three more signals whose 3-zone/
+// run trios were long complete but had never been 4-zone-audited: ORIGINALITY_POSITIVE_EMOTION_ZONE_
+// IMBALANCE (emotionalShift === 'positive', the positive-valence mirror of Wave 928's negative one),
+// ORIGINALITY_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and ORIGINALITY_
+// PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field). Three distinct signal
+// classes (valence, delta, array), each keyed independently of authored purpose.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5694,6 +5700,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r928c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName928c} contains ${r928c.counts[r928c.bloatZoneIdx]} of them (${Math.round((r928c.counts[r928c.bloatZoneIdx] / r928c.totalCount) * 100)}%) while ${emptyNames928c} contains none — a predictable emotional shape the audience can learn to anticipate rather than downturns distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames928c} — so the story's emotional low points stay less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER and run-based ORIGINALITY_POSITIVE_EMOTION_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this valence signal,
+  // and the positive-valence mirror of the Wave 928 ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r942a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r942a.fires) {
+      const emptyNames942a = r942a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName942a = FOUR_ZONE_NAMES[r942a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames942a} empty; ${bloatName942a} has ${r942a.counts[r942a.bloatZoneIdx]}/${r942a.totalCount} positive-shift scenes`,
+        rule: 'ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r942a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName942a} contains ${r942a.counts[r942a.bloatZoneIdx]} of them (${Math.round((r942a.counts[r942a.bloatZoneIdx] / r942a.totalCount) * 100)}%) while ${emptyNames942a} contains none — a predictable emotional shape the audience can learn to anticipate rather than upturns distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute upturns: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames942a} — so the story's emotional high points stay less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_
+  // SUSPENSE_ZONE_CLUSTER and run-based ORIGINALITY_SUSPENSE_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than categorical purpose or emotional valence.
+  {
+    const r942b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r942b.fires) {
+      const emptyNames942b = r942b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName942b = FOUR_ZONE_NAMES[r942b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames942b} empty; ${bloatName942b} has ${r942b.counts[r942b.bloatZoneIdx]}/${r942b.totalCount} suspense-raising scenes`,
+        rule: 'ORIGINALITY_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r942b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName942b} contains ${r942b.counts[r942b.bloatZoneIdx]} of them (${Math.round((r942b.counts[r942b.bloatZoneIdx] / r942b.totalCount) * 100)}%) while ${emptyNames942b} contains none — a predictable tension shape the audience can learn to anticipate rather than suspense distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames942b} — so where tension spikes stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_
+  // PAYOFF_ZONE_CLUSTER and run-based ORIGINALITY_PAYOFF_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the payoff array-field signal in this pass, keying on setups-
+  // being-paid-off rather than purpose, valence, or delta magnitude.
+  {
+    const r942c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r942c.fires) {
+      const emptyNames942c = r942c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName942c = FOUR_ZONE_NAMES[r942c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames942c} empty; ${bloatName942c} has ${r942c.counts[r942c.bloatZoneIdx]}/${r942c.totalCount} payoff scenes`,
+        rule: 'ORIGINALITY_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r942c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName942c} contains ${r942c.counts[r942c.bloatZoneIdx]} of them (${Math.round((r942c.counts[r942c.bloatZoneIdx] / r942c.totalCount) * 100)}%) while ${emptyNames942c} contains none — a predictable resolution shape the audience can learn to anticipate rather than payoffs distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames942c} — so where planted threads land stays less predictable across the story's whole shape.`,
       });
     }
   }

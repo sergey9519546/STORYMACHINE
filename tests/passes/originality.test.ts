@@ -1210,6 +1210,86 @@ He sits at his desk.
   });
 
 
+  describe('Wave 942 — originalityPass: originality positive emotion zone imbalance, originality suspense zone imbalance, originality payoff zone imbalance', async () => {
+    // Same truncation pitfall as Waves 592/606/…/914/928 above — every fixture cycles purpose/
+    // emotion/slug/sentence per scene to avoid tripping unrelated 'major' rules that would crowd
+    // these 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // are non-purpose (positive shift / suspense delta / payoff array), so filler defaults
+    // (neutral emotion, suspenseDelta 0, empty payoffSetupIds) never contaminate them.
+    const EMOTION_POOL_942 = ['neutral', 'neutral', 'neutral'];
+    const PURPOSE_POOL_942 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_942 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor942 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec942 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor942(idx),
+      emotionalShift: EMOTION_POOL_942[idx % EMOTION_POOL_942.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_942[idx % PURPOSE_POOL_942.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain942 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor942(i)}\n\n${SENTENCE_POOL_942[i % SENTENCE_POOL_942.length]}`).join('\n\n');
+    const runO942 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain942(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs942a = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runO942(recs942a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs942an = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runO942(recs942an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'ORIGINALITY_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ORIGINALITY_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs942b = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 1, 2, 8, 9].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runO942(recs942b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_ZONE_IMBALANCE'), 'ORIGINALITY_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs942bn = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 3, 5, 8].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runO942(recs942bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_ZONE_IMBALANCE'), 'ORIGINALITY_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs942c = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 1, 2, 8, 9].includes(i) ? { payoffSetupIds: ['s1'] } : {}));
+      const res = await runO942(recs942c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_ZONE_IMBALANCE'), 'ORIGINALITY_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs942cn = Array.from({ length: 10 }, (_, i) => makeRec942(i, [0, 3, 5, 8].includes(i) ? { payoffSetupIds: ['s1'] } : {}));
+      const res = await runO942(recs942cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_ZONE_IMBALANCE'), 'ORIGINALITY_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 928 — originalityPass: originality character moment zone imbalance, originality stakes zone imbalance, originality negative emotion zone imbalance', async () => {
     // Same truncation pitfall as Waves 592/606/…/900/914 above — every fixture cycles
     // purpose/emotion/slug/sentence per scene to avoid tripping unrelated 'major' rules. PURPOSE_
