@@ -312,6 +312,17 @@
 // suspenseDelta-as-magnitude × 2-scene lookback — Waves 683/753 applied the zone-cluster and
 // run-based drought modes to suspenseDelta; the backward-cause peak mode has never been applied
 // to it, completing the trio).
+// Wave 795 additions: VOICE_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn !== 'nothing'
+// presence × structural thirds — Wave 781 applied the run-based drought mode to dramaticTurn; the
+// zone-cluster mode has never been applied to it, completing the trio for a categorical field
+// where the peak mode is conventionally skipped), VOICE_EMOTION_DROUGHT_RUN (run-based ×
+// emotionalShift !== 'neutral' absence — Wave 781 applied the zone-cluster mode to
+// emotionalShift; the drought-run mode has never been applied to it, completing the trio for a
+// categorical field where the peak mode is conventionally skipped), VOICE_REVELATION_ZONE_CLUSTER
+// (distribution/timing × revelation × structural thirds — the existing REVELATION_ZONE_IMBALANCE
+// uses checkZoneImbalance, a different shared-library helper testing deficit-vs-surplus across
+// zones, not the general thirds-based >75%-concentration test that checkZoneCluster performs;
+// none of the three trio modes has ever been applied to revelation as the primary signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4811,6 +4822,73 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single highest-suspense scene (Scene ${r781c.peakIdx}, suspenseDelta ${r781c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r781c.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — the story's voice has nothing building toward the peak to react against.`,
         suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r781c.peakIdx} so the story's voice has something building toward the peak to react against instead of springing without preparation.`,
+      });
+    }
+  }
+
+  // ── Wave 795: VOICE_TURN_ZONE_CLUSTER, VOICE_EMOTION_DROUGHT_RUN, VOICE_REVELATION_ZONE_CLUSTER ──
+
+  // VOICE_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 turn
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 781 applied
+  // the run-based drought mode to dramaticTurn; the zone-cluster mode has never been applied to
+  // it, completing the trio for this categorical field (peak mode conventionally skipped).
+  {
+    const r795a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r795a.fires) {
+      issues.push({
+        location: `${r795a.zoneNames[r795a.maxZoneIdx]} third — ${r795a.maxZoneCount} of ${r795a.count} turn scenes`,
+        rule: 'VOICE_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r795a.maxZoneCount / r795a.count) * 100)}% of the story's dramatic turns cluster in the ${r795a.zoneNames[r795a.maxZoneIdx]} third. When every pivot lands in the same structural window, the story's voice has nothing to react against anywhere else across the story.`,
+        suggestedFix: `Introduce a dramatic turn outside the ${r795a.zoneNames[r795a.maxZoneIdx]} third so the story's voice keeps reacting to pivots more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift !== 'neutral' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 emotionally charged scenes overall,
+  // fires when the longest consecutive run of emotionally neutral scenes reaches 6. Wave 781
+  // applied the zone-cluster mode to emotionalShift; the drought-run mode has never been applied
+  // to it, completing the trio for this categorical field (peak mode conventionally skipped).
+  {
+    const r795b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r795b.fires) {
+      issues.push({
+        location: `longest stretch with no emotional charge: ${r795b.longestRun} consecutive scenes`,
+        rule: 'VOICE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r795b.longestRun} consecutive emotionally neutral scenes, even though ${r795b.presentCount} scenes elsewhere register a felt shift. A long unbroken stretch with no emotional charge leaves the story's voice flat, with nothing to register against for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r795b.longestRun}-scene stretch a positive or negative emotional charge so the story's voice keeps registering felt experience throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when
+  // more than 75% of them fall in a single structural third. Distinct from the existing
+  // REVELATION_ZONE_IMBALANCE (Wave 599), which uses checkZoneImbalance — a different
+  // shared-library helper testing deficit-vs-surplus of revelation across the four named acts —
+  // not the general thirds-based >75%-concentration test that checkZoneCluster performs; none of
+  // the three trio modes has ever been applied to revelation as the primary signal.
+  {
+    const r795c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r795c.fires) {
+      issues.push({
+        location: `${r795c.zoneNames[r795c.maxZoneIdx]} third — ${r795c.maxZoneCount} of ${r795c.count} revelation scenes`,
+        rule: 'VOICE_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r795c.maxZoneCount / r795c.count) * 100)}% of the story's revelation scenes cluster in the ${r795c.zoneNames[r795c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the story's voice has no fresh truth to react to anywhere else across the story.`,
+        suggestedFix: `Move at least one revelation outside the ${r795c.zoneNames[r795c.maxZoneIdx]} third so the story's voice keeps reacting to new disclosures more evenly across the story.`,
       });
     }
   }
