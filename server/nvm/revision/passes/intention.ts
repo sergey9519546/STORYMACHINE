@@ -319,6 +319,14 @@
 // dramaticTurn !== 'nothing' absence — the existing TURNS_UNDRIVEN audits co-occurrence with
 // proactivity, not run-length absence; none of the three shared-library trio modes has ever been
 // applied to dramaticTurn as a primary signal).
+// Wave 787 additions: INTENTION_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave
+// 773 applied the zone-cluster mode to suspenseDelta; the run-based drought mode has never been
+// applied to it, completing 2 of 3 slots), INTENTION_CURIOSITY_ZONE_CLUSTER (distribution/timing
+// × curiosityDelta>0 presence × structural thirds — Wave 773 applied the run-based drought mode
+// to curiosityDelta; the zone-cluster mode has never been applied to it, completing 2 of 3
+// slots), INTENTION_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn !== 'nothing' presence
+// × structural thirds — Wave 773 applied the run-based drought mode to dramaticTurn; the
+// zone-cluster mode has never been applied to it, completing 2 of 3 slots).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4485,6 +4493,72 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r773c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r773c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the character's pursuit of their goal without a structural pivot to react to for an extended run.`,
         suggestedFix: `Introduce a dramatic turn somewhere within the ${r773c.longestRun}-scene stretch so the character's intention keeps a structural pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 787: INTENTION_SUSPENSE_DROUGHT_RUN, INTENTION_CURIOSITY_ZONE_CLUSTER,
+  //              INTENTION_TURN_ZONE_CLUSTER ──────────────────────────────────────
+
+  // INTENTION_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 suspense-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no rising tension reaches 6. Wave 773
+  // applied the zone-cluster mode to suspenseDelta; the run-based drought mode has never been
+  // applied to it, completing 2 of 3 slots.
+  {
+    const r787a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r787a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r787a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r787a.longestRun} consecutive scenes with no rise in suspense at all, even though ${r787a.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the character's pursuit of their goal without rising pressure for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r787a.longestRun}-scene stretch so the character's intention keeps facing rising pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // curiosity-positive scenes, fires when more than 75% of those scenes cluster in a single
+  // third. Wave 773 applied the run-based drought mode to curiosityDelta; the zone-cluster mode
+  // has never been applied to it, completing 2 of 3 slots.
+  {
+    const r787b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r787b.fires) {
+      issues.push({
+        location: `${r787b.zoneNames[r787b.maxZoneIdx]} third — ${r787b.maxZoneCount} of ${r787b.count} curiosity-positive scenes`,
+        rule: 'INTENTION_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r787b.maxZoneCount / r787b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r787b.zoneNames[r787b.maxZoneIdx]} third. When every spike in wonder lands in the same structural window, the character's pursuit of their goal loses a driving question everywhere else in the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r787b.zoneNames[r787b.maxZoneIdx]} third so the character's intention keeps a driving question more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 turn
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 773 applied
+  // the run-based drought mode to dramaticTurn; the zone-cluster mode has never been applied to
+  // it, completing 2 of 3 slots.
+  {
+    const r787c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r787c.fires) {
+      issues.push({
+        location: `${r787c.zoneNames[r787c.maxZoneIdx]} third — ${r787c.maxZoneCount} of ${r787c.count} turn scenes`,
+        rule: 'INTENTION_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r787c.maxZoneCount / r787c.count) * 100)}% of the story's dramatic turns cluster in the ${r787c.zoneNames[r787c.maxZoneIdx]} third. When every pivot lands in the same structural window, the character's pursuit of their goal loses a structural pivot to react to everywhere else in the story.`,
+        suggestedFix: `Introduce a dramatic turn in at least one scene outside the ${r787c.zoneNames[r787c.maxZoneIdx]} third so the character's intention keeps a pivot to react to more evenly across the story.`,
       });
     }
   }
