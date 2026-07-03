@@ -1365,6 +1365,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 650 — payoffPass: payoff staging peak uncaused, payoff highlight drought run, payoff open thread zone cluster', async () => {
+    const runPY650 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; staging at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('PAYOFF_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs650a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs650a[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs650a[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY650(recs650a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAGING_PEAK_UNCAUSED'), 'PAYOFF_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PAYOFF_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs650an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs650an[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs650an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs650an[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY650(recs650an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAGING_PEAK_UNCAUSED'), 'PAYOFF_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PAYOFF_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs650b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs650b[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs650b[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs650b[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs650b[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runPY650(recs650b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_DROUGHT_RUN'), 'PAYOFF_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PAYOFF_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs650bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs650bn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs650bn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs650bn[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runPY650(recs650bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_DROUGHT_RUN'), 'PAYOFF_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs650c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs650c[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs650c[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs650c[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      const res = await runPY650(recs650c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_ZONE_CLUSTER'), 'PAYOFF_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs650cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs650cn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs650cn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs650cn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      const res = await runPY650(recs650cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_ZONE_CLUSTER'), 'PAYOFF_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 636 — payoffPass: payoff highlight open thread decoupled, payoff turn highlight aftermath void, payoff dialogue highlight zone imbalance', async () => {
     const runPY636 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

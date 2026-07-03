@@ -223,10 +223,27 @@
 // dialogueHighlights × four structural zones — Waves 594/608/622 applied this template to
 // seededClueIds, visualBeats, and unresolvedClues; dialogueHighlights itself has never been
 // zone-audited here).
+// Wave 650 additions (built on the shared checks library, audit M2.2): this 113-rule pass already
+// hand-rolls the peak/drought/cluster analytical concepts extensively (five PEAK_*_DECOUPLED
+// checks on curiosity/suspense/relationship/clock across the payoff and clue-seed channels, two
+// drought-run checks on seed/payoff, two temporal-cluster checks on payoff/clue-seed) — but never
+// via the shared checkPeakUncaused/checkDroughtRun/checkZoneCluster helpers, and never on the
+// visualBeats/dialogueHighlights/unresolvedClues channels. PAYOFF_STAGING_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × visualBeats magnitude — the scene with the densest
+// physical staging has no dramatic turn or revelation in itself or the two scenes before it;
+// distinct from the existing PEAK_*_DECOUPLED family, which checks whether the peak scene itself
+// lacks a channel, not whether a physical-staging peak is backward-caused), PAYOFF_HIGHLIGHT_
+// DROUGHT_RUN (run-based × dialogueHighlights absence — a 6+ consecutive-scene stretch with no
+// highlighted dialogue while such scenes occur ≥3 times elsewhere; the drought-run template
+// applied to a third channel after seed and payoff), PAYOFF_OPEN_THREAD_ZONE_CLUSTER
+// (distribution/timing × unresolvedClues × structural thirds — >75% of open-thread scenes
+// concentrate in one third; the first checkZoneCluster use in this pass, distinct from the
+// hand-rolled PAYOFF_TEMPORAL_CLUSTER and CLUE_SEED_TEMPORAL_CLUSTER, which track different
+// channels entirely).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function payoffPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -3515,6 +3532,78 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r636c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName636c} contains ${r636c.counts[r636c.bloatZoneIdx]} of them (${Math.round((r636c.counts[r636c.bloatZoneIdx] / r636c.totalCount) * 100)}%) while ${emptyNames636c} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the story's verbal rhythm around its seed/payoff economy an uneven pulse.`,
         suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames636c}, so every structural quarter carries some verbal high point, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 650: PAYOFF_STAGING_PEAK_UNCAUSED, PAYOFF_HIGHLIGHT_DROUGHT_RUN,
+  //              PAYOFF_OPEN_THREAD_ZONE_CLUSTER ────────────────────────────────────────────
+
+  // PAYOFF_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // First checkPeakUncaused use in this pass via the shared library — distinct from the existing
+  // PEAK_*_DECOUPLED family (curiosity/suspense/relationship/clock), which each check whether the
+  // peak scene itself lacks a channel, not whether a physical-staging peak is backward-caused.
+  {
+    const r650a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r650a.fires) {
+      issues.push({
+        location: `scene ${r650a.peakIdx + 1} — peak physical-staging density (${r650a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r650a.peakIdx + 1}, with ${r650a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action and the payoff engine's sense of causal escalation never coincide.`,
+        suggestedFix: `Give scene ${r650a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6. This
+  // pass already hand-rolls drought-run logic for seed (SEED_DROUGHT_RUN) and payoff
+  // (PAYOFF_DROUGHT_RUN), but never via the shared helper and never on the dialogueHighlights
+  // channel — a long unbroken stretch with nothing verbally memorable leaves the payoff engine's
+  // most quotable resolutions with no verbal high point to punctuate them.
+  {
+    const r650b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r650b.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r650b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r650b.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r650b.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the payoff engine's resolutions landing on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r650b.longestRun}-scene stretch a standout line of dialogue — a character's reaction to a resolving thread voiced memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when >75% of them fall in a single structural third. First checkZoneCluster use in this pass
+  // — distinct from the hand-rolled PAYOFF_TEMPORAL_CLUSTER and CLUE_SEED_TEMPORAL_CLUSTER, which
+  // track the payoff and clue-seed channels rather than outstanding clue-debt.
+  {
+    const r650c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r650c.fires) {
+      const zoneName650c = r650c.zoneNames[r650c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName650c} third — ${r650c.maxZoneCount}/${r650c.count} open-thread scenes`,
+        rule: 'PAYOFF_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r650c.maxZoneCount} of the story's ${r650c.count} scenes carrying outstanding clue-debt (${Math.round((r650c.maxZoneCount / r650c.count) * 100)}%) cluster in the ${zoneName650c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery for the payoff engine to eventually resolve.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName650c} third — spreading open threads across the story gives every structural third some outstanding debt for a later payoff to satisfy.`,
       });
     }
   }
