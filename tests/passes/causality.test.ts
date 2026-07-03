@@ -1247,6 +1247,61 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 923 — causalityPass: causality revelation purpose zone cluster, causality revelation purpose drought run, causality negative emotion zone imbalance', async () => {
+    const runCA923 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs923a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA923(recs923a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER'), 'CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs923an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA923(recs923an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER'), 'CAUSALITY_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs923b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA923(recs923b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN'), 'CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs923bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA923(recs923bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN'), 'CAUSALITY_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7},
+    // Z3={8,9}; negative at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty. Filler 'neutral'.
+    it('CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs923c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runCA923(recs923c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs923cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runCA923(recs923cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 909 — causalityPass: causality introduce conflict zone imbalance, causality character moment zone imbalance, causality stakes zone imbalance', async () => {
     const runCA909 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
