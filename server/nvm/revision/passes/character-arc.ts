@@ -476,6 +476,12 @@
 // classes: ARC_RELATIONAL_ZONE_IMBALANCE (relationshipShifts array), ARC_TURN_ZONE_IMBALANCE
 // (dramaticTurn !== 'nothing' categorical), and ARC_REVELATION_ZONE_IMBALANCE (revelation string
 // field, != null — distinct from the purpose-enum ARC_REVELATION_PURPOSE_ZONE_IMBALANCE).
+// Wave 967 additions: with the underweight/bloat (zone-imbalance) mode now saturated for this pass,
+// this wave pivots to the sequence/aftermath mode via the shared checkAftermathVoid helper, adding
+// three trigger→aftermath pairings absent from the pass's existing ~13 aftermath rules: ARC_REVELATION_
+// EMOTIONAL_AFTERMATH_VOID (revelation → emotional), ARC_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes
+// → relational), and ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoff → emotional) — each a distinct
+// trigger/output pairing proving decoupling (trigger present, aftermath absent in a 2-scene window).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5461,6 +5467,84 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r953c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName953c} contains ${r953c.counts[r953c.bloatZoneIdx]} of them (${Math.round((r953c.counts[r953c.bloatZoneIdx] / r953c.totalCount) * 100)}%) while ${emptyNames953c} contains none. Disclosures bloat in one structural quarter and never land in another, so fresh truth reshapes the character's arc in only part of the story.`,
         suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames953c} — so new truth keeps reshaping the character's arc across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 967: with the underweight/bloat (zone-imbalance) mode now saturated for this pass, this
+  // wave pivots to the sequence/aftermath mode via the shared checkAftermathVoid helper, adding three
+  // trigger→aftermath pairings that do not exist anywhere in the pass's ~30 aftermath rules. Each
+  // fires only when the trigger signal genuinely occurs (≥2 triggers with a full 2-scene lookahead)
+  // AND the aftermath signal genuinely occurs somewhere (≥2), but NO trigger is followed by the
+  // aftermath within 2 scenes — proving decoupling, not mere absence. ──────────────────────────────
+
+  // ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID — revelation trigger × emotional aftermath. Every
+  // revelation is followed by two scenes with no emotional shift, even though the story does register
+  // feeling elsewhere. A discovery should stir something in its wake; when every revelation's
+  // aftermath is emotionally flat, the arc's truths are informational but never felt. Distinct from
+  // ARC_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 463: revelation → RELATIONAL aftermath) — this is
+  // the revelation trigger × EMOTIONAL channel, a distinct output pairing, and from ARC_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (turn trigger) and ARC_SEED_EMOTIONAL_AFTERMATH_VOID (seed trigger) — different triggers.
+  {
+    const r967a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => r.emotionalShift !== 'neutral',
+    });
+    if (r967a.fires) {
+      issues.push({
+        location: `${r967a.triggerCount} revelation aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation (${r967a.triggerCount} discoveries) is followed by two scenes in which the protagonist's emotional state does not shift, even though ${r967a.aftermathCount} scenes elsewhere do carry an emotional charge. A discovery should land: learning the truth about someone, or about themselves, should move the protagonist in the scenes that follow. When every revelation's aftermath is emotionally flat, the arc's truths are informationally significant but never felt — the protagonist learns things that never register.`,
+        suggestedFix: `Let at least one revelation move the protagonist emotionally in its aftermath: in the scene or two after a discovery, show the feeling it provokes — the sting of betrayal, the relief of confirmation, the dread of what it means. A revelation whose aftermath shifts the emotional register has weight beyond information; it changes how the protagonist feels, not just what they know.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_RELATIONAL_AFTERMATH_VOID — raise-stakes trigger × relational aftermath. Every stakes-
+  // raising scene is followed by two scenes with no relationship shift, even though bonds do move
+  // elsewhere. Raising the stakes usually strains or realigns who stands with whom; when the aftermath
+  // of every escalation leaves all bonds untouched, rising danger is impersonal — it threatens the
+  // plot but never the relationships. Distinct from ARC_NEGATIVE_RELATIONAL and ARC_POSITIVE_RELATIONAL
+  // AFTERMATH_VOID (emotion-valence triggers) and ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID (turn
+  // trigger) — this is the raise_stakes purpose trigger × RELATIONAL channel, a distinct pairing.
+  {
+    const r967b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r967b.fires) {
+      issues.push({
+        location: `${r967b.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ARC_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r967b.triggerCount} escalations) is followed by two scenes in which no relationship shifts, even though ${r967b.aftermathCount} scenes elsewhere do move a bond. Raising the stakes usually reshapes who stands with whom — new danger tests alliances, forces choices, exposes loyalties. When the aftermath of every escalation leaves all bonds untouched, rising danger is impersonal: it threatens the plot but never the protagonist's relationships.`,
+        suggestedFix: `Let at least one stakes-raise move a bond in its aftermath: in the scene or two after the danger sharpens, have the pressure realign a relationship — an ally who wavers, an enemy who becomes necessary, trust that fractures under the new weight. Stakes that reshape a relationship in their wake threaten the character personally, not just structurally.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID — payoff trigger × emotional aftermath. Every payoff scene is
+  // followed by two scenes with no emotional shift, even though feeling registers elsewhere. Cashing
+  // in a setup should carry an emotional charge into what follows — satisfaction, cost, relief; when
+  // every payoff's aftermath is emotionally flat, the arc's callbacks are mechanically satisfying but
+  // hollow. Distinct from ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoff → CURIOSITY aftermath) — this is
+  // the payoff trigger × EMOTIONAL channel, and from ARC_TURN/SEED_EMOTIONAL_AFTERMATH_VOID (different triggers).
+  {
+    const r967c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => r.emotionalShift !== 'neutral',
+    });
+    if (r967c.fires) {
+      issues.push({
+        location: `${r967c.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r967c.triggerCount} cashed-in setups) is followed by two scenes in which the protagonist's emotional state does not shift, even though ${r967c.aftermathCount} scenes elsewhere do carry an emotional charge. Paying off a planted setup should land emotionally in its wake — the satisfaction of a promise kept, the cost of a debt come due. When every payoff's aftermath is emotionally flat, the arc's callbacks are mechanically satisfying but hollow: the plot's threads close without the character feeling their closure.`,
+        suggestedFix: `Let at least one payoff move the protagonist emotionally in its aftermath: in the scene or two after a setup pays off, show what it costs or gives them — the ache of a victory that came too late, the release of a fear finally answered. A payoff whose aftermath shifts the emotional register earns its callback rather than merely completing it.`,
       });
     }
   }

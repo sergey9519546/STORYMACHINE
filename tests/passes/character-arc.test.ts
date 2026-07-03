@@ -1080,6 +1080,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 967 — characterArcPass: arc revelation emotional aftermath void, arc stakes relational aftermath void, arc payoff emotional aftermath void', async () => {
+    const makeRec967 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc967 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation has no emotional shift within 2 scenes', async () => {
+      const recs967a = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { revelation: 'a truth surfaces' } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runArc967(recs967a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within 2 scenes', async () => {
+      const recs967an = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { revelation: 'a truth surfaces' } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runArc967(recs967an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise has no relationship shift within 2 scenes', async () => {
+      const recs967b = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runArc967(recs967b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_RELATIONAL_AFTERMATH_VOID'), 'ARC_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within 2 scenes', async () => {
+      const recs967bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runArc967(recs967bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_RELATIONAL_AFTERMATH_VOID'), 'ARC_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID fires when every payoff has no emotional shift within 2 scenes', async () => {
+      const recs967c = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runArc967(recs967c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID does not fire when a payoff is followed by an emotional shift within 2 scenes', async () => {
+      const recs967cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec967(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runArc967(recs967cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 953 — characterArcPass: arc relational zone imbalance, arc turn zone imbalance, arc revelation zone imbalance', async () => {
     const makeRec953 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
