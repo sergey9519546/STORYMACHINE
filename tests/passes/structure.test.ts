@@ -1006,6 +1006,70 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 891 — structurePass: structure climax zone imbalance, structure establish world zone imbalance, structure resolution zone imbalance', async () => {
+    const runST891 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('STRUCTURE_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs891a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runST891(recs891a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLIMAX_ZONE_IMBALANCE'), 'STRUCTURE_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs891an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runST891(recs891an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLIMAX_ZONE_IMBALANCE'), 'STRUCTURE_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs891b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runST891(recs891b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs891bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runST891(recs891bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'STRUCTURE_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // STRUCTURE_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('STRUCTURE_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs891c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runST891(recs891c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_RESOLUTION_ZONE_IMBALANCE'), 'STRUCTURE_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs891cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runST891(recs891cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_RESOLUTION_ZONE_IMBALANCE'), 'STRUCTURE_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 877 — structurePass: structure resolution drought run, structure complicate zone cluster, structure complicate drought run', async () => {
     const runST877 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
