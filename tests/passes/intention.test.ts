@@ -1352,6 +1352,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 815 — intentionPass: intention character moment zone cluster, intention character moment drought run, intention turning point zone cluster', async () => {
+    const makeRec815 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN815 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs815a = Array.from({ length: 9 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runIN815(recs815a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER'), 'INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs815an = Array.from({ length: 9 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runIN815(recs815an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER'), 'INTENTION_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs815b = Array.from({ length: 10 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runIN815(recs815b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_CHARACTER_MOMENT_DROUGHT_RUN'), 'INTENTION_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs815bn = Array.from({ length: 10 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runIN815(recs815bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_CHARACTER_MOMENT_DROUGHT_RUN'), 'INTENTION_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('INTENTION_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs815c = Array.from({ length: 9 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'turning_point' } : {}
+      ));
+      const res = await runIN815(recs815c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_TURNING_POINT_ZONE_CLUSTER'), 'INTENTION_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('INTENTION_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs815cn = Array.from({ length: 9 }, (_, i) => makeRec815(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'turning_point' } : {}
+      ));
+      const res = await runIN815(recs815cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_TURNING_POINT_ZONE_CLUSTER'), 'INTENTION_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 801 — intentionPass: intention suspense peak uncaused, intention curiosity peak uncaused, intention positive emotion drought run', async () => {
     const makeRec801 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
