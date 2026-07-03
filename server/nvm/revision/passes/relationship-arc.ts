@@ -429,6 +429,11 @@
 // 'raise_stakes'), RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose
 // trio was completed in Wave 917), and RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift
 // === 'negative', a valence signal with a complete 3-zone/run trio).
+// Wave 945 additions: extending the checkZoneImbalance rollout to three more trio-complete signals
+// spanning three distinct signal classes: RELATIONAL_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift
+// === 'positive', the positive-valence mirror of Wave 931's negative one), RELATIONAL_CURIOSITY_ZONE_
+// IMBALANCE (curiosityDelta > 0 — question-raising delta magnitude), and RELATIONAL_PAYOFF_ZONE_
+// IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5434,6 +5439,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r931c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName931c} contains ${r931c.counts[r931c.bloatZoneIdx]} of them (${Math.round((r931c.counts[r931c.bloatZoneIdx] / r931c.totalCount) * 100)}%) while ${emptyNames931c} contains none. Downturns bloat in one structural quarter and vanish from another, so the relationship's strain lands on the pair in only part of the story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames931c} — so the relationship's strain is felt across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER and run-based RELATIONAL_POSITIVE_EMOTION_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this valence signal,
+  // and the positive-valence mirror of the Wave 931 RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r945a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r945a.fires) {
+      const emptyNames945a = r945a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName945a = FOUR_ZONE_NAMES[r945a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames945a} empty; ${bloatName945a} has ${r945a.counts[r945a.bloatZoneIdx]}/${r945a.totalCount} positive-shift scenes`,
+        rule: 'RELATIONAL_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r945a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName945a} contains ${r945a.counts[r945a.bloatZoneIdx]} of them (${Math.round((r945a.counts[r945a.bloatZoneIdx] / r945a.totalCount) * 100)}%) while ${emptyNames945a} contains none. Warm beats bloat in one structural quarter and vanish from another, so the relationship's gains land on the pair in only part of the story.`,
+        suggestedFix: `Redistribute warmth: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames945a} — so the relationship's gains are felt across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_
+  // CURIOSITY_ZONE_CLUSTER and run-based RELATIONAL_CURIOSITY_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on
+  // question-raising change rather than categorical purpose or emotional valence.
+  {
+    const r945b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r945b.fires) {
+      const emptyNames945b = r945b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName945b = FOUR_ZONE_NAMES[r945b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames945b} empty; ${bloatName945b} has ${r945b.counts[r945b.bloatZoneIdx]}/${r945b.totalCount} curiosity-raising scenes`,
+        rule: 'RELATIONAL_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r945b.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName945b} contains ${r945b.counts[r945b.bloatZoneIdx]} of them (${Math.round((r945b.counts[r945b.bloatZoneIdx] / r945b.totalCount) * 100)}%) while ${emptyNames945b} contains none. New questions bloat in one structural quarter and never open in another, so what the pair still has to learn about each other is confined to part of the story.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames945b} — so the relationship keeps opening new questions across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_
+  // PAYOFF_ZONE_CLUSTER and run-based RELATIONAL_PAYOFF_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the payoff array-field signal in this pass, keying on setups-
+  // being-paid-off rather than purpose, valence, or delta magnitude.
+  {
+    const r945c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r945c.fires) {
+      const emptyNames945c = r945c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName945c = FOUR_ZONE_NAMES[r945c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames945c} empty; ${bloatName945c} has ${r945c.counts[r945c.bloatZoneIdx]}/${r945c.totalCount} payoff scenes`,
+        rule: 'RELATIONAL_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r945c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName945c} contains ${r945c.counts[r945c.bloatZoneIdx]} of them (${Math.round((r945c.counts[r945c.bloatZoneIdx] / r945c.totalCount) * 100)}%) while ${emptyNames945c} contains none. Setups get paid off in a bloated cluster in one structural quarter and nowhere in another, so the relationship only closes prior threads in part of the story.`,
+        suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames945c} — so the relationship keeps resolving planted threads across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
