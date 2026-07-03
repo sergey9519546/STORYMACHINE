@@ -339,6 +339,18 @@
 // from all three — has never been applied to it), ARC_STAKES_DROUGHT_RUN (run-based × purpose ===
 // 'raise_stakes' absence — purpose has never anchored any of the three shared-library modes for
 // this specific value; the run-based drought mode has never been applied to it).
+// Wave 771 additions: ARC_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-magnitude ×
+// 2-scene lookback — ARC_SUSPENSE_DROUGHT_RUN and ARC_SUSPENSE_ZONE_CLUSTER completed the
+// drought/cluster half of the trio; the existing ARC_PEAK_SUSPENSE_EMOTION_ABSENT audits the
+// co-occurring emotion channel AT the peak scene, not a preparing cause in the scenes before it —
+// the backward-cause peak mode has never been applied to suspenseDelta itself), ARC_STAKES_ZONE_
+// CLUSTER (distribution/timing × purpose === 'raise_stakes' presence × structural thirds —
+// ARC_STAKES_DROUGHT_RUN [Wave 757] applied the run-based drought mode to this value; the
+// zone-cluster mode has never been applied to it), ARC_REVELATION_ZONE_CLUSTER (distribution/
+// timing × revelation × structural thirds — the existing ARC_REVELATION_LATE_CLUSTER audits a
+// fixed final-quarter window [>60% of revelations in the last 25%]; the general thirds-ratio
+// zone-cluster mode — a disjoint-third majority test at a lower 75% threshold with no fixed
+// zone — has never been applied to revelation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4328,6 +4340,76 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r757c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r757c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the character's arc coasting without mounting pressure for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r757c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the character's arc under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 771: ARC_SUSPENSE_PEAK_UNCAUSED, ARC_STAKES_ZONE_CLUSTER,
+  //              ARC_REVELATION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ARC_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene lookback.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-positive scenes,
+  // fires when the peak suspense scene has no dramatic turn or revelation in the 2 scenes
+  // preceding it. ARC_SUSPENSE_DROUGHT_RUN and ARC_SUSPENSE_ZONE_CLUSTER completed the
+  // drought/cluster half of the trio; the existing ARC_PEAK_SUSPENSE_EMOTION_ABSENT audits the
+  // co-occurring emotion channel AT the peak scene, not a preparing cause in the scenes before
+  // it — the backward-cause peak mode has never been applied to suspenseDelta itself.
+  {
+    const r771a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r771a.fires) {
+      issues.push({
+        location: `scene ${r771a.peakIdx} (peak suspenseDelta ${r771a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'ARC_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r771a.peakIdx}, suspenseDelta ${r771a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r771a.qualifyingCount} scenes elsewhere carry tension. The moment the character is most gripped lands out of nowhere — the arc hasn't built toward the pressure it's about to test them with.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r771a.peakIdx} so the character's arc builds toward the peak instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // stakes-raising scenes, fires when more than 75% of those scenes cluster in a single third.
+  // ARC_STAKES_DROUGHT_RUN applied the run-based drought mode to this value; the zone-cluster
+  // mode has never been applied to it.
+  {
+    const r771b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r771b.fires) {
+      issues.push({
+        location: `${r771b.zoneNames[r771b.maxZoneIdx]} third — ${r771b.maxZoneCount} of ${r771b.count} stakes-raising scenes`,
+        rule: 'ARC_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r771b.maxZoneCount / r771b.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r771b.zoneNames[r771b.maxZoneIdx]} third. When every escalation lands in the same structural window, the character's arc has no mounting pressure testing them anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r771b.zoneNames[r771b.maxZoneIdx]} third to raise stakes so the character's arc keeps mounting pressure testing them more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when more
+  // than 75% of those scenes cluster in a single third. The existing ARC_REVELATION_LATE_CLUSTER
+  // audits a fixed final-quarter window (>60% of revelations in the last 25%); the general
+  // thirds-ratio zone-cluster mode — a disjoint-third majority test at a lower 75% threshold with
+  // no fixed zone — has never been applied to revelation.
+  {
+    const r771c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r771c.fires) {
+      issues.push({
+        location: `${r771c.zoneNames[r771c.maxZoneIdx]} third — ${r771c.maxZoneCount} of ${r771c.count} revelation scenes`,
+        rule: 'ARC_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r771c.maxZoneCount / r771c.count) * 100)}% of the story's revelation scenes cluster in the ${r771c.zoneNames[r771c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the character's arc has no fresh truth reshaping them anywhere else in the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r771c.zoneNames[r771c.maxZoneIdx]} third so the character's arc keeps being reshaped by new disclosures more evenly across the story.`,
       });
     }
   }

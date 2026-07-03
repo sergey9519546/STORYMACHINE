@@ -1080,6 +1080,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 771 — characterArcPass: arc suspense peak uncaused, arc stakes zone cluster, arc revelation zone cluster', async () => {
+    const makeRec771 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc771 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('ARC_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs771a = Array.from({ length: 8 }, (_, i) => makeRec771(i));
+      recs771a[2] = makeRec771(2, { suspenseDelta: 3 });
+      recs771a[5] = makeRec771(5, { suspenseDelta: 3 });
+      const res = await runArc771(recs771a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_PEAK_UNCAUSED'), 'ARC_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('ARC_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs771an = Array.from({ length: 8 }, (_, i) => makeRec771(i));
+      recs771an[2] = makeRec771(2, { suspenseDelta: 3 });
+      recs771an[5] = makeRec771(5, { suspenseDelta: 3 });
+      recs771an[1] = makeRec771(1, { dramaticTurn: 'reversal' });
+      const res = await runArc771(recs771an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_PEAK_UNCAUSED'), 'ARC_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // ARC_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('ARC_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs771b = Array.from({ length: 9 }, (_, i) => makeRec771(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runArc771(recs771b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_ZONE_CLUSTER'), 'ARC_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes spread across thirds', async () => {
+      const recs771bn = Array.from({ length: 9 }, (_, i) => makeRec771(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runArc771(recs771bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_ZONE_CLUSTER'), 'ARC_STAKES_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('ARC_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs771c = Array.from({ length: 9 }, (_, i) => makeRec771(i,
+        (i === 0 || i === 1 || i === 2) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runArc771(recs771c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_ZONE_CLUSTER'), 'ARC_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs771cn = Array.from({ length: 9 }, (_, i) => makeRec771(i,
+        (i === 0 || i === 4 || i === 8) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runArc771(recs771cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_ZONE_CLUSTER'), 'ARC_REVELATION_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 757 — characterArcPass: arc suspense zone cluster, arc emotion zone cluster, arc stakes drought run', async () => {
     const makeRec757 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
