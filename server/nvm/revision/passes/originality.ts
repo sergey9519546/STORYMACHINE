@@ -300,6 +300,18 @@
 // isolation/backward-cause × unresolvedClues magnitude — Wave 676 applied the run-based drought
 // mode to unresolvedClues; the backward-cause peak mode has never been applied to it — an
 // uncaused spike in accumulated open-thread debt is itself a predictable pattern).
+// Wave 746 additions: ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER (distribution/timing ×
+// unresolvedClues × structural thirds — Waves 676/732 applied the run-based drought and
+// backward-cause peak modes to unresolvedClues; the zone-cluster mode has never been applied to
+// it, completing the trio — a predictable, front- or back-loaded distribution of open-thread
+// debt is itself a learnable pattern), ORIGINALITY_TURN_DROUGHT_RUN (run-based × dramaticTurn
+// !== 'nothing' absence — dramaticTurn has only ever anchored a co-occurrence/decoupling check
+// and served as a hasCause predicate elsewhere in this pass; the run-based drought mode has never
+// been applied to it as a primary signal — a long unbroken stretch with no dramatic turn at all
+// is itself a predictable pattern the audience can anticipate), ORIGINALITY_STAKES_ZONE_CLUSTER
+// (distribution/timing × purpose === 'raise_stakes' × structural thirds — purpose has never
+// anchored any of the three shared-library modes in this pass; a predictable, front- or
+// back-loaded distribution of stakes-raising scenes is itself a learnable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4565,6 +4577,78 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for outstanding clue-debt (scene ${r732c.peakIdx + 1}, with ${r732c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. An unmotivated spike in accumulated mystery is itself a learnable pattern — the audience senses the story's open-thread load rising and falling on its own schedule rather than in response to what happens.`,
         suggestedFix: `Give scene ${r732c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's peak of accumulated mystery is earned by an event rather than arriving as an arbitrary, learnable spike.`,
+      });
+    }
+  }
+
+  // ── Wave 746: ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER, ORIGINALITY_TURN_DROUGHT_RUN,
+  //              ORIGINALITY_STAKES_ZONE_CLUSTER ─────────────────────────────────────────
+
+  // ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 676/732
+  // applied the run-based drought and backward-cause peak modes to unresolvedClues; the
+  // zone-cluster mode has never been applied to it, completing the trio — a predictable, front-
+  // or back-loaded distribution of open-thread debt is itself a learnable pattern.
+  {
+    const r746a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r746a.fires) {
+      const zoneName746a = r746a.zoneNames[r746a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName746a} third — ${r746a.maxZoneCount}/${r746a.count} open-thread scenes`,
+        rule: 'ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r746a.maxZoneCount} of the story's ${r746a.count} open-thread scenes (${Math.round((r746a.maxZoneCount / r746a.count) * 100)}%) cluster in the ${zoneName746a} third. Outstanding clue-debt concentrates almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect unresolved mystery in rather than experiencing genuinely unpredictable tension.`,
+        suggestedFix: `Carry an open thread into at least one scene outside the ${zoneName746a} third — spreading unresolved clue-debt across the story keeps its timing genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn has only ever
+  // anchored a co-occurrence/decoupling check and served as a hasCause predicate elsewhere in
+  // this pass; the run-based drought mode has never been applied to it as a primary signal — a
+  // long unbroken stretch with no dramatic turn at all is itself a predictable pattern the
+  // audience can anticipate.
+  {
+    const r746b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r746b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r746b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r746b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r746b.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation is itself a learnable pattern — the audience can predict that no pivot will arrive for an extended stretch.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r746b.longestRun}-scene stretch so the audience can't predict a long, structurally inert lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // stakes-raising scenes, fires when more than 75% of those scenes cluster in a single third.
+  // purpose has never anchored any of the three shared-library modes in this pass; a
+  // predictable, front- or back-loaded distribution of stakes-raising scenes is itself a
+  // learnable pattern.
+  {
+    const r746c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r746c.fires) {
+      const zoneName746c = r746c.zoneNames[r746c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName746c} third — ${r746c.maxZoneCount}/${r746c.count} stakes-raising scenes`,
+        rule: 'ORIGINALITY_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r746c.maxZoneCount} of the story's ${r746c.count} scenes purposed to raise stakes (${Math.round((r746c.maxZoneCount / r746c.count) * 100)}%) cluster in the ${zoneName746c} third. Escalation concentrates almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect the stakes to rise in rather than experiencing genuinely unpredictable pressure.`,
+        suggestedFix: `Raise the stakes in at least one scene outside the ${zoneName746c} third — spreading escalation across the story keeps its timing genuinely unpredictable.`,
       });
     }
   }

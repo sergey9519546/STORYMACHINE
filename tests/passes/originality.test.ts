@@ -1210,6 +1210,106 @@ He sits at his desk.
   });
 
 
+  describe('Wave 746 — originalityPass: originality open thread zone cluster, originality turn drought run, originality stakes zone cluster', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732 above — every
+    // fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated
+    // 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_746 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_746 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_746 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor746 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec746 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor746(idx),
+      emotionalShift: EMOTION_POOL_746[idx % EMOTION_POOL_746.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_746[idx % PURPOSE_POOL_746.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain746 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor746(i)}\n\n${SENTENCE_POOL_746[i % SENTENCE_POOL_746.length]}`).join('\n\n');
+    const runO746 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain746(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs746a = Array.from({ length: 9 }, (_, i) => makeRec746(i, {
+        unresolvedClues: (i === 0 || i === 1 || i === 2) ? ['clue-a'] : [],
+      }));
+      const res = await runO746(recs746a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER'), 'ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs746an = Array.from({ length: 9 }, (_, i) => makeRec746(i, {
+        unresolvedClues: (i === 0 || i === 4 || i === 7) ? ['clue-a'] : [],
+      }));
+      const res = await runO746(recs746an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER'), 'ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_TURN_DROUGHT_RUN fire:
+    // 10 scenes; dramatic turns at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ORIGINALITY_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run is ≥6', async () => {
+      const recs746b = Array.from({ length: 10 }, (_, i) => makeRec746(i, {
+        dramaticTurn: (i === 0 || i === 1 || i === 2 || i === 9) ? 'reversal' : 'nothing',
+      }));
+      const res = await runO746(recs746b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURN_DROUGHT_RUN'), 'ORIGINALITY_TURN_DROUGHT_RUN should fire');
+    });
+
+    // ORIGINALITY_TURN_DROUGHT_RUN no-fire:
+    // dramatic turns at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ORIGINALITY_TURN_DROUGHT_RUN does not fire when dramatic turns are distributed without a long drought', async () => {
+      const recs746bn = Array.from({ length: 10 }, (_, i) => makeRec746(i, {
+        dramaticTurn: (i === 0 || i === 4 || i === 9) ? 'reversal' : 'nothing',
+      }));
+      const res = await runO746(recs746bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURN_DROUGHT_RUN'), 'ORIGINALITY_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs746c = Array.from({ length: 9 }, (_, i) => makeRec746(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'raise_stakes' : 'complicate',
+      }));
+      const res = await runO746(recs746c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_ZONE_CLUSTER'), 'ORIGINALITY_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    // ORIGINALITY_STAKES_ZONE_CLUSTER no-fire:
+    // stakes-raising scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ORIGINALITY_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes are distributed across thirds', async () => {
+      const recs746cn = Array.from({ length: 9 }, (_, i) => makeRec746(i, {
+        purpose: (i === 0 || i === 4 || i === 7) ? 'raise_stakes' : 'complicate',
+      }));
+      const res = await runO746(recs746cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_ZONE_CLUSTER'), 'ORIGINALITY_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 732 — originalityPass: originality relationship drought run, originality revelation zone cluster, originality open thread peak uncaused', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718 above — every
     // fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated
