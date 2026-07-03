@@ -931,6 +931,84 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 682 — themePass: theme clock delta peak uncaused, theme staging drought run, theme character moment zone cluster', async () => {
+    const runT682 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta at 2 (delta 1) and 6 (delta 5, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('THEME_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clock-delta scene has no dramatic turn or revelation nearby', async () => {
+      const recs682a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs682a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs682a[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runT682(recs682a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_PEAK_UNCAUSED'), 'THEME_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // revelation at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a revelation precedes the peak within the lookback', async () => {
+      const recs682an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs682an[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs682an[5] = makeSharedRecord(5, { revelation: 'the deadline was moved up' });
+      recs682an[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runT682(recs682an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_PEAK_UNCAUSED'), 'THEME_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // THEME_STAGING_DROUGHT_RUN fire:
+    // 10 scenes; visual beats at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('THEME_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run is ≥6', async () => {
+      const recs682b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs682b[0] = makeSharedRecord(0, { visualBeats: ['rain streaks the window'] });
+      recs682b[1] = makeSharedRecord(1, { visualBeats: ['a photo turned face-down'] });
+      recs682b[2] = makeSharedRecord(2, { visualBeats: ['the clock stopped at noon'] });
+      recs682b[9] = makeSharedRecord(9, { visualBeats: ['the door swings open'] });
+      const res = await runT682(recs682b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAGING_DROUGHT_RUN'), 'THEME_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // THEME_STAGING_DROUGHT_RUN no-fire:
+    // visual beats at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_STAGING_DROUGHT_RUN does not fire when visual beats are distributed without a long drought', async () => {
+      const recs682bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs682bn[0] = makeSharedRecord(0, { visualBeats: ['rain streaks the window'] });
+      recs682bn[4] = makeSharedRecord(4, { visualBeats: ['a photo turned face-down'] });
+      recs682bn[9] = makeSharedRecord(9, { visualBeats: ['the door swings open'] });
+      const res = await runT682(recs682bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAGING_DROUGHT_RUN'), 'THEME_STAGING_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character-moment scenes at 0,1,2 → 100% opening third
+    it('THEME_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs682c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs682c[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs682c[1] = makeSharedRecord(1, { purpose: 'character_moment' });
+      recs682c[2] = makeSharedRecord(2, { purpose: 'character_moment' });
+      const res = await runT682(recs682c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_ZONE_CLUSTER'), 'THEME_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_CHARACTER_MOMENT_ZONE_CLUSTER no-fire:
+    // character-moment scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes are distributed across thirds', async () => {
+      const recs682cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs682cn[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs682cn[4] = makeSharedRecord(4, { purpose: 'character_moment' });
+      recs682cn[7] = makeSharedRecord(7, { purpose: 'character_moment' });
+      const res = await runT682(recs682cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_ZONE_CLUSTER'), 'THEME_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 668 — themePass: theme relationship peak uncaused, theme payoff drought run, theme turn zone cluster', async () => {
     const runT668 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

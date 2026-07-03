@@ -247,6 +247,18 @@
 // CLUSTER (distribution/timing × dramaticTurn presence × structural thirds — Wave 640/654 applied
 // the zone-cluster mode to payoffSetupIds and seededClueIds; dramaticTurn itself has never been
 // cluster-audited despite being the most heavily used field in this pass).
+// Wave 682 additions: THEME_CLOCK_DELTA_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// clockDelta magnitude — the scene where the clock advances the most has no dramatic turn or
+// revelation in itself or the two scenes before it; distinct from the existing hand-rolled
+// THEME_CLOCK_PEAK_ABSENT [Wave 374], which checks whether the peak clock-raising scene lacks
+// thematic resonance, not whether it is backward-caused), THEME_STAGING_DROUGHT_RUN (run-based ×
+// visualBeats absence — Waves 612/640/654/668 already audit visualBeats via decoupling, four-zone
+// imbalance, aftermath-silence, and peak-uncaused, but never via drought-run; a long stretch with
+// no visual staging at all leaves the theme's imagery dormant), THEME_CHARACTER_MOMENT_ZONE_CLUSTER
+// (distribution/timing × purpose === 'character_moment' × structural thirds — the purpose field
+// has only ever been referenced incidentally [raise_stakes at line 1392] and never used as a
+// standalone signal here; character-defining scenes clustering in one third leave the theme's
+// human throughline unevenly weighted).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3884,6 +3896,75 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r668c.maxZoneCount} of the story's ${r668c.count} dramatic-turn scenes (${Math.round((r668c.maxZoneCount / r668c.count) * 100)}%) cluster in the ${zoneName668c} third. Structural pivots concentrate almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's argument an uneven structural rhythm.`,
         suggestedFix: `Give at least one scene outside the ${zoneName668c} third a dramatic turn — spreading structural pivots across the story lets the theme's argument develop gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 682: THEME_CLOCK_DELTA_PEAK_UNCAUSED, THEME_STAGING_DROUGHT_RUN,
+  //              THEME_CHARACTER_MOMENT_ZONE_CLUSTER ────────────────────────────────────────────
+
+  // THEME_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a nonzero clock
+  // delta, a 2-scene lookback. Finds the single scene where the clock advances the most; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Distinct from the existing hand-rolled THEME_CLOCK_PEAK_ABSENT (Wave 374), which checks whether
+  // the peak clock-raising scene lacks thematic resonance keywords, not whether it is backward-caused.
+  {
+    const r682a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.abs(r.clockDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r682a.fires) {
+      issues.push({
+        location: `scene ${r682a.peakIdx + 1} — peak clock delta (${r682a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single largest clock swing (scene ${r682a.peakIdx + 1}, delta magnitude ${r682a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where time pressure shifts most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the theme's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r682a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest clock swing is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // THEME_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 scenes carrying a visual beat overall, fires when the longest
+  // consecutive run of scenes with zero visual staging reaches 6. Waves 612/640/654/668 already
+  // audit visualBeats via decoupling, four-zone imbalance, aftermath-silence, and peak-uncaused;
+  // visualBeats itself has never been drought-audited here.
+  {
+    const r682b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r682b.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r682b.longestRun} consecutive scenes`,
+        rule: 'THEME_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r682b.longestRun} consecutive scenes with no visual beat at all, even though ${r682b.presentCount} scenes elsewhere stage the theme visually. A long unbroken stretch with nothing to look at leaves the theme's imagery dormant for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r682b.longestRun}-scene stretch a visual beat that stages the theme, keeping its imagery alive throughout.`,
+      });
+    }
+  }
+
+  // THEME_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // character-moment scenes, fires when >75% of them fall in a single structural third. The
+  // `purpose` field has only ever been referenced incidentally in this file (a raise_stakes filter
+  // at line 1392); this is the first standalone check on it here.
+  {
+    const r682c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r682c.fires) {
+      const zoneName682c = r682c.zoneNames[r682c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName682c} third — ${r682c.maxZoneCount}/${r682c.count} character-moment scenes`,
+        rule: 'THEME_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r682c.maxZoneCount} of the story's ${r682c.count} character-moment scenes (${Math.round((r682c.maxZoneCount / r682c.count) * 100)}%) cluster in the ${zoneName682c} third. Scenes purposed to deepen character concentrate almost exclusively in that stretch rather than surfacing throughout, giving the theme's human throughline an uneven structural rhythm.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName682c} third a character-moment purpose — spreading character-deepening beats across the story keeps the theme's human throughline present at every stage.`,
       });
     }
   }
