@@ -337,6 +337,16 @@
 // RHYTHM_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
 // completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
 // same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 834 additions: RHYTHM_STAKES_ZONE_CLUSTER (distribution/timing × purpose === 'raise_stakes'
+// × structural thirds — the existing STAKES_ZONE_IMBALANCE is an underweight/bloat four-zone
+// check on this purpose value; none of the three shared-library trio modes has ever been applied
+// to it), RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; a virgin field), RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/
+// timing × emotionalShift === 'positive' × structural thirds — mirrors the completed negative-
+// valence trio; the positive valence has never been isolated by any of the three shared-library
+// trio modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4149,6 +4159,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r820c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r820c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the story's rhythm without a pivot to react to for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r820c.longestRun}-scene stretch as a turning point so the rhythm keeps a pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 834: RHYTHM_STAKES_ZONE_CLUSTER, RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RHYTHM_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of them fall in a single structural third. The existing
+  // STAKES_ZONE_IMBALANCE is an underweight/bloat four-zone check on this purpose value; none of
+  // the three shared-library trio modes has ever been applied to it.
+  {
+    const r834a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r834a.fires) {
+      issues.push({
+        location: `${r834a.zoneNames[r834a.maxZoneIdx]} third — ${r834a.maxZoneCount} of ${r834a.count} stakes-raising scenes`,
+        rule: 'RHYTHM_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r834a.maxZoneCount / r834a.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r834a.zoneNames[r834a.maxZoneIdx]} third. When every escalation lands in the same structural window, the story's rhythm has no mounting pressure to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r834a.zoneNames[r834a.maxZoneIdx]} third to raise stakes so the rhythm keeps mounting pressure to react to more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r834b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r834b.fires) {
+      issues.push({
+        location: `${r834b.zoneNames[r834b.maxZoneIdx]} third — ${r834b.maxZoneCount} of ${r834b.count} conflict-introducing scenes`,
+        rule: 'RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r834b.maxZoneCount / r834b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r834b.zoneNames[r834b.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the story's rhythm has no fresh friction to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r834b.zoneNames[r834b.maxZoneIdx]} third to introduce conflict so the rhythm keeps facing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed negative-valence trio; the positive valence has never been isolated by
+  // any of the three shared-library trio modes in this pass.
+  {
+    const r834c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r834c.fires) {
+      issues.push({
+        location: `${r834c.zoneNames[r834c.maxZoneIdx]} third — ${r834c.maxZoneCount} of ${r834c.count} positive-emotion scenes`,
+        rule: 'RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r834c.maxZoneCount / r834c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r834c.zoneNames[r834c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the story's rhythm carries its emotional payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r834c.zoneNames[r834c.maxZoneIdx]} third so the rhythm delivers its emotional payoff more evenly across the story.`,
       });
     }
   }
