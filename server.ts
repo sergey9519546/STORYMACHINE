@@ -32,10 +32,28 @@ async function startServer() {
   }
 
   const app = express();
+  app.disable('x-powered-by'); // don't advertise the framework
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger());
   // Assign a trace ID to every request for correlation across logs.
   app.use((_req, res, next) => { res.locals.traceId = crypto.randomUUID(); next(); });
+
+  // ── Security headers ─────────────────────────────────────────────────────────
+  // Hand-set (no dependency) and applied to every response, including static
+  // assets. No Content-Security-Policy: Vite's dev-mode inline scripts and HMR
+  // would need a nonce/unsafe-inline policy that weakens it to noise — revisit
+  // if the app is ever served exclusively from a production build.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    // Ignored over plain HTTP per spec; effective if ever served via TLS/proxy.
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+    next();
+  });
 
   app.use(configRouter);
   app.use(gameRouter);

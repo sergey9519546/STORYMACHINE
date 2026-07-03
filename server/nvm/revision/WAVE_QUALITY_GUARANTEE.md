@@ -3,8 +3,13 @@
 **Scope:** the narrative-quality-check "wave" workflow that incrementally extends the
 revision passes in `server/nvm/revision/passes/` (and their tests in `test.ts`).
 
-**Status at last update:** through **Wave 392** — 14 passes, **818** distinct rule names,
-**2653** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+**Status at last update:** through **Wave 590** — 14 passes, **1307** distinct rule names,
+**3841** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+
+> This count drifts every wave. Rather than hand-updating it each time, verify the live
+> numbers with:
+> `grep -h "rule: '" server/nvm/revision/passes/*.ts | grep -oP "rule: '[A-Z_]+'" | sort -u | wc -l`
+> and the `# tests` / `# pass` lines from `node --experimental-strip-types test.ts`.
 
 ---
 
@@ -149,7 +154,7 @@ has met it; each future wave will.
 ## Why this constitutes "the best absolute version"
 
 - A check cannot be made **more distinct** than one verified non-duplicative against all
-  ~776 sibling rules (item 1).
+  ~1300 sibling rules (item 1) — see the note above for how to get the live count.
 - A check cannot be made **more correct on edge inputs** than one with explicit minimum-N
   and "signal-otherwise-present" guards (item 2).
 - A feature cannot be made **more capable** than one whose checks fill every supportable
