@@ -1136,6 +1136,85 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 750 — rhythmPass: rhythm clock zone cluster, rhythm emotion drought run, rhythm turn drought run', async () => {
+    const runR750 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_CLOCK_ZONE_CLUSTER fires when >75% of clockRaised scenes cluster in one third', async () => {
+      const recs750a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs750a[0] = makeSharedRecord(0, { clockRaised: true });
+      recs750a[1] = makeSharedRecord(1, { clockRaised: true });
+      recs750a[2] = makeSharedRecord(2, { clockRaised: true });
+      const res = await runR750(recs750a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_ZONE_CLUSTER'), 'RHYTHM_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // RHYTHM_CLOCK_ZONE_CLUSTER no-fire:
+    // clockRaised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RHYTHM_CLOCK_ZONE_CLUSTER does not fire when clockRaised scenes are distributed across thirds', async () => {
+      const recs750an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs750an[0] = makeSharedRecord(0, { clockRaised: true });
+      recs750an[4] = makeSharedRecord(4, { clockRaised: true });
+      recs750an[7] = makeSharedRecord(7, { clockRaised: true });
+      const res = await runR750(recs750an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_ZONE_CLUSTER'), 'RHYTHM_CLOCK_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_EMOTION_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a positive emotional shift (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('RHYTHM_EMOTION_DROUGHT_RUN fires when the longest no-positive-emotion run reaches 6', async () => {
+      const recs750b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs750b[0] = makeSharedRecord(0, { emotionalShift: 'positive' });
+      recs750b[1] = makeSharedRecord(1, { emotionalShift: 'positive' });
+      recs750b[2] = makeSharedRecord(2, { emotionalShift: 'positive' });
+      const res = await runR750(recs750b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_EMOTION_DROUGHT_RUN'), 'RHYTHM_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    // RHYTHM_EMOTION_DROUGHT_RUN no-fire:
+    // positive-emotion scenes spread out so no gap reaches 6 consecutive scenes
+    it('RHYTHM_EMOTION_DROUGHT_RUN does not fire when positive emotion is spread through the story', async () => {
+      const recs750bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs750bn[0] = makeSharedRecord(0, { emotionalShift: 'positive' });
+      recs750bn[3] = makeSharedRecord(3, { emotionalShift: 'positive' });
+      recs750bn[6] = makeSharedRecord(6, { emotionalShift: 'positive' });
+      recs750bn[9] = makeSharedRecord(9, { emotionalShift: 'positive' });
+      const res = await runR750(recs750bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_EMOTION_DROUGHT_RUN'), 'RHYTHM_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_TURN_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a dramatic turn (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('RHYTHM_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run reaches 6', async () => {
+      const recs750c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs750c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs750c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs750c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runR750(recs750c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_DROUGHT_RUN'), 'RHYTHM_TURN_DROUGHT_RUN should fire');
+    });
+
+    // RHYTHM_TURN_DROUGHT_RUN no-fire:
+    // dramatic-turn scenes spread out so no gap reaches 6 consecutive scenes
+    it('RHYTHM_TURN_DROUGHT_RUN does not fire when dramatic turns are spread through the story', async () => {
+      const recs750cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs750cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs750cn[3] = makeSharedRecord(3, { dramaticTurn: 'reversal' });
+      recs750cn[6] = makeSharedRecord(6, { dramaticTurn: 'reversal' });
+      recs750cn[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runR750(recs750cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_DROUGHT_RUN'), 'RHYTHM_TURN_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 736 — rhythmPass: rhythm clock delta drought run, rhythm staging zone cluster, rhythm open thread zone cluster', async () => {
     const runR736 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

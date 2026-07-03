@@ -282,6 +282,13 @@
 // unresolvedClues × structural thirds — Waves 680/722 applied the run-based drought and
 // backward-cause peak modes to unresolvedClues; the zone-cluster mode has never been applied to
 // it, completing the trio).
+// Wave 750 additions: RHYTHM_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaised === true ×
+// structural thirds — Wave 624 applied the run-based drought mode to clockRaised; the
+// zone-cluster mode has never been applied to it), RHYTHM_EMOTION_DROUGHT_RUN (run-based ×
+// emotionalShift === 'positive' absence — Wave 652 applied the zone-cluster mode to this signal;
+// the drought-run mode has never been applied to it), RHYTHM_TURN_DROUGHT_RUN (run-based ×
+// dramaticTurn !== 'nothing' absence — Wave 666 applied the zone-cluster mode to this signal; the
+// drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3694,6 +3701,69 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r736c.maxZoneCount / r736c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the ${r736c.zoneNames[r736c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the story's rhythm has no unresolved tension pressing on it anywhere else.`,
         suggestedFix: `Seed or carry forward at least one open thread outside the ${r736c.zoneNames[r736c.maxZoneIdx]} third so unresolved tension keeps varying the rhythm throughout the story.`,
+      });
+    }
+  }
+
+  // ── Wave 750: RHYTHM_CLOCK_ZONE_CLUSTER, RHYTHM_EMOTION_DROUGHT_RUN, RHYTHM_TURN_DROUGHT_RUN ──
+
+  // RHYTHM_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised === true × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clockRaised scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Wave 624 applied the run-based
+  // drought mode to clockRaised; the zone-cluster mode has never been applied to it.
+  {
+    const r750a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r750a.fires) {
+      issues.push({
+        location: `${r750a.zoneNames[r750a.maxZoneIdx]} third — ${r750a.maxZoneCount} of ${r750a.count} clockRaised scenes`,
+        rule: 'RHYTHM_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r750a.maxZoneCount / r750a.count) * 100)}% of the story's clockRaised scenes cluster in the ${r750a.zoneNames[r750a.maxZoneIdx]} third. When every ticking-clock beat lands in the same structural window, the story's rhythm loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Raise the clock in at least one scene outside the ${r750a.zoneNames[r750a.maxZoneIdx]} third so time pressure keeps varying the rhythm more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no positive emotional shift reaches 6.
+  // Wave 652 applied the zone-cluster mode to this signal; the drought-run mode has never been
+  // applied to it.
+  {
+    const r750b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r750b.fires) {
+      issues.push({
+        location: `longest stretch with no positive emotional shift: ${r750b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r750b.longestRun} consecutive scenes with no positive emotional shift at all, even though ${r750b.presentCount} scenes elsewhere do lift. A long unbroken stretch with nothing brightening the protagonist's mood leaves the story's rhythm running on unrelieved weight for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r750b.longestRun}-scene stretch a positive emotional beat so the rhythm gets a lift somewhere within that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. Wave 666 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r750c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r750c.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r750c.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r750c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r750c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the story's rhythm coasting without a structural pivot for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r750c.longestRun}-scene stretch so the rhythm keeps a structural pivot to punctuate that stretch.`,
       });
     }
   }
