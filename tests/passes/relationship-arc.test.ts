@@ -1376,6 +1376,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 637 — relationshipArcPass: relational highlight open thread decoupled, relational open thread staging aftermath void, relational open thread zone imbalance', async () => {
+    const runRA637 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no debt); debt at 4,5 (no highlight) → zero overlap → fires
+    it('RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when dialogue-highlight scenes and open-thread scenes never overlap', async () => {
+      const recs637a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs637a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs637a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs637a[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs637a[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runRA637(recs637a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and open debt → overlap exists
+    it('RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs637an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs637an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'], unresolvedClues: ['unpaid-clue'] });
+      recs637an[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs637an[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runRA637(recs637an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'RELATIONAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // visually dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a visually dense scene', async () => {
+      const recs637b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs637b[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs637b[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs637b[5] = makeSharedRecord(5, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      recs637b[6] = makeSharedRecord(6, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      recs637b[7] = makeSharedRecord(7, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      const res = await runRA637(recs637b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs637bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs637bn[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs637bn[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs637bn[3] = makeSharedRecord(3, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      recs637bn[5] = makeSharedRecord(5, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      recs637bn[6] = makeSharedRecord(6, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      recs637bn[7] = makeSharedRecord(7, { visualBeats: ['reaches for her hand', 'pulls back'] });
+      const res = await runRA637(recs637bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); debt at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty of open-thread scenes while another is bloated', async () => {
+      const recs637c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs637c[6] = makeSharedRecord(6, { unresolvedClues: ['a'] });
+      recs637c[7] = makeSharedRecord(7, { unresolvedClues: ['b'] });
+      recs637c[8] = makeSharedRecord(8, { unresolvedClues: ['c'] });
+      recs637c[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runRA637(recs637c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE'), 'RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE no-fire:
+    // one open-thread scene per zone (1,4,7,10) → no zone is empty
+    it('RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes are spread across all zones', async () => {
+      const recs637cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs637cn[1] = makeSharedRecord(1, { unresolvedClues: ['a'] });
+      recs637cn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs637cn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      recs637cn[10] = makeSharedRecord(10, { unresolvedClues: ['d'] });
+      const res = await runRA637(recs637cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE'), 'RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 623 — relationshipArcPass: relational payoff staging decoupled, relational seed staging aftermath void, relational dialogue highlight zone imbalance', async () => {
     const runRA623 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
