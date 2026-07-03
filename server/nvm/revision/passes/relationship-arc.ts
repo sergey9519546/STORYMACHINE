@@ -422,6 +422,13 @@
 // mode conventionally skipped for this categorical field), plus RELATIONAL_CHARACTER_MOMENT_ZONE_
 // IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
 // a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 931 additions: continuing the checkZoneImbalance rollout, this wave applies the 4-zone
+// bloat+empty-zone mode to three more signals that each already have a complete 3-zone/run-based
+// trio but had never been audited by it: RELATIONAL_STAKES_ZONE_IMBALANCE (purpose ===
+// 'raise_stakes'), RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose
+// trio was completed in Wave 917), and RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift
+// === 'negative', a valence signal with a complete 3-zone/run trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5352,6 +5359,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r917c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName917c} contains ${r917c.counts[r917c.bloatZoneIdx]} of them (${Math.round((r917c.counts[r917c.bloatZoneIdx] / r917c.totalCount) * 100)}%) while ${emptyNames917c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the relationship's intimate pauses an uneven structural rhythm.`,
         suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames917c} — so the relationship's intimate pauses land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 889. n≥10, ≥4 stakes-raising scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone RELATIONAL_STAKES_ZONE_CLUSTER and run-based
+  // RELATIONAL_STAKES_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r931a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r931a.fires) {
+      const emptyNames931a = r931a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName931a = FOUR_ZONE_NAMES[r931a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames931a} empty; ${bloatName931a} has ${r931a.counts[r931a.bloatZoneIdx]}/${r931a.totalCount} stakes-raising scenes`,
+        rule: 'RELATIONAL_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r931a.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName931a} contains ${r931a.counts[r931a.bloatZoneIdx]} of them (${Math.round((r931a.counts[r931a.bloatZoneIdx] / r931a.totalCount) * 100)}%) while ${emptyNames931a} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the relationship's tests of loyalty an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames931a} — so the relationship's loyalty is tested across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, closing the
+  // 4-zone gap for this purpose value (its 3-zone/run trio was completed in Wave 917). n≥10, ≥4
+  // revelation-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from RELATIONAL_
+  // REVELATION_PURPOSE_ZONE_CLUSTER/DROUGHT_RUN (Wave 917) and from the revelation-string-field
+  // rules — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r931b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r931b.fires) {
+      const emptyNames931b = r931b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName931b = FOUR_ZONE_NAMES[r931b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames931b} empty; ${bloatName931b} has ${r931b.counts[r931b.bloatZoneIdx]}/${r931b.totalCount} revelation-purposed scenes`,
+        rule: 'RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r931b.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName931b} contains ${r931b.counts[r931b.bloatZoneIdx]} of them (${Math.round((r931b.counts[r931b.bloatZoneIdx] / r931b.totalCount) * 100)}%) while ${emptyNames931b} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the relationship is reshaped by new truth in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames931b} — so the relationship keeps being reshaped by new truth across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r931c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r931c.fires) {
+      const emptyNames931c = r931c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName931c = FOUR_ZONE_NAMES[r931c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames931c} empty; ${bloatName931c} has ${r931c.counts[r931c.bloatZoneIdx]}/${r931c.totalCount} negative-shift scenes`,
+        rule: 'RELATIONAL_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r931c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName931c} contains ${r931c.counts[r931c.bloatZoneIdx]} of them (${Math.round((r931c.counts[r931c.bloatZoneIdx] / r931c.totalCount) * 100)}%) while ${emptyNames931c} contains none. Downturns bloat in one structural quarter and vanish from another, so the relationship's strain lands on the pair in only part of the story.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames931c} — so the relationship's strain is felt across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
