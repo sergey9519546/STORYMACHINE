@@ -1438,6 +1438,68 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 907 — voicePass: voice resolution zone imbalance, voice turning point zone imbalance, voice complicate zone imbalance', async () => {
+    const runV907 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Filler is 'establish_world' (not one of the tested purpose values).
+    it('VOICE_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs907a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runV907(recs907a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_ZONE_IMBALANCE'), 'VOICE_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs907an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runV907(recs907an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_ZONE_IMBALANCE'), 'VOICE_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs907b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runV907(recs907b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURNING_POINT_ZONE_IMBALANCE'), 'VOICE_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs907bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runV907(recs907bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURNING_POINT_ZONE_IMBALANCE'), 'VOICE_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs907c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runV907(recs907c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_COMPLICATE_ZONE_IMBALANCE'), 'VOICE_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs907cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runV907(recs907cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_COMPLICATE_ZONE_IMBALANCE'), 'VOICE_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 893 — voicePass: voice complicate drought run, voice climax zone imbalance, voice establish world zone imbalance', async () => {
     const runV893 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

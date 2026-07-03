@@ -385,6 +385,13 @@
 // applies it to two purpose values with complete 3-zone/run-based trios: VOICE_CLIMAX_
 // ZONE_IMBALANCE (purpose === 'climax') and VOICE_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose ===
 // 'establish_world').
+//
+// Wave 907 additions: continuing the checkZoneImbalance rollout begun in Wave 893, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: VOICE_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
+// VOICE_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'), and
+// VOICE_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5422,6 +5429,81 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r893c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName893c} contains ${r893c.counts[r893c.bloatZoneIdx]} of them (${Math.round((r893c.counts[r893c.bloatZoneIdx] / r893c.totalCount) * 100)}%) while ${emptyNames893c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the voice's ground to speak through an uneven structural rhythm.`,
         suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames893c} — so the voice keeps fresh ground to speak through more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 893. n≥10, ≥4 resolution-purposed scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone VOICE_RESOLUTION_ZONE_CLUSTER and run-based
+  // VOICE_RESOLUTION_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r907a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r907a.fires) {
+      const emptyNames907a = r907a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName907a = FOUR_ZONE_NAMES[r907a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames907a} empty; ${bloatName907a} has ${r907a.counts[r907a.bloatZoneIdx]}/${r907a.totalCount} resolution-purposed scenes`,
+        rule: 'VOICE_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r907a.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName907a} contains ${r907a.counts[r907a.bloatZoneIdx]} of them (${Math.round((r907a.counts[r907a.bloatZoneIdx] / r907a.totalCount) * 100)}%) while ${emptyNames907a} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the voice's tone of closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames907a} — so the voice modulates toward closure more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 893. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone VOICE_TURNING_POINT_ZONE_CLUSTER and run-based
+  // VOICE_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r907b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r907b.fires) {
+      const emptyNames907b = r907b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName907b = FOUR_ZONE_NAMES[r907b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames907b} empty; ${bloatName907b} has ${r907b.counts[r907b.bloatZoneIdx]}/${r907b.totalCount} turning-point scenes`,
+        rule: 'VOICE_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r907b.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName907b} contains ${r907b.counts[r907b.bloatZoneIdx]} of them (${Math.round((r907b.counts[r907b.bloatZoneIdx] / r907b.totalCount) * 100)}%) while ${emptyNames907b} contains none. Pivots bloat in one structural quarter and vanish from another, giving the voice's shifts of register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames907b} — so the voice shifts register more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 893. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone VOICE_COMPLICATE_ZONE_CLUSTER and run-based
+  // VOICE_COMPLICATE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r907c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r907c.fires) {
+      const emptyNames907c = r907c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName907c = FOUR_ZONE_NAMES[r907c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames907c} empty; ${bloatName907c} has ${r907c.counts[r907c.bloatZoneIdx]}/${r907c.totalCount} complicating scenes`,
+        rule: 'VOICE_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r907c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName907c} contains ${r907c.counts[r907c.bloatZoneIdx]} of them (${Math.round((r907c.counts[r907c.bloatZoneIdx] / r907c.totalCount) * 100)}%) while ${emptyNames907c} contains none. Complications bloat in one structural quarter and vanish from another, giving the voice's tension an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames907c} — so the voice sustains tension more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
