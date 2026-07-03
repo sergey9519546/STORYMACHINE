@@ -1438,6 +1438,71 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 865 — voicePass: voice establish world drought run, voice climax zone cluster, voice resolution zone cluster', async () => {
+    const runV865 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_ESTABLISH_WORLD_DROUGHT_RUN fire:
+    // n=10; establish_world at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_ESTABLISH_WORLD_DROUGHT_RUN fires when a long run has no world-establishing scene', async () => {
+      const recs865a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runV865(recs865a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_ESTABLISH_WORLD_DROUGHT_RUN'), 'VOICE_ESTABLISH_WORLD_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_ESTABLISH_WORLD_DROUGHT_RUN does not fire when world-establishing scenes are evenly spread', async () => {
+      const recs865an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runV865(recs865an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_ESTABLISH_WORLD_DROUGHT_RUN'), 'VOICE_ESTABLISH_WORLD_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('VOICE_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs865b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runV865(recs865b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLIMAX_ZONE_CLUSTER'), 'VOICE_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs865bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runV865(recs865bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLIMAX_ZONE_CLUSTER'), 'VOICE_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('VOICE_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs865c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runV865(recs865c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_ZONE_CLUSTER'), 'VOICE_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs865cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runV865(recs865cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_ZONE_CLUSTER'), 'VOICE_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 851 — voicePass: voice stakes drought run, voice positive emotion zone cluster, voice establish world zone cluster', async () => {
     const runV851 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

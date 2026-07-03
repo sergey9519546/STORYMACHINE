@@ -359,6 +359,14 @@
 // three shared-library trio modes in this file), VOICE_ESTABLISH_WORLD_ZONE_CLUSTER
 // (distribution/timing × purpose === 'establish_world' × structural thirds — this purpose value
 // has never been referenced anywhere in this file; a virgin field).
+//
+// Wave 865 additions: VOICE_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose ===
+// 'establish_world' absence -- completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 851; peak mode conventionally skipped for this categorical
+// field), VOICE_CLIMAX_ZONE_CLUSTER (distribution/timing x purpose === 'climax' x structural
+// thirds -- this purpose value has never been referenced anywhere in this file; a virgin
+// field), VOICE_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- likewise a virgin field, never referenced in this file before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5191,6 +5199,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r851c.maxZoneCount / r851c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r851c.zoneNames[r851c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the story's voice has no fresh ground to speak through anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r851c.zoneNames[r851c.maxZoneIdx]} third to establish the world so the story's voice keeps fresh ground to speak through more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 865: VOICE_ESTABLISH_WORLD_DROUGHT_RUN, VOICE_CLIMAX_ZONE_CLUSTER,
+  //              VOICE_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 851 (peak mode conventionally skipped for this categorical field).
+  {
+    const r865a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r865a.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r865a.longestRun} consecutive scenes`,
+        rule: 'VOICE_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r865a.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r865a.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the story's voice with no fresh ground to speak through for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r865a.longestRun}-scene stretch to establish the world, so the voice has fresh ground to speak through throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // VOICE_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed scenes,
+  // fires when more than 75% of them fall in a single structural third. This purpose value has
+  // never been referenced anywhere in this file — a virgin field for all three shared-library
+  // trio modes.
+  {
+    const r865b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r865b.fires) {
+      issues.push({
+        location: `${r865b.zoneNames[r865b.maxZoneIdx]} third — ${r865b.maxZoneCount} of ${r865b.count} climax-purposed scenes`,
+        rule: 'VOICE_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r865b.maxZoneCount / r865b.count) * 100)}% of the scenes purposed as the climax cluster in the ${r865b.zoneNames[r865b.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the story's voice raises its register in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r865b.zoneNames[r865b.maxZoneIdx]} third so the story's voice raises its register more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 resolution-
+  // purposed scenes, fires when more than 75% of them fall in a single structural third. This
+  // purpose value has never been referenced anywhere in this file — a virgin field for all
+  // three shared-library trio modes.
+  {
+    const r865c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r865c.fires) {
+      issues.push({
+        location: `${r865c.zoneNames[r865c.maxZoneIdx]} third — ${r865c.maxZoneCount} of ${r865c.count} resolution-purposed scenes`,
+        rule: 'VOICE_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r865c.maxZoneCount / r865c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r865c.zoneNames[r865c.maxZoneIdx]} third. When every settling beat concentrates in one structural window, the story's voice has no room to soften gradually before the ending absorbs it all at once.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r865c.zoneNames[r865c.maxZoneIdx]} third so the voice's wind-down is distributed across the story rather than concentrated in a single structural window.`,
       });
     }
   }
