@@ -934,6 +934,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 887 — pacingPass: pacing complicate drought run, pacing climax zone imbalance, pacing establish world zone imbalance', async () => {
+    const runP887 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs887a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runP887(recs887a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_COMPLICATE_DROUGHT_RUN'), 'PACING_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs887an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runP887(recs887an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_COMPLICATE_DROUGHT_RUN'), 'PACING_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('PACING_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs887b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runP887(recs887b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLIMAX_ZONE_IMBALANCE'), 'PACING_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs887bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runP887(recs887bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLIMAX_ZONE_IMBALANCE'), 'PACING_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // PACING_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('PACING_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs887c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runP887(recs887c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'PACING_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs887cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runP887(recs887cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'PACING_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 873 — pacingPass: pacing climax drought run, pacing resolution drought run, pacing complicate zone cluster', async () => {
     const runP873 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

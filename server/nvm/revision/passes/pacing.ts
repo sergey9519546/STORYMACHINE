@@ -384,6 +384,14 @@
 // categorical field), PACING_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose ===
 // 'complicate' x structural thirds -- this purpose value has never been referenced anywhere in
 // this pass; a virgin field).
+//
+// Wave 887 additions: PACING_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 873; peak mode conventionally skipped for this categorical field). Also, no
+// purpose value had ever been audited by the distinct 4-zone checkZoneImbalance mode in this
+// pass (only dialogueHighlights and unresolvedClues had); this wave applies it to two purpose
+// values with complete 3-zone/run-based trios: PACING_CLIMAX_ZONE_IMBALANCE (purpose ===
+// 'climax') and PACING_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4979,6 +4987,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r873c.maxZoneCount / r873c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r873c.zoneNames[r873c.maxZoneIdx]} third. When every complication lands in the same structural window, pacing stops deepening the trouble anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r873c.zoneNames[r873c.maxZoneIdx]} third to complicate the story so pacing keeps deepening the trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 887: PACING_COMPLICATE_DROUGHT_RUN, PACING_CLIMAX_ZONE_IMBALANCE,
+  //              PACING_ESTABLISH_WORLD_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // PACING_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 873 (peak mode conventionally skipped for this categorical field).
+  {
+    const r887a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r887a.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r887a.longestRun} consecutive scenes`,
+        rule: 'PACING_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r887a.longestRun} consecutive scenes with no complicating purpose at all, even though ${r887a.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves pacing stalled for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r887a.longestRun}-scene stretch to complicate the story so pacing keeps deepening its trouble throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // PACING_CLIMAX_ZONE_CLUSTER and run-based PACING_CLIMAX_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r887b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r887b.fires) {
+      const emptyNames887b = r887b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName887b = FOUR_ZONE_NAMES[r887b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames887b} empty; ${bloatName887b} has ${r887b.counts[r887b.bloatZoneIdx]}/${r887b.totalCount} climax-purposed scenes`,
+        rule: 'PACING_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r887b.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName887b} contains ${r887b.counts[r887b.bloatZoneIdx]} of them (${Math.round((r887b.counts[r887b.bloatZoneIdx] / r887b.totalCount) * 100)}%) while ${emptyNames887b} contains none. Peak moments bloat in one structural quarter and vanish from another, giving pacing's biggest payoff an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames887b} — so pacing's payoff builds more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone PACING_ESTABLISH_WORLD_ZONE_CLUSTER and run-based PACING_ESTABLISH_WORLD_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r887c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r887c.fires) {
+      const emptyNames887c = r887c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName887c = FOUR_ZONE_NAMES[r887c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames887c} empty; ${bloatName887c} has ${r887c.counts[r887c.bloatZoneIdx]}/${r887c.totalCount} world-establishing scenes`,
+        rule: 'PACING_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r887c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName887c} contains ${r887c.counts[r887c.bloatZoneIdx]} of them (${Math.round((r887c.counts[r887c.bloatZoneIdx] / r887c.totalCount) * 100)}%) while ${emptyNames887c} contains none. World-building bloats in one structural quarter and vanishes from another, giving pacing's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames887c} — so pacing keeps fresh ground to build from more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
