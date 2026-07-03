@@ -308,6 +308,16 @@
 // zone-cluster mode has never been applied to it), RHYTHM_REVELATION_DROUGHT_RUN (run-based ×
 // revelation absence — Wave 764 applied the backward-cause peak mode to revelation; the
 // run-based drought mode has never been applied to it).
+// Wave 792 additions: RHYTHM_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-magnitude
+// × 2-scene lookback — completes the trio for suspenseDelta alongside the zone-cluster mode
+// (Wave 764) and the run-based drought mode (Wave 778); the backward-cause peak mode has never
+// been applied to it), RHYTHM_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityDelta-as-
+// magnitude × 2-scene lookback — completes the trio for curiosityDelta alongside the run-based
+// drought mode (Wave 764) and the zone-cluster mode (Wave 778); the backward-cause peak mode has
+// never been applied to it), RHYTHM_REVELATION_ZONE_CLUSTER (distribution/timing × revelation ×
+// structural thirds — completes the trio for revelation alongside the backward-cause peak mode
+// (Wave 764) and the run-based drought mode (Wave 778); the zone-cluster mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3917,6 +3927,76 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r778c.longestRun} consecutive scenes with no revelation at all, even though ${r778c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the story's rhythm without a disclosure to punctuate it for an extended run.`,
         suggestedFix: `Let a truth surface somewhere within the ${r778c.longestRun}-scene stretch so the rhythm keeps a disclosure punctuating that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 792: RHYTHM_SUSPENSE_PEAK_UNCAUSED, RHYTHM_CURIOSITY_PEAK_UNCAUSED,
+  //              RHYTHM_REVELATION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RHYTHM_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for suspenseDelta alongside the zone-cluster mode
+  // (Wave 764) and the run-based drought mode (Wave 778) — the backward-cause peak mode has never
+  // been applied to it.
+  {
+    const r792a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r792a.fires) {
+      issues.push({
+        location: `scene ${r792a.peakIdx} (peak suspenseDelta ${r792a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'RHYTHM_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r792a.peakIdx}, suspenseDelta ${r792a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792a.qualifyingCount} scenes elsewhere carry tension. The story's rhythm hits its sharpest spike without any build punctuating the approach to it.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792a.peakIdx} so the rhythm's peak tension reads as built toward rather than arbitrary.`,
+      });
+    }
+  }
+
+  // RHYTHM_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for curiosityDelta alongside the run-based drought
+  // mode (Wave 764) and the zone-cluster mode (Wave 778) — the backward-cause peak mode has never
+  // been applied to it.
+  {
+    const r792b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r792b.fires) {
+      issues.push({
+        location: `scene ${r792b.peakIdx} (peak curiosityDelta ${r792b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'RHYTHM_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r792b.peakIdx}, curiosityDelta ${r792b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r792b.qualifyingCount} scenes elsewhere provoke wonder. The story's rhythm hits its sharpest question without any build punctuating the approach to it.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r792b.peakIdx} so the rhythm's peak curiosity reads as built toward rather than arbitrary.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when
+  // more than 75% of them fall in a single structural third. Completes the trio for revelation
+  // alongside the backward-cause peak mode (Wave 764) and the run-based drought mode (Wave 778) —
+  // the zone-cluster mode has never been applied to it.
+  {
+    const r792c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r792c.fires) {
+      issues.push({
+        location: `${r792c.zoneNames[r792c.maxZoneIdx]} third — ${r792c.maxZoneCount} of ${r792c.count} revelation scenes`,
+        rule: 'RHYTHM_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r792c.maxZoneCount / r792c.count) * 100)}% of the story's revelation scenes cluster in the ${r792c.zoneNames[r792c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the story's rhythm goes silent on new information for the rest of the story.`,
+        suggestedFix: `Move at least one revelation outside the ${r792c.zoneNames[r792c.maxZoneIdx]} third so the rhythm keeps punctuating the story with fresh disclosures more evenly.`,
       });
     }
   }

@@ -1136,6 +1136,75 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 792 — rhythmPass: rhythm suspense peak uncaused, rhythm curiosity peak uncaused, rhythm revelation zone cluster', async () => {
+    const runR792 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('RHYTHM_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs792a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs792a[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs792a[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      const res = await runR792(recs792a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_PEAK_UNCAUSED'), 'RHYTHM_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('RHYTHM_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs792an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs792an[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs792an[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      recs792an[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runR792(recs792an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_PEAK_UNCAUSED'), 'RHYTHM_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // RHYTHM_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('RHYTHM_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs792b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs792b[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs792b[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runR792(recs792b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_PEAK_UNCAUSED'), 'RHYTHM_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('RHYTHM_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs792bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs792bn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs792bn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs792bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runR792(recs792bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_PEAK_UNCAUSED'), 'RHYTHM_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // RHYTHM_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs792c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runR792(recs792c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_ZONE_CLUSTER'), 'RHYTHM_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs792cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runR792(recs792cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_ZONE_CLUSTER'), 'RHYTHM_REVELATION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 778 — rhythmPass: rhythm suspense drought run, rhythm curiosity zone cluster, rhythm revelation drought run', async () => {
     const runR778 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
