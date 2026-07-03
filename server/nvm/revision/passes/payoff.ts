@@ -270,6 +270,14 @@
 // (distribution/timing × purpose === 'raise_stakes' × structural thirds — `purpose` has only ever
 // been used to tally counts inside unrelated aggregate checks [Waves 594a/594b]; never the
 // standalone subject of its own check).
+// Wave 706 additions (built on the shared checks library): PAYOFF_STAGING_DROUGHT_RUN (run-based
+// × visualBeats absence — Waves 650/664 applied the backward-cause peak and zone-cluster modes to
+// visualBeats; the drought-run mode has never been applied to it, completing the trio),
+// PAYOFF_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural thirds —
+// Wave 650 applied the drought-run mode to dialogueHighlights; the zone-cluster mode has never
+// been applied to it), PAYOFF_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// unresolvedClues magnitude — Wave 650 applied the zone-cluster mode to unresolvedClues; the
+// backward-cause peak mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3844,6 +3852,74 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r692c.maxZoneCount} of the story's ${r692c.count} scenes purposed to raise stakes (${Math.round((r692c.maxZoneCount / r692c.count) * 100)}%) cluster in the ${zoneName692c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure feeding the payoff engine.`,
         suggestedFix: `Purpose at least one scene outside the ${zoneName692c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of pressure toward eventual resolution.`,
+      });
+    }
+  }
+
+  // ── Wave 706: PAYOFF_STAGING_DROUGHT_RUN, PAYOFF_HIGHLIGHT_ZONE_CLUSTER,
+  //              PAYOFF_OPEN_THREAD_PEAK_UNCAUSED ──────────────────────────────────────────────
+
+  // PAYOFF_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero visual beats reaches 6. Waves 650/664 applied the
+  // backward-cause peak and zone-cluster modes to visualBeats; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r706a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r706a.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r706a.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r706a.longestRun} consecutive scenes with no visual staging beats at all, even though ${r706a.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the payoff engine without any embodied resolution to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r706a.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the payoff engine stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // PAYOFF_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue scenes,
+  // fires when >75% of them fall in a single structural third. Wave 650 applied the drought-run
+  // mode to dialogueHighlights; the zone-cluster mode has never been applied to it.
+  {
+    const r706b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r706b.fires) {
+      const zoneName706b = r706b.zoneNames[r706b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName706b} third — ${r706b.maxZoneCount}/${r706b.count} highlighted-dialogue scenes`,
+        rule: 'PAYOFF_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r706b.maxZoneCount} of the story's ${r706b.count} scenes carrying a standout line of dialogue (${Math.round((r706b.maxZoneCount / r706b.count) * 100)}%) cluster in the ${zoneName706b} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to punctuate their resolutions.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName706b} third a standout line of dialogue — spreading memorable dialogue across the story lets each structural third carry its own verbal high point.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 650 applied the zone-cluster mode to unresolvedClues; the
+  // backward-cause peak mode has never been applied to it.
+  {
+    const r706c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r706c.fires) {
+      issues.push({
+        location: `scene ${r706c.peakIdx + 1} — peak open-thread density (${r706c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r706c.peakIdx + 1}, with ${r706c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r706c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
       });
     }
   }
