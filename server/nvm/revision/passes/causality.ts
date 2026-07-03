@@ -470,6 +470,12 @@
 // CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — matching the field's existing cluster/drought
 // predicate), CAUSALITY_PAYOFF_ZONE_IMBALANCE (payoffSetupIds — effects), and CAUSALITY_SEED_ZONE_
 // IMBALANCE (seededClueIds — causes); payoff and seed key on genuinely different arrays.
+// Wave 965 additions (closes the twenty-seventh rotation cycle, 952-965): auditing the three remaining
+// trio-complete signals in this pass, spanning three distinct classes: CAUSALITY_REVELATION_ZONE_
+// IMBALANCE (revelation != null — the revelation string field, distinct from the purpose-enum
+// CAUSALITY_REVELATION_PURPOSE one), CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array,
+// distinct from the payoff/seed arrays audited in Wave 951), and CAUSALITY_TURN_ZONE_IMBALANCE
+// (dramaticTurn !== 'nothing' categorical).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5596,6 +5602,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r951c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName951c} contains ${r951c.counts[r951c.bloatZoneIdx]} of them (${Math.round((r951c.counts[r951c.bloatZoneIdx] / r951c.totalCount) * 100)}%) while ${emptyNames951c} contains none. Planted causes bloat in one structural quarter and never get seeded in another, so the causal chain lays its groundwork in only part of the story.`,
         suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames951c} — so the causal chain seeds its causes across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone CAUSALITY_REVELATION_
+  // ZONE_CLUSTER and run-based CAUSALITY_REVELATION_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the revelation STRING field (revelation != null), and distinct from
+  // CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation' enum.
+  {
+    const r965a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r965a.fires) {
+      const emptyNames965a = r965a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName965a = FOUR_ZONE_NAMES[r965a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames965a} empty; ${bloatName965a} has ${r965a.counts[r965a.bloatZoneIdx]}/${r965a.totalCount} revelation scenes`,
+        rule: 'CAUSALITY_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r965a.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName965a} contains ${r965a.counts[r965a.bloatZoneIdx]} of them (${Math.round((r965a.counts[r965a.bloatZoneIdx] / r965a.totalCount) * 100)}%) while ${emptyNames965a} contains none. Disclosures bloat in one structural quarter and never land in another, so the new information that redirects the causal chain surfaces in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames965a} — so new information keeps redirecting the causal chain across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // CAUSALITY_RELATIONSHIP_ZONE_CLUSTER and run-based CAUSALITY_RELATIONSHIP_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the relationshipShifts array field, distinct
+  // from the payoffSetupIds and seededClueIds arrays audited in Wave 951.
+  {
+    const r965b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r965b.fires) {
+      const emptyNames965b = r965b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName965b = FOUR_ZONE_NAMES[r965b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames965b} empty; ${bloatName965b} has ${r965b.counts[r965b.bloatZoneIdx]}/${r965b.totalCount} relationship-shift scenes`,
+        rule: 'CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r965b.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName965b} contains ${r965b.counts[r965b.bloatZoneIdx]} of them (${Math.round((r965b.counts[r965b.bloatZoneIdx] / r965b.totalCount) * 100)}%) while ${emptyNames965b} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the relational consequences that drive the causal chain concentrate in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames965b} — a relationship shift so relational cause-and-effect runs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone CAUSALITY_TURN_ZONE_CLUSTER and run-based CAUSALITY_TURN_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical
+  // signal, closing the twenty-seventh rotation cycle (952-965).
+  {
+    const r965c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r965c.fires) {
+      const emptyNames965c = r965c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName965c = FOUR_ZONE_NAMES[r965c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames965c} empty; ${bloatName965c} has ${r965c.counts[r965c.bloatZoneIdx]}/${r965c.totalCount} dramatic-turn scenes`,
+        rule: 'CAUSALITY_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r965c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName965c} contains ${r965c.counts[r965c.bloatZoneIdx]} of them (${Math.round((r965c.counts[r965c.bloatZoneIdx] / r965c.totalCount) * 100)}%) while ${emptyNames965c} contains none. Turns bloat in one structural quarter and never fire in another, so the pivots where one event forces the next concentrate in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames965c} — a dramatic turn so the causal chain keeps pivoting across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

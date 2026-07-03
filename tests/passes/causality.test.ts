@@ -1247,6 +1247,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 965 — causalityPass: causality revelation zone imbalance, causality relationship zone imbalance, causality turn zone imbalance', async () => {
+    const runCA965 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CAUSALITY_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs965a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runCA965(recs965a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_ZONE_IMBALANCE'), 'CAUSALITY_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs965an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runCA965(recs965an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_ZONE_IMBALANCE'), 'CAUSALITY_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs965b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runCA965(recs965b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE'), 'CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs965bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runCA965(recs965bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE'), 'CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs965c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runCA965(recs965c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_ZONE_IMBALANCE'), 'CAUSALITY_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs965cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runCA965(recs965cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_ZONE_IMBALANCE'), 'CAUSALITY_TURN_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 951 — causalityPass: causality clock delta zone imbalance, causality payoff zone imbalance, causality seed zone imbalance', async () => {
     const runCA951 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
