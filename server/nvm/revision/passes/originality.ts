@@ -235,6 +235,18 @@
 // thread-resolution scenes and scenes where curiosity is actively rising; payoffSetupIds had only
 // been zone- and co-occurrence-audited against dramaticTurn, never against the curiosity channel —
 // a resolution scene that also reopens curiosity would itself be a less-predictable beat).
+// Wave 662 additions (built on the shared checks library, audit M2.2): ORIGINALITY_HIGHLIGHT_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × dialogueHighlights magnitude — the scene with
+// the single densest count of highlighted lines has no dramatic turn or revelation in itself or
+// the two scenes before it; first application of the peak-uncaused mode to the dialogueHighlights
+// channel in this 117-rule pass), ORIGINALITY_SEED_DROUGHT_RUN (run-based × seededClueIds absence
+// — a 6+ consecutive-scene stretch with no clue seeded at all while seeding occurs ≥3 times
+// elsewhere; PURPOSE_CONSECUTIVE_RUN is this pass's only prior run-based check and tracks a
+// different field entirely via hand-rolled logic, not the shared checkDroughtRun helper),
+// ORIGINALITY_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds —
+// this pass already applies the zone-cluster template to dramaticTurn and clockRaised;
+// payoffSetupIds itself has never been cluster-audited here — a predictable, front- or
+// back-loaded resolution rhythm is itself a learnable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4081,6 +4093,76 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The ${r648c.aCount} scenes where a planted thread resolves never coincide with the ${r648c.bCount} scenes where curiosity is actively rising — resolution and rising intrigue run on separate tracks. Once the audience notices the pattern, every payoff scene reads as guaranteed to only close a question, never to open one, making the story's resolutions more predictable in isolation.`,
         suggestedFix: `Let at least one payoff scene also raise a new question as it resolves the old one — closing one thread while cracking open another keeps resolution beats from becoming a purely predictable category.`,
+      });
+    }
+  }
+
+  // ── Wave 662: ORIGINALITY_HIGHLIGHT_PEAK_UNCAUSED, ORIGINALITY_SEED_DROUGHT_RUN,
+  //              ORIGINALITY_PAYOFF_ZONE_CLUSTER ─────────────────────────────────────────────
+
+  // ORIGINALITY_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // dialogueHighlights magnitude. Built on checkPeakUncaused from the shared checks library.
+  // n≥8, ≥2 scenes carrying a dialogue highlight, a 2-scene lookback. Finds the single scene with
+  // the most highlighted lines; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. First application of the peak-uncaused mode to the
+  // dialogueHighlights channel in this pass. A learnable, causally unmotivated spike in the
+  // story's most memorable dialogue is itself a predictable pattern.
+  {
+    const r662a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r662a.fires) {
+      issues.push({
+        location: `scene ${r662a.peakIdx + 1} — peak highlighted-dialogue density (${r662a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r662a.peakIdx + 1}, with ${r662a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated spike that reads as a convenient peak rather than an earned one.`,
+        suggestedFix: `Give scene ${r662a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest
+  // consecutive run of scenes with zero clue seeded reaches 6. PURPOSE_CONSECUTIVE_RUN is this
+  // pass's only prior run-based check and tracks a different field entirely via hand-rolled logic,
+  // not the shared checkDroughtRun helper — seededClueIds itself has never been drought-audited.
+  {
+    const r662b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r662b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r662b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r662b.longestRun} consecutive scenes with no clue seeded at all, even though ${r662b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the audience with a learnable lull in foreshadowing — they can predict that no new thread will open for an extended stretch.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r662b.longestRun}-scene stretch so foreshadowing arrives unpredictably throughout the story rather than settling into a learnable gap.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // >75% of them fall in a single structural third. This pass already applies the zone-cluster
+  // template to dramaticTurn and clockRaised; payoffSetupIds itself has never been cluster-audited
+  // here — a predictable, front- or back-loaded resolution rhythm is itself a learnable pattern.
+  {
+    const r662c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r662c.fires) {
+      const zoneName662c = r662c.zoneNames[r662c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName662c} third — ${r662c.maxZoneCount}/${r662c.count} payoff scenes`,
+        rule: 'ORIGINALITY_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r662c.maxZoneCount} of the story's ${r662c.count} thread-resolution scenes (${Math.round((r662c.maxZoneCount / r662c.count) * 100)}%) cluster in the ${zoneName662c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout — once the audience notices the pattern, they learn which third to expect answers in rather than experiencing a genuinely unpredictable rhythm.`,
+        suggestedFix: `Resolve at least one thread outside the ${zoneName662c} third — spreading payoffs across the story keeps the timing of resolutions unpredictable rather than confined to a single learnable stretch.`,
       });
     }
   }
