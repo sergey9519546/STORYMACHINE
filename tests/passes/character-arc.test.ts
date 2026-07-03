@@ -1080,6 +1080,109 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 603 — characterArcPass: relationship shift/dialogue highlight decoupled, visual staging emotional flatness cluster, open thread emotional aftermath void', async () => {
+    const makeRec603 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc603 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED fire:
+    // n=8; rel shifts at 0,1 (no highlight); highlights at 2,3 (no rel shift) → zero overlap → fires
+    it('RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED fires when relationship shifts and dialogue highlights never overlap', async () => {
+      const recs603a = Array.from({ length: 8 }, (_, i) =>
+        makeRec603(i, {
+          relationshipShifts: i === 0 || i === 1 ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }] : [],
+          dialogueHighlights: i === 2 || i === 3 ? ['a memorable line'] : [],
+        })
+      );
+      const res = await runArc603(recs603a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED should fire');
+    });
+
+    // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED no-fire:
+    // scene 1 carries BOTH a relationship shift and a dialogue highlight → overlap exists
+    it('RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs603an = Array.from({ length: 8 }, (_, i) =>
+        makeRec603(i, {
+          relationshipShifts: i === 0 || i === 1 ? [{ pairKey: 'alice|bob', dimension: 'trust', amount: 0.5 }] : [],
+          dialogueHighlights: i === 1 || i === 3 ? ['a memorable line'] : [],
+        })
+      );
+      const res = await runArc603(recs603an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED should not fire');
+    });
+
+    // VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER fire:
+    // n=9 (thirds of 3); visually-staged+neutral scenes at 6,7,8 (closing third) — 3/3 = 100% ≥ 75% → fires
+    it('VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER fires when visually-staged, emotionally flat scenes cluster in one third', async () => {
+      const recs603b = Array.from({ length: 9 }, (_, i) =>
+        makeRec603(i, {
+          visualBeats: i === 6 || i === 7 || i === 8 ? ['examines the wreckage'] : [],
+          emotionalShift: 'neutral',
+        })
+      );
+      const res = await runArc603(recs603b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER'), 'VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER should fire');
+    });
+
+    // VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER no-fire:
+    // one qualifying scene per third (1,4,7) → max zone ratio = 1/3 = 33% < 75%
+    it('VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER does not fire when qualifying scenes spread evenly across thirds', async () => {
+      const recs603bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec603(i, {
+          visualBeats: i === 1 || i === 4 || i === 7 ? ['examines the wreckage'] : [],
+          emotionalShift: 'neutral',
+        })
+      );
+      const res = await runArc603(recs603bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER'), 'VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER should not fire');
+    });
+
+    // OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} stay neutral;
+    // emotional shifts exist elsewhere at 5,6,7 → fires
+    it('OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by an emotional shift', async () => {
+      const recs603c = Array.from({ length: 8 }, (_, i) =>
+        makeRec603(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+          emotionalShift: i === 5 || i === 6 || i === 7 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runArc603(recs603c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID'), 'OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    // OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries an emotional shift → that trigger's
+    // aftermath is no longer void
+    it('OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID does not fire when a trigger window contains an emotional shift', async () => {
+      const recs603cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec603(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+          emotionalShift: i === 3 || i === 5 || i === 6 || i === 7 ? 'positive' : 'neutral',
+        })
+      );
+      const res = await runArc603(recs603cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID'), 'OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 589 — characterArcPass: dramatic-turn relational aftermath void, payoff curiosity aftermath void, emotional drought run', async () => {
     const makeRec589 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

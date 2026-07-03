@@ -218,9 +218,17 @@
 // channel targeting opening third, distinct from ARC_CLOCK_EMOTION_DECOUPLED co-occurrence, ARC_
 // CLOCK_PEAK_EMOTION_ABSENT single-peak, ARC_CLOCK_CURIOSITY_AFTERMATH_VOID aftermath, and all
 // relational zone checks which target the relational channel).
+// Wave 603 additions (built on the shared checks library, audit M2.2): RELATIONSHIP_SHIFT_
+// DIALOGUE_HIGHLIGHT_DECOUPLED (co-occurrence/decoupling × relationshipShifts × dialogueHighlights
+// — first use of dialogueHighlights anywhere in this 99-rule pass), VISUAL_STAGING_EMOTIONAL_
+// FLATNESS_CLUSTER (distribution/timing × visualBeats+emotionalShift compound × structural thirds
+// — first use of visualBeats anywhere in this pass), OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID
+// (sequence/aftermath × heavy unresolvedClues debt → emotional beat absence — first use of
+// unresolvedClues anywhere in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid } from './lib/checks.ts';
 
 export async function characterArcPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, annotations, approvedSpans } = input;
@@ -3336,6 +3344,94 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 603: RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED, VISUAL_STAGING_EMOTIONAL_
+  //              FLATNESS_CLUSTER, OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID ──────────────────────
+
+  // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED — Co-occurrence/decoupling ×
+  // relationshipShifts × dialogueHighlights. Built on checkCoOccurrenceDecoupled from the shared
+  // checks library. n≥8, ≥2 scenes carrying a relationship shift, ≥2 scenes carrying a curated
+  // dialogue highlight. Zero overlap → fire. A bond changing between characters and a line the
+  // story itself judged worth highlighting never happen in the same scene — the moments this
+  // pass's central signal (relational movement) occurs are never also the moments flagged as
+  // verbally memorable. First use of the dialogueHighlights field anywhere in this 99-rule pass —
+  // every prior relational check in this file cross-references clock/curiosity/suspense/dramatic-
+  // turn/emotional channels, never the story's own record of which dialogue stood out. Distinct
+  // from ARC_SUSPENSE_RELATIONAL_DECOUPLED (Wave 463: suspense channel, not dialogueHighlights)
+  // and every other decoupling check in this pass, none of which pair relationshipShifts with a
+  // dialogue-side signal.
+  {
+    const r603a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.relationshipShifts ?? []).length > 0,
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r603a.fires) {
+      issues.push({
+        location: `${r603a.aCount} relationship-shift scene(s), ${r603a.bCount} dialogue-highlight scene(s) — zero overlap`,
+        rule: 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r603a.aCount} scenes where a relationship shifts never coincide with the ${r603a.bCount} scenes flagged as containing a standout line of dialogue — every bond change in the story passes without a memorable verbal moment attached to it, and every memorable line lands while every relationship is holding steady. The arc's most relationally charged beats and its most verbally charged beats run on entirely separate tracks.`,
+        suggestedFix: `Let at least one relationship shift land in a scene that also carries a line worth remembering — a character naming what just changed between them, or a piece of dialogue whose weight comes precisely from the bond having moved. Tying the story's most memorable lines to its relational turns gives the shift a voice instead of leaving it to structural bookkeeping alone.`,
+      });
+    }
+  }
+
+  // VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER — Distribution/timing × a compound visualBeats+
+  // emotionalShift signal × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 scenes that are BOTH physically staged (visualBeats non-empty) AND
+  // emotionally neutral, more than 75% of which fall in a single structural third → fire. First
+  // use of the visualBeats field anywhere in this pass. Purely physical, emotionally inert scenes
+  // are ordinary in isolation, but when they cluster overwhelmingly in one third of the story, that
+  // third becomes a stretch where the arc pauses: the protagonist is staged and moved through space
+  // without the felt experience this pass exists to track. Distinct from ARC_EMOTIONAL_DROUGHT_RUN
+  // (Wave 589: run-based × pure emotional-neutrality — no visualBeats condition, and consecutive-
+  // run rather than zone-proportion) and ARC_CURIOSITY_ZONE_CLUSTER (Wave 575: curiosityDelta
+  // channel, not the visualBeats+emotionalShift compound).
+  {
+    const r603b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length > 0 && r.emotionalShift === 'neutral',
+    });
+    if (r603b.fires) {
+      const zoneName603b = r603b.zoneNames[r603b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName603b} third — ${r603b.maxZoneCount}/${r603b.count} visually-staged, emotionally flat scenes`,
+        rule: 'VISUAL_STAGING_EMOTIONAL_FLATNESS_CLUSTER',
+        severity: 'minor',
+        description: `${r603b.maxZoneCount} of the story's ${r603b.count} scenes that are both physically staged and emotionally neutral (${Math.round((r603b.maxZoneCount / r603b.count) * 100)}%) cluster in the ${zoneName603b} third. That stretch of the story leans on physical staging while the protagonist's felt experience goes quiet — the arc pauses precisely where the scenes are busiest with visual description, rather than the physical and emotional registers being interwoven throughout.`,
+        suggestedFix: `Break up the concentration by giving at least one visually-staged scene in the ${zoneName603b} third an emotional shift — let the protagonist feel something while the physical action or staging is happening, rather than treating physical description and emotional experience as scenes that never overlap.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt
+  // trigger → emotional-shift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying trigger scenes (unresolvedClues.length≥3 — heavy carried debt),
+  // ≥3 scenes anywhere with a non-neutral emotionalShift, a 2-scene lookahead window. Fires when
+  // every heavy-debt scene's two-scene aftermath contains no emotional beat, while emotional beats
+  // do occur elsewhere in the story. First use of the unresolvedClues field anywhere in this pass —
+  // this is the arc-relevant question the mystery-tracking passes don't ask: does the protagonist's
+  // felt experience ever register the weight of everything still unresolved? Distinct from
+  // ARC_SEED_EMOTIONAL_AFTERMATH_VOID (Wave 505: seededClueIds — a single planting event this
+  // scene — not unresolvedClues, the accumulated, carried-forward debt of clues not yet paid off)
+  // and ARC_EMOTIONAL_DROUGHT_RUN (Wave 589: unconditioned run-based absence, no debt trigger).
+  {
+    const r603c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => r.emotionalShift !== 'neutral' && r.emotionalShift != null,
+    });
+    if (r603c.fires) {
+      issues.push({
+        location: `${r603c.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes after any of them`,
+        rule: 'OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r603c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no emotional shift, even though ${r603c.aftermathCount} emotional beats occur elsewhere in the story. The heaviest concentrations of open mystery never register on the protagonist's felt experience in their immediate aftermath — the weight of everything left unanswered passes without being felt.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give the protagonist an emotional beat shaped by the unresolved pressure — anxiety at not knowing, a flash of hope that an answer is close, or frustration at how much is still open. Let the accumulated mystery register as something felt, not only something tracked.`,
+      });
     }
   }
 
