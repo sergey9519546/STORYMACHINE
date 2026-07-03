@@ -1598,6 +1598,83 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 854 — dialoguePass: dialogue positive emotion drought run, dialogue climax zone cluster, dialogue establish world zone cluster', async () => {
+    const makeRec854 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes854 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD854 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs854a = Array.from({ length: 10 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runD854(buildScenes854(10), recs854a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs854an = Array.from({ length: 10 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runD854(buildScenes854(10), recs854an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs854b = Array.from({ length: 9 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runD854(buildScenes854(9), recs854b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLIMAX_ZONE_CLUSTER'), 'DIALOGUE_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs854bn = Array.from({ length: 9 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runD854(buildScenes854(9), recs854bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLIMAX_ZONE_CLUSTER'), 'DIALOGUE_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs854c = Array.from({ length: 9 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runD854(buildScenes854(9), recs854c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER'), 'DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs854cn = Array.from({ length: 9 }, (_, i) => makeRec854(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runD854(buildScenes854(9), recs854cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER'), 'DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 840 — dialoguePass: dialogue introduce conflict drought run, dialogue negative emotion drought run, dialogue positive emotion zone cluster', async () => {
     const makeRec840 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -381,6 +381,16 @@
 // 'positive' × structural thirds — distinct from DIALOGUE_EMOTION_ZONE_CLUSTER [Wave 686], which
 // tests combined non-neutral emotionalShift [either valence]; this isolates the positive valence
 // alone, opening a new trio in this pass).
+//
+// Wave 854 additions (opens the twentieth rotation cycle): DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN
+// (run-based × emotionalShift === 'positive' absence — completes 2 of 3 slots for this valence
+// alongside the zone-cluster mode added in Wave 840; peak mode conventionally skipped for this
+// categorical field), DIALOGUE_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
+// structural thirds — this purpose value has only ever appeared combined with 'turning_point'
+// inside a co-occurrence check; it has never been audited as its own standalone signal),
+// DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5006,6 +5016,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r840c.maxZoneCount / r840c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r840c.zoneNames[r840c.maxZoneIdx]} third. When all the relief concentrates in one structural window, dialogue carries its emotional reward in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r840c.zoneNames[r840c.maxZoneIdx]} third so dialogue registers its emotional reward more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 854: DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN, DIALOGUE_CLIMAX_ZONE_CLUSTER,
+  //              DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER ──────────────────────────────────────
+
+  // DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 840 (peak mode conventionally skipped for this categorical field).
+  {
+    const r854a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r854a.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r854a.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r854a.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r854a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves dialogue with no emotional reward to voice for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r854a.longestRun}-scene stretch a positive-emotion charge so dialogue keeps an emotional reward to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has only ever appeared combined with 'turning_point' inside a co-occurrence check; it
+  // has never been audited as its own standalone signal.
+  {
+    const r854b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r854b.fires) {
+      issues.push({
+        location: `${r854b.zoneNames[r854b.maxZoneIdx]} third — ${r854b.maxZoneCount} of ${r854b.count} climax-purposed scenes`,
+        rule: 'DIALOGUE_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r854b.maxZoneCount / r854b.count) * 100)}% of the scenes purposed as the climax cluster in the ${r854b.zoneNames[r854b.maxZoneIdx]} third. When every peak moment concentrates in one structural window, dialogue has no room to voice its biggest moments anywhere else across the story.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r854b.zoneNames[r854b.maxZoneIdx]} third so dialogue keeps voicing peak moments more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r854c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r854c.fires) {
+      issues.push({
+        location: `${r854c.zoneNames[r854c.maxZoneIdx]} third — ${r854c.maxZoneCount} of ${r854c.count} world-establishing scenes`,
+        rule: 'DIALOGUE_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r854c.maxZoneCount / r854c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r854c.zoneNames[r854c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, dialogue has no fresh ground to speak through anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r854c.zoneNames[r854c.maxZoneIdx]} third to establish the world so dialogue keeps fresh ground to speak through more evenly across the story.`,
       });
     }
   }
