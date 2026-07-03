@@ -1438,6 +1438,61 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 963 — voicePass: voice turn zone imbalance, voice open thread zone imbalance, voice clock delta zone imbalance', async () => {
+    const runV963 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('VOICE_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs963a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runV963(recs963a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURN_ZONE_IMBALANCE'), 'VOICE_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs963an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runV963(recs963an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURN_ZONE_IMBALANCE'), 'VOICE_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs963b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 1, 2, 8, 9].includes(i) ? ['q1'] : [] }));
+      const res = await runV963(recs963b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_ZONE_IMBALANCE'), 'VOICE_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs963bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 3, 5, 8].includes(i) ? ['q1'] : [] }));
+      const res = await runV963(recs963bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_ZONE_IMBALANCE'), 'VOICE_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs963c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runV963(recs963c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_ZONE_IMBALANCE'), 'VOICE_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs963cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runV963(recs963cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_ZONE_IMBALANCE'), 'VOICE_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 949 — voicePass: voice revelation purpose zone imbalance, voice suspense zone imbalance, voice payoff zone imbalance', async () => {
     const runV949 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
