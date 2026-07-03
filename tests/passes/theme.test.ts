@@ -931,6 +931,70 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 892 — themePass: theme climax zone imbalance, theme establish world zone imbalance, theme resolution zone imbalance', async () => {
+    const runT892 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('THEME_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs892a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT892(recs892a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_ZONE_IMBALANCE'), 'THEME_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs892an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT892(recs892an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_ZONE_IMBALANCE'), 'THEME_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // THEME_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('THEME_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs892b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT892(recs892b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'THEME_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs892bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT892(recs892bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'THEME_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // THEME_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('THEME_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs892c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runT892(recs892c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_ZONE_IMBALANCE'), 'THEME_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs892cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runT892(recs892cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_ZONE_IMBALANCE'), 'THEME_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 878 — themePass: theme resolution drought run, theme complicate zone cluster, theme complicate drought run', async () => {
     const runT878 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
