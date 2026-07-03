@@ -186,9 +186,21 @@
 // that breaks a single dramatic beat into clause splinters; distinct from ACTION_QUESTION_INTRUSION
 // which counts any "?" in action and from CONSECUTIVE_SHORT_RUN which measures run length not
 // clause structure).
+// Wave 596 additions: suspense signal flatline, curiosity signal flatline (record-based analogs
+// of this file's own MONOTONOUS_RHYTHM/ACTION_WORDCOUNT_FLATLINE shape — n≥8, fewer than 20% of
+// scenes deviate from the average suspenseDelta/curiosityDelta by more than 30% of that average —
+// but applied to the story's own structural tension/wonder signal rather than sentence word count;
+// this pass had never destructured `records` at all before this wave — all 98 prior rules operate
+// purely on fountain text; distinct from each other only by channel, exactly as MONOTONOUS_RHYTHM
+// and ACTION_WORDCOUNT_FLATLINE already coexist in this file differentiated only by measure), stakes
+// zone imbalance (underweight/bloat × purpose === 'raise_stakes' × four structural zones, built on
+// checkZoneImbalance from the shared checks library — audit M2.2, its third use across passes after
+// payoff.ts's seed channel and relationship-arc.ts's shift channel — n≥10, ≥4 stakes-raise scenes;
+// fires only when one zone has zero stakes-raises while another holds ≥50% of the total).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action lines (non-dialogue, non-slug, non-transition) from fountain */
 function extractActionLines(fountain: string): Array<{ text: string; lineNum: number }> {
@@ -239,7 +251,7 @@ function countWords(text: string): number {
 }
 
 export async function rhythmPass(input: PassInput): Promise<PassResult> {
-  const { fountain, approvedSpans } = input;
+  const { fountain, approvedSpans, records } = input;
   const issues: RevisionIssue[] = [];
 
   const actionLines = extractActionLines(fountain);
@@ -2801,6 +2813,84 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Look at the first ${openEnd582c} action lines. If they run to very short beats (≤4 words each) or to long descriptive passages (≥12 words), introduce at least one medium-length sentence (5–11 words) that establishes a concrete action, object, or spatial detail. The opening does not need to average medium length — just touch the register to calibrate the reader's ear for the prose that follows.`,
         });
       }
+    }
+  }
+
+  // ── Wave 596: SUSPENSE_SIGNAL_FLATLINE, CURIOSITY_SIGNAL_FLATLINE,
+  //              STAKES_ZONE_IMBALANCE ──────────────────────────────────────────────────────
+  // First checks in this pass to destructure `records` at all — all 98 prior rules operate
+  // purely on the fountain text (sentence length, punctuation, word choice). These three treat
+  // the story's own structural signals (suspenseDelta, curiosityDelta, scene purpose) as having
+  // a "rhythm" too, extending this pass's analytical lens from prose cadence to narrative cadence.
+
+  // SUSPENSE_SIGNAL_FLATLINE — Average/aggregate × suspenseDelta variety.
+  // n≥8. Fewer than 20% of scenes deviate from the average suspenseDelta by more than 30% of
+  // that average → fire. The story's own tension signal barely moves scene to scene — a
+  // structural-signal analog of this file's own MONOTONOUS_RHYTHM/ACTION_WORDCOUNT_FLATLINE
+  // (which apply the identical "variety < 20%" shape to action-line word count). Distinct from
+  // both by signal source: those measure sentence-level prose rhythm; this measures the story's
+  // own tension rhythm at the structural level.
+  if (records.length >= 8) {
+    const suspenseVals596a = records.map(r => r.suspenseDelta ?? 0);
+    const avgSusp596a = suspenseVals596a.reduce((s, v) => s + v, 0) / suspenseVals596a.length;
+    if (Math.abs(avgSusp596a) > 1e-9) {
+      const variedSusp596a = suspenseVals596a.filter(v => Math.abs(v - avgSusp596a) > Math.abs(avgSusp596a) * 0.3).length;
+      if (variedSusp596a < suspenseVals596a.length * 0.2) {
+        issues.push({
+          location: 'suspenseDelta throughout',
+          rule: 'SUSPENSE_SIGNAL_FLATLINE',
+          severity: 'minor',
+          description: `Fewer than 20% of the story's ${records.length} scenes deviate from the average suspenseDelta (${avgSusp596a.toFixed(2)}) by more than 30% — the tension signal barely moves from scene to scene. A story's suspense should have its own rhythm: sharp rises into danger, brief releases, a slow climb toward the climax. When suspenseDelta sits close to its own average almost everywhere, the tension track reads as a flat hum rather than a shaped arc, even if individual scenes are eventful in other ways.`,
+          suggestedFix: `Introduce at least a few scenes with a suspenseDelta clearly above or below the story's average — a sharp escalation that spikes tension, or a deliberate lull that lets it recede. The suspense signal should have peaks and valleys the audience can feel, not a steady murmur across the whole script.`,
+        });
+      }
+    }
+  }
+
+  // CURIOSITY_SIGNAL_FLATLINE — Average/aggregate × curiosityDelta variety.
+  // Same shape as SUSPENSE_SIGNAL_FLATLINE (n≥8, <20% of scenes deviate from the average
+  // curiosityDelta by more than 30%), applied to the wonder/question-generation signal instead
+  // of tension. Distinct from SUSPENSE_SIGNAL_FLATLINE by channel only — exactly how MONOTONOUS_
+  // RHYTHM and ACTION_WORDCOUNT_FLATLINE already coexist in this file as near-siblings
+  // differentiated by measure rather than by underlying shape.
+  if (records.length >= 8) {
+    const curiosityVals596b = records.map(r => r.curiosityDelta ?? 0);
+    const avgCur596b = curiosityVals596b.reduce((s, v) => s + v, 0) / curiosityVals596b.length;
+    if (Math.abs(avgCur596b) > 1e-9) {
+      const variedCur596b = curiosityVals596b.filter(v => Math.abs(v - avgCur596b) > Math.abs(avgCur596b) * 0.3).length;
+      if (variedCur596b < curiosityVals596b.length * 0.2) {
+        issues.push({
+          location: 'curiosityDelta throughout',
+          rule: 'CURIOSITY_SIGNAL_FLATLINE',
+          severity: 'minor',
+          description: `Fewer than 20% of the story's ${records.length} scenes deviate from the average curiosityDelta (${avgCur596b.toFixed(2)}) by more than 30% — the wonder signal barely moves from scene to scene. A story's curiosity engine should have its own rhythm: sharp spikes when a mystery deepens, quieter stretches while the audience sits with a question. When curiosityDelta sits close to its own average almost everywhere, the audience's sense of active questioning flattens into a steady, undifferentiated hum.`,
+          suggestedFix: `Introduce at least a few scenes with a curiosityDelta clearly above or below the story's average — a moment that raises a sharp new question, or a deliberate stretch where no new mystery is introduced and existing questions are left to breathe. The curiosity signal should visibly rise and fall, not hold at one level throughout.`,
+        });
+      }
+    }
+  }
+
+  // STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural zones.
+  // Built on checkZoneImbalance from the shared check-template library (audit M2.2) — its third
+  // use across passes, after payoff.ts's seed channel and relationship-arc.ts's relationship-shift
+  // channel. n≥10, ≥4 stakes-raise scenes total, divided across four equal structural zones
+  // (Act 1/2a/2b/3). Fires only when at least one zone has ZERO stakes-raises while another holds
+  // ≥50% of the total — the co-presence of a void AND a bloat, not concentration alone.
+  {
+    const r596c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r596c.fires) {
+      const emptyNames596c = r596c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName596c = FOUR_ZONE_NAMES[r596c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames596c} empty; ${bloatName596c} has ${r596c.counts[r596c.bloatZoneIdx]}/${r596c.totalCount} stakes-raises`,
+        rule: 'STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r596c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName596c} contains ${r596c.counts[r596c.bloatZoneIdx]} of them (${Math.round((r596c.counts[r596c.bloatZoneIdx] / r596c.totalCount) * 100)}%) while ${emptyNames596c} contains none. Escalation simultaneously bloats in one zone and vanishes from another: the audience experiences a burst of rising stakes in one structural quarter while another quarter passes with the cost of failure never increasing.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one from ${bloatName596c} into the empty zone(s) — ${emptyNames596c} — so every structural quarter carries some escalation. The goal is not perfect uniformity, but that no zone is completely stakes-free while another carries more than half the total load.`,
+      });
     }
   }
 

@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1132,6 +1135,63 @@ Running now, she turns the corner.
     });
   });
 
+
+  describe('Wave 596 — rhythmPass: suspense signal flatline, curiosity signal flatline, stakes zone imbalance', async () => {
+    const runR596 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('SUSPENSE_SIGNAL_FLATLINE fires when suspenseDelta barely varies across scenes', async () => {
+      // 8 scenes, every suspenseDelta identical (1.0) — zero deviation from the average
+      const recs596a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { suspenseDelta: 1.0 }));
+      const res = await runR596(recs596a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SUSPENSE_SIGNAL_FLATLINE'), 'SUSPENSE_SIGNAL_FLATLINE should fire');
+    });
+
+    it('SUSPENSE_SIGNAL_FLATLINE does not fire when suspenseDelta varies widely across scenes', async () => {
+      const recs596a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { suspenseDelta: i % 2 === 0 ? 0.2 : 2.5 }));
+      const res = await runR596(recs596a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SUSPENSE_SIGNAL_FLATLINE'), 'SUSPENSE_SIGNAL_FLATLINE should not fire');
+    });
+
+    it('CURIOSITY_SIGNAL_FLATLINE fires when curiosityDelta barely varies across scenes', async () => {
+      const recs596b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { curiosityDelta: 1.0 }));
+      const res = await runR596(recs596b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CURIOSITY_SIGNAL_FLATLINE'), 'CURIOSITY_SIGNAL_FLATLINE should fire');
+    });
+
+    it('CURIOSITY_SIGNAL_FLATLINE does not fire when curiosityDelta varies widely across scenes', async () => {
+      const recs596b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { curiosityDelta: i % 2 === 0 ? 0.2 : 2.5 }));
+      const res = await runR596(recs596b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CURIOSITY_SIGNAL_FLATLINE'), 'CURIOSITY_SIGNAL_FLATLINE should not fire');
+    });
+
+    it('STAKES_ZONE_IMBALANCE fires when one zone has zero stakes-raises and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: stakes-raises at 6,7,8 (zone 2) plus one at 9 (zone 3) to meet minCount=4
+      const recs596c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs596c[6] = makeSharedRecord(6, { purpose: 'raise_stakes' });
+      recs596c[7] = makeSharedRecord(7, { purpose: 'raise_stakes' });
+      recs596c[8] = makeSharedRecord(8, { purpose: 'raise_stakes' });
+      recs596c[9] = makeSharedRecord(9, { purpose: 'raise_stakes' });
+      const res = await runR596(recs596c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_ZONE_IMBALANCE'), 'STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('STAKES_ZONE_IMBALANCE does not fire when stakes-raises are spread across all zones', async () => {
+      const recs596c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs596c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs596c[4] = makeSharedRecord(4, { purpose: 'raise_stakes' });
+      recs596c[7] = makeSharedRecord(7, { purpose: 'raise_stakes' });
+      recs596c[10] = makeSharedRecord(10, { purpose: 'raise_stakes' });
+      const res = await runR596(recs596c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_ZONE_IMBALANCE'), 'STAKES_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 582 — rhythmPass: long single sentence, shortest outlier, medium opening absent', async () => {
     const runR582 = async (fountain: string) => {
