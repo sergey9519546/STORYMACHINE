@@ -1204,6 +1204,78 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 726 — beliefPass: belief clock delta zone cluster, belief staging peak uncaused, belief open thread zone cluster', async () => {
+    const runBF726 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-advancing scenes at 0,1,2 → 100% opening third
+    it('BELIEF_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-advancing scenes cluster in one third', async () => {
+      const recs726a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs726a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs726a[1] = makeSharedRecord(1, { clockDelta: 1 });
+      recs726a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runBF726(recs726a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DELTA_ZONE_CLUSTER'), 'BELIEF_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-advancing scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-advancing scenes are distributed across thirds', async () => {
+      const recs726an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs726an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs726an[4] = makeSharedRecord(4, { clockDelta: 1 });
+      recs726an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runBF726(recs726an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DELTA_ZONE_CLUSTER'), 'BELIEF_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; visual beats at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('BELIEF_STAGING_PEAK_UNCAUSED fires when the peak visual-beat scene has no dramatic turn or revelation nearby', async () => {
+      const recs726b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs726b[2] = makeSharedRecord(2, { visualBeats: ['beat a'] });
+      recs726b[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF726(recs726b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_PEAK_UNCAUSED'), 'BELIEF_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs726bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs726bn[2] = makeSharedRecord(2, { visualBeats: ['beat a'] });
+      recs726bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs726bn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF726(recs726bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_PEAK_UNCAUSED'), 'BELIEF_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('BELIEF_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs726c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs726c[0] = makeSharedRecord(0, { unresolvedClues: ['clue a'] });
+      recs726c[1] = makeSharedRecord(1, { unresolvedClues: ['clue b'] });
+      recs726c[2] = makeSharedRecord(2, { unresolvedClues: ['clue c'] });
+      const res = await runBF726(recs726c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_ZONE_CLUSTER'), 'BELIEF_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs726cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs726cn[0] = makeSharedRecord(0, { unresolvedClues: ['clue a'] });
+      recs726cn[4] = makeSharedRecord(4, { unresolvedClues: ['clue b'] });
+      recs726cn[7] = makeSharedRecord(7, { unresolvedClues: ['clue c'] });
+      const res = await runBF726(recs726cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_ZONE_CLUSTER'), 'BELIEF_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 712 — beliefPass: belief payoff zone cluster, belief seed drought run, belief highlight drought run', async () => {
     const runBF712 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

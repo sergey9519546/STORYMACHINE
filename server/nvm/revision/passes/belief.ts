@@ -282,6 +282,14 @@
 // BELIEF_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence — Waves 670/698 applied
 // the backward-cause peak and zone-cluster modes to this pass's most heavily used field; the
 // drought-run mode has never been applied to it, completing the trio).
+// Wave 726 additions: BELIEF_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta>0 presence
+// × structural thirds — Wave 628 applied the backward-cause peak mode to clockDelta; the
+// zone-cluster mode has never been applied to it), BELIEF_STAGING_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × visualBeats magnitude — Wave 642 applied the zone-cluster mode to
+// visualBeats; the backward-cause peak mode has never been applied to it),
+// BELIEF_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues × structural thirds —
+// Wave 642 applied the run-based drought mode to unresolvedClues; the zone-cluster mode has never
+// been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4001,6 +4009,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r712c.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r712c.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the belief-tracking layer with no character stating a conviction worth tracking for an extended run.`,
         suggestedFix: `Give at least one scene within the ${r712c.longestRun}-scene stretch a standout line of dialogue — a character stating what they believe memorably, keeping the belief-tracking layer's verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 726: BELIEF_CLOCK_DELTA_ZONE_CLUSTER, BELIEF_STAGING_PEAK_UNCAUSED,
+  //              BELIEF_OPEN_THREAD_ZONE_CLUSTER ──────────────────────────────────────────
+
+  // BELIEF_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes with a
+  // positive clock delta, fires when more than 75% of those scenes cluster in a single third.
+  // Wave 628 applied the backward-cause peak mode to clockDelta; the zone-cluster mode has never
+  // been applied to it.
+  {
+    const r726a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r726a.fires) {
+      issues.push({
+        location: `${r726a.zoneNames[r726a.maxZoneIdx]} third — ${r726a.maxZoneCount} of ${r726a.count} clock-advancing scenes`,
+        rule: 'BELIEF_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r726a.maxZoneCount / r726a.count) * 100)}% of the scenes that advance the ticking clock cluster in the story's ${r726a.zoneNames[r726a.maxZoneIdx]} third. When every clock-tightening beat lands in the same structural window, the belief-tracking layer loses any sense of mounting pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-advancing beat outside the ${r726a.zoneNames[r726a.maxZoneIdx]} third so the pressure on characters' convictions tightens more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually dense scenes, a
+  // 2-scene lookback. Finds the single scene with the most visual beats; fires when neither that
+  // scene nor either of the two before it contains a dramatic turn or revelation. Wave 642 applied
+  // the zone-cluster mode to visualBeats; the backward-cause peak mode has never been applied to
+  // it.
+  {
+    const r726b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r726b.fires) {
+      issues.push({
+        location: `scene ${r726b.peakIdx + 1} — peak visual-beat density (${r726b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single most visually dense scene (scene ${r726b.peakIdx + 1}, with ${r726b.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where staging carries the most visual weight arrives without any structural pivot or disclosure driving it — an uncaused spectacle that gives the belief-tracking layer nothing causal to anchor to.`,
+        suggestedFix: `Give scene ${r726b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most visually loaded moment is earned rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Wave 642 applied the run-based
+  // drought mode to unresolvedClues; the zone-cluster mode has never been applied to it.
+  {
+    const r726c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r726c.fires) {
+      issues.push({
+        location: `${r726c.zoneNames[r726c.maxZoneIdx]} third — ${r726c.maxZoneCount} of ${r726c.count} open-thread scenes`,
+        rule: 'BELIEF_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r726c.maxZoneCount / r726c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the story's ${r726c.zoneNames[r726c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the belief-tracking layer has no unresolved mystery pressing on characters' convictions anywhere else in the story.`,
+        suggestedFix: `Seed or carry forward at least one open thread outside the ${r726c.zoneNames[r726c.maxZoneIdx]} third so unresolved mystery keeps pressing on the story's beliefs throughout.`,
       });
     }
   }
