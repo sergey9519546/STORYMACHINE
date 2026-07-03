@@ -1006,6 +1006,83 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 695 — structurePass: structure open thread peak uncaused, structure seed drought run, structure staging zone cluster', async () => {
+    const runST695 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs695a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs695a[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs695a[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST695(recs695a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED'), 'STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs695an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs695an[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs695an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs695an[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST695(recs695an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED'), 'STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // STRUCTURE_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeds at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('STRUCTURE_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs695b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs695b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs695b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs695b[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      recs695b[9] = makeSharedRecord(9, { seededClueIds: ['clue-d'] });
+      const res = await runST695(recs695b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_DROUGHT_RUN'), 'STRUCTURE_SEED_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_SEED_DROUGHT_RUN no-fire:
+    // seeds at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('STRUCTURE_SEED_DROUGHT_RUN does not fire when seeds are distributed without a long drought', async () => {
+      const recs695bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs695bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs695bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs695bn[9] = makeSharedRecord(9, { seededClueIds: ['clue-c'] });
+      const res = await runST695(recs695bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_DROUGHT_RUN'), 'STRUCTURE_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs695c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs695c[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs695c[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs695c[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runST695(recs695c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_STAGING_ZONE_CLUSTER'), 'STRUCTURE_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // STRUCTURE_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('STRUCTURE_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs695cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs695cn[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs695cn[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs695cn[7] = makeSharedRecord(7, { visualBeats: ['a', 'b'] });
+      const res = await runST695(recs695cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_STAGING_ZONE_CLUSTER'), 'STRUCTURE_STAGING_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 681 — structurePass: structure clock delta peak uncaused, structure staging drought run, structure stakes zone cluster', async () => {
     const runST681 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

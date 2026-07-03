@@ -249,6 +249,15 @@
 // applied to this channel), STRUCTURE_STAKES_ZONE_CLUSTER (distribution/timing × purpose ===
 // 'raise_stakes' × structural thirds — `purpose` has only ever appeared inside incidental
 // filter/set-collection contexts here, never as the standalone subject of its own check).
+// Wave 695 additions (built on the shared checks library): STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × unresolvedClues magnitude — unresolvedClues anchors a
+// drought-run check [Wave 653] plus decoupling/aftermath checks [Wave 639]; the backward-cause
+// peak mode has never been applied to it), STRUCTURE_SEED_DROUGHT_RUN (run-based × seededClueIds
+// absence — Wave 653 applied the zone-cluster mode to seededClueIds; the drought-run mode has
+// never been applied to this channel), STRUCTURE_STAGING_ZONE_CLUSTER (distribution/timing ×
+// visualBeats × structural thirds — visualBeats anchors a four-zone imbalance check [Wave 611], a
+// backward-cause peak check [Wave 625], and a drought-run check [Wave 681]; the thirds-based
+// zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3809,6 +3818,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r681c.maxZoneCount} of the story's ${r681c.count} scenes purposed to raise stakes (${Math.round((r681c.maxZoneCount / r681c.count) * 100)}%) cluster in the ${zoneName681c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure.`,
         suggestedFix: `Purpose at least one scene outside the ${zoneName681c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting pressure.`,
+      });
+    }
+  }
+
+  // ── Wave 695: STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED, STRUCTURE_SEED_DROUGHT_RUN,
+  //              STRUCTURE_STAGING_ZONE_CLUSTER ────────────────────────────────────────────────
+
+  // STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. unresolvedClues anchors a drought-run check (Wave 653) plus
+  // decoupling/aftermath checks (Wave 639); the backward-cause peak mode has never been applied.
+  {
+    const r695a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r695a.fires) {
+      issues.push({
+        location: `scene ${r695a.peakIdx + 1} — peak open-thread density (${r695a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STRUCTURE_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r695a.peakIdx + 1}, with ${r695a.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r695a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. Wave 653 applied the zone-cluster mode to
+  // seededClueIds; the drought-run mode has never been applied to this channel.
+  {
+    const r695b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r695b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r695b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r695b.longestRun} consecutive scenes with no clue seeded at all, even though ${r695b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the story's structure coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r695b.longestRun}-scene stretch so the story's structure keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes, fires when
+  // >75% of them fall in a single structural third. visualBeats anchors a four-zone imbalance
+  // check (Wave 611), a backward-cause peak check (Wave 625), and a drought-run check (Wave 681);
+  // the thirds-based zone-cluster mode has never been applied to it.
+  {
+    const r695c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r695c.fires) {
+      const zoneName695c = r695c.zoneNames[r695c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName695c} third — ${r695c.maxZoneCount}/${r695c.count} visually dense scenes`,
+        rule: 'STRUCTURE_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r695c.maxZoneCount} of the story's ${r695c.count} visually dense scenes (${Math.round((r695c.maxZoneCount / r695c.count) * 100)}%) cluster in the ${zoneName695c} third. Physical staging concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no physically embodied anchor.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName695c} third substantial physical staging — spreading staged action across the story lets each structural third carry its own physical weight.`,
       });
     }
   }
