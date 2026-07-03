@@ -261,6 +261,15 @@
 // never been applied to this channel), VOICE_STAGING_DROUGHT_RUN (run-based × visualBeats absence
 // — Wave 655's VOICE_STAGING_PEAK_UNCAUSED applied the backward-cause peak mode to visualBeats;
 // the drought-run mode has never been applied to this channel).
+// Wave 711 additions: VOICE_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural
+// thirds — Waves 655/697 applied the backward-cause peak and drought-run modes to visualBeats;
+// the zone-cluster mode has never been applied to it, completing the trio), VOICE_SEED_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × seededClueIds magnitude — Waves 655/697
+// applied the drought-run and zone-cluster modes to seededClueIds; the backward-cause peak mode
+// has never been applied to it, completing the trio), VOICE_PAYOFF_ZONE_CLUSTER (distribution/
+// timing × payoffSetupIds × structural thirds — Waves 669/697 applied the drought-run and
+// backward-cause peak modes to payoffSetupIds; the zone-cluster mode has never been applied to
+// it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4356,6 +4365,75 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r697c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r697c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the story's voice without any staged action to anchor it.`,
         suggestedFix: `Add a physical staging beat somewhere within the ${r697c.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the story's voice stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 711: VOICE_STAGING_ZONE_CLUSTER, VOICE_SEED_PEAK_UNCAUSED, VOICE_PAYOFF_ZONE_CLUSTER ──
+
+  // VOICE_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 physically-staged scenes, fires when
+  // >75% of them fall in a single structural third. Waves 655/697 applied the backward-cause peak
+  // and drought-run modes to visualBeats; the zone-cluster mode has never been applied to it,
+  // completing the trio.
+  {
+    const r711a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r711a.fires) {
+      const zoneName711a = r711a.zoneNames[r711a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName711a} third — ${r711a.maxZoneCount}/${r711a.count} visually dense scenes`,
+        rule: 'VOICE_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r711a.maxZoneCount} of the story's ${r711a.count} visually dense scenes (${Math.round((r711a.maxZoneCount / r711a.count) * 100)}%) cluster in the ${zoneName711a} third. Physical staging concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no physically embodied voice.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName711a} third substantial physical staging — spreading embodied presence across the story lets each structural third carry some physical sense of the story's voice.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Waves
+  // 655/697 applied the drought-run and zone-cluster modes to seededClueIds; the backward-cause
+  // peak mode has never been applied to it, completing the trio.
+  {
+    const r711b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r711b.fires) {
+      issues.push({
+        location: `scene ${r711b.peakIdx + 1} — peak seed density (${r711b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r711b.peakIdx + 1}, with ${r711b.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the story's voice is causally connected.`,
+        suggestedFix: `Give scene ${r711b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when >75% of
+  // them fall in a single structural third. Waves 669/697 applied the drought-run and backward-
+  // cause peak modes to payoffSetupIds; the zone-cluster mode has never been applied to it,
+  // completing the trio.
+  {
+    const r711c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r711c.fires) {
+      const zoneName711c = r711c.zoneNames[r711c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName711c} third — ${r711c.maxZoneCount}/${r711c.count} payoff scenes`,
+        rule: 'VOICE_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r711c.maxZoneCount} of the story's ${r711c.count} thread-resolution scenes (${Math.round((r711c.maxZoneCount / r711c.count) * 100)}%) cluster in the ${zoneName711c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the voice's resolutions paying off.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName711c} third — spreading resolutions across the story lets the story's voice pay off gradually instead of arriving all at once.`,
       });
     }
   }

@@ -1438,6 +1438,82 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 711 — voicePass: voice staging zone cluster, voice seed peak uncaused, voice payoff zone cluster', async () => {
+    const runV711 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('VOICE_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs711a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs711a[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs711a[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs711a[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runV711(recs711a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAGING_ZONE_CLUSTER'), 'VOICE_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs711an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs711an[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs711an[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs711an[7] = makeSharedRecord(7, { visualBeats: ['a', 'b'] });
+      const res = await runV711(recs711an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAGING_ZONE_CLUSTER'), 'VOICE_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('VOICE_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs711b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs711b[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs711b[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV711(recs711b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SEED_PEAK_UNCAUSED'), 'VOICE_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // VOICE_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VOICE_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs711bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs711bn[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs711bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs711bn[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV711(recs711bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SEED_PEAK_UNCAUSED'), 'VOICE_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('VOICE_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs711c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs711c[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs711c[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs711c[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runV711(recs711c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_ZONE_CLUSTER'), 'VOICE_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs711cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs711cn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs711cn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs711cn[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runV711(recs711cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_ZONE_CLUSTER'), 'VOICE_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 697 — voicePass: voice seed zone cluster, voice payoff peak uncaused, voice staging drought run', async () => {
     const runV697 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
