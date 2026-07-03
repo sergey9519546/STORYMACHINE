@@ -1247,6 +1247,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 727 — causalityPass: causality clock delta drought run, causality relationship peak uncaused, causality seed drought run', async () => {
+    const runCA727 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('CAUSALITY_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs727a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs727a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs727a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs727a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runCA727(recs727a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_DROUGHT_RUN'), 'CAUSALITY_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('CAUSALITY_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs727an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs727an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs727an[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs727an[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs727an[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runCA727(recs727an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_DROUGHT_RUN'), 'CAUSALITY_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; relationship shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs727b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs727b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs727b[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runCA727(recs727b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED'), 'CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs727bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs727bn[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs727bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs727bn[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runCA727(recs727bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED'), 'CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // CAUSALITY_SEED_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 plant new clues (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('CAUSALITY_SEED_DROUGHT_RUN fires when the longest no-new-clues run reaches 6', async () => {
+      const recs727c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs727c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs727c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs727c[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runCA727(recs727c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_DROUGHT_RUN'), 'CAUSALITY_SEED_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_SEED_DROUGHT_RUN no-fire:
+    // seed scenes spread out so no gap reaches 6 consecutive scenes
+    it('CAUSALITY_SEED_DROUGHT_RUN does not fire when new clues are seeded throughout the story', async () => {
+      const recs727cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs727cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs727cn[3] = makeSharedRecord(3, { seededClueIds: ['clue-b'] });
+      recs727cn[6] = makeSharedRecord(6, { seededClueIds: ['clue-c'] });
+      recs727cn[9] = makeSharedRecord(9, { seededClueIds: ['clue-d'] });
+      const res = await runCA727(recs727cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_DROUGHT_RUN'), 'CAUSALITY_SEED_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 713 — causalityPass: causality open thread zone cluster, causality stakes drought run, causality seed peak uncaused', async () => {
     const runCA713 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

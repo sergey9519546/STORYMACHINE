@@ -297,6 +297,14 @@
 // drought-run mode has never been applied to it), CAUSALITY_SEED_PEAK_UNCAUSED (single-peak
 // isolation/backward-cause × seededClueIds magnitude — Wave 685 applied the zone-cluster mode to
 // seededClueIds; the backward-cause peak mode has never been applied to it).
+// Wave 727 additions (closes the tenth rotation cycle, 713-727): CAUSALITY_CLOCK_DELTA_DROUGHT_RUN
+// (run-based × clockDelta≠0 absence — Wave 685 applied the backward-cause peak mode to clockDelta;
+// the drought-run mode has never been applied to it), CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × relationshipShifts magnitude — Wave 713 applied the
+// drought-run mode to relationshipShifts; the backward-cause peak mode has never been applied to
+// it), CAUSALITY_SEED_DROUGHT_RUN (run-based × seededClueIds absence — Waves 685/713 applied the
+// zone-cluster and backward-cause peak modes to seededClueIds; the drought-run mode has never been
+// applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4237,6 +4245,74 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for planting new clues (scene ${r713c.peakIdx + 1}, with ${r713c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
         suggestedFix: `Give scene ${r713c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 727: CAUSALITY_CLOCK_DELTA_DROUGHT_RUN, CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED,
+  //              CAUSALITY_SEED_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // CAUSALITY_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires
+  // when the longest consecutive run of scenes with zero clock movement reaches 6. Wave 685
+  // applied the backward-cause peak mode to clockDelta; the drought-run mode has never been
+  // applied to it.
+  {
+    const r727a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r727a.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r727a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r727a.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r727a.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the causal chain without any mechanical pressure driving events forward for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r727a.longestRun}-scene stretch so the causal chain keeps a mechanical pressure acting on events throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // relationshipShifts magnitude. Built on checkPeakUncaused from the shared checks library. n≥8,
+  // ≥2 scenes carrying a relationship shift, a 2-scene lookback. Finds the single scene with the
+  // most simultaneous bond changes; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. Wave 713 applied the drought-run mode to
+  // relationshipShifts; the backward-cause peak mode has never been applied to it.
+  {
+    const r727b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r727b.fires) {
+      issues.push({
+        location: `scene ${r727b.peakIdx + 1} — peak relationship-shift density (${r727b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r727b.peakIdx + 1}, with ${r727b.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
+        suggestedFix: `Give scene ${r727b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with no new clues planted reaches 6. Waves 685/713 applied the zone-cluster and
+  // backward-cause peak modes to seededClueIds; the drought-run mode has never been applied to it,
+  // completing the trio.
+  {
+    const r727c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r727c.fires) {
+      issues.push({
+        location: `longest stretch with no new clues planted: ${r727c.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r727c.longestRun} consecutive scenes with no new clues planted at all, even though ${r727c.presentCount} scenes elsewhere do seed foreshadowing. A long unbroken stretch with nothing new laid down leaves the causal chain running on old setups for an extended run.`,
+        suggestedFix: `Plant at least one new clue within the ${r727c.longestRun}-scene stretch so the causal chain keeps feeding fresh foreshadowing throughout that stretch.`,
       });
     }
   }
