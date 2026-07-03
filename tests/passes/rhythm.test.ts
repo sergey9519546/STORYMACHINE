@@ -1136,6 +1136,71 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 876 — rhythmPass: rhythm climax drought run, rhythm establish world drought run, rhythm resolution drought run', async () => {
+    const runR876 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_CLIMAX_DROUGHT_RUN fire:
+    // n=10; climax at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_CLIMAX_DROUGHT_RUN fires when a long run has no climax-purposed scene', async () => {
+      const recs876a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runR876(recs876a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLIMAX_DROUGHT_RUN'), 'RHYTHM_CLIMAX_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_CLIMAX_DROUGHT_RUN does not fire when climax-purposed scenes are evenly spread', async () => {
+      const recs876an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runR876(recs876an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLIMAX_DROUGHT_RUN'), 'RHYTHM_CLIMAX_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN fire:
+    // n=10; establish_world at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN fires when a long run has no world-establishing scene', async () => {
+      const recs876b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runR876(recs876b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN'), 'RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN does not fire when world-establishing scenes are evenly spread', async () => {
+      const recs876bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runR876(recs876bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN'), 'RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs876c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runR876(recs876c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_RESOLUTION_DROUGHT_RUN'), 'RHYTHM_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs876cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runR876(recs876cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_RESOLUTION_DROUGHT_RUN'), 'RHYTHM_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 862 — rhythmPass: rhythm establish world zone cluster, rhythm climax zone cluster, rhythm resolution zone cluster', async () => {
     const runR862 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

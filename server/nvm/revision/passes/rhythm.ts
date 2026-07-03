@@ -364,6 +364,16 @@
 // 'climax' x structural thirds -- likewise a virgin field, never referenced in this pass
 // before), RHYTHM_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
 // structural thirds -- likewise a virgin field, never referenced in this pass before).
+//
+// Wave 876 additions: RHYTHM_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 862; peak mode conventionally skipped for this categorical field),
+// RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 'establish_world' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 862; peak mode conventionally skipped for this categorical field),
+// RHYTHM_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution' absence -- completes 2 of
+// 3 slots for this purpose value alongside the zone-cluster mode added in Wave 862; peak mode
+// conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4375,6 +4385,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r862c.maxZoneCount / r862c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r862c.zoneNames[r862c.maxZoneIdx]} third. When every settling beat concentrates in one structural window, the story's rhythm has no room to wind down gradually before the ending absorbs it all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r862c.zoneNames[r862c.maxZoneIdx]} third so the rhythm's wind-down is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 876: RHYTHM_CLIMAX_DROUGHT_RUN, RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              RHYTHM_RESOLUTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // RHYTHM_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 862 (peak mode conventionally skipped for this categorical field).
+  {
+    const r876a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r876a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r876a.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r876a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r876a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the story's rhythm without a structural high point to build toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r876a.longestRun}-scene stretch as the climax, or restructure so the rhythm's peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 862 (peak mode conventionally skipped for this categorical field).
+  {
+    const r876b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r876b.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r876b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r876b.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r876b.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the story's rhythm with no fresh ground to orient the reader against for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r876b.longestRun}-scene stretch to establish the world, so the rhythm has fresh ground to orient the reader against throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // RHYTHM_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 862 (peak mode conventionally skipped for this categorical field).
+  {
+    const r876c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r876c.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r876c.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r876c.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r876c.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the story's rhythm with no wind-down beat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r876c.longestRun}-scene stretch to resolve part of the story, so the rhythm keeps winding down throughout the story rather than only at its very end.`,
       });
     }
   }
