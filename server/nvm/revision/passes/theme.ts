@@ -259,6 +259,13 @@
 // has only ever been referenced incidentally [raise_stakes at line 1392] and never used as a
 // standalone signal here; character-defining scenes clustering in one third leave the theme's
 // human throughline unevenly weighted).
+// Wave 696 additions: THEME_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural
+// thirds — completing this channel's coverage alongside the existing peak-uncaused [Wave 640] and
+// drought-run [Wave 682] checks), THEME_PAYOFF_PEAK_UNCAUSED (single-peak isolation/backward-cause
+// × payoffSetupIds magnitude — completing this channel's coverage alongside the existing
+// zone-cluster [Wave 640] and drought-run [Wave 668] checks), THEME_SEED_DROUGHT_RUN (run-based ×
+// seededClueIds absence — Wave 654 applied the zone-cluster mode to seededClueIds; the drought-run
+// mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3965,6 +3972,72 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r682c.maxZoneCount} of the story's ${r682c.count} character-moment scenes (${Math.round((r682c.maxZoneCount / r682c.count) * 100)}%) cluster in the ${zoneName682c} third. Scenes purposed to deepen character concentrate almost exclusively in that stretch rather than surfacing throughout, giving the theme's human throughline an uneven structural rhythm.`,
         suggestedFix: `Give at least one scene outside the ${zoneName682c} third a character-moment purpose — spreading character-deepening beats across the story keeps the theme's human throughline present at every stage.`,
+      });
+    }
+  }
+
+  // ── Wave 696: THEME_STAGING_ZONE_CLUSTER, THEME_PAYOFF_PEAK_UNCAUSED, THEME_SEED_DROUGHT_RUN ──
+
+  // THEME_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes, fires when
+  // >75% of them fall in a single structural third. Completes this channel's coverage alongside
+  // the existing peak-uncaused (Wave 640) and drought-run (Wave 682) checks.
+  {
+    const r696a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r696a.fires) {
+      const zoneName696a = r696a.zoneNames[r696a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName696a} third — ${r696a.maxZoneCount}/${r696a.count} visually dense scenes`,
+        rule: 'THEME_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r696a.maxZoneCount} of the story's ${r696a.count} visually dense scenes (${Math.round((r696a.maxZoneCount / r696a.count) * 100)}%) cluster in the ${zoneName696a} third. Physical staging concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's physical manifestation an uneven structural rhythm.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName696a} third substantial physical staging — spreading physical expression of the theme across the story lets each structural third carry its own embodiment of it.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Completes this channel's coverage alongside the existing zone-cluster (Wave 640) and
+  // drought-run (Wave 668) checks.
+  {
+    const r696b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r696b.fires) {
+      issues.push({
+        location: `scene ${r696b.peakIdx + 1} — peak payoff density (${r696b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r696b.peakIdx + 1}, with ${r696b.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r696b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // THEME_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive run of
+  // scenes with zero clue seeded reaches 6. Wave 654 applied the zone-cluster mode to
+  // seededClueIds; the drought-run mode has never been applied to this channel.
+  {
+    const r696c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r696c.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r696c.longestRun} consecutive scenes`,
+        rule: 'THEME_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r696c.longestRun} consecutive scenes with no clue seeded at all, even though ${r696c.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the theme's sense of gradual accumulation dormant for an extended run.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r696c.longestRun}-scene stretch so the theme's sense of accumulating mystery keeps building throughout that stretch.`,
       });
     }
   }
