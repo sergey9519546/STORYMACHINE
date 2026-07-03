@@ -1352,6 +1352,94 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 675 — intentionPass: intention clock delta peak uncaused, intention stakes drought run, intention positive emotion zone cluster', async () => {
+    const makeRec675 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN675 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // n=8; clockDelta at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('INTENTION_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs675a = Array.from({ length: 8 }, (_, i) => makeRec675(i));
+      recs675a[2] = makeRec675(2, { clockDelta: 1 });
+      recs675a[6] = makeRec675(6, { clockDelta: 5 });
+      const res = await runIN675(recs675a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_PEAK_UNCAUSED'), 'INTENTION_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // INTENTION_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('INTENTION_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs675an = Array.from({ length: 8 }, (_, i) => makeRec675(i));
+      recs675an[2] = makeRec675(2, { clockDelta: 1 });
+      recs675an[5] = makeRec675(5, { dramaticTurn: 'reversal' });
+      recs675an[6] = makeRec675(6, { clockDelta: 5 });
+      const res = await runIN675(recs675an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_PEAK_UNCAUSED'), 'INTENTION_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_STAKES_DROUGHT_RUN fire:
+    // 10 scenes; stakes-raising at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_STAKES_DROUGHT_RUN fires when the longest no-stakes-raising run is ≥6', async () => {
+      const recs675b = Array.from({ length: 10 }, (_, i) => makeRec675(i));
+      recs675b[0] = makeRec675(0, { purpose: 'raise_stakes' });
+      recs675b[1] = makeRec675(1, { purpose: 'raise_stakes' });
+      recs675b[2] = makeRec675(2, { purpose: 'raise_stakes' });
+      recs675b[9] = makeRec675(9, { purpose: 'raise_stakes' });
+      const res = await runIN675(recs675b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_DROUGHT_RUN'), 'INTENTION_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are distributed without a long drought', async () => {
+      const recs675bn = Array.from({ length: 10 }, (_, i) => makeRec675(i));
+      recs675bn[0] = makeRec675(0, { purpose: 'raise_stakes' });
+      recs675bn[4] = makeRec675(4, { purpose: 'raise_stakes' });
+      recs675bn[9] = makeRec675(9, { purpose: 'raise_stakes' });
+      const res = await runIN675(recs675bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_DROUGHT_RUN'), 'INTENTION_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs675c = Array.from({ length: 9 }, (_, i) => makeRec675(i));
+      recs675c[0] = makeRec675(0, { emotionalShift: 'positive' });
+      recs675c[1] = makeRec675(1, { emotionalShift: 'positive' });
+      recs675c[2] = makeRec675(2, { emotionalShift: 'positive' });
+      const res = await runIN675(recs675c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER'), 'INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER no-fire:
+    // positive-emotion scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes are distributed across thirds', async () => {
+      const recs675cn = Array.from({ length: 9 }, (_, i) => makeRec675(i));
+      recs675cn[0] = makeRec675(0, { emotionalShift: 'positive' });
+      recs675cn[4] = makeRec675(4, { emotionalShift: 'positive' });
+      recs675cn[7] = makeRec675(7, { emotionalShift: 'positive' });
+      const res = await runIN675(recs675cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER'), 'INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 661 — intentionPass: intention relationship peak uncaused, intention clock drought run, intention payoff zone cluster', async () => {
     const makeRec661 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

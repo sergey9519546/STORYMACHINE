@@ -244,6 +244,16 @@
 // (distribution/timing × payoffSetupIds × structural thirds — this pass already applies the
 // zone-cluster template to revelation, seed, and open-thread; payoffSetupIds itself has never
 // been cluster-audited despite anchoring two existing peak-decoupled checks).
+// Wave 675 additions (built on the shared checks library, audit M2.2): INTENTION_CLOCK_DELTA_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — clockDelta has
+// only ever appeared inside incidental threshold comparisons [clockDelta > 1, clockDelta <= 0]
+// in this pass, never as the standalone subject of a backward-cause peak check),
+// INTENTION_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — `purpose` has
+// only been used as an incidental filter [STAKES_RAISED_EXTERNALLY] or fallback default here,
+// never drought-audited as its own signal), INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'positive' × structural thirds — emotionalShift
+// anchors several hand-rolled decoupled checks [PROACTIVE_EMOTION_DECOUPLED, PAYOFF_EMOTION_
+// DECOUPLED, REVELATION_EMOTION_DECOUPLED] but has never been cluster-audited).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3865,6 +3875,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r661c.maxZoneCount} of the story's ${r661c.count} thread-resolution scenes (${Math.round((r661c.maxZoneCount / r661c.count) * 100)}%) cluster in the ${zoneName661c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the protagonist's initiative paying off.`,
         suggestedFix: `Let at least one thread resolve outside the ${zoneName661c} third — spreading resolutions across the story lets the protagonist's initiative pay off gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 675: INTENTION_CLOCK_DELTA_PEAK_UNCAUSED, INTENTION_STAKES_DROUGHT_RUN,
+  //              INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER ───────────────────────────────────────
+
+  // INTENTION_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. clockDelta has only ever appeared inside incidental threshold comparisons
+  // (clockDelta > 1, clockDelta <= 0) in this pass, never as the standalone subject of a
+  // backward-cause peak check.
+  {
+    const r675a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r675a.fires) {
+      issues.push({
+        location: `scene ${r675a.peakIdx + 1} — peak clockDelta (${r675a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'INTENTION_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r675a.peakIdx + 1}, at ${r675a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r675a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest deadline compression is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // `purpose` has only been used as an incidental filter (STAKES_RAISED_EXTERNALLY) or fallback
+  // default here, never drought-audited as its own signal.
+  {
+    const r675b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r675b.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising scene: ${r675b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r675b.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r675b.presentCount} scenes elsewhere do escalate the stakes. A long unbroken stretch with nothing pushing the stakes higher leaves the protagonist's initiative without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r675b.longestRun}-scene stretch to raise stakes — even a small escalation keeps the protagonist's initiative under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when >75% of them fall in a single structural third.
+  // emotionalShift anchors several hand-rolled decoupled checks (PROACTIVE_EMOTION_DECOUPLED,
+  // PAYOFF_EMOTION_DECOUPLED, REVELATION_EMOTION_DECOUPLED) but has never been cluster-audited.
+  {
+    const r675c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r675c.fires) {
+      const zoneName675c = r675c.zoneNames[r675c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName675c} third — ${r675c.maxZoneCount}/${r675c.count} positive-emotion scenes`,
+        rule: 'INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r675c.maxZoneCount} of the story's ${r675c.count} positive-emotion scenes (${Math.round((r675c.maxZoneCount / r675c.count) * 100)}%) cluster in the ${zoneName675c} third. Emotional lift concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no sense of the protagonist's initiative paying off in felt relief.`,
+        suggestedFix: `Let at least one scene outside the ${zoneName675c} third carry a positive emotional shift — spreading moments of relief across the story keeps the protagonist's initiative rewarded throughout, not only in one stretch.`,
       });
     }
   }
