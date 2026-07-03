@@ -380,6 +380,17 @@
 // structural thirds — this purpose value has never been referenced anywhere in this pass; a
 // virgin field), CONFLICT_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
 // structural thirds — likewise a virgin field, never referenced in this pass before).
+//
+// Wave 856 additions: CONFLICT_CLIMAX_DROUGHT_RUN (run-based × purpose === 'climax' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 842; peak mode conventionally skipped for this categorical field),
+// CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose === 'establish_world' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 842; peak mode conventionally skipped for this categorical field),
+// CONFLICT_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' × structural
+// thirds — distinct from CONFLICT_RESOLUTION_PREMATURE, which checks timing relative to the
+// climax rather than distributional clustering; a virgin standalone signal for this purpose
+// value).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4962,6 +4973,73 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r842c.maxZoneCount / r842c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r842c.zoneNames[r842c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the conflict builds toward its payoff in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r842c.zoneNames[r842c.maxZoneIdx]} third so the conflict builds toward its payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 856: CONFLICT_CLIMAX_DROUGHT_RUN, CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              CONFLICT_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CONFLICT_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 842 (peak mode conventionally skipped for this categorical field).
+  {
+    const r856a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r856a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r856a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r856a.longestRun} consecutive scenes purposed otherwise than the climax, even though ${r856a.presentCount} scenes elsewhere are dedicated to the story's peak. A long unbroken stretch with no climactic scene leaves the conflict without a payoff to build toward for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r856a.longestRun}-scene stretch as the climax so the conflict keeps a payoff to build toward throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes
+  // overall, fires when the longest consecutive run of scenes with no world-establishing purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 842 (peak mode conventionally skipped for this categorical field).
+  {
+    const r856b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r856b.fires) {
+      issues.push({
+        location: `longest stretch with no world-building: ${r856b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r856b.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r856b.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves the conflict without fresh ground to escalate from for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r856b.longestRun}-scene stretch to establish the world so the conflict keeps fresh ground to escalate from throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. Distinct from CONFLICT_RESOLUTION_PREMATURE, which checks timing of relationshipShifts
+  // negative events relative to the climax, not this purpose enum value; a virgin standalone
+  // signal.
+  {
+    const r856c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r856c.fires) {
+      issues.push({
+        location: `${r856c.zoneNames[r856c.maxZoneIdx]} third — ${r856c.maxZoneCount} of ${r856c.count} resolution-purposed scenes`,
+        rule: 'CONFLICT_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r856c.maxZoneCount / r856c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r856c.zoneNames[r856c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the conflict settles its threads in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r856c.zoneNames[r856c.maxZoneIdx]} third so the conflict settles its threads more evenly across the story.`,
       });
     }
   }

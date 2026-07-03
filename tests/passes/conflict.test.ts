@@ -1535,6 +1535,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 856 — conflictPass: conflict climax drought run, conflict establish world drought run, conflict resolution zone cluster', async () => {
+    const makeRec856 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF856 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_CLIMAX_DROUGHT_RUN fire:
+    // n=10; climax at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_CLIMAX_DROUGHT_RUN fires when a long run has no climax-purposed scene', async () => {
+      const recs856a = Array.from({ length: 10 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runCF856(recs856a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_CLIMAX_DROUGHT_RUN'), 'CONFLICT_CLIMAX_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_CLIMAX_DROUGHT_RUN does not fire when climax-purposed scenes are evenly spread', async () => {
+      const recs856an = Array.from({ length: 10 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runCF856(recs856an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_CLIMAX_DROUGHT_RUN'), 'CONFLICT_CLIMAX_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN fire:
+    // n=10; establish_world at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN fires when a long run has no world-building', async () => {
+      const recs856b = Array.from({ length: 10 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runCF856(recs856b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN'), 'CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN does not fire when world-establishing scenes are evenly spread', async () => {
+      const recs856bn = Array.from({ length: 10 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runCF856(recs856bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN'), 'CONFLICT_ESTABLISH_WORLD_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs856c = Array.from({ length: 9 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'resolution' } : {}
+      ));
+      const res = await runCF856(recs856c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_RESOLUTION_ZONE_CLUSTER'), 'CONFLICT_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs856cn = Array.from({ length: 9 }, (_, i) => makeRec856(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'resolution' } : {}
+      ));
+      const res = await runCF856(recs856cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_RESOLUTION_ZONE_CLUSTER'), 'CONFLICT_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 842 — conflictPass: conflict positive emotion drought run, conflict establish world zone cluster, conflict climax zone cluster', async () => {
     const makeRec842 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
