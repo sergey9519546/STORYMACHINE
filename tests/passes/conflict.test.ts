@@ -1535,6 +1535,99 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 618 — conflictPass: conflict payoff staging decoupled, conflict payoff zone imbalance, conflict turn staging aftermath void', async () => {
+    const makeRec618 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF618 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('CONFLICT_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs618a = Array.from({ length: 6 }, (_, i) => makeRec618(i,
+        i === 0 || i === 1 ? { payoffSetupIds: ['thread-a'] }
+        : i === 4 || i === 5 ? { visualBeats: ['throws the punch', 'wipes the blood'] }
+        : {}
+      ));
+      const res = await runCF618(recs618a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_STAGING_DECOUPLED'), 'CONFLICT_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // CONFLICT_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('CONFLICT_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs618an = Array.from({ length: 6 }, (_, i) => makeRec618(i,
+        i === 0 ? { payoffSetupIds: ['thread-a'], visualBeats: ['throws the punch', 'wipes the blood'] }
+        : i === 1 ? { payoffSetupIds: ['thread-b'] }
+        : i === 5 ? { visualBeats: ['throws the punch', 'wipes the blood'] }
+        : {}
+      ));
+      const res = await runCF618(recs618an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_STAGING_DECOUPLED'), 'CONFLICT_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // CONFLICT_PAYOFF_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); payoffs at 6,7,8,9; zones 0 (0-2) and 1 (3-5) are empty;
+    // zone 3 holds (7,8,9 wait) — zone 2 (6,7,8)=3, zone 3 (9)=1, bloatZoneIdx=zone2, 3/4=75%
+    it('CONFLICT_PAYOFF_ZONE_IMBALANCE fires when one zone is empty of payoffs while another is bloated', async () => {
+      const recs618b = Array.from({ length: 12 }, (_, i) => makeRec618(i, {
+        payoffSetupIds: (i === 6 || i === 7 || i === 8 || i === 9) ? ['thread'] : [],
+      }));
+      const res = await runCF618(recs618b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_ZONE_IMBALANCE'), 'CONFLICT_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    // CONFLICT_PAYOFF_ZONE_IMBALANCE no-fire:
+    // one payoff per zone (1,4,7,10) → no zone is empty
+    it('CONFLICT_PAYOFF_ZONE_IMBALANCE does not fire when payoffs are spread across all zones', async () => {
+      const recs618bn = Array.from({ length: 12 }, (_, i) => makeRec618(i, {
+        payoffSetupIds: (i === 1 || i === 4 || i === 7 || i === 10) ? ['thread'] : [],
+      }));
+      const res = await runCF618(recs618bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_ZONE_IMBALANCE'), 'CONFLICT_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+
+    // CONFLICT_TURN_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; turn triggers at 0,1; their windows {1,2} and {2,3} carry no visually dense
+    // scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('CONFLICT_TURN_STAGING_AFTERMATH_VOID fires when no dramatic turn is followed by a visually dense scene within 2 scenes', async () => {
+      const recs618c = Array.from({ length: 8 }, (_, i) => makeRec618(i,
+        i === 0 || i === 1 ? { dramaticTurn: 'reversal' }
+        : i === 5 || i === 6 || i === 7 ? { visualBeats: ['throws the punch', 'wipes the blood'] }
+        : {}
+      ));
+      const res = await runCF618(recs618c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_STAGING_AFTERMATH_VOID'), 'CONFLICT_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // CONFLICT_TURN_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('CONFLICT_TURN_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs618cn = Array.from({ length: 8 }, (_, i) => makeRec618(i,
+        i === 0 || i === 1 ? { dramaticTurn: 'reversal' }
+        : i === 3 || i === 5 || i === 6 || i === 7 ? { visualBeats: ['throws the punch', 'wipes the blood'] }
+        : {}
+      ));
+      const res = await runCF618(recs618cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_STAGING_AFTERMATH_VOID'), 'CONFLICT_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 604 — conflictPass: open thread rupture decoupled, visual conflict zone imbalance, open thread repair aftermath void', async () => {
     const makeRec604 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

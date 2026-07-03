@@ -216,6 +216,13 @@
 // anywhere in this 105-rule pass), VISUAL_CONFLICT_ZONE_IMBALANCE (underweight/bloat × visualBeats
 // × four structural zones — first use of visualBeats anywhere in this pass), OPEN_THREAD_REPAIR_
 // AFTERMATH_VOID (sequence/aftermath × heavy unresolvedClues debt → repair absence).
+// Wave 618 additions (built on the shared checks library, audit M2.2): CONFLICT_PAYOFF_STAGING_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — first pairing of these two
+// lightly-used fields in this 108-rule pass), CONFLICT_PAYOFF_ZONE_IMBALANCE (underweight/bloat ×
+// payoffSetupIds × four structural zones — first zone-based check on the payoff channel; Wave 604
+// applied this template to visualBeats only), CONFLICT_TURN_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × dramaticTurn trigger → visualBeats absence — first pairing of these two
+// fields).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3618,6 +3625,82 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r604c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no relational repair, even though ${r604c.aftermathCount} repair moments occur elsewhere in the story. The heaviest concentrations of open mystery never give bonds a chance to mend in their immediate aftermath — the pressure of stacked unanswered questions is never relieved by relational healing nearby.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a relationship mend — a small act of trust, an apology, or a moment of closeness that offsets the pressure of what's still unresolved. Giving the mystery's weight a nearby relational counterweight keeps the conflict and connection channels responsive to each other.`,
+      });
+    }
+  }
+
+  // ── Wave 618: CONFLICT_PAYOFF_STAGING_DECOUPLED, CONFLICT_PAYOFF_ZONE_IMBALANCE,
+  //              CONFLICT_TURN_STAGING_AFTERMATH_VOID ─────────────────────────────────────
+
+  // CONFLICT_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. A conflict thread
+  // resolving and a scene rich in physical staging never happen together — every payoff lands
+  // through dialogue or interiority alone, and every heavily staged scene resolves no ongoing
+  // conflict. First pairing of these two fields in this 108-rule pass.
+  {
+    const r618a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r618a.fires) {
+      issues.push({
+        location: `${r618a.aCount} payoff scene(s), ${r618a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'CONFLICT_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r618a.aCount} scenes where a conflict thread resolves never coincide with the ${r618a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A conflict's resolution often lands with more force when a character's action embodies the outcome, rather than the moment being carried entirely through dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action a character takes, or an object they handle, that embodies what the resolved conflict cost or settled.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero payoffs while
+  // another holds ≥50% of the total. First zone-based check on the payoff channel in this pass —
+  // Wave 604 applied checkZoneImbalance to visualBeats only; payoffSetupIds itself has never been
+  // audited for structural distribution here, despite being the trigger for two existing aftermath
+  // checks.
+  {
+    const r618b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r618b.fires) {
+      const emptyNames618b = r618b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName618b = FOUR_ZONE_NAMES[r618b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames618b} empty; ${bloatName618b} has ${r618b.counts[r618b.bloatZoneIdx]}/${r618b.totalCount} payoff scenes`,
+        rule: 'CONFLICT_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r618b.totalCount} conflict-resolution scenes are unevenly distributed across its four structural zones: ${bloatName618b} contains ${r618b.counts[r618b.bloatZoneIdx]} of them (${Math.round((r618b.counts[r618b.bloatZoneIdx] / r618b.totalCount) * 100)}%) while ${emptyNames618b} contains none. Conflict resolution bloats in one structural quarter and vanishes from another, giving the story's sense of ongoing settlement an uneven structural rhythm.`,
+        suggestedFix: `Redistribute resolutions: let at least one conflict thread resolve in the empty zone(s) — ${emptyNames618b} — rather than concentrating settlement in a single quarter of the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥3 scenes anywhere with substantial physical
+  // staging (visualBeats.length≥2), a 2-scene lookahead window. Fires when every turn's two-scene
+  // aftermath contains no visually dense scene, while such scenes do occur elsewhere in the story.
+  // A structural pivot that never gives way to physical staging nearby means the story processes
+  // its reversals entirely through dialogue or exposition, never through visible physical
+  // consequence. First pairing of dramaticTurn with visualBeats in this pass.
+  {
+    const r618c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r618c.fires) {
+      issues.push({
+        location: `${r618c.triggerCount} dramatic-turn scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CONFLICT_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r618c.triggerCount} dramatic-turn scenes is followed by two scenes with no substantial physical staging, even though ${r618c.aftermathCount} such scenes exist elsewhere in the script. A pivot's consequences often play out physically — a character acting differently in the world because of what just changed — and when that aftermath consistently stays unstaged, the turn's impact is only ever discussed, never shown.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry substantial physical staging — a character's changed behavior made visible through action rather than only through what they say.`,
       });
     }
   }
