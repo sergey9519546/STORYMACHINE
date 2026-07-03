@@ -1210,6 +1210,119 @@ He sits at his desk.
   });
 
 
+  describe('Wave 648 — originalityPass: originality relationship peak uncaused, originality revelation drought run, originality payoff curiosity decoupled', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634 above — every fixture cycles
+    // purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated 'major'
+    // rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_648 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_648 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_648 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor648 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec648 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor648(idx),
+      emotionalShift: EMOTION_POOL_648[idx % EMOTION_POOL_648.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_648[idx % PURPOSE_POOL_648.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain648 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor648(i)}\n\n${SENTENCE_POOL_648[i % SENTENCE_POOL_648.length]}`).join('\n\n');
+    const runO648 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain648(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs648a = Array.from({ length: 8 }, (_, i) => makeRec648(i, {
+        relationshipShifts: i === 2
+          ? [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }]
+          : i === 6
+            ? [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 }))
+            : [],
+      }));
+      const res = await runO648(recs648a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED'), 'ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs648an = Array.from({ length: 8 }, (_, i) => makeRec648(i, {
+        relationshipShifts: i === 2
+          ? [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }]
+          : i === 6
+            ? [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 }))
+            : [],
+        dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+      }));
+      const res = await runO648(recs648an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED'), 'ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // ORIGINALITY_REVELATION_DROUGHT_RUN fire:
+    // 10 scenes; revelations at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ORIGINALITY_REVELATION_DROUGHT_RUN fires when the longest no-revelation run is ≥6', async () => {
+      const recs648b = Array.from({ length: 10 }, (_, i) => makeRec648(i, {
+        revelation: (i === 0 || i === 1 || i === 2 || i === 9) ? 'a hidden truth surfaces' : null,
+      }));
+      const res = await runO648(recs648b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_DROUGHT_RUN'), 'ORIGINALITY_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    // ORIGINALITY_REVELATION_DROUGHT_RUN no-fire:
+    // revelations at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ORIGINALITY_REVELATION_DROUGHT_RUN does not fire when revelations are distributed without a long drought', async () => {
+      const recs648bn = Array.from({ length: 10 }, (_, i) => makeRec648(i, {
+        revelation: (i === 0 || i === 4 || i === 9) ? 'a hidden truth surfaces' : null,
+      }));
+      const res = await runO648(recs648bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_DROUGHT_RUN'), 'ORIGINALITY_REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no curiosity rise); curiosity rises at 4,5 (no payoff) → zero overlap
+    // → fires
+    it('ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED fires when payoff scenes and rising-curiosity scenes never overlap', async () => {
+      const recs648c = Array.from({ length: 6 }, (_, i) => makeRec648(i, {
+        payoffSetupIds: (i === 0 || i === 1) ? ['thread-a'] : [],
+        curiosityDelta: (i === 4 || i === 5) ? 1 : 0,
+      }));
+      const res = await runO648(recs648c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED'), 'ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and a curiosity rise → overlap exists
+    it('ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs648cn = Array.from({ length: 6 }, (_, i) => makeRec648(i, {
+        payoffSetupIds: (i === 0 || i === 1) ? ['thread-a'] : [],
+        curiosityDelta: (i === 0 || i === 5) ? 1 : 0,
+      }));
+      const res = await runO648(recs648cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED'), 'ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 634 — originalityPass: originality highlight staging decoupled, originality open thread highlight aftermath void, originality seed zone imbalance', async () => {
     // Same truncation pitfall as Waves 592/606/620 above — every fixture cycles
     // purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated 'major'

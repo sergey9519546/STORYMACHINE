@@ -220,10 +220,25 @@
 // pairing of these two fields), ORIGINALITY_SEED_ZONE_IMBALANCE (underweight/bloat ×
 // seededClueIds × four structural zones — Wave 606/620 applied this template to visualBeats and
 // payoffSetupIds; seededClueIds itself has never been zone-audited here).
+// Wave 648 additions (built on the shared checks library, audit M2.2): ORIGINALITY_RELATIONSHIP_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × relationshipShifts-count magnitude —
+// first checkPeakUncaused use in this 114-rule pass; relationshipShifts had only ever appeared
+// inside a debug reporting string [Wave 260-era], never as a per-scene signal — the scene with the
+// most simultaneous bond changes has no dramatic turn or revelation in itself or the two scenes
+// before it, so the story's densest relational moment arrives as a learnable, uncaused spike),
+// ORIGINALITY_REVELATION_DROUGHT_RUN (run-based × revelation presence — first checkDroughtRun use
+// in this pass; a 6+ consecutive-scene stretch with no revelation at all while revelations occur
+// ≥3 times elsewhere — distinct from the pre-existing Wave 396 revelation filter, which compares
+// `r.revelation === true` against a string|null field and therefore never actually matches; this
+// is the pass's first functioning revelation-presence check), ORIGINALITY_PAYOFF_CURIOSITY_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × curiosityDelta>0 — zero overlap between
+// thread-resolution scenes and scenes where curiosity is actively rising; payoffSetupIds had only
+// been zone- and co-occurrence-audited against dramaticTurn, never against the curiosity channel —
+// a resolution scene that also reopens curiosity would itself be a less-predictable beat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, FOUR_ZONE_NAMES } from './lib/checks.ts';
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
@@ -3990,6 +4005,82 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r634c.totalCount} clue-planting scenes are unevenly distributed across its four structural zones: ${bloatName634c} contains ${r634c.counts[r634c.bloatZoneIdx]} of them (${Math.round((r634c.counts[r634c.bloatZoneIdx] / r634c.totalCount) * 100)}%) while ${emptyNames634c} contains none. Foreshadowing bloats in one structural quarter and vanishes from another, giving the audience a learnable window for when new clues arrive rather than a genuinely unpredictable rhythm.`,
         suggestedFix: `Redistribute clue-planting: move at least one seed from ${bloatName634c} into the empty zone(s) — ${emptyNames634c} — so foreshadowing can arrive unpredictably throughout the story rather than only in one learnable stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 648: ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED, ORIGINALITY_REVELATION_DROUGHT_RUN,
+  //              ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED ────────────────────────────────────────
+
+  // ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // relationshipShifts-count magnitude. Built on checkPeakUncaused from the shared checks
+  // library. n≥8, ≥2 scenes carrying a relationship shift, a 2-scene lookback. Finds the single
+  // scene with the most simultaneous bond changes; fires when neither that scene nor either of
+  // the two before it contains a dramatic turn or revelation. First checkPeakUncaused use in this
+  // pass — relationshipShifts had only ever appeared inside a debug reporting string, never as a
+  // per-scene signal. A learnable, uncaused spike in relational upheaval is itself a predictable
+  // pattern the audience can anticipate.
+  {
+    const r648a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r648a.fires) {
+      issues.push({
+        location: `scene ${r648a.peakIdx + 1} — peak relationship-shift density (${r648a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r648a.peakIdx + 1}, with ${r648a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that reads as a predictable convenience rather than an earned collision.`,
+        suggestedFix: `Give scene ${r648a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving as an unmotivated cluster.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_DROUGHT_RUN — Run-based × revelation presence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation scenes overall, fires
+  // when the longest consecutive run of scenes with no revelation reaches 6. First checkDroughtRun
+  // use in this pass, and — because the pre-existing Wave 396 filter compares `r.revelation ===
+  // true` against a field typed string|null and therefore never matches anything — this is the
+  // pass's first functioning revelation-presence check. A long unbroken stretch with nothing
+  // disclosed leaves the story's information rhythm flat and its "next surprise" position fully
+  // predictable.
+  {
+    const r648b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r648b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r648b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r648b.longestRun} consecutive scenes with no revelation at all, even though ${r648b.presentCount} scenes elsewhere do disclose something new. A long unbroken stretch with nothing revealed leaves the story's information rhythm flat and predictable — the audience learns that surprises won't arrive for an extended stretch, and stops watching for them.`,
+        suggestedFix: `Disclose something new somewhere within the ${r648b.longestRun}-scene stretch — even a small revelation keeps the story's information rhythm unpredictable rather than settling into a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds ×
+  // curiosityDelta>0. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 payoff scenes, ≥2 scenes where curiosity is actively rising, zero overlap → fire.
+  // payoffSetupIds had only been zone- and co-occurrence-audited against dramaticTurn (Wave 620's
+  // SEED_TURN_DECOUPLED pairs it with seededClueIds instead) — never against the curiosity
+  // channel. When every resolution closes a question without ever opening a new one, the
+  // audience learns that payoff scenes are always purely closing beats, a predictable category.
+  {
+    const r648c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r648c.fires) {
+      issues.push({
+        location: `${r648c.aCount} payoff scene(s), ${r648c.bCount} rising-curiosity scene(s) — zero overlap`,
+        rule: 'ORIGINALITY_PAYOFF_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r648c.aCount} scenes where a planted thread resolves never coincide with the ${r648c.bCount} scenes where curiosity is actively rising — resolution and rising intrigue run on separate tracks. Once the audience notices the pattern, every payoff scene reads as guaranteed to only close a question, never to open one, making the story's resolutions more predictable in isolation.`,
+        suggestedFix: `Let at least one payoff scene also raise a new question as it resolves the old one — closing one thread while cracking open another keeps resolution beats from becoming a purely predictable category.`,
       });
     }
   }
