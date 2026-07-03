@@ -1006,6 +1006,83 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 709 — structurePass: structure highlight drought run, structure open thread zone cluster, structure seed peak uncaused', async () => {
+    const runST709 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('STRUCTURE_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs709a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs709a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs709a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs709a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs709a[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runST709(recs709a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_HIGHLIGHT_DROUGHT_RUN'), 'STRUCTURE_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('STRUCTURE_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs709an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs709an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs709an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs709an[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runST709(recs709an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_HIGHLIGHT_DROUGHT_RUN'), 'STRUCTURE_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs709b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs709b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs709b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs709b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      const res = await runST709(recs709b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_ZONE_CLUSTER'), 'STRUCTURE_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // STRUCTURE_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('STRUCTURE_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs709bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs709bn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs709bn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs709bn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      const res = await runST709(recs709bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_ZONE_CLUSTER'), 'STRUCTURE_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('STRUCTURE_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs709c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs709c[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs709c[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST709(recs709c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_PEAK_UNCAUSED'), 'STRUCTURE_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // STRUCTURE_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STRUCTURE_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs709cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs709cn[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs709cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs709cn[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST709(recs709cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_PEAK_UNCAUSED'), 'STRUCTURE_SEED_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 695 — structurePass: structure open thread peak uncaused, structure seed drought run, structure staging zone cluster', async () => {
     const runST695 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
