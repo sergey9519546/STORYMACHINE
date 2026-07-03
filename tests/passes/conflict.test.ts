@@ -1535,6 +1535,100 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 604 — conflictPass: open thread rupture decoupled, visual conflict zone imbalance, open thread repair aftermath void', async () => {
+    const makeRec604 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF604 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // OPEN_THREAD_RUPTURE_DECOUPLED fire:
+    // n=8; open threads at 0,1 (no rupture); ruptures at 2,3 (no open thread) → zero overlap → fires
+    it('OPEN_THREAD_RUPTURE_DECOUPLED fires when open-thread scenes and rupture scenes never overlap', async () => {
+      const recs604a = Array.from({ length: 8 }, (_, i) => makeRec604(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['unpaid-clue'] }
+        : i === 2 || i === 3 ? { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] }
+        : {}
+      ));
+      const res = await runCF604(recs604a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_RUPTURE_DECOUPLED'), 'OPEN_THREAD_RUPTURE_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_RUPTURE_DECOUPLED no-fire:
+    // scene 2 carries BOTH an open thread and a rupture → overlap exists
+    it('OPEN_THREAD_RUPTURE_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs604an = Array.from({ length: 8 }, (_, i) => makeRec604(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['unpaid-clue'] }
+        : i === 2 ? { unresolvedClues: ['unpaid-clue'], relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] }
+        : i === 3 ? { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] }
+        : {}
+      ));
+      const res = await runCF604(recs604an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_RUPTURE_DECOUPLED'), 'OPEN_THREAD_RUPTURE_DECOUPLED should not fire');
+    });
+
+    // VISUAL_CONFLICT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('VISUAL_CONFLICT_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs604b = Array.from({ length: 12 }, (_, i) => makeRec604(i, {
+        visualBeats: (i === 6 || i === 9 || i === 10 || i === 11) ? ['draws a weapon', 'lunges forward'] : [],
+      }));
+      const res = await runCF604(recs604b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_CONFLICT_ZONE_IMBALANCE'), 'VISUAL_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    // VISUAL_CONFLICT_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('VISUAL_CONFLICT_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs604bn = Array.from({ length: 12 }, (_, i) => makeRec604(i, {
+        visualBeats: (i === 1 || i === 4 || i === 7 || i === 10) ? ['draws a weapon', 'lunges forward'] : [],
+      }));
+      const res = await runCF604(recs604bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_CONFLICT_ZONE_IMBALANCE'), 'VISUAL_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    // OPEN_THREAD_REPAIR_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // repair; repairs exist elsewhere at 5,6,7 → fires
+    it('OPEN_THREAD_REPAIR_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a repair', async () => {
+      const recs604c = Array.from({ length: 8 }, (_, i) => makeRec604(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['c1', 'c2', 'c3'] }
+        : i === 5 || i === 6 || i === 7 ? { relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] }
+        : {}
+      ));
+      const res = await runCF604(recs604c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_REPAIR_AFTERMATH_VOID'), 'OPEN_THREAD_REPAIR_AFTERMATH_VOID should fire');
+    });
+
+    // OPEN_THREAD_REPAIR_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a repair → that trigger's aftermath
+    // is no longer void
+    it('OPEN_THREAD_REPAIR_AFTERMATH_VOID does not fire when a trigger window contains a repair', async () => {
+      const recs604cn = Array.from({ length: 8 }, (_, i) => makeRec604(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['c1', 'c2', 'c3'] }
+        : i === 3 || i === 5 || i === 6 || i === 7 ? { relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] }
+        : {}
+      ));
+      const res = await runCF604(recs604cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_REPAIR_AFTERMATH_VOID'), 'OPEN_THREAD_REPAIR_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 590 — conflictPass: seed suspense aftermath void, clock turn aftermath void, rupture drought run', async () => {
     const makeRec590 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

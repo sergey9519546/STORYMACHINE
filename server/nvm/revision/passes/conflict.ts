@@ -211,9 +211,15 @@
 // climax; first zone check on the curiosity channel in this pass, distinct from CONFLICT_CLOSING_
 // SUSPENSE_VOID and CONFLICT_REPAIR_CLOSING_ABSENT which audit suspense and repair respectively, and
 // from CONFLICT_AFTERMATH_CURIOSITY_VOID which is an aftermath not a zone check).
+// Wave 604 additions (built on the shared checks library, audit M2.2): OPEN_THREAD_RUPTURE_
+// DECOUPLED (co-occurrence/decoupling × unresolvedClues × rupture — first use of unresolvedClues
+// anywhere in this 105-rule pass), VISUAL_CONFLICT_ZONE_IMBALANCE (underweight/bloat × visualBeats
+// × four structural zones — first use of visualBeats anywhere in this pass), OPEN_THREAD_REPAIR_
+// AFTERMATH_VOID (sequence/aftermath × heavy unresolvedClues debt → repair absence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function conflictPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -3526,6 +3532,93 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 604: OPEN_THREAD_RUPTURE_DECOUPLED, VISUAL_CONFLICT_ZONE_IMBALANCE,
+  //              OPEN_THREAD_REPAIR_AFTERMATH_VOID ──────────────────────────────────────────
+
+  // OPEN_THREAD_RUPTURE_DECOUPLED — Co-occurrence/decoupling × unresolvedClues × rupture. Built
+  // on checkCoOccurrenceDecoupled from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, ≥2 rupture scenes (a relationship shift ≤ -0.3). Zero overlap → fire.
+  // Unresolved narrative tension and active relational conflict never occupy the same scene —
+  // every open mystery lands while every bond is stable, and every bond-breaking moment lands
+  // while no mystery hangs open. First use of the unresolvedClues field anywhere in this
+  // 105-rule pass. Distinct from CONFRONTATION_AVOIDANCE (rupture × dialogueHighlights same-scene
+  // check, a different field pairing entirely) and every other decoupling check in this file,
+  // none of which pair unresolvedClues with the relational-conflict channel.
+  {
+    const r604a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.relationshipShifts ?? []).some(s => s.amount <= -0.3),
+    });
+    if (r604a.fires) {
+      issues.push({
+        location: `${r604a.aCount} open-thread scene(s), ${r604a.bCount} rupture scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_RUPTURE_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r604a.aCount} scenes carrying outstanding, unpaid clue-debt never coincide with the ${r604a.bCount} scenes where a relationship ruptures — unresolved narrative tension and active interpersonal conflict run on entirely separate tracks. A mystery hanging open and a bond breaking are both sources of pressure on the story; when they never combine, each pressure is felt in isolation rather than compounding into a scene where a character's relationships fray precisely because something crucial remains unknown.`,
+        suggestedFix: `Let at least one rupture happen in a scene that also carries open clue-debt — a bond breaking under the strain of an unresolved question, or a character's suspicion about what hasn't been explained driving the relational fracture. Tying the mystery's pressure to the conflict's pressure gives each greater weight than either carries alone.`,
+      });
+    }
+  }
+
+  // VISUAL_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass — every existing check in this file audits
+  // conflict through relational shifts, suspenseDelta, or dramaticTurn (verbal/psychological
+  // registers); this is the first to audit the distribution of conflict's physical register —
+  // scenes leaning on staged action rather than dialogue or interior tension — across the story's
+  // four quarters. A story whose physically staged conflict clusters in one act and vanishes from
+  // another shifts abruptly between physical and psychological modes of conflict instead of
+  // sustaining both throughout.
+  {
+    const r604b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r604b.fires) {
+      const emptyNames604b = r604b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName604b = FOUR_ZONE_NAMES[r604b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames604b} empty; ${bloatName604b} has ${r604b.counts[r604b.bloatZoneIdx]}/${r604b.totalCount} visually dense scenes`,
+        rule: 'VISUAL_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r604b.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName604b} contains ${r604b.counts[r604b.bloatZoneIdx]} of them (${Math.round((r604b.counts[r604b.bloatZoneIdx] / r604b.totalCount) * 100)}%) while ${emptyNames604b} contains none. Conflict's physical register — staged action rather than dialogue or relational tension — bloats in one structural quarter and vanishes from another, giving the story's balance between physical and psychological conflict an uneven rhythm across its four quarters.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged conflict beat into ${emptyNames604b}, or thin out ${bloatName604b}'s concentration by letting one of its visually dense scenes carry the conflict through dialogue or relational tension instead. A more even spread keeps both physical and psychological registers of conflict active throughout the story.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_REPAIR_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt trigger
+  // → repair absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying trigger scenes (unresolvedClues.length≥3 — heavy carried debt), ≥3 scenes anywhere
+  // with a repair (relationship shift ≥ +0.3), a 2-scene lookahead window. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no repair, while repair does occur elsewhere
+  // in the story. The heaviest concentrations of open mystery never give way to relational
+  // healing in their immediate wake — bonds never mend in the shadow of what's still unresolved.
+  // Distinct from CONFLICT_AFTERMATH_CURIOSITY_VOID and every other aftermath check in this pass
+  // (Waves 506/520/548/590 and others), all of which use a discrete event trigger (rupture, seed,
+  // payoff, single-peak) rather than unresolvedClues' accumulated-debt magnitude, and distinct
+  // from OPEN_THREAD_RUPTURE_DECOUPLED above (same field, but that check is same-scene
+  // co-occurrence with no positional/windowed component and checks rupture, not repair).
+  {
+    const r604c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).some(s => s.amount >= 0.3),
+    });
+    if (r604c.fires) {
+      issues.push({
+        location: `${r604c.triggerCount} heavy clue-debt scene(s) — no repair within 2 scenes after any of them`,
+        rule: 'OPEN_THREAD_REPAIR_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r604c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no relational repair, even though ${r604c.aftermathCount} repair moments occur elsewhere in the story. The heaviest concentrations of open mystery never give bonds a chance to mend in their immediate aftermath — the pressure of stacked unanswered questions is never relieved by relational healing nearby.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a relationship mend — a small act of trust, an apology, or a moment of closeness that offsets the pressure of what's still unresolved. Giving the mystery's weight a nearby relational counterweight keeps the conflict and connection channels responsive to each other.`,
+      });
     }
   }
 
