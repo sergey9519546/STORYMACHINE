@@ -216,6 +216,18 @@
 // DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first pairing of
 // these two fields), STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × heavy
 // unresolvedClues debt trigger → dialogueHighlights absence — first pairing of these two fields).
+// Wave 653 additions (built on the shared checks library, audit M2.2): this 119-rule pass already
+// imports all six shared-checks-library templates, so distinctness comes from applying each to a
+// channel it has never touched. STRUCTURE_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/
+// backward-cause × dialogueHighlights magnitude — Wave 625's STRUCTURAL_STAGING_PEAK_UNCAUSED
+// applied the peak-uncaused mode to visualBeats; this is the first application to the highlighted-
+// dialogue channel), STRUCTURE_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence —
+// Wave 597's DIALOGUE_HIGHLIGHT_DROUGHT_RUN applied the drought-run mode to dialogueHighlights;
+// unresolvedClues itself has never been drought-audited here despite being used in co-occurrence
+// and aftermath contexts), STRUCTURE_SEED_ZONE_CLUSTER (distribution/timing
+// × seededClueIds × structural thirds — Wave 639's STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER
+// applied the zone-cluster mode to dialogueHighlights; seededClueIds itself has never been
+// cluster-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3566,6 +3578,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r639c.triggerCount} instances) is followed by two full scenes with no highlighted dialogue, even though ${r639c.aftermathCount} such scenes occur elsewhere in the story. The heaviest concentrations of open mystery never earn a memorable line nearby at the macro-structural level.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line worth remembering — pressing on what's unresolved or voicing the stakes of not knowing.`,
+      });
+    }
+  }
+
+  // ── Wave 653: STRUCTURE_HIGHLIGHT_PEAK_UNCAUSED, STRUCTURE_OPEN_THREAD_DROUGHT_RUN,
+  //              STRUCTURE_SEED_ZONE_CLUSTER ─────────────────────────────────────────────────
+
+  // STRUCTURE_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. Wave 625's STRUCTURAL_STAGING_PEAK_UNCAUSED applied the peak-uncaused mode to
+  // visualBeats; this is the first application to the highlighted-dialogue channel.
+  {
+    const r653a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r653a.fires) {
+      issues.push({
+        location: `scene ${r653a.peakIdx + 1} — peak highlighted-dialogue density (${r653a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STRUCTURE_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r653a.peakIdx + 1}, with ${r653a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of structural causality never coincide.`,
+        suggestedFix: `Give scene ${r653a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6. Wave
+  // 597's DIALOGUE_HIGHLIGHT_DROUGHT_RUN applied the drought-run mode to dialogueHighlights;
+  // unresolvedClues itself has never been drought-audited here despite being used in
+  // co-occurrence (Wave 639) and aftermath (Wave 639) contexts.
+  {
+    const r653b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r653b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r653b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r653b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r653b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the story's structural sense of active mystery goes dark for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r653b.longestRun}-scene stretch so the story maintains some outstanding mystery throughout, keeping its structural sense of open questions alive.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of
+  // them fall in a single structural third. Wave 639's STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER
+  // applied the zone-cluster mode to dialogueHighlights; seededClueIds itself has never been
+  // cluster-audited here.
+  {
+    const r653c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r653c.fires) {
+      const zoneName653c = r653c.zoneNames[r653c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName653c} third — ${r653c.maxZoneCount}/${r653c.count} seed scenes`,
+        rule: 'STRUCTURE_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r653c.maxZoneCount} of the story's ${r653c.count} clue-planting scenes (${Math.round((r653c.maxZoneCount / r653c.count) * 100)}%) cluster in the ${zoneName653c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new seed being planted.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName653c} third — spreading foreshadowing across the story lets each structural third carry its own share of setup for later payoffs.`,
       });
     }
   }
