@@ -278,6 +278,15 @@
 // been applied to it), PAYOFF_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
 // unresolvedClues magnitude — Wave 650 applied the zone-cluster mode to unresolvedClues; the
 // backward-cause peak mode has never been applied to it).
+// Wave 720 additions (built on the shared checks library): PAYOFF_HIGHLIGHT_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × dialogueHighlights magnitude — Waves 650/706 applied
+// the drought-run and zone-cluster modes to dialogueHighlights; the backward-cause peak mode has
+// never been applied to it, completing the trio), PAYOFF_OPEN_THREAD_DROUGHT_RUN (run-based ×
+// unresolvedClues absence — Waves 650/706 applied the zone-cluster and backward-cause peak modes
+// to unresolvedClues; the drought-run mode has never been applied to it, completing the trio),
+// PAYOFF_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence — Wave 664 applied the
+// backward-cause peak mode to relationshipShifts; the drought-run mode has never been applied to
+// it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3920,6 +3929,75 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for outstanding clue-debt (scene ${r706c.peakIdx + 1}, with ${r706c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
         suggestedFix: `Give scene ${r706c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 720: PAYOFF_HIGHLIGHT_PEAK_UNCAUSED, PAYOFF_OPEN_THREAD_DROUGHT_RUN,
+  //              PAYOFF_RELATIONSHIP_DROUGHT_RUN ───────────────────────────────────────────────
+
+  // PAYOFF_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. Waves 650/706 applied the drought-run and zone-cluster modes to
+  // dialogueHighlights; the backward-cause peak mode has never been applied to it, completing the
+  // trio.
+  {
+    const r720a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r720a.fires) {
+      issues.push({
+        location: `scene ${r720a.peakIdx + 1} — peak highlighted-dialogue density (${r720a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r720a.peakIdx + 1}, with ${r720a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the payoff engine's sense of causal escalation never coincide.`,
+        suggestedFix: `Give scene ${r720a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6. Waves
+  // 650/706 applied the zone-cluster and backward-cause peak modes to unresolvedClues; the
+  // drought-run mode has never been applied to it, completing the trio.
+  {
+    const r720b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r720b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r720b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r720b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r720b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved leaves the payoff engine with no live mystery to work against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r720b.longestRun}-scene stretch so the payoff engine has some outstanding mystery to eventually resolve throughout that stretch.`,
+      });
+    }
+  }
+
+  // PAYOFF_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6. Wave 664
+  // applied the backward-cause peak mode to relationshipShifts; the drought-run mode has never
+  // been applied to it.
+  {
+    const r720c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r720c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r720c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r720c.longestRun} consecutive scenes with no relationship shift at all, even though ${r720c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the payoff engine's interpersonal dimension dormant for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r720c.longestRun}-scene stretch — even a small movement keeps the payoff engine tied to changing interpersonal stakes throughout.`,
       });
     }
   }

@@ -1365,6 +1365,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 720 — payoffPass: payoff highlight peak uncaused, payoff open thread drought run, payoff relationship drought run', async () => {
+    const runPY720 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PAYOFF_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs720a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs720a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs720a[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY720(recs720a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_PEAK_UNCAUSED'), 'PAYOFF_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PAYOFF_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs720an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs720an[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs720an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs720an[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY720(recs720an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_PEAK_UNCAUSED'), 'PAYOFF_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; open threads at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PAYOFF_OPEN_THREAD_DROUGHT_RUN fires when the longest no-open-thread run is ≥6', async () => {
+      const recs720b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs720b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs720b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs720b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      recs720b[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runPY720(recs720b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_DROUGHT_RUN'), 'PAYOFF_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // open threads at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PAYOFF_OPEN_THREAD_DROUGHT_RUN does not fire when open threads are distributed without a long drought', async () => {
+      const recs720bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs720bn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs720bn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs720bn[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runPY720(recs720bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_DROUGHT_RUN'), 'PAYOFF_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PAYOFF_RELATIONSHIP_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs720c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs720c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs720c[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs720c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs720c[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runPY720(recs720c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DROUGHT_RUN'), 'PAYOFF_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PAYOFF_RELATIONSHIP_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs720cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs720cn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs720cn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs720cn[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runPY720(recs720cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DROUGHT_RUN'), 'PAYOFF_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 706 — payoffPass: payoff staging drought run, payoff highlight zone cluster, payoff open thread peak uncaused', async () => {
     const runPY706 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
