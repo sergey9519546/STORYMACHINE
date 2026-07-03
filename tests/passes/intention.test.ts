@@ -1352,6 +1352,88 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 731 — intentionPass: intention staging zone cluster, intention seed zone cluster, intention relationship drought run', async () => {
+    const makeRec731 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN731 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('INTENTION_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs731a = Array.from({ length: 9 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 1 || i === 2) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runIN731(recs731a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAGING_ZONE_CLUSTER'), 'INTENTION_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs731an = Array.from({ length: 9 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 4 || i === 7) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runIN731(recs731an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAGING_ZONE_CLUSTER'), 'INTENTION_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('INTENTION_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs731b = Array.from({ length: 9 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 1 || i === 2) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runIN731(recs731b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SEED_ZONE_CLUSTER'), 'INTENTION_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs731bn = Array.from({ length: 9 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 4 || i === 7) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runIN731(recs731bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SEED_ZONE_CLUSTER'), 'INTENTION_SEED_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; relationship shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_RELATIONSHIP_DROUGHT_RUN fires when the longest no-relationship-shift run is ≥6', async () => {
+      const recs731c = Array.from({ length: 10 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runIN731(recs731c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_DROUGHT_RUN'), 'INTENTION_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // relationship shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_RELATIONSHIP_DROUGHT_RUN does not fire when relationship shifts are distributed without a long drought', async () => {
+      const recs731cn = Array.from({ length: 10 }, (_, i) => makeRec731(i,
+        (i === 0 || i === 4 || i === 9) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runIN731(recs731cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_DROUGHT_RUN'), 'INTENTION_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 717 — intentionPass: intention highlight zone cluster, intention open thread peak uncaused, intention payoff drought run', async () => {
     const makeRec717 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -280,6 +280,14 @@
 // applied to it, completing the trio), INTENTION_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds
 // absence — Waves 661/703 applied the zone-cluster and backward-cause peak modes to
 // payoffSetupIds; the drought-run mode has never been applied to it, completing the trio).
+// Wave 731 additions: INTENTION_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats ×
+// structural thirds — Waves 619/689 applied the backward-cause peak and run-based drought modes
+// to visualBeats; the zone-cluster mode has never been applied to it, completing the trio),
+// INTENTION_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds × structural thirds — Wave 689
+// applied the backward-cause peak mode to seededClueIds; the zone-cluster mode has never been
+// applied to it), INTENTION_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence —
+// Wave 661 applied the backward-cause peak mode to relationshipShifts; the drought-run mode has
+// never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4178,6 +4186,71 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r717c.longestRun} consecutive scenes with no thread resolving at all, even though ${r717c.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the protagonist's initiative without any sense of accumulating payoff for an extended run.`,
         suggestedFix: `Resolve at least one thread somewhere within the ${r717c.longestRun}-scene stretch so the protagonist's initiative keeps building toward payoff throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 731: INTENTION_STAGING_ZONE_CLUSTER, INTENTION_SEED_ZONE_CLUSTER,
+  //              INTENTION_RELATIONSHIP_DROUGHT_RUN ─────────────────────────────────────────
+
+  // INTENTION_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 visually dense scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Waves 619/689 applied the
+  // backward-cause peak and run-based drought modes to visualBeats; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r731a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r731a.fires) {
+      issues.push({
+        location: `${r731a.zoneNames[r731a.maxZoneIdx]} third — ${r731a.maxZoneCount} of ${r731a.count} visually dense scenes`,
+        rule: 'INTENTION_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r731a.maxZoneCount / r731a.count) * 100)}% of the story's visually dense scenes cluster in the ${r731a.zoneNames[r731a.maxZoneIdx]} third. When staging carries the intention almost everywhere in one window, the character's goals go unstaged for the rest of the story.`,
+        suggestedFix: `Move at least one visually dense beat outside the ${r731a.zoneNames[r731a.maxZoneIdx]} third so staging keeps expressing intention more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when more than
+  // 75% of those scenes cluster in a single third. Wave 689 applied the backward-cause peak mode
+  // to seededClueIds; the zone-cluster mode has never been applied to it.
+  {
+    const r731b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r731b.fires) {
+      issues.push({
+        location: `${r731b.zoneNames[r731b.maxZoneIdx]} third — ${r731b.maxZoneCount} of ${r731b.count} seed scenes`,
+        rule: 'INTENTION_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r731b.maxZoneCount / r731b.count) * 100)}% of the story's clue-planting scenes cluster in the ${r731b.zoneNames[r731b.maxZoneIdx]} third. When every seed is planted in the same structural window, the character's intentions have nothing new to reach for once that window closes.`,
+        suggestedFix: `Plant at least one clue outside the ${r731b.zoneNames[r731b.maxZoneIdx]} third so fresh foreshadowing keeps feeding the character's intentions throughout the story.`,
+      });
+    }
+  }
+
+  // INTENTION_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no bond change reaches 6. Wave 661
+  // applied the backward-cause peak mode to relationshipShifts; the drought-run mode has never
+  // been applied to it.
+  {
+    const r731c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r731c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r731c.longestRun} consecutive scenes`,
+        rule: 'INTENTION_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r731c.longestRun} consecutive scenes with no relationship shift at all, even though ${r731c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters leaves intention operating in a social vacuum for an extended run.`,
+        suggestedFix: `Shift at least one relationship — however slightly — within the ${r731c.longestRun}-scene stretch so the character's pursuit of their goal keeps testing their bonds throughout that stretch.`,
       });
     }
   }
