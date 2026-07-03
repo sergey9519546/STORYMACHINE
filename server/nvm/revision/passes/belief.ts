@@ -255,6 +255,16 @@
 // BELIEF_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn presence × structural thirds —
 // dramaticTurn has only ever served as a hasCause/trigger condition in this pass, never as the
 // subject of a zone-cluster check). Completes the sixth full rotation cycle (657-670).
+// Wave 684 additions: BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — distinct from Wave 628's BELIEF_CHARACTER_MOMENT_
+// ZONE_IMBALANCE, which checks four-zone bloat/empty rather than a thirds-based majority cluster),
+// BELIEF_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — curiosityDelta has only
+// ever anchored average-based hand-rolled logic and a single co-occurrence/decoupling check
+// [Wave 642's BELIEF_SEED_CURIOSITY_DECOUPLED]; the run-based mode applied to this channel for
+// the first time), BELIEF_SUSPENSE_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// suspenseDelta magnitude — suspenseDelta has only ever anchored average-based hand-rolled logic
+// [e.g. avgRevSusp, tenseRevScenes]; the scene where suspense spikes hardest has never been
+// checked for backward causation via the shared library).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3772,6 +3782,75 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r670c.maxZoneCount} of the story's ${r670c.count} dramatic-turn scenes (${Math.round((r670c.maxZoneCount / r670c.count) * 100)}%) cluster in the ${zoneName670c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no reversal to test the audience's beliefs against.`,
         suggestedFix: `Give at least one scene outside the ${zoneName670c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry a reversal that tests what the audience believes.`,
+      });
+    }
+  }
+
+  // ── Wave 684: BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER, BELIEF_CURIOSITY_DROUGHT_RUN,
+  //              BELIEF_SUSPENSE_PEAK_UNCAUSED ─────────────────────────────────────────────────
+
+  // BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // character-moment scenes, fires when >75% of them fall in a single structural third. Distinct
+  // from Wave 628's BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE, which checks four-zone bloat/empty
+  // distribution rather than a thirds-based majority cluster.
+  {
+    const r684a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r684a.fires) {
+      const zoneName684a = r684a.zoneNames[r684a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName684a} third — ${r684a.maxZoneCount}/${r684a.count} character-moment scenes`,
+        rule: 'BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r684a.maxZoneCount} of the story's ${r684a.count} scenes purposed as character moments (${Math.round((r684a.maxZoneCount / r684a.count) * 100)}%) cluster in the ${zoneName684a} third. Dedicated reflection beats concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no scene purposed to let belief and self-deception surface.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName684a} third a character-moment purpose — spreading dedicated reflection beats across the story keeps opportunities for belief to surface present at every stage.`,
+      });
+    }
+  }
+
+  // BELIEF_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 curiosity-spike scenes overall, fires when the
+  // longest consecutive run of scenes with no new curiosity spike reaches 6. curiosityDelta has
+  // only ever anchored average-based hand-rolled logic and Wave 642's single co-occurrence check
+  // against seededClueIds; the run-based mode applied to this channel for the first time.
+  {
+    const r684b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r684b.fires) {
+      issues.push({
+        location: `longest stretch with no new curiosity spike: ${r684b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r684b.longestRun} consecutive scenes with no new curiosity spike at all, even though ${r684b.presentCount} scenes elsewhere raise a fresh question. A long unbroken stretch with nothing new to wonder about leaves the belief-tracking layer's sense of active questioning dormant for an extended run.`,
+        suggestedFix: `Raise a new question or unknown somewhere within the ${r684b.longestRun}-scene stretch so the belief-tracking layer's sense of active curiosity keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_PEAK_UNCAUSED — Single-peak isolation/backward-cause × suspenseDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a
+  // positive suspense delta, a 2-scene lookback. Finds the single scene where suspense spikes
+  // hardest; fires when neither that scene nor either of the two before it contains a dramatic
+  // turn or revelation. suspenseDelta has only ever anchored average-based hand-rolled logic
+  // (e.g. avgRevSusp, tenseRevScenes) in this pass; never checked for backward causation.
+  {
+    const r684c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r684c.fires) {
+      issues.push({
+        location: `scene ${r684c.peakIdx + 1} — peak suspense spike (${r684c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single sharpest suspense spike (scene ${r684c.peakIdx + 1}, delta ${r684c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where tension rises most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the belief-tracking layer's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r684c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest rise in tension is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
       });
     }
   }

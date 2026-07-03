@@ -1204,6 +1204,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 684 — beliefPass: belief character moment zone cluster, belief curiosity drought run, belief suspense peak uncaused', async () => {
+    const runBF684 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character-moment scenes at 0,1,2 → 100% opening third
+    it('BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs684a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs684a[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs684a[1] = makeSharedRecord(1, { purpose: 'character_moment' });
+      recs684a[2] = makeSharedRecord(2, { purpose: 'character_moment' });
+      const res = await runBF684(recs684a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER'), 'BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER no-fire:
+    // character-moment scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes are distributed across thirds', async () => {
+      const recs684an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs684an[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs684an[4] = makeSharedRecord(4, { purpose: 'character_moment' });
+      recs684an[7] = makeSharedRecord(7, { purpose: 'character_moment' });
+      const res = await runBF684(recs684an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER'), 'BELIEF_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_CURIOSITY_DROUGHT_RUN fire:
+    // 10 scenes; curiosity spikes at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_CURIOSITY_DROUGHT_RUN fires when the longest no-curiosity-spike run is ≥6', async () => {
+      const recs684b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs684b[0] = makeSharedRecord(0, { curiosityDelta: 2 });
+      recs684b[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs684b[2] = makeSharedRecord(2, { curiosityDelta: 1 });
+      recs684b[9] = makeSharedRecord(9, { curiosityDelta: 2 });
+      const res = await runBF684(recs684b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_DROUGHT_RUN'), 'BELIEF_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_CURIOSITY_DROUGHT_RUN no-fire:
+    // curiosity spikes at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_CURIOSITY_DROUGHT_RUN does not fire when curiosity spikes are distributed without a long drought', async () => {
+      const recs684bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs684bn[0] = makeSharedRecord(0, { curiosityDelta: 2 });
+      recs684bn[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs684bn[9] = makeSharedRecord(9, { curiosityDelta: 2 });
+      const res = await runBF684(recs684bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_DROUGHT_RUN'), 'BELIEF_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspense at 2 (delta 1) and 6 (delta 5, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('BELIEF_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense-spike scene has no dramatic turn or revelation nearby', async () => {
+      const recs684c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs684c[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      recs684c[6] = makeSharedRecord(6, { suspenseDelta: 5 });
+      const res = await runBF684(recs684c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_PEAK_UNCAUSED'), 'BELIEF_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_SUSPENSE_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_SUSPENSE_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs684cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs684cn[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      recs684cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs684cn[6] = makeSharedRecord(6, { suspenseDelta: 5 });
+      const res = await runBF684(recs684cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_PEAK_UNCAUSED'), 'BELIEF_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 670 — beliefPass: belief highlight peak uncaused, belief relationship drought run, belief turn zone cluster', async () => {
     const runBF670 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
