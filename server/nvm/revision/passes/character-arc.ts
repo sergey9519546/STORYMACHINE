@@ -471,6 +471,11 @@
 // trio but has never been audited by the 4-zone mode: ARC_OPEN_THREAD_ZONE_IMBALANCE
 // (unresolvedClues.length > 0), ARC_PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0), and
 // ARC_SEED_ZONE_IMBALANCE (seededClueIds.length > 0).
+// Wave 953 additions: with arc's valence/delta/purpose/clue-array signals now saturated by the
+// 4-zone mode, this wave audits three remaining trio-complete signals spanning three distinct
+// classes: ARC_RELATIONAL_ZONE_IMBALANCE (relationshipShifts array), ARC_TURN_ZONE_IMBALANCE
+// (dramaticTurn !== 'nothing' categorical), and ARC_REVELATION_ZONE_IMBALANCE (revelation string
+// field, != null — distinct from the purpose-enum ARC_REVELATION_PURPOSE_ZONE_IMBALANCE).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5382,6 +5387,80 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r939c.totalCount} scenes that seed a clue are unevenly distributed across its four structural zones: ${bloatName939c} contains ${r939c.counts[r939c.bloatZoneIdx]} of them (${Math.round((r939c.counts[r939c.bloatZoneIdx] / r939c.totalCount) * 100)}%) while ${emptyNames939c} contains none. Seeds bloat in one structural quarter and vanish from another, so the arc plants its groundwork in only part of the story.`,
         suggestedFix: `Redistribute seeds: plant a clue in at least one scene inside the empty zone(s) — ${emptyNames939c} — so the arc lays groundwork across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_RELATIONAL_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone ARC_RELATIONAL_ZONE_CLUSTER and run-based ARC_RELATIONAL_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the relationship-shift array field, keying on
+  // where the character's bonds change (the relational engine of an arc).
+  {
+    const r953a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r953a.fires) {
+      const emptyNames953a = r953a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName953a = FOUR_ZONE_NAMES[r953a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames953a} empty; ${bloatName953a} has ${r953a.counts[r953a.bloatZoneIdx]}/${r953a.totalCount} relationship-shift scenes`,
+        rule: 'ARC_RELATIONAL_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r953a.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName953a} contains ${r953a.counts[r953a.bloatZoneIdx]} of them (${Math.round((r953a.counts[r953a.bloatZoneIdx] / r953a.totalCount) * 100)}%) while ${emptyNames953a} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the character's arc is reshaped by relationships in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames953a} — a relationship shift so the character's arc keeps being reshaped by their bonds across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone ARC_TURN_ZONE_CLUSTER and run-based ARC_TURN_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical signal.
+  {
+    const r953b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r953b.fires) {
+      const emptyNames953b = r953b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName953b = FOUR_ZONE_NAMES[r953b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames953b} empty; ${bloatName953b} has ${r953b.counts[r953b.bloatZoneIdx]}/${r953b.totalCount} dramatic-turn scenes`,
+        rule: 'ARC_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r953b.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName953b} contains ${r953b.counts[r953b.bloatZoneIdx]} of them (${Math.round((r953b.counts[r953b.bloatZoneIdx] / r953b.totalCount) * 100)}%) while ${emptyNames953b} contains none. Turns bloat in one structural quarter and never fire in another, so the character's arc pivots in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames953b} — a dramatic turn so the character's arc keeps pivoting across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone ARC_REVELATION_ZONE_CLUSTER
+  // and run-based ARC_REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to the revelation STRING field (revelation != null), and distinct from ARC_REVELATION_
+  // PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation' enum value.
+  {
+    const r953c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r953c.fires) {
+      const emptyNames953c = r953c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName953c = FOUR_ZONE_NAMES[r953c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames953c} empty; ${bloatName953c} has ${r953c.counts[r953c.bloatZoneIdx]}/${r953c.totalCount} revelation scenes`,
+        rule: 'ARC_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r953c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName953c} contains ${r953c.counts[r953c.bloatZoneIdx]} of them (${Math.round((r953c.counts[r953c.bloatZoneIdx] / r953c.totalCount) * 100)}%) while ${emptyNames953c} contains none. Disclosures bloat in one structural quarter and never land in another, so fresh truth reshapes the character's arc in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames953c} — so new truth keeps reshaping the character's arc across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

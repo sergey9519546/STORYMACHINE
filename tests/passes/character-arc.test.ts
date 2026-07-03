@@ -1080,6 +1080,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 953 — characterArcPass: arc relational zone imbalance, arc turn zone imbalance, arc revelation zone imbalance', async () => {
+    const makeRec953 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc953 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ARC_RELATIONAL_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs953a = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 1, 2, 8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runArc953(recs953a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_ZONE_IMBALANCE'), 'ARC_RELATIONAL_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_RELATIONAL_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs953an = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 3, 5, 8].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runArc953(recs953an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_ZONE_IMBALANCE'), 'ARC_RELATIONAL_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs953b = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 1, 2, 8, 9].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runArc953(recs953b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_ZONE_IMBALANCE'), 'ARC_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs953bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 3, 5, 8].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runArc953(recs953bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_ZONE_IMBALANCE'), 'ARC_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs953c = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 1, 2, 8, 9].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runArc953(recs953c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_ZONE_IMBALANCE'), 'ARC_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs953cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec953(i, [0, 3, 5, 8].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runArc953(recs953cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_ZONE_IMBALANCE'), 'ARC_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 939 — characterArcPass: arc open thread zone imbalance, arc payoff zone imbalance, arc seed zone imbalance', async () => {
     const makeRec939 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
