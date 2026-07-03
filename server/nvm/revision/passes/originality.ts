@@ -386,6 +386,17 @@
 // ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined non-neutral emotionalShift [either
 // valence]; this isolates the negative valence alone, which none of the three shared-library trio
 // modes has ever done on its own).
+//
+// Wave 844 additions: ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 830; peak mode conventionally skipped for this categorical
+// field), ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative'
+// absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode added in
+// Wave 830; peak mode conventionally skipped for this categorical field),
+// ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift === 'positive'
+// × structural thirds — distinct from ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined
+// non-neutral emotionalShift [either valence]; this isolates the positive valence alone, opening
+// a new trio in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5145,6 +5156,74 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r830c.maxZoneCount / r830c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r830c.zoneNames[r830c.maxZoneIdx]} third — a predictable concentration of darkness the audience can learn to anticipate rather than emotional cost distributed unevenly across the whole story.`,
         suggestedFix: `Introduce a negative-emotion scene outside the ${r830c.zoneNames[r830c.maxZoneIdx]} third so emotional cost stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 844: ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN, ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 830 (peak mode conventionally skipped for this
+  // categorical field).
+  {
+    const r844a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r844a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r844a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r844a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r844a.presentCount} scenes elsewhere open a new front — a long, predictable stretch of coasting the audience can learn to anticipate.`,
+        suggestedFix: `Purpose at least one scene within the ${r844a.longestRun}-scene stretch to introduce conflict so new fronts stay unpredictable throughout that stretch rather than absent for a learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 830 (peak mode conventionally skipped for this categorical field).
+  {
+    const r844b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r844b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r844b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r844b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r844b.presentCount} scenes elsewhere carry one — a long, predictable stretch of emotional safety the audience can learn to anticipate.`,
+        suggestedFix: `Give at least one scene within the ${r844b.longestRun}-scene stretch a negative-emotion charge so emotional cost stays unpredictable throughout that stretch rather than absent for a learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift ===
+  // 'positive' × structural thirds. Built on checkZoneCluster from the shared checks library.
+  // n≥9, ≥3 positive-emotion scenes, fires when more than 75% of them fall in a single
+  // structural third. Distinct from ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined
+  // non-neutral emotionalShift (either valence); this isolates the positive valence alone,
+  // opening a new trio in this pass.
+  {
+    const r844c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r844c.fires) {
+      issues.push({
+        location: `${r844c.zoneNames[r844c.maxZoneIdx]} third — ${r844c.maxZoneCount} of ${r844c.count} positive-emotion scenes`,
+        rule: 'ORIGINALITY_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r844c.maxZoneCount / r844c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r844c.zoneNames[r844c.maxZoneIdx]} third — a predictable concentration of relief the audience can learn to anticipate rather than emotional reward distributed unevenly across the whole story.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r844c.zoneNames[r844c.maxZoneIdx]} third so emotional relief stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }
