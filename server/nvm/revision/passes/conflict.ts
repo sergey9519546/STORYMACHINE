@@ -230,10 +230,26 @@
 // of these two fields), CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
 // dialogueHighlights × four structural zones — Wave 604/618 applied this template to visualBeats
 // and payoffSetupIds; dialogueHighlights itself has never been zone-audited here).
+// Wave 646 additions (built on the shared checks library, audit M2.2): this 114-rule pass already
+// hand-rolls the peak/drought/cluster analytical concepts extensively (ten CONFLICT_PEAK_*_ABSENT
+// checks on suspense/emotion/curiosity/dramaticTurn/clock/revelation/payoff/seed/rupture/repair,
+// three drought-run checks on repair/revelation/rupture, one zone-cluster on curiosity) — but
+// never via the shared checkPeakUncaused/checkDroughtRun/checkZoneCluster helpers, and never on
+// the visualBeats/unresolvedClues/dialogueHighlights channels. CONFLICT_STAGING_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × visualBeats magnitude — the scene with the densest
+// physical staging has no dramatic turn or revelation in itself or the two scenes before it;
+// distinct from the existing CONFLICT_PEAK_*_ABSENT family, which audits whether the peak
+// conflict-magnitude scene itself lacks a channel, not whether a physical-staging peak is
+// backward-caused), CONFLICT_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence — a
+// 6+ consecutive-scene stretch with zero outstanding clue-debt while such scenes occur ≥3 times
+// elsewhere; the drought-run template applied to a fourth channel after repair/revelation/
+// rupture), CONFLICT_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural
+// thirds — >75% of highlighted-dialogue scenes concentrate in one third; the zone-cluster
+// template applied to a second channel after curiosity).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function conflictPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -3782,6 +3798,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r632c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName632c} contains ${r632c.counts[r632c.bloatZoneIdx]} of them (${Math.round((r632c.counts[r632c.bloatZoneIdx] / r632c.totalCount) * 100)}%) while ${emptyNames632c} contains none. Memorable conflict dialogue bloats in one structural quarter and vanishes from another, giving the story's verbal-conflict rhythm an uneven pulse.`,
         suggestedFix: `Redistribute standout dialogue: bring at least one memorable conflict line into ${emptyNames632c}, so every structural quarter carries some verbal high point for the conflict, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 646: CONFLICT_STAGING_PEAK_UNCAUSED, CONFLICT_OPEN_THREAD_DROUGHT_RUN,
+  //              CONFLICT_HIGHLIGHT_ZONE_CLUSTER ──────────────────────────────────────────────
+
+  // CONFLICT_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged
+  // scenes, a 2-scene lookback. Finds the single scene with the densest physical staging; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. First checkPeakUncaused use in this pass via the shared library — distinct from
+  // the existing CONFLICT_PEAK_*_ABSENT family (suspense/emotion/curiosity/dramaticTurn/clock/
+  // revelation/payoff/seed/rupture/repair), which each audit whether the story's peak
+  // conflict-magnitude scene itself lacks a given channel; this instead asks whether a
+  // physical-staging peak is causally earned by a preceding structural pivot.
+  {
+    const r646a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r646a.fires) {
+      issues.push({
+        location: `scene ${r646a.peakIdx + 1} — peak physical-staging density (${r646a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r646a.peakIdx + 1}, with ${r646a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical conflict concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action and the peak of narrative causality never coincide.`,
+        suggestedFix: `Give scene ${r646a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically intense moment is earned by a shift in the conflict rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6. This
+  // pass already hand-rolls drought-run logic for repair (CONFLICT_REPAIR_DROUGHT_RUN),
+  // revelation (CONFLICT_REVELATION_DROUGHT_RUN), and rupture (CONFLICT_RUPTURE_DROUGHT_RUN), but
+  // never via the shared helper and never on the unresolvedClues channel — a long unbroken
+  // stretch where every mystery is settled leaves the conflict's causal engine idle.
+  {
+    const r646b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r646b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r646b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r646b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r646b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the conflict's engine of unanswered questions goes fully dark for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r646b.longestRun}-scene stretch so the conflict maintains some outstanding mystery throughout, keeping its causal pressure alive.`,
+      });
+    }
+  }
+
+  // CONFLICT_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-
+  // dialogue scenes, fires when >75% of them fall in a single structural third. This pass already
+  // applies the zone-cluster template to curiosity (CONFLICT_CURIOSITY_ZONE_CLUSTER); this is the
+  // second channel — a scene where a line of dialogue is flagged as memorable concentrates
+  // almost exclusively in one third rather than surfacing throughout the conflict.
+  {
+    const r646c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r646c.fires) {
+      const zoneName646c = r646c.zoneNames[r646c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName646c} third — ${r646c.maxZoneCount}/${r646c.count} highlighted-dialogue scenes`,
+        rule: 'CONFLICT_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r646c.maxZoneCount} of the story's ${r646c.count} scenes carrying a standout line of dialogue (${Math.round((r646c.maxZoneCount / r646c.count) * 100)}%) cluster in the ${zoneName646c} third. Memorable dialogue concentrates almost exclusively in that stretch of the conflict rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the confrontation.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName646c} third a standout line of dialogue — spreading memorable confrontation across the story lets each structural third carry its own verbal weight.`,
       });
     }
   }
