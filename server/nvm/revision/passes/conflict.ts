@@ -340,6 +340,18 @@
 // none of the three shared-library trio modes has ever been applied to it), CONFLICT_TURN_
 // DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — completing 2 of 3 slots for
 // dramaticTurn alongside the zone-cluster mode added in this same wave).
+// Wave 800 additions: CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'negative' × structural thirds — distinct from the existing
+// NEGATIVE_SPIRAL_UNBROKEN [Wave 285], which is a PRESENCE-run of 4+ consecutive negative scenes,
+// not a thirds-based concentration test; the general cluster mode has never been applied to this
+// specific valence), CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'negative' absence — distinct from NEGATIVE_SPIRAL_UNBROKEN's presence-run in the same way; an
+// absence run of 6+ scenes with no negative beat is the mirror-image claim, completing 2 of 3
+// slots for this valence alongside the zone-cluster mode added in this same wave),
+// CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass despite being thematically central to it; none of the three
+// shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4652,6 +4664,76 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r786c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r786c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the conflict flat without a structural pivot for an extended run.`,
         suggestedFix: `Introduce a dramatic turn somewhere within the ${r786c.longestRun}-scene stretch so the conflict keeps a pivot to redirect it throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 800: CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER, CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from the existing NEGATIVE_SPIRAL_UNBROKEN (Wave 285), which is a PRESENCE-run of 4+
+  // consecutive negative scenes anywhere in the story, not a thirds-based concentration test —
+  // the general cluster mode has never been applied to this specific valence.
+  {
+    const r800a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r800a.fires) {
+      issues.push({
+        location: `${r800a.zoneNames[r800a.maxZoneIdx]} third — ${r800a.maxZoneCount} of ${r800a.count} negative-emotion scenes`,
+        rule: 'CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r800a.maxZoneCount / r800a.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r800a.zoneNames[r800a.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the conflict carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r800a.zoneNames[r800a.maxZoneIdx]} third so the conflict's emotional cost registers more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative charge reaches 6.
+  // Distinct from NEGATIVE_SPIRAL_UNBROKEN's presence-run in the same way as the zone-cluster
+  // check above — an absence run of 6+ scenes with no negative beat is the mirror-image claim.
+  // Completes 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+  // wave.
+  {
+    const r800b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r800b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r800b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r800b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r800b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the conflict without any adversity testing it for an extended run.`,
+        suggestedFix: `Give the conflict a setback within the ${r800b.longestRun}-scene stretch so it keeps testing the characters with adversity throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass
+  // despite being thematically central to it; none of the three shared-library trio modes has
+  // ever been applied to it.
+  {
+    const r800c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r800c.fires) {
+      issues.push({
+        location: `${r800c.zoneNames[r800c.maxZoneIdx]} third — ${r800c.maxZoneCount} of ${r800c.count} conflict-introducing scenes`,
+        rule: 'CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r800c.maxZoneCount / r800c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r800c.zoneNames[r800c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the story stops introducing fresh sources of friction anywhere else across its full shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r800c.zoneNames[r800c.maxZoneIdx]} third to introduce conflict so the story keeps opening fresh friction more evenly across its full shape.`,
       });
     }
   }

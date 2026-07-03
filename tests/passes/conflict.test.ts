@@ -1535,6 +1535,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 800 — conflictPass: conflict negative emotion zone cluster, conflict negative emotion drought run, conflict introduce conflict zone cluster', async () => {
+    const makeRec800 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF800 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs800a = Array.from({ length: 9 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF800(recs800a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs800an = Array.from({ length: 9 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 4 || i === 8) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF800(recs800an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'CONFLICT_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs800b = Array.from({ length: 10 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF800(recs800b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN'), 'CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs800bn = Array.from({ length: 10 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF800(recs800bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN'), 'CONFLICT_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; introduce_conflict scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER fires when >75% of conflict-introducing scenes cluster in one third', async () => {
+      const recs800c = Array.from({ length: 9 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runCF800(recs800c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER does not fire when conflict-introducing scenes spread across thirds', async () => {
+      const recs800cn = Array.from({ length: 9 }, (_, i) => makeRec800(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runCF800(recs800cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'CONFLICT_INTRODUCE_CONFLICT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 786 — conflictPass: conflict emotion drought run, conflict turn zone cluster, conflict turn drought run', async () => {
     const makeRec786 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
