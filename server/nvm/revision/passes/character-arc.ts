@@ -231,6 +231,13 @@
 // (underweight/bloat × purpose === 'character_moment' × four structural zones — first zone-based
 // check on the purpose channel), ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath ×
 // seededClueIds trigger → dialogueHighlights absence — first pairing of these two fields).
+// Wave 631 additions (built on the shared checks library, audit M2.2): ARC_DIALOGUE_HIGHLIGHT_
+// STAGING_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × visualBeats — first pairing
+// of these two fields in this 105-rule pass), ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × heavy unresolvedClues debt trigger → visualBeats absence — first pairing
+// of these two fields), ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
+// dialogueHighlights × four structural zones — Wave 617 applied this template to purpose only;
+// dialogueHighlights itself has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3517,6 +3524,80 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r617c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r617c.aftermathCount} such scenes exist elsewhere in the script. Seeds are the arc's long-horizon deposits; when their immediate aftermath never carries a memorable line, the planted material gets no verbal texture nearby, living purely as structural bookkeeping until its eventual payoff.`,
         suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, or a reaction that gives it emotional presence before the payoff arrives.`,
+      });
+    }
+  }
+
+  // ── Wave 631: ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED, ARC_OPEN_THREAD_STAGING_AFTERMATH_
+  //              VOID, ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE ─────────────────────────────────
+
+  // ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // visualBeats. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 visually-staged scenes (visualBeats.length≥2). Zero
+  // overlap → fire. First pairing of these two fields in this 105-rule pass. The arc's most
+  // memorable dialogue and its most physically staged moments never share a scene — a character's
+  // standout line and their most visible physical action develop on entirely separate beats.
+  {
+    const r631a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r631a.fires) {
+      issues.push({
+        location: `${r631a.aCount} dialogue-highlight scene(s), ${r631a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r631a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r631a.bCount} scenes leaning heavily on physical staging — the arc's most memorable words and its most visible physical action run on separate tracks. A line worth remembering often lands hardest when paired with a physical beat that embodies it.`,
+        suggestedFix: `Let at least one heavily staged scene also carry a line worth remembering — a character's standout dialogue landing during, not instead of, a moment of visible physical action.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥3 scenes anywhere
+  // with substantial physical staging, a 2-scene lookahead window. Fires when every heavy-debt
+  // scene's two-scene aftermath contains no visually dense scene, while such scenes do occur
+  // elsewhere. First pairing of unresolvedClues with visualBeats in this pass — distinct from
+  // OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (Wave 603: same trigger, emotionalShift channel instead).
+  {
+    const r631b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r631b.fires) {
+      issues.push({
+        location: `${r631b.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r631b.triggerCount} instances) is followed by two full scenes with no substantial physical staging, even though ${r631b.aftermathCount} such scenes occur elsewhere in the story. The heaviest concentrations of open mystery never register in the protagonist's physical world nearby — no lingering glance, no restless action reflecting the unresolved pressure.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the protagonist's physical behavior register the pressure — a restless action, a lingering look at something tied to the mystery, staged rather than only stated.`,
+      });
+    }
+  }
+
+  // ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a dialogue highlight, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Wave 617 applied this
+  // template to the purpose channel only; dialogueHighlights itself has never been zone-audited
+  // in this file despite already being used in a co-occurrence and an aftermath check.
+  {
+    const r631c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r631c.fires) {
+      const emptyNames631c = r631c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName631c = FOUR_ZONE_NAMES[r631c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames631c} empty; ${bloatName631c} has ${r631c.counts[r631c.bloatZoneIdx]}/${r631c.totalCount} dialogue-highlight scenes`,
+        rule: 'ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r631c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName631c} contains ${r631c.counts[r631c.bloatZoneIdx]} of them (${Math.round((r631c.counts[r631c.bloatZoneIdx] / r631c.totalCount) * 100)}%) while ${emptyNames631c} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the arc's verbal high points an uneven structural rhythm.`,
+        suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames631c}, so every structural quarter carries some verbal high point for the arc, not only the quarter currently carrying most of them.`,
       });
     }
   }

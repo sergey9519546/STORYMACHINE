@@ -1080,6 +1080,103 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 631 — characterArcPass: arc dialogue highlight staging decoupled, arc open thread staging aftermath void, arc dialogue highlight zone imbalance', async () => {
+    const makeRec631 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc631 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no staging); staged at 4,5 (no highlight) → zero overlap → fires
+    it('ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED fires when dialogue highlights and visually-staged scenes never overlap', async () => {
+      const recs631a = Array.from({ length: 6 }, (_, i) =>
+        makeRec631(i, {
+          dialogueHighlights: i === 0 || i === 1 ? ['a memorable line'] : [],
+          visualBeats: i === 4 || i === 5 ? ['throws open the shutters', 'stares at the yard'] : [],
+        })
+      );
+      const res = await runArc631(recs631a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED'), 'ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED should fire');
+    });
+
+    // ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and visual staging → overlap exists
+    it('ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs631an = Array.from({ length: 6 }, (_, i) =>
+        makeRec631(i, {
+          dialogueHighlights: i === 0 || i === 1 ? ['a memorable line'] : [],
+          visualBeats: i === 0 || i === 5 ? ['throws open the shutters', 'stares at the yard'] : [],
+        })
+      );
+      const res = await runArc631(recs631an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED'), 'ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED should not fire');
+    });
+
+    // ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // visually dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a visually dense scene', async () => {
+      const recs631b = Array.from({ length: 8 }, (_, i) =>
+        makeRec631(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+          visualBeats: i === 5 || i === 6 || i === 7 ? ['throws open the shutters', 'stares at the yard'] : [],
+        })
+      );
+      const res = await runArc631(recs631b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs631bn = Array.from({ length: 8 }, (_, i) =>
+        makeRec631(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+          visualBeats: i === 3 || i === 5 || i === 6 || i === 7 ? ['throws open the shutters', 'stares at the yard'] : [],
+        })
+      );
+      const res = await runArc631(recs631bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); highlights at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty of dialogue highlights while another is bloated', async () => {
+      const recs631c = Array.from({ length: 12 }, (_, i) =>
+        makeRec631(i, { dialogueHighlights: (i === 6 || i === 7 || i === 8 || i === 9) ? ['a memorable line'] : [] })
+      );
+      const res = await runArc631(recs631c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    // ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE no-fire:
+    // one highlight per zone (1,4,7,10) → no zone is empty
+    it('ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlights are spread across all zones', async () => {
+      const recs631cn = Array.from({ length: 12 }, (_, i) =>
+        makeRec631(i, { dialogueHighlights: (i === 1 || i === 4 || i === 7 || i === 10) ? ['a memorable line'] : [] })
+      );
+      const res = await runArc631(recs631cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 617 — characterArcPass: payoff visual beat decoupled, arc character moment zone imbalance, arc seed dialogue highlight aftermath void', async () => {
     const makeRec617 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
