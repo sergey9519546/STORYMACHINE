@@ -382,6 +382,17 @@
 // INTENTION_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' × structural
 // thirds — this purpose value has only ever appeared inside a separate composite low-momentum
 // purposes set; likewise a virgin standalone signal).
+//
+// Wave 871 additions: INTENTION_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 857; peak mode conventionally skipped for this categorical field),
+// INTENTION_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution' absence -- completes 2
+// of 3 slots for this purpose value alongside the zone-cluster mode added in Wave 857; peak mode
+// conventionally skipped for this categorical field), INTENTION_COMPLICATE_ZONE_CLUSTER
+// (distribution/timing x purpose === 'complicate' x structural thirds -- this purpose value has
+// only ever appeared inside an explanatory comment listing "dramatic purposes expected to
+// recur"; none of the three shared-library trio modes has ever isolated it as its own
+// standalone signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4953,6 +4964,73 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r857c.maxZoneCount / r857c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r857c.zoneNames[r857c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the character's pursuit of their goal settles in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r857c.zoneNames[r857c.maxZoneIdx]} third so the character's intention settles more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 871: INTENTION_CLIMAX_DROUGHT_RUN, INTENTION_RESOLUTION_DROUGHT_RUN,
+  //              INTENTION_COMPLICATE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // INTENTION_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 857 (peak mode conventionally skipped for this categorical field).
+  {
+    const r871a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r871a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r871a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r871a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r871a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the character's pursuit of their goal without a structural high point to build its biggest test toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r871a.longestRun}-scene stretch as the climax, or restructure so the character's intention builds toward recurring peak tests rather than a single distant one.`,
+      });
+    }
+  }
+
+  // INTENTION_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 857 (peak mode conventionally skipped for this categorical field).
+  {
+    const r871b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r871b.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r871b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r871b.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r871b.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the character's pursuit of their goal without a resolving beat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r871b.longestRun}-scene stretch to resolve part of the story, so the character's intention keeps settling throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // INTENTION_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has only ever appeared inside an explanatory comment listing "dramatic
+  // purposes expected to recur"; none of the three shared-library trio modes has ever isolated
+  // it as its own standalone signal.
+  {
+    const r871c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r871c.fires) {
+      issues.push({
+        location: `${r871c.zoneNames[r871c.maxZoneIdx]} third — ${r871c.maxZoneCount} of ${r871c.count} complicating scenes`,
+        rule: 'INTENTION_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r871c.maxZoneCount / r871c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r871c.zoneNames[r871c.maxZoneIdx]} third. When every complication lands in the same structural window, the character's pursuit of their goal stops encountering fresh obstacles anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r871c.zoneNames[r871c.maxZoneIdx]} third to complicate the story so the character's intention keeps meeting fresh obstacles more evenly across the story.`,
       });
     }
   }
