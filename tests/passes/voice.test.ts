@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 641 — voicePass: voice suspense flatline, voice curiosity zone imbalance, voice clock delta peak uncaused', async () => {
+    const runV641 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_SUSPENSE_FLATLINE fire:
+    // 8 scenes, every suspenseDelta identical (1.0) — zero deviation from the average
+    it('VOICE_SUSPENSE_FLATLINE fires when suspenseDelta barely varies across scenes', async () => {
+      const recs641a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { suspenseDelta: 1.0 }));
+      const res = await runV641(recs641a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_FLATLINE'), 'VOICE_SUSPENSE_FLATLINE should fire');
+    });
+
+    // VOICE_SUSPENSE_FLATLINE no-fire:
+    // alternating 0.2/2.5 — wide deviation from the average
+    it('VOICE_SUSPENSE_FLATLINE does not fire when suspenseDelta varies widely across scenes', async () => {
+      const recs641an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { suspenseDelta: i % 2 === 0 ? 0.2 : 2.5 }));
+      const res = await runV641(recs641an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_FLATLINE'), 'VOICE_SUSPENSE_FLATLINE should not fire');
+    });
+
+    // VOICE_CURIOSITY_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); curiosity-positive scenes at 6,7,8,9; zone 2 (6-8)=3,
+    // zone 3 (9)=1, total=4; zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('VOICE_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty of curiosity-spike scenes while another is bloated', async () => {
+      const recs641b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs641b[6] = makeSharedRecord(6, { curiosityDelta: 1 });
+      recs641b[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      recs641b[8] = makeSharedRecord(8, { curiosityDelta: 1 });
+      recs641b[9] = makeSharedRecord(9, { curiosityDelta: 1 });
+      const res = await runV641(recs641b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_ZONE_IMBALANCE'), 'VOICE_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    // VOICE_CURIOSITY_ZONE_IMBALANCE no-fire:
+    // one curiosity-spike scene per zone (1,4,7,10) → no zone is empty
+    it('VOICE_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity spikes are spread across all zones', async () => {
+      const recs641bn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs641bn[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs641bn[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs641bn[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      recs641bn[10] = makeSharedRecord(10, { curiosityDelta: 1 });
+      const res = await runV641(recs641bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_ZONE_IMBALANCE'), 'VOICE_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    // VOICE_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta>0 at 2 (val=1) and 6 (val=5, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('VOICE_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs641c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs641c[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs641c[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runV641(recs641c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_PEAK_UNCAUSED'), 'VOICE_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // VOICE_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VOICE_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs641cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs641cn[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs641cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs641cn[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runV641(recs641cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_PEAK_UNCAUSED'), 'VOICE_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 627 — voicePass: voice payoff staging decoupled, voice seed dialogue highlight aftermath void, voice relationship shift zone imbalance', async () => {
     const runV627 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

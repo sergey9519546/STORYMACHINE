@@ -219,10 +219,15 @@
 // (sequence/aftermath × seededClueIds trigger → dialogueHighlights absence — first use of
 // seededClueIds in this pass), VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE (underweight/bloat ×
 // relationshipShifts × four structural zones — first use of relationshipShifts in this pass).
+// Wave 641 additions: VOICE_SUSPENSE_FLATLINE (average/aggregate × suspenseDelta variety — first
+// use of suspenseDelta anywhere in this 110-rule pass), VOICE_CURIOSITY_ZONE_IMBALANCE
+// (underweight/bloat × curiosityDelta × four structural zones — first use of curiosityDelta in
+// this pass), VOICE_CLOCK_DELTA_PEAK_UNCAUSED (backward-cause × clockDelta-magnitude peak ×
+// dramaticTurn/revelation cause — first use of clockDelta and the backward-cause mode here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
@@ -3969,6 +3974,76 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r627c.totalCount} relationship-shift scenes are unevenly distributed across its four structural zones: ${bloatName627c} contains ${r627c.counts[r627c.bloatZoneIdx]} of them (${Math.round((r627c.counts[r627c.bloatZoneIdx] / r627c.totalCount) * 100)}%) while ${emptyNames627c} contains none. Relational movement bloats in one structural quarter and vanishes from another, giving the story's verbal-relational rhythm an uneven pulse across its four quarters.`,
         suggestedFix: `Redistribute relationship shifts: bring at least one bond change into ${emptyNames627c}, so every structural quarter carries some relational movement rather than only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 641: VOICE_SUSPENSE_FLATLINE, VOICE_CURIOSITY_ZONE_IMBALANCE,
+  //              VOICE_CLOCK_DELTA_PEAK_UNCAUSED ────────────────────────────────────────────
+
+  // VOICE_SUSPENSE_FLATLINE — Average/aggregate × suspenseDelta variety. n≥8. Fewer than 20% of
+  // scenes deviate from the average suspenseDelta by more than 30% of that average → fire. First
+  // use of the suspenseDelta field anywhere in this 110-rule pass. A story's tension signal that
+  // barely moves scene to scene is a structural-signal flatline distinct from every text-level
+  // rhythm check this pass already runs.
+  if (records.length >= 8) {
+    const suspenseVals641a = records.map(r => r.suspenseDelta ?? 0);
+    const avgSusp641a = suspenseVals641a.reduce((s, v) => s + v, 0) / suspenseVals641a.length;
+    if (Math.abs(avgSusp641a) > 1e-9) {
+      const variedSusp641a = suspenseVals641a.filter(v => Math.abs(v - avgSusp641a) > Math.abs(avgSusp641a) * 0.3).length;
+      if (variedSusp641a < suspenseVals641a.length * 0.2) {
+        issues.push({
+          location: 'suspenseDelta throughout',
+          rule: 'VOICE_SUSPENSE_FLATLINE',
+          severity: 'minor',
+          description: `Fewer than 20% of the story's ${records.length} scenes deviate from the average suspenseDelta (${avgSusp641a.toFixed(2)}) by more than 30% — the tension signal barely moves from scene to scene. A story's suspense should have its own rhythm of rises and lulls; when it sits close to its own average almost everywhere, the tension track reads as a flat hum regardless of how varied the dialogue is scene to scene.`,
+          suggestedFix: `Introduce at least a few scenes with a suspenseDelta clearly above or below the story's average — a sharp escalation or a deliberate lull — so the tension signal has peaks and valleys the audience can feel.`,
+        });
+      }
+    }
+  }
+
+  // VOICE_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × curiosityDelta × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-positive
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. First use of the curiosityDelta field
+  // anywhere in this pass.
+  {
+    const r641b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r641b.fires) {
+      const emptyNames641b = r641b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName641b = FOUR_ZONE_NAMES[r641b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames641b} empty; ${bloatName641b} has ${r641b.counts[r641b.bloatZoneIdx]}/${r641b.totalCount} curiosity-spike scenes`,
+        rule: 'VOICE_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r641b.totalCount} curiosity-spike scenes are unevenly distributed across its four structural zones: ${bloatName641b} contains ${r641b.counts[r641b.bloatZoneIdx]} of them (${Math.round((r641b.counts[r641b.bloatZoneIdx] / r641b.totalCount) * 100)}%) while ${emptyNames641b} contains none. New questions bloat in one structural quarter and vanish from another, giving the audience's sense of active wondering an uneven structural rhythm.`,
+        suggestedFix: `Redistribute curiosity spikes: move at least one moment that raises a new question into the empty zone(s) — ${emptyNames641b} — so every structural quarter keeps the audience actively wondering about something.`,
+      });
+    }
+  }
+
+  // VOICE_CLOCK_DELTA_PEAK_UNCAUSED — Backward-cause × clockDelta-magnitude peak × dramaticTurn/
+  // revelation cause. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes
+  // with clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta and
+  // fires when neither that scene nor either of the 2 scenes before it contains a dramatic turn or
+  // a revelation. First use of the clockDelta field and the backward-cause mode in this pass.
+  {
+    const r641c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r641c.fires) {
+      issues.push({
+        location: `Scene at position ${r641c.peakIdx + 1} — peak clockDelta (${r641c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (${r641c.peakMagnitude}, out of ${r641c.qualifyingCount} scenes that raise the clock at all) has no dramatic turn and no revelation in itself or in either of the 2 scenes before it. The moment time pressure compresses most sharply arrives with no pivot or disclosure explaining why.`,
+        suggestedFix: `Add a dramatic turn or a revelation in the scene that raises the clock most sharply, or in one of the two scenes before it, so the audience understands why the deadline suddenly tightens this hard.`,
       });
     }
   }
