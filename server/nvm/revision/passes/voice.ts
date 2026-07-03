@@ -242,6 +242,17 @@
 // relationshipShifts × structural thirds — relationshipShifts has only been zone-IMBALANCE-
 // audited [four-zone bloat/empty]; this is the first application of the thirds-based
 // zone-cluster mode to the relational channel).
+// Wave 683 additions: VOICE_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// unresolvedClues magnitude — Wave 599's UNRESOLVED_CLUE_DROUGHT_RUN already drought-audits this
+// channel's absence, but the scene where open threads pile up densest has never been checked for
+// backward causation; fires when neither that scene nor either of the two before it has a
+// dramatic turn or revelation), VOICE_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence
+// — Wave 641's VOICE_CURIOSITY_ZONE_IMBALANCE already four-zone-audits this channel's bloat/empty
+// distribution, but a long unbroken run with no new curiosity spike at all has never been
+// drought-audited), VOICE_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 ×
+// structural thirds — Wave 641's VOICE_SUSPENSE_FLATLINE checks average/aggregate variety across
+// the whole story; this instead asks where positive suspense spikes concentrate structurally,
+// the first zone-cluster application to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4201,6 +4212,75 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r669c.maxZoneCount} of the story's ${r669c.count} relationship-shift scenes (${Math.round((r669c.maxZoneCount / r669c.count) * 100)}%) cluster in the ${zoneName669c} third. Bond changes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no relational movement carrying the voice.`,
         suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName669c} third — spreading relational movement across the story lets each structural third carry its own sense of changing dynamics.`,
+      });
+    }
+  }
+
+  // ── Wave 683: VOICE_OPEN_THREAD_PEAK_UNCAUSED, VOICE_CURIOSITY_DROUGHT_RUN,
+  //              VOICE_SUSPENSE_ZONE_CLUSTER ───────────────────────────────────────────────────
+
+  // VOICE_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // an open thread, a 2-scene lookback. Finds the single scene with the densest open-thread count;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Distinct from Wave 599's UNRESOLVED_CLUE_DROUGHT_RUN, which measures the longest
+  // absence of open threads rather than whether the peak concentration is backward-caused.
+  {
+    const r683a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r683a.fires) {
+      issues.push({
+        location: `scene ${r683a.peakIdx + 1} — peak open-thread density (${r683a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding open threads (scene ${r683a.peakIdx + 1}, with ${r683a.peakMagnitude} unresolved clues) has no dramatic turn or revelation in itself or the two scenes before it. The moment where accumulated mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — a spike in unanswered questions with no causal weight behind it.`,
+        suggestedFix: `Give scene ${r683a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most thread-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 curiosity-spike scenes overall, fires when the
+  // longest consecutive run of scenes with no new curiosity spike reaches 6. Wave 641's VOICE_
+  // CURIOSITY_ZONE_IMBALANCE already four-zone-audits this channel's bloat/empty distribution;
+  // curiosityDelta itself has never been drought-audited here.
+  {
+    const r683b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r683b.fires) {
+      issues.push({
+        location: `longest stretch with no new curiosity spike: ${r683b.longestRun} consecutive scenes`,
+        rule: 'VOICE_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r683b.longestRun} consecutive scenes with no new curiosity spike at all, even though ${r683b.presentCount} scenes elsewhere raise a fresh question. A long unbroken stretch with nothing new to wonder about leaves the audience's active curiosity dormant for an extended run.`,
+        suggestedFix: `Raise a new question or unknown somewhere within the ${r683b.longestRun}-scene stretch so the audience's sense of active curiosity keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes with a positive suspense
+  // delta, fires when >75% of them fall in a single structural third. Distinct from Wave 641's
+  // VOICE_SUSPENSE_FLATLINE, which checks average/aggregate variety of suspenseDelta across the
+  // whole story rather than where positive spikes concentrate structurally.
+  {
+    const r683c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r683c.fires) {
+      const zoneName683c = r683c.zoneNames[r683c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName683c} third — ${r683c.maxZoneCount}/${r683c.count} rising-suspense scenes`,
+        rule: 'VOICE_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r683c.maxZoneCount} of the story's ${r683c.count} rising-suspense scenes (${Math.round((r683c.maxZoneCount / r683c.count) * 100)}%) cluster in the ${zoneName683c} third. Tension spikes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no rising dread to carry the voice.`,
+        suggestedFix: `Let suspense rise in at least one scene outside the ${zoneName683c} third — spreading tension spikes across the story lets each structural third carry its own sense of mounting dread.`,
       });
     }
   }
