@@ -382,6 +382,17 @@
 // thirds -- distinct from THEME_RESOLUTION_SILENT, a co-occurrence check on the fixed final
 // scene's thematic content regardless of its purpose value; none of the three shared-library
 // trio modes has ever isolated purpose === 'resolution' as a standalone distributional signal).
+//
+// Wave 878 additions: THEME_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 864; distinct from THEME_RESOLUTION_SILENT, a co-occurrence check on the fixed
+// final scene's thematic content regardless of purpose; peak mode conventionally skipped for
+// this categorical field), THEME_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'complicate' x structural thirds -- this purpose value has never been referenced anywhere in
+// this pass; a virgin field), THEME_COMPLICATE_DROUGHT_RUN (run-based x purpose ===
+// 'complicate' absence -- completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in this same wave; peak mode conventionally skipped for this
+// categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4963,6 +4974,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r864c.maxZoneCount / r864c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r864c.zoneNames[r864c.maxZoneIdx]} third. When every resolution beat concentrates in one structural window, the theme has no room to be affirmed gradually before the ending answers it all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r864c.zoneNames[r864c.maxZoneIdx]} third so the theme's closing affirmation is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 878: THEME_RESOLUTION_DROUGHT_RUN, THEME_COMPLICATE_ZONE_CLUSTER,
+  //              THEME_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // THEME_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 864. Distinct from THEME_RESOLUTION_SILENT, a co-occurrence check on the fixed final
+  // scene's thematic content regardless of purpose; peak mode conventionally skipped for this
+  // categorical field.
+  {
+    const r878a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r878a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r878a.longestRun} consecutive scenes`,
+        rule: 'THEME_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r878a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r878a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the theme without an affirming beat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r878a.longestRun}-scene stretch to resolve part of the story, so the theme keeps being affirmed throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // THEME_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r878b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r878b.fires) {
+      issues.push({
+        location: `${r878b.zoneNames[r878b.maxZoneIdx]} third — ${r878b.maxZoneCount} of ${r878b.count} complicating scenes`,
+        rule: 'THEME_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r878b.maxZoneCount / r878b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r878b.zoneNames[r878b.maxZoneIdx]} third. When every complication lands in the same structural window, the theme stops being tested against fresh trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r878b.zoneNames[r878b.maxZoneIdx]} third to complicate the story so the theme keeps being tested against fresh trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r878c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r878c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r878c.longestRun} consecutive scenes`,
+        rule: 'THEME_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r878c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r878c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the theme untested for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r878c.longestRun}-scene stretch to complicate the story so the theme keeps being tested throughout that stretch.`,
       });
     }
   }
