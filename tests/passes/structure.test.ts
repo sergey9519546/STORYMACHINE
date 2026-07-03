@@ -1006,6 +1006,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 625 — structurePass: structural staging open thread decoupled, dramatic turn staging aftermath void, structural staging peak uncaused', async () => {
+    const runST625 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED fire:
+    // n=6; staged at 0,1 (no debt); debt at 4,5 (no staging) → zero overlap → fires
+    it('STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED fires when visually-staged scenes and open-thread scenes never overlap', async () => {
+      const recs625a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs625a[0] = makeSharedRecord(0, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625a[1] = makeSharedRecord(1, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625a[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs625a[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runST625(recs625a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED'), 'STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH staging and open debt → overlap exists
+    it('STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs625an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs625an[0] = makeSharedRecord(0, { visualBeats: ['flips through the ledger', 'circles a name'], unresolvedClues: ['unpaid-clue'] });
+      recs625an[1] = makeSharedRecord(1, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625an[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runST625(recs625an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED'), 'STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // DRAMATIC_TURN_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; turn triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('DRAMATIC_TURN_STAGING_AFTERMATH_VOID fires when no dramatic turn is followed by a visually dense scene within 2 scenes', async () => {
+      const recs625b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs625b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs625b[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs625b[5] = makeSharedRecord(5, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625b[6] = makeSharedRecord(6, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625b[7] = makeSharedRecord(7, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      const res = await runST625(recs625b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_STAGING_AFTERMATH_VOID'), 'DRAMATIC_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // DRAMATIC_TURN_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('DRAMATIC_TURN_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs625bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs625bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs625bn[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs625bn[3] = makeSharedRecord(3, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625bn[5] = makeSharedRecord(5, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625bn[6] = makeSharedRecord(6, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      recs625bn[7] = makeSharedRecord(7, { visualBeats: ['flips through the ledger', 'circles a name'] });
+      const res = await runST625(recs625bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_STAGING_AFTERMATH_VOID'), 'DRAMATIC_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // STRUCTURAL_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; visualBeats present at 2 (1 beat) and 6 (5 beats, the peak); no revelation or
+    // dramaticTurn at 6, 5, or 4
+    it('STRUCTURAL_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no revelation or dramatic turn nearby', async () => {
+      const recs625c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs625c[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs625c[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST625(recs625c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURAL_STAGING_PEAK_UNCAUSED'), 'STRUCTURAL_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // STRUCTURAL_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STRUCTURAL_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs625cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs625cn[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs625cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs625cn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST625(recs625cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURAL_STAGING_PEAK_UNCAUSED'), 'STRUCTURAL_STAGING_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 611 — structurePass: visual beat structural imbalance, payoff scene turn decoupled, payoff dialogue highlight aftermath void', async () => {
     const runST611 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

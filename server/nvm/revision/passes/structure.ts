@@ -203,10 +203,17 @@
 // PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × payoff trigger → dialogueHighlights
 // absence — first aftermath-mode check on the dialogueHighlights channel in this file, which had
 // only drought-run and zone-imbalance coverage from Wave 597).
+// Wave 625 additions (built on the shared checks library, audit M2.2): STRUCTURAL_STAGING_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × visualBeats × unresolvedClues — first pairing of
+// these two fields in this 113-rule pass), DRAMATIC_TURN_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × dramaticTurn trigger → visualBeats absence — first pairing of these two
+// fields, despite dramaticTurn already being paired with clockDelta/clockRaised/emotionalShift/
+// payoffSetupIds), STRUCTURAL_STAGING_PEAK_UNCAUSED (backward-cause × visualBeats-density peak ×
+// revelation/dramaticTurn cause — first backward-cause check in this file).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
@@ -3405,6 +3412,82 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r611c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r611c.aftermathCount} such scenes exist elsewhere in the script. A resolution's aftermath is where a character often gets to say what the resolved thread meant; when that aftermath never carries a memorable line, the payoff's emotional residue goes unvoiced.`,
         suggestedFix: `After at least one payoff, let one of the following two scenes carry a line worth remembering — a character naming what the resolution cost or what it means now that it's settled. Give the payoff's aftermath a voice, not just a structural close.`,
+      });
+    }
+  }
+
+  // ── Wave 625: STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED, DRAMATIC_TURN_STAGING_AFTERMATH_VOID,
+  //              STRUCTURAL_STAGING_PEAK_UNCAUSED ───────────────────────────────────────────
+
+  // STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × visualBeats ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // visually-staged scenes (visualBeats.length≥2), ≥2 scenes carrying outstanding clue-debt. Zero
+  // overlap → fire. First pairing of these two fields in this 113-rule pass. Physical staging and
+  // open narrative debt never occupy the same scene, so a mystery hanging open never gets a
+  // physical anchor in the story's macro-structure.
+  {
+    const r625a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.visualBeats ?? []).length >= 2,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r625a.fires) {
+      issues.push({
+        location: `${r625a.aCount} visually-staged scene(s), ${r625a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'STRUCTURAL_STAGING_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r625a.aCount} scenes leaning heavily on physical staging never coincide with the ${r625a.bCount} scenes carrying outstanding clue-debt — physical presence and unresolved mystery run on separate tracks throughout the story's structure. A scene rich in staging is a natural place to give an open thread a physical anchor, but that opportunity is never taken.`,
+        suggestedFix: `Let at least one heavily staged scene also carry open clue-debt — physical details tied to what's still unresolved, giving the mystery a tangible presence rather than existing only as a dangling narrative thread.`,
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥3 scenes anywhere with substantial physical
+  // staging, a 2-scene lookahead window. Fires when every turn's two-scene aftermath contains no
+  // visually dense scene, while such scenes do occur elsewhere. First pairing of dramaticTurn
+  // with visualBeats in this file, despite dramaticTurn already being paired with clockDelta,
+  // clockRaised, emotionalShift, and payoffSetupIds. A pivot's consequences often play out
+  // physically; when that aftermath consistently stays unstaged, the turn's impact is only
+  // discussed, never shown.
+  {
+    const r625b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r625b.fires) {
+      issues.push({
+        location: `${r625b.triggerCount} dramatic-turn scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'DRAMATIC_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r625b.triggerCount} dramatic-turn scenes is followed by two scenes with no substantial physical staging, even though ${r625b.aftermathCount} such scenes exist elsewhere in the script. A pivot's consequences often play out physically — a character acting differently because of what just changed — and when that aftermath consistently stays unstaged, the turn's impact is only ever discussed.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry substantial physical staging — the pivot's consequences made visible through action rather than only through what characters say.`,
+      });
+    }
+  }
+
+  // STRUCTURAL_STAGING_PEAK_UNCAUSED — Backward-cause × visualBeats-density peak ×
+  // revelation/dramaticTurn cause. Built on checkPeakUncaused from the shared checks library.
+  // n≥8, ≥2 scenes with visualBeats present, a 2-scene lookback. Finds the single scene with the
+  // most physical staging beats and fires when neither that scene nor either of the 2 scenes
+  // before it contains a revelation or a dramatic turn. First backward-cause check in this file —
+  // the story's single most visually dense scene should be motivated by something the macro-
+  // structure is dramatizing, not simply appear as unmotivated staging.
+  {
+    const r625c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.revelation != null || (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r625c.fires) {
+      issues.push({
+        location: `Scene at position ${r625c.peakIdx + 1} — peak physical staging (${r625c.peakMagnitude} beats) with no revelation or dramatic turn nearby`,
+        rule: 'STRUCTURAL_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single densest physical staging (${r625c.peakMagnitude} visual beats, out of ${r625c.qualifyingCount} scenes with any staging at all) has no revelation and no dramatic turn in itself or in either of the 2 scenes before it. The moment the macro-structure invests most heavily in physical description arrives with no disclosure or pivot explaining why.`,
+        suggestedFix: `Add a revelation or a dramatic turn in the scene with the densest physical staging, or in one of the two scenes before it, so the audience understands why this particular moment earns such heavy physical attention.`,
       });
     }
   }
