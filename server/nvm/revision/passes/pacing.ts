@@ -266,6 +266,15 @@
 // mode has never been applied to it), PACING_TURN_ZONE_CLUSTER (distribution/timing ×
 // dramaticTurn presence × structural thirds — Wave 677 applied the drought-run mode to
 // dramaticTurn; the zone-cluster mode has never been applied to this channel).
+// Wave 705 additions (built on the shared checks library): PACING_SEED_ZONE_CLUSTER
+// (distribution/timing × seededClueIds × structural thirds — Waves 663/691 applied the
+// drought-run and backward-cause peak modes to seededClueIds; the zone-cluster mode has never
+// been applied to it, completing the trio), PACING_OPEN_THREAD_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × unresolvedClues magnitude — Wave 649 applied the drought-run mode to
+// unresolvedClues; the backward-cause peak mode has never been applied to it), PACING_PAYOFF_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds magnitude — Wave 663
+// applied the zone-cluster mode to payoffSetupIds; the backward-cause peak mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3990,6 +3999,77 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r691c.maxZoneCount} of the story's ${r691c.count} dramatic-turn scenes (${Math.round((r691c.maxZoneCount / r691c.count) * 100)}%) cluster in the ${zoneName691c} third. Structural pivots concentrate almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds paced without a reversal to punctuate them.`,
         suggestedFix: `Give at least one scene outside the ${zoneName691c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry its own punctuating reversal.`,
+      });
+    }
+  }
+
+  // ── Wave 705: PACING_SEED_ZONE_CLUSTER, PACING_OPEN_THREAD_PEAK_UNCAUSED,
+  //              PACING_PAYOFF_PEAK_UNCAUSED ───────────────────────────────────────────────────
+
+  // PACING_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Waves 663/691 applied the drought-run and backward-cause
+  // peak modes to seededClueIds; the zone-cluster mode has never been applied to it, completing
+  // the trio.
+  {
+    const r705a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r705a.fires) {
+      const zoneName705a = r705a.zoneNames[r705a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName705a} third — ${r705a.maxZoneCount}/${r705a.count} seed scenes`,
+        rule: 'PACING_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r705a.maxZoneCount} of the story's ${r705a.count} clue-planting scenes (${Math.round((r705a.maxZoneCount / r705a.count) * 100)}%) cluster in the ${zoneName705a} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the story's pacing an uneven structural rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName705a} third — spreading foreshadowing across the story lets the pacing build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 649 applied the drought-run mode to unresolvedClues; the
+  // backward-cause peak mode has never been applied to it.
+  {
+    const r705b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r705b.fires) {
+      issues.push({
+        location: `scene ${r705b.peakIdx + 1} — peak open-thread density (${r705b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r705b.peakIdx + 1}, with ${r705b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most mystery-dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r705b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Wave 663 applied the zone-cluster mode to payoffSetupIds; the backward-cause peak mode has
+  // never been applied to it.
+  {
+    const r705c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r705c.fires) {
+      issues.push({
+        location: `scene ${r705c.peakIdx + 1} — peak payoff density (${r705c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r705c.peakIdx + 1}, with ${r705c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most convergent beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r705c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
       });
     }
   }
