@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1243,6 +1246,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 601 — causalityPass: stated belief revelation decoupled, stated belief dramatic-turn aftermath void, stated belief zone imbalance', async () => {
+    const runCA601 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('STATED_BELIEF_REVELATION_DECOUPLED fires when no belief-assertion scene coincides with a revelation', async () => {
+      // 6 scenes; belief assertions at 0,1; revelations at 4,5 — zero overlap
+      const recs601a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs601a[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'] });
+      recs601a[1] = makeSharedRecord(1, { dialogueHighlights: ['bob: believes Y'] });
+      recs601a[4] = makeSharedRecord(4, { revelation: 'She was lying.' });
+      recs601a[5] = makeSharedRecord(5, { revelation: 'He knew all along.' });
+      const res = await runCA601(recs601a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STATED_BELIEF_REVELATION_DECOUPLED'), 'STATED_BELIEF_REVELATION_DECOUPLED should fire');
+    });
+
+    it('STATED_BELIEF_REVELATION_DECOUPLED does not fire when a belief-assertion scene also carries a revelation', async () => {
+      const recs601a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs601a[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'], revelation: 'She was lying.' });
+      recs601a[1] = makeSharedRecord(1, { dialogueHighlights: ['bob: believes Y'] });
+      recs601a[4] = makeSharedRecord(4, { revelation: 'He knew all along.' });
+      const res = await runCA601(recs601a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STATED_BELIEF_REVELATION_DECOUPLED'), 'STATED_BELIEF_REVELATION_DECOUPLED should not fire');
+    });
+
+    it('STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID fires when no belief-assertion scene is followed by a dramatic turn within 2 scenes', async () => {
+      // 9 scenes; belief assertions at 0,1,2 (windows reach at most scene 4); turns at 7,8 (outside every window)
+      const recs601b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs601b[0] = makeSharedRecord(0, { dialogueHighlights: ['a'] });
+      recs601b[1] = makeSharedRecord(1, { dialogueHighlights: ['b'] });
+      recs601b[2] = makeSharedRecord(2, { dialogueHighlights: ['c'] });
+      recs601b[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      recs601b[8] = makeSharedRecord(8, { dramaticTurn: 'revelation' });
+      const res = await runCA601(recs601b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID'), 'STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID should fire');
+    });
+
+    it('STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID does not fire when a belief-assertion scene is followed by a dramatic turn within 2 scenes', async () => {
+      const recs601bnr = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs601bnr[0] = makeSharedRecord(0, { dialogueHighlights: ['a'] });
+      recs601bnr[1] = makeSharedRecord(1, { dialogueHighlights: ['b'] });
+      recs601bnr[2] = makeSharedRecord(2, { dialogueHighlights: ['c'], dramaticTurn: 'reversal' });
+      recs601bnr[7] = makeSharedRecord(7, { dramaticTurn: 'revelation' });
+      const res = await runCA601(recs601bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID'), 'STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID should not fire');
+    });
+
+    it('STATED_BELIEF_ZONE_IMBALANCE fires when one zone has zero belief-assertion scenes and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: belief assertions at 6,7,8 (zone 2) plus 9 (zone 3) to meet minCount=4
+      const recs601c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs601c[6] = makeSharedRecord(6, { dialogueHighlights: ['a'] });
+      recs601c[7] = makeSharedRecord(7, { dialogueHighlights: ['b'] });
+      recs601c[8] = makeSharedRecord(8, { dialogueHighlights: ['c'] });
+      recs601c[9] = makeSharedRecord(9, { dialogueHighlights: ['d'] });
+      const res = await runCA601(recs601c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STATED_BELIEF_ZONE_IMBALANCE'), 'STATED_BELIEF_ZONE_IMBALANCE should fire');
+    });
+
+    it('STATED_BELIEF_ZONE_IMBALANCE does not fire when belief-assertion scenes are spread across all zones', async () => {
+      const recs601cnr = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs601cnr[1] = makeSharedRecord(1, { dialogueHighlights: ['a'] });
+      recs601cnr[4] = makeSharedRecord(4, { dialogueHighlights: ['b'] });
+      recs601cnr[7] = makeSharedRecord(7, { dialogueHighlights: ['c'] });
+      recs601cnr[10] = makeSharedRecord(10, { dialogueHighlights: ['d'] });
+      const res = await runCA601(recs601cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STATED_BELIEF_ZONE_IMBALANCE'), 'STATED_BELIEF_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 587 — causalityPass: dramatic-turn suspense aftermath void, clock curiosity aftermath void, payoff closing-third absent', async () => {
     const makeRec587 = (idx: number, overrides: any = {}): any => ({

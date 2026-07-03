@@ -207,9 +207,22 @@
 // distinct from PAYOFF_RELATIONSHIP_VOID [co-occurrence × same scene — payoff scene itself has no
 // relationship shift; this checks the scene AFTER], PAYOFF_AFTERMATH_SUSPENSE_VOID [suspense channel
 // aftermath], PAYOFF_AFTERMATH_CURIOSITY_VOID [curiosity channel aftermath]).
+// Wave 601 additions: stated belief revelation decoupled (co-occurrence/decoupling ×
+// dialogueHighlights-presence × revelation-presence — n≥6, ≥2 belief-assertion scenes, ≥2
+// revelation scenes, zero overlap; first use of the dialogueHighlights signal in this 105-rule
+// file at all — every other channel here [clock, curiosity, dramaticTurn, relationship, seed,
+// payoff, revelation] is exhaustively covered, but a character stating a tracked belief and the
+// story disclosing a hidden truth have never been paired), stated belief dramatic-turn aftermath
+// void (sequence/aftermath × dialogueHighlights-presence trigger → dramaticTurn aftermath, built
+// on checkAftermathVoid from the shared checks library — audit M2.2 — n≥8, ≥3 qualifying
+// belief-assertion scenes, none followed by a dramatic turn within 2 scenes while ≥2 turn scenes
+// exist elsewhere; a stated conviction never precedes a structural pivot), stated belief zone
+// imbalance (underweight/bloat × dialogueHighlights × four structural zones, built on
+// checkZoneImbalance — one zone silent while another holds ≥50% of all belief assertions).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function causalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3495,6 +3508,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 601: STATED_BELIEF_REVELATION_DECOUPLED, STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID,
+  //              STATED_BELIEF_ZONE_IMBALANCE ────────────────────────────────────────────────
+  // First checks in this 105-rule file to use the dialogueHighlights signal — every other
+  // channel here (clock, curiosity, dramaticTurn, relationship, seed, payoff, revelation) is
+  // exhaustively covered by dozens of checks, but a character stating a tracked belief has never
+  // been audited on its own.
+
+  // STATED_BELIEF_REVELATION_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // revelation. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // belief-assertion scenes, ≥2 revelation scenes. Zero overlap → fire. A character voicing a
+  // conviction and the story disclosing a hidden truth never share a scene — the moment a truth
+  // surfaces is a natural occasion for a character's stated belief to be confirmed, denied, or
+  // upended, yet the two channels never coincide.
+  {
+    const r601a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+    });
+    if (r601a.fires) {
+      issues.push({
+        location: `${r601a.aCount} belief-assertion scene(s) and ${r601a.bCount} revelation scene(s) — zero overlap`,
+        rule: 'STATED_BELIEF_REVELATION_DECOUPLED',
+        severity: 'minor',
+        description: `The script has ${r601a.aCount} scene(s) where a character states a tracked belief and ${r601a.bCount} revelation scene(s), but the two never coincide. A hidden truth coming to light is a natural moment for a character's own conviction to be tested — confirmed, denied, or reframed. When disclosure and voiced belief never share a scene, revelations land as plot information without a character's stated response to anchor them.`,
+        suggestedFix: `Let at least one revelation scene also carry a character stating what they now believe — a line of confirmation, denial, or reinterpretation spoken in direct reaction to the disclosed truth.`,
+      });
+    }
+  }
+
+  // STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID — Sequence/aftermath × dialogueHighlights-present
+  // trigger → dramaticTurn aftermath. Built on checkAftermathVoid. n≥8, ≥3 qualifying
+  // belief-assertion scenes (pos < n-2), ≥2 dramatic-turn scenes existing elsewhere. None of the
+  // qualifying belief scenes are followed by a dramatic turn within 2 scenes → fire. A stated
+  // conviction never precedes a structural pivot — characters voice what they believe, but that
+  // belief never becomes the hinge the story turns on.
+  {
+    const r601b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dialogueHighlights ?? []).length > 0,
+      isAftermath: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+    });
+    if (r601b.fires) {
+      issues.push({
+        location: `${r601b.triggerCount} belief-assertion scene(s) — no dramatic turn within 2 scenes of any`,
+        rule: 'STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `None of the story's ${r601b.triggerCount} scenes where a character states a tracked belief are followed by a dramatic turn within the next two, even though ${r601b.aftermathCount} dramatic-turn scene(s) exist elsewhere. A stated conviction is a natural setup for a structural pivot — the belief being tested, confirmed catastrophically wrong, or acted upon — but that connection never lands.`,
+        suggestedFix: `After at least one scene where a character voices a belief, let the following scene or the one after turn on that belief — a reversal that proves it wrong, a choice made because of it, or a confrontation it provokes.`,
+      });
+    }
+  }
+
+  // STATED_BELIEF_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four structural
+  // zones. Built on checkZoneImbalance. n≥10, ≥4 belief-assertion scenes total, divided across
+  // four equal structural zones. Fires only when one zone has zero such scenes while another
+  // holds ≥50% of the total.
+  {
+    const r601c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r601c.fires) {
+      const emptyNames601c = r601c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName601c = FOUR_ZONE_NAMES[r601c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames601c} empty; ${bloatName601c} has ${r601c.counts[r601c.bloatZoneIdx]}/${r601c.totalCount} belief-assertion scenes`,
+        rule: 'STATED_BELIEF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r601c.totalCount} belief-assertion scenes are unevenly distributed across its four structural zones: ${bloatName601c} contains ${r601c.counts[r601c.bloatZoneIdx]} of them (${Math.round((r601c.counts[r601c.bloatZoneIdx] / r601c.totalCount) * 100)}%) while ${emptyNames601c} contains none. Characters' stated convictions bloat in one structural quarter and vanish from another.`,
+        suggestedFix: `Redistribute belief assertions: let at least one character state a conviction in the empty zone(s) — ${emptyNames601c} — so every structural quarter carries some evidence of what characters believe.`,
+      });
     }
   }
 
