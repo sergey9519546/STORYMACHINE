@@ -296,6 +296,17 @@
 // mode has never been applied to it, completing the trio), INTENTION_CLOCK_DELTA_DROUGHT_RUN
 // (run-based × clockDelta≠0 absence — Wave 675 applied the backward-cause peak mode to
 // clockDelta; the drought-run mode has never been applied to it).
+// Wave 759 additions: INTENTION_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 675/745 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), INTENTION_REVELATION_PEAK_UNCAUSED (single-peak isolation/backward-cause × revelation
+// magnitude — REVELATION_DROUGHT_RUN and REVELATION_ZONE_CLUSTER applied the run-based drought
+// and zone-cluster modes to revelation != null; the backward-cause peak mode has never been
+// applied to it, completing the trio — this check's hasCause deliberately references only
+// dramaticTurn, not revelation itself, to avoid a circular audit of the revelation channel),
+// INTENTION_STAKES_ZONE_CLUSTER (distribution/timing × purpose === 'raise_stakes' × structural
+// thirds — INTENTION_STAKES_DROUGHT_RUN applied the run-based drought mode to this signal; the
+// zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4325,6 +4336,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r745c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r745c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the character's intention without any external pressure driving it for an extended run.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r745c.longestRun}-scene stretch so the character's pursuit of their goal keeps facing mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 759: INTENTION_CLOCK_DELTA_ZONE_CLUSTER, INTENTION_REVELATION_PEAK_UNCAUSED,
+  //              INTENTION_STAKES_ZONE_CLUSTER ──────────────────────────────────────────────
+
+  // INTENTION_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-shifting scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Waves 675/745 applied the backward-cause peak and run-based drought modes to clockDelta; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r759a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r759a.fires) {
+      issues.push({
+        location: `${r759a.zoneNames[r759a.maxZoneIdx]} third — ${r759a.maxZoneCount} of ${r759a.count} clock-shifting scenes`,
+        rule: 'INTENTION_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r759a.maxZoneCount / r759a.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r759a.zoneNames[r759a.maxZoneIdx]} third. When every clock movement lands in the same structural window, the character's intention loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r759a.zoneNames[r759a.maxZoneIdx]} third so time pressure keeps testing the character's pursuit of their goal more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_PEAK_UNCAUSED — Single-peak isolation/backward-cause × revelation
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, a 2-scene lookback. Finds the single scene carrying a revelation (magnitude 1 vs 0
+  // elsewhere); fires when neither that scene nor either of the two before it contains a dramatic
+  // turn. REVELATION_DROUGHT_RUN and REVELATION_ZONE_CLUSTER applied the run-based drought and
+  // zone-cluster modes to revelation != null; the backward-cause peak mode has never been applied
+  // to it, completing the trio — this check's hasCause deliberately references only dramaticTurn,
+  // not revelation itself, to avoid a circular audit of the revelation channel.
+  {
+    const r759b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r759b.fires) {
+      issues.push({
+        location: `scene ${r759b.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'INTENTION_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's revelation at scene ${r759b.peakIdx + 1} arrives with no dramatic turn in itself or the two scenes before it. A disclosure that lands without a structural pivot preparing it undercuts the sense that the character's pursuit of their goal is what forced the truth into the open.`,
+        suggestedFix: `Give scene ${r759b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn, so the revelation is earned by the character's pursuit of their goal rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of those scenes cluster in a single third.
+  // INTENTION_STAKES_DROUGHT_RUN applied the run-based drought mode to this signal; the
+  // zone-cluster mode has never been applied to it.
+  {
+    const r759c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r759c.fires) {
+      issues.push({
+        location: `${r759c.zoneNames[r759c.maxZoneIdx]} third — ${r759c.maxZoneCount} of ${r759c.count} stakes-raising scenes`,
+        rule: 'INTENTION_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r759c.maxZoneCount / r759c.count) * 100)}% of the story's stakes-raising scenes cluster in the ${r759c.zoneNames[r759c.maxZoneIdx]} third. When every escalation lands in the same structural window, the character's pursuit of their goal loses mounting pressure everywhere else in the story.`,
+        suggestedFix: `Raise the stakes in at least one scene outside the ${r759c.zoneNames[r759c.maxZoneIdx]} third so the character's intention keeps facing mounting pressure more evenly across the story.`,
       });
     }
   }

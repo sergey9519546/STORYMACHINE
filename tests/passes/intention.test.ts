@@ -1352,6 +1352,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 759 — intentionPass: intention clock delta zone cluster, intention revelation peak uncaused, intention stakes zone cluster', async () => {
+    const makeRec759 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN759 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('INTENTION_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs759a = Array.from({ length: 9 }, (_, i) => makeRec759(i,
+        (i === 0 || i === 1 || i === 2) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runIN759(recs759a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_ZONE_CLUSTER'), 'INTENTION_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-shifting scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock movement is distributed across thirds', async () => {
+      const recs759an = Array.from({ length: 9 }, (_, i) => makeRec759(i,
+        (i === 0 || i === 4 || i === 7) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runIN759(recs759an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_ZONE_CLUSTER'), 'INTENTION_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 and 5 (magnitude ties at 1, so the peak resolves to the first
+    // occurrence — scene 2); no dramaticTurn at 2, 1, or 0.
+    it('INTENTION_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs759b = Array.from({ length: 8 }, (_, i) => makeRec759(i,
+        (i === 2 || i === 5) ? { revelation: 'a truth surfaces' } : {}
+      ));
+      const res = await runIN759(recs759b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PEAK_UNCAUSED'), 'INTENTION_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    // INTENTION_REVELATION_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 1, within the peak's 2-scene lookback (2-1=1)
+    it('INTENTION_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation within the lookback', async () => {
+      const recs759bn = Array.from({ length: 8 }, (_, i) => makeRec759(i,
+        i === 1 ? { dramaticTurn: 'reversal' }
+        : (i === 2 || i === 5) ? { revelation: 'a truth surfaces' }
+        : {}
+      ));
+      const res = await runIN759(recs759bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PEAK_UNCAUSED'), 'INTENTION_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('INTENTION_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs759c = Array.from({ length: 9 }, (_, i) => makeRec759(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runIN759(recs759c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_ZONE_CLUSTER'), 'INTENTION_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_STAKES_ZONE_CLUSTER no-fire:
+    // stakes-raising scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes are distributed across thirds', async () => {
+      const recs759cn = Array.from({ length: 9 }, (_, i) => makeRec759(i,
+        (i === 0 || i === 4 || i === 7) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runIN759(recs759cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_ZONE_CLUSTER'), 'INTENTION_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 745 — intentionPass: intention relationship zone cluster, intention seed drought run, intention clock delta drought run', async () => {
     const makeRec745 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
