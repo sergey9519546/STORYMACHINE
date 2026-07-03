@@ -376,6 +376,17 @@
 // structural thirds — likewise a virgin field, never referenced in this pass before),
 // BELIEF_COMPLICATE_ZONE_CLUSTER (distribution/timing × purpose === 'complicate' × structural
 // thirds — also a virgin field, never referenced in this pass before).
+//
+// Wave 866 additions: BELIEF_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose ===
+// 'establish_world' absence -- completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 838; peak mode conventionally skipped for this categorical
+// field), BELIEF_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence -- completes 2 of
+// 3 slots for this purpose value alongside the zone-cluster mode added in Wave 852; peak mode
+// conventionally skipped for this categorical field), BELIEF_RESOLUTION_DROUGHT_RUN (run-based
+// x purpose === 'resolution' absence -- completes 2 of 3 slots for this purpose value alongside
+// the zone-cluster mode added in Wave 852; distinct from the pre-existing BELIEF_RESOLUTION_
+// ABSENT, which audits witnessed-revelation timing rather than the purpose field; peak mode
+// conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4772,6 +4783,74 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r852c.maxZoneCount / r852c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r852c.zoneNames[r852c.maxZoneIdx]} third. When every complication lands in the same structural window, the belief-tracking layer stops deepening the trouble anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r852c.zoneNames[r852c.maxZoneIdx]} third to complicate the story so the belief-tracking layer keeps deepening the trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 866: BELIEF_ESTABLISH_WORLD_DROUGHT_RUN, BELIEF_CLIMAX_DROUGHT_RUN,
+  //              BELIEF_RESOLUTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // BELIEF_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 838 (peak mode conventionally skipped for this categorical field).
+  {
+    const r866a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r866a.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r866a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r866a.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r866a.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the belief-tracking layer with no fresh ground to plant convictions against for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r866a.longestRun}-scene stretch to establish the world, so the belief-tracking layer has fresh ground to plant convictions against throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // BELIEF_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 852 (peak mode conventionally skipped for this categorical field).
+  {
+    const r866b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r866b.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r866b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r866b.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r866b.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the belief-tracking layer without a structural high point to build its biggest test toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r866b.longestRun}-scene stretch as the climax, or restructure so the belief-tracking layer's peak tests recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // BELIEF_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes
+  // overall, fires when the longest consecutive run of scenes with no resolution purpose
+  // reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 852. Distinct from the pre-existing BELIEF_RESOLUTION_ABSENT, which audits
+  // witnessed-revelation timing (whether any revelation lands in the final 20%) rather than
+  // the scene's `purpose` field; peak mode conventionally skipped for this categorical field.
+  {
+    const r866c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r866c.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r866c.longestRun} consecutive scenes`,
+        rule: 'BELIEF_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r866c.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r866c.presentCount} scenes elsewhere are. A long unbroken stretch without any settling beat leaves the belief-tracking layer with no room to affirm convictions for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r866c.longestRun}-scene stretch to resolve part of the story, so the belief-tracking layer keeps affirming convictions throughout the story rather than only at its very end.`,
       });
     }
   }
