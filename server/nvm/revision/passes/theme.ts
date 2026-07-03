@@ -282,6 +282,14 @@
 // peak mode has never been applied to it), THEME_RELATIONSHIP_DROUGHT_RUN (run-based ×
 // relationshipShifts absence — Wave 668 applied the backward-cause peak mode to
 // relationshipShifts; the drought-run mode has never been applied to it).
+// Wave 738 additions: THEME_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights ×
+// structural thirds — Waves 654/724 applied the run-based drought and backward-cause peak modes
+// to dialogueHighlights; the zone-cluster mode has never been applied to it, completing the
+// trio), THEME_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × relationshipShifts × structural
+// thirds — Waves 668/724 applied the backward-cause peak and run-based drought modes to
+// relationshipShifts; the zone-cluster mode has never been applied to it, completing the trio),
+// THEME_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 682 applied the
+// backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4190,6 +4198,71 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r724c.longestRun} consecutive scenes with no relationship shift at all, even though ${r724c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the theme's human throughline dormant for an extended run.`,
         suggestedFix: `Let a bond shift somewhere within the ${r724c.longestRun}-scene stretch — even a small movement keeps the theme's human throughline alive throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 738: THEME_HIGHLIGHT_ZONE_CLUSTER, THEME_RELATIONSHIP_ZONE_CLUSTER,
+  //              THEME_CLOCK_DELTA_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // THEME_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 654/724
+  // applied the run-based drought and backward-cause peak modes to dialogueHighlights; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r738a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r738a.fires) {
+      issues.push({
+        location: `${r738a.zoneNames[r738a.maxZoneIdx]} third — ${r738a.maxZoneCount} of ${r738a.count} highlighted-dialogue scenes`,
+        rule: 'THEME_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r738a.maxZoneCount / r738a.count) * 100)}% of the story's standout dialogue clusters in the ${r738a.zoneNames[r738a.maxZoneIdx]} third. When every memorable line lands in the same structural window, the theme has no verbal reinforcement anywhere else in the story.`,
+        suggestedFix: `Give at least one scene outside the ${r738a.zoneNames[r738a.maxZoneIdx]} third a standout line of dialogue so the theme keeps getting stated more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 668/724
+  // applied the backward-cause peak and run-based drought modes to relationshipShifts; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r738b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r738b.fires) {
+      issues.push({
+        location: `${r738b.zoneNames[r738b.maxZoneIdx]} third — ${r738b.maxZoneCount} of ${r738b.count} relationship-shift scenes`,
+        rule: 'THEME_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r738b.maxZoneCount / r738b.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r738b.zoneNames[r738b.maxZoneIdx]} third. When every bond change lands in the same structural window, the theme has no relational testing ground anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r738b.zoneNames[r738b.maxZoneIdx]} third so the theme keeps being tested through relationships more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Wave 682 applied the
+  // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it.
+  {
+    const r738c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r738c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r738c.longestRun} consecutive scenes`,
+        rule: 'THEME_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r738c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r738c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the theme without any external pressure testing it for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r738c.longestRun}-scene stretch so external pressure keeps testing the theme throughout that stretch.`,
       });
     }
   }
