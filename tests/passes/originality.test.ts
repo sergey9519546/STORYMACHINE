@@ -1210,6 +1210,100 @@ He sits at his desk.
   });
 
 
+  describe('Wave 816 — originalityPass: originality character moment zone cluster, originality character moment drought run, originality turning point zone cluster', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const EMOTION_POOL_816 = ['positive', 'negative', 'neutral'];
+    const PURPOSE_POOL_816 = ['establish_world', 'complicate', 'raise_stakes', 'resolution'];
+    const SENTENCE_POOL_816 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor816 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec816 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor816(idx),
+      emotionalShift: EMOTION_POOL_816[idx % EMOTION_POOL_816.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_816[idx % PURPOSE_POOL_816.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain816 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor816(i)}\n\n${SENTENCE_POOL_816[i % SENTENCE_POOL_816.length]}`).join('\n\n');
+    const runO816 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain816(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs816a = Array.from({ length: 9 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runO816(recs816a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER'), 'ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs816an = Array.from({ length: 9 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 4 || i === 8) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runO816(recs816an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER'), 'ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs816b = Array.from({ length: 10 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runO816(recs816b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN'), 'ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs816bn = Array.from({ length: 10 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 3 || i === 6 || i === 9) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runO816(recs816bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN'), 'ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs816c = Array.from({ length: 9 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'turning_point' : 'complicate',
+      }));
+      const res = await runO816(recs816c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURNING_POINT_ZONE_CLUSTER'), 'ORIGINALITY_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs816cn = Array.from({ length: 9 }, (_, i) => makeRec816(i, {
+        purpose: (i === 0 || i === 4 || i === 8) ? 'turning_point' : 'complicate',
+      }));
+      const res = await runO816(recs816cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURNING_POINT_ZONE_CLUSTER'), 'ORIGINALITY_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 802 — originalityPass: originality suspense peak uncaused, originality curiosity drought run, originality emotion drought run', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788
     // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid

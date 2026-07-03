@@ -364,6 +364,17 @@
 // DRAMATIC_TURN_ZONE_CLUSTER (Wave 592, hand-rolled) already completes the dramaticTurn trio
 // alongside ORIGINALITY_TURN_DROUGHT_RUN, so dramaticTurn was correctly skipped as a non-distinct
 // candidate.
+// Wave 816 additions: ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose
+// === 'character_moment' × structural thirds — this purpose value has only ever appeared inside
+// the generic PURPOSE_CONSECUTIVE_RUN check [Wave 592, any 4+ consecutive identical-purpose
+// scenes], never audited via thirds-based concentration; a predictable window where every
+// character moment lands is itself a learnable pattern), ORIGINALITY_CHARACTER_MOMENT_
+// DROUGHT_RUN (run-based × purpose === 'character_moment' absence — completing 2 of 3 slots
+// for this purpose value alongside the zone-cluster mode added in this same wave; peak mode
+// conventionally skipped for this categorical field), ORIGINALITY_TURNING_POINT_ZONE_CLUSTER
+// (distribution/timing × purpose === 'turning_point' × structural thirds — likewise only ever
+// touched by the generic PURPOSE_CONSECUTIVE_RUN check; none of the three shared-library trio
+// modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4993,6 +5004,74 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   // Clichés (minor) are pushed first and would crowd out the higher-severity
   // structural findings (UNIFORM_SCENE_PURPOSES is major) under a naive slice.
   // Sort by severity so the most important issues always survive truncation.
+  // ── Wave 816: ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER, ORIGINALITY_CHARACTER_MOMENT_
+  //              DROUGHT_RUN, ORIGINALITY_TURNING_POINT_ZONE_CLUSTER ──────────────────────────
+
+  // ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has only ever appeared inside the generic
+  // PURPOSE_CONSECUTIVE_RUN check (any 4+ consecutive identical-purpose scenes), never audited
+  // via thirds-based concentration — a predictable window where every character moment lands is
+  // itself a learnable pattern.
+  {
+    const r816a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r816a.fires) {
+      issues.push({
+        location: `${r816a.zoneNames[r816a.maxZoneIdx]} third — ${r816a.maxZoneCount} of ${r816a.count} character-moment scenes`,
+        rule: 'ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r816a.maxZoneCount / r816a.count) * 100)}% of the story's character-moment scenes cluster in the ${r816a.zoneNames[r816a.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than interior reflection distributed unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r816a.zoneNames[r816a.maxZoneIdx]} third as a character moment so interior reflection stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment
+  // scenes overall, fires when the longest consecutive run of scenes with no character-moment
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r816b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r816b.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r816b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r816b.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r816b.presentCount} scenes elsewhere pause for interior reflection — a predictable stretch with no reflective beat the audience can learn to expect rather than interiority distributed unevenly throughout.`,
+        suggestedFix: `Purpose at least one scene within the ${r816b.longestRun}-scene stretch as a character moment so interior reflection stays unpredictable rather than settling into a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // Likewise only ever touched by the generic PURPOSE_CONSECUTIVE_RUN check; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r816c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r816c.fires) {
+      issues.push({
+        location: `${r816c.zoneNames[r816c.maxZoneIdx]} third — ${r816c.maxZoneCount} of ${r816c.count} turning-point scenes`,
+        rule: 'ORIGINALITY_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r816c.maxZoneCount / r816c.count) * 100)}% of the story's turning-point scenes cluster in the ${r816c.zoneNames[r816c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than pivots distributed unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r816c.zoneNames[r816c.maxZoneIdx]} third as a turning point so pivots stay unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
   const severityRank: Record<string, number> = { critical: 0, major: 1, minor: 2 };
   const prioritized = [...issues].sort(
     (a, b) => (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3),
