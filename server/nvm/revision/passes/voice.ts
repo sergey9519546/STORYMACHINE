@@ -398,6 +398,14 @@
 // 3-zone/run-based trios that had never been audited by it: VOICE_INTRODUCE_CONFLICT_ZONE_IMBALANCE
 // (purpose === 'introduce_conflict'), VOICE_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose ===
 // 'character_moment'), and VOICE_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes').
+//
+// Wave 935 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing VOICE_REVELATION_ZONE_CLUSTER/DROUGHT_RUN audit the separate revelation
+// string|null field, not this purpose enum value) -- a genuinely virgin field. This wave adds
+// VOICE_REVELATION_PURPOSE_ZONE_CLUSTER and VOICE_REVELATION_PURPOSE_DROUGHT_RUN (peak mode
+// conventionally skipped for this categorical field), plus VOICE_NEGATIVE_EMOTION_ZONE_IMBALANCE,
+// extending the 4-zone checkZoneImbalance mode to the emotionalShift valence signal (emotionalShift
+// === 'negative' has a complete 3-zone/run trio but has never been audited by it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5584,6 +5592,74 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r921c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName921c} contains ${r921c.counts[r921c.bloatZoneIdx]} of them (${Math.round((r921c.counts[r921c.bloatZoneIdx] / r921c.totalCount) * 100)}%) while ${emptyNames921c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the voice's urgency an uneven structural rhythm.`,
         suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames921c} — so the voice's urgency rises more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from VOICE_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r935a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r935a.fires) {
+      issues.push({
+        location: `${r935a.zoneNames[r935a.maxZoneIdx]} third — ${r935a.maxZoneCount} of ${r935a.count} revelation-purposed scenes`,
+        rule: 'VOICE_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r935a.maxZoneCount / r935a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r935a.zoneNames[r935a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the voice shifts to its knowing register in one part of the story and stays flat elsewhere.`,
+        suggestedFix: `Purpose at least one scene outside the ${r935a.zoneNames[r935a.maxZoneIdx]} third as a revelation so the voice keeps modulating with new knowledge more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r935b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r935b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r935b.longestRun} consecutive scenes`,
+        rule: 'VOICE_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r935b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r935b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with no turns of new knowledge leaves the voice's register unchanged for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r935b.longestRun}-scene stretch as a revelation so the voice keeps modulating with new knowledge throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone VOICE_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based VOICE_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r935c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r935c.fires) {
+      const emptyNames935c = r935c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName935c = FOUR_ZONE_NAMES[r935c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames935c} empty; ${bloatName935c} has ${r935c.counts[r935c.bloatZoneIdx]}/${r935c.totalCount} negative-shift scenes`,
+        rule: 'VOICE_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r935c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName935c} contains ${r935c.counts[r935c.bloatZoneIdx]} of them (${Math.round((r935c.counts[r935c.bloatZoneIdx] / r935c.totalCount) * 100)}%) while ${emptyNames935c} contains none. Downturns bloat in one structural quarter and vanish from another, giving the voice's darker register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames935c} — so the voice's darker register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
