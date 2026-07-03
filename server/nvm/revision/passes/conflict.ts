@@ -301,6 +301,15 @@
 // applied to it), CONFLICT_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta>0 presence ×
 // structural thirds — Waves 674/716 applied the backward-cause peak and run-based drought modes to
 // clockDelta; the zone-cluster mode has never been applied to it, completing the trio).
+// Wave 744 additions: CONFLICT_RELATIONSHIP_ZONE_CLUSTER (distribution/timing ×
+// relationshipShifts × structural thirds — Waves 702/730 applied the run-based drought and
+// backward-cause peak modes to this pass's most heavily used field; the zone-cluster mode has
+// never been applied to it, completing the trio), CONFLICT_CLOCK_DROUGHT_RUN (run-based ×
+// clockRaised absence — Wave 702 applied the zone-cluster mode to clockRaised; the drought-run
+// mode has never been applied to it), CONFLICT_CURIOSITY_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × curiosityDelta magnitude — curiosityDelta has only ever anchored
+// co-occurrence/decoupling, zone-presence/absence, front-loaded, and zone-cluster checks; the
+// backward-cause peak-isolation mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4342,6 +4351,74 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r730c.maxZoneCount / r730c.count) * 100)}% of the scenes that advance the ticking clock cluster in the ${r730c.zoneNames[r730c.maxZoneIdx]} third. When every clock-tightening beat lands in the same structural window, the conflict loses any sense of mounting time pressure recurring across the whole story.`,
         suggestedFix: `Move at least one clock-advancing beat outside the ${r730c.zoneNames[r730c.maxZoneIdx]} third so time pressure tightens on the conflict more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 744: CONFLICT_RELATIONSHIP_ZONE_CLUSTER, CONFLICT_CLOCK_DROUGHT_RUN,
+  //              CONFLICT_CURIOSITY_PEAK_UNCAUSED ────────────────────────────────────────────
+
+  // CONFLICT_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 702/730
+  // applied the run-based drought and backward-cause peak modes to this pass's most heavily used
+  // field; the zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r744a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r744a.fires) {
+      issues.push({
+        location: `${r744a.zoneNames[r744a.maxZoneIdx]} third — ${r744a.maxZoneCount} of ${r744a.count} relationship-shift scenes`,
+        rule: 'CONFLICT_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r744a.maxZoneCount / r744a.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r744a.zoneNames[r744a.maxZoneIdx]} third. When every bond change lands in the same structural window, the conflict has no relational fallout to draw on anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r744a.zoneNames[r744a.maxZoneIdx]} third so the conflict's relational fallout lands more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clockRaised scenes overall, fires when the longest
+  // consecutive run of scenes with clockRaised false reaches 6. Wave 702 applied the zone-cluster
+  // mode to clockRaised; the drought-run mode has never been applied to it.
+  {
+    const r744b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r744b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r744b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r744b.longestRun} consecutive scenes with the clock never raised at all, even though ${r744b.presentCount} scenes elsewhere do raise it. A long unbroken stretch where the deadline never tightens leaves the conflict without any mechanical pressure driving it for an extended run.`,
+        suggestedFix: `Raise the clock somewhere within the ${r744b.longestRun}-scene stretch so the conflict keeps a mechanical pressure acting on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_CURIOSITY_PEAK_UNCAUSED — Single-peak isolation/backward-cause × curiosityDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a
+  // positive curiosity spike, a 2-scene lookback. Finds the single scene with the sharpest
+  // curiosity rise; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. curiosityDelta has only ever anchored co-occurrence/decoupling,
+  // zone-presence/absence, front-loaded, and zone-cluster checks; the backward-cause
+  // peak-isolation mode has never been applied to it.
+  {
+    const r744c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r744c.fires) {
+      issues.push({
+        location: `scene ${r744c.peakIdx + 1} — peak curiosity spike (${r744c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single sharpest curiosity spike (scene ${r744c.peakIdx + 1}, a rise of ${r744c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the audience's hunger to know more peaks hardest arrives without any structural pivot or disclosure driving it — the conflict has nothing causal to hook that curiosity to.`,
+        suggestedFix: `Give scene ${r744c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest curiosity spike is earned by the conflict's escalation rather than arriving in a causal vacuum.`,
       });
     }
   }
