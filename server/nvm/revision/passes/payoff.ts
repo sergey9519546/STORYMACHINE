@@ -202,10 +202,16 @@
 // requirement — a story could have seeds in every zone and still trip that check] and CLUE_SEED_
 // TEMPORAL_CLUSTER [uses thirds, not quarters, and likewise has no void-zone requirement]; first
 // check in this pass requiring the co-presence of a void AND a bloat rather than either alone).
+// Wave 608 additions (built on the shared checks library, audit M2.2): PAYOFF_DIALOGUE_HIGHLIGHT_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × dialogueHighlights — first use of
+// dialogueHighlights anywhere in this 104-rule pass), VISUAL_STAGING_ZONE_IMBALANCE
+// (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere
+// in this pass), SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × seed trigger →
+// dialogueHighlights absence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function payoffPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -3263,6 +3269,89 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r594c.totalCount} seeded clues are unevenly distributed across its four structural zones: ${bloatName594c} contains ${r594c.counts[r594c.bloatZoneIdx]} of them (${Math.round((r594c.counts[r594c.bloatZoneIdx] / r594c.totalCount) * 100)}%) while ${emptyNames594c} contains none. Clue-planting simultaneously bloats in one zone and vanishes from another: the audience receives a concentrated burst of new threads in one structural quarter while another quarter offers nothing new to wonder about.`,
         suggestedFix: `Redistribute seeds: move at least one clue-plant from ${bloatName594c} into the empty zone(s) — ${emptyNames594c} — so every structural quarter carries some foreshadowing. The goal is not perfect uniformity, but that no zone is completely seed-free while another carries more than half the total load.`,
+      });
+    }
+  }
+
+  // ── Wave 608: PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED, VISUAL_STAGING_ZONE_IMBALANCE,
+  //              SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ──────────────────────────────────────
+
+  // PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds ×
+  // dialogueHighlights. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8,
+  // ≥2 payoff scenes, ≥2 scenes carrying a curated dialogue highlight. Zero overlap → fire. A
+  // thread resolving and a line the story itself judged worth highlighting never happen in the
+  // same scene — every payoff lands in a scene with no standout dialogue, and every memorable
+  // line lands while no thread is being paid off. First use of the dialogueHighlights field
+  // anywhere in this 104-rule pass. Distinct from every other co-occurrence check in this file
+  // (PAYOFF_REVELATION_DECOUPLED and siblings), none of which pair the payoff channel with a
+  // dialogue-side signal.
+  {
+    const r608a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r608a.fires) {
+      issues.push({
+        location: `${r608a.aCount} payoff scene(s), ${r608a.bCount} dialogue-highlight scene(s) — zero overlap`,
+        rule: 'PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r608a.aCount} scenes where a planted thread pays off never coincide with the ${r608a.bCount} scenes flagged as containing a standout line of dialogue — every payoff lands without a line worth remembering attached to it, and every memorable line lands while nothing is being resolved. A payoff's emotional weight is often carried by the line that names what it means; when the two channels never touch, resolutions land as plot mechanics rather than moments.`,
+        suggestedFix: `Let at least one payoff scene carry a line worth remembering — a character naming what the resolved thread cost, or what it means now that it's answered. Tying the story's most memorable dialogue to its resolutions gives the payoff a voice instead of leaving it to structural bookkeeping alone.`,
+      });
+    }
+  }
+
+  // VISUAL_STAGING_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass — every existing check here audits the
+  // seed/payoff/revelation economy through non-visual record channels; this is the first to audit
+  // how physical staging — as opposed to the promise-and-payment machinery — is spread across the
+  // four structural quarters. Distinct from CLUE_SEED_ZONE_IMBALANCE (Wave 594: same template,
+  // seededClueIds channel rather than visualBeats).
+  {
+    const r608b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r608b.fires) {
+      const emptyNames608b = r608b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName608b = FOUR_ZONE_NAMES[r608b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames608b} empty; ${bloatName608b} has ${r608b.counts[r608b.bloatZoneIdx]}/${r608b.totalCount} visually dense scenes`,
+        rule: 'VISUAL_STAGING_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r608b.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName608b} contains ${r608b.counts[r608b.bloatZoneIdx]} of them (${Math.round((r608b.counts[r608b.bloatZoneIdx] / r608b.totalCount) * 100)}%) while ${emptyNames608b} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's balance between staged and unstaged scenes an uneven rhythm relative to its setup/payoff economy.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames608b}, or thin out ${bloatName608b}'s concentration by letting one of its visually dense scenes lean more on dialogue instead. A more even spread keeps physical presence active throughout the story's promise-and-payment arc.`,
+      });
+    }
+  }
+
+  // SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seed trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a 2-scene
+  // lookahead window. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while highlighted dialogue does occur elsewhere in the story. Every clue-planting
+  // scene passes into an aftermath with no memorable verbal moment — the planted material gets no
+  // nearby voice giving it texture. Distinct from SEED_REVELATION_AFTERMATH_ABSENT (Wave 510) and
+  // SEED_SUSPENSE_AFTERMATH_ABSENT (Wave 524), which use different aftermath channels, and from
+  // PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED above (same dialogueHighlights field, but that check is
+  // same-scene co-occurrence with the payoff channel, not a windowed check on the seed channel).
+  {
+    const r608c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r608c.fires) {
+      issues.push({
+        location: `${r608c.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r608c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r608c.aftermathCount} such scenes exist elsewhere in the script. Seeds are the story's long-horizon deposits; when their immediate aftermath never carries a memorable line, the planted material gets no verbal texture nearby — it lives purely as structural bookkeeping until the eventual payoff.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, an oblique reference that will read differently in retrospect, or a reaction that gives the seed emotional presence before its payoff arrives.`,
       });
     }
   }

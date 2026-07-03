@@ -1365,6 +1365,97 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 608 — payoffPass: payoff dialogue highlight decoupled, visual staging zone imbalance, seed dialogue highlight aftermath void', async () => {
+    const runPY608 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED fire:
+    // n=8; payoffs at 0,1 (no highlight); highlights at 2,3 (no payoff) → zero overlap → fires
+    it('PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED fires when payoff scenes and dialogue highlights never overlap', async () => {
+      const recs608a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs608a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs608a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs608a[2] = makeSharedRecord(2, { dialogueHighlights: ['a memorable line'] });
+      recs608a[3] = makeSharedRecord(3, { dialogueHighlights: ['another line'] });
+      const res = await runPY608(recs608a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED should fire');
+    });
+
+    // PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED no-fire:
+    // scene 1 carries BOTH a payoff and a dialogue highlight → overlap exists
+    it('PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs608an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs608an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs608an[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'], dialogueHighlights: ['a memorable line'] });
+      recs608an[3] = makeSharedRecord(3, { dialogueHighlights: ['another line'] });
+      const res = await runPY608(recs608an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'PAYOFF_DIALOGUE_HIGHLIGHT_DECOUPLED should not fire');
+    });
+
+    // VISUAL_STAGING_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('VISUAL_STAGING_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs608b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs608b[6] = makeSharedRecord(6, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608b[9] = makeSharedRecord(9, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608b[10] = makeSharedRecord(10, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608b[11] = makeSharedRecord(11, { visualBeats: ['opens the case', 'reads the label'] });
+      const res = await runPY608(recs608b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_STAGING_ZONE_IMBALANCE'), 'VISUAL_STAGING_ZONE_IMBALANCE should fire');
+    });
+
+    // VISUAL_STAGING_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('VISUAL_STAGING_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs608bn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs608bn[1] = makeSharedRecord(1, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608bn[4] = makeSharedRecord(4, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608bn[7] = makeSharedRecord(7, { visualBeats: ['opens the case', 'reads the label'] });
+      recs608bn[10] = makeSharedRecord(10, { visualBeats: ['opens the case', 'reads the label'] });
+      const res = await runPY608(recs608bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_STAGING_ZONE_IMBALANCE'), 'VISUAL_STAGING_ZONE_IMBALANCE should not fire');
+    });
+
+    // SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no seed is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs608c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs608c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs608c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs608c[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs608c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs608c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runPY608(recs608c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs608cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs608cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs608cn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs608cn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs608cn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs608cn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs608cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runPY608(recs608cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 594 — payoffPass: seed purpose monotone, payoff purpose monotone, clue seed zone imbalance', async () => {
     const runPY594 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
