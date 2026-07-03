@@ -388,6 +388,17 @@
 // × emotionalShift === 'positive' absence — completes 2 of 3 slots for this valence alongside the
 // zone-cluster mode added in this same wave; peak mode conventionally skipped for this categorical
 // field).
+//
+// Wave 839 additions (closes the eighteenth rotation cycle, 826-839): CAUSALITY_CLIMAX_ZONE_
+// CLUSTER (distribution/timing × purpose === 'climax' × structural thirds — this purpose value
+// has only ever appeared inside the tensionReleasingPurposes composite set and incidental
+// threshold conditions [e.g. purpose === 'climax'/'resolution' guards]; it has never been audited
+// as its own standalone signal by any of the three shared-library trio modes),
+// CAUSALITY_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' × structural
+// thirds — likewise only ever touched via the same composite set and threshold guards; a virgin
+// standalone signal), CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'establish_world' × structural thirds — this purpose value has never been referenced anywhere
+// in this pass; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4872,6 +4883,73 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r825c.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r825c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the causal chain without an emotional payoff to deliver for an extended run.`,
         suggestedFix: `Give the story a moment of relief within the ${r825c.longestRun}-scene stretch so the causal chain keeps an emotional payoff to deliver throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 839: CAUSALITY_CLIMAX_ZONE_CLUSTER, CAUSALITY_RESOLUTION_ZONE_CLUSTER,
+  //              CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CAUSALITY_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has only ever appeared inside the tensionReleasingPurposes composite set and incidental
+  // threshold conditions; it has never been audited as its own standalone signal by any of the
+  // three shared-library trio modes.
+  {
+    const r839a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r839a.fires) {
+      issues.push({
+        location: `${r839a.zoneNames[r839a.maxZoneIdx]} third — ${r839a.maxZoneCount} of ${r839a.count} climax-purposed scenes`,
+        rule: 'CAUSALITY_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r839a.maxZoneCount / r839a.count) * 100)}% of the scenes purposed as the climax cluster in the ${r839a.zoneNames[r839a.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the causal chain delivers its payoff in only one part of the story instead of building toward it across its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r839a.zoneNames[r839a.maxZoneIdx]} third so the causal chain's build toward the payoff reads across the whole story rather than concentrated in one window.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. Likewise only ever touched via the tensionReleasingPurposes composite set and
+  // threshold guards — a virgin standalone signal.
+  {
+    const r839b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r839b.fires) {
+      issues.push({
+        location: `${r839b.zoneNames[r839b.maxZoneIdx]} third — ${r839b.maxZoneCount} of ${r839b.count} resolution-purposed scenes`,
+        rule: 'CAUSALITY_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r839b.maxZoneCount / r839b.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r839b.zoneNames[r839b.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the causal chain settles its threads in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r839b.zoneNames[r839b.maxZoneIdx]} third so the causal chain settles its threads more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r839c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r839c.fires) {
+      issues.push({
+        location: `${r839c.zoneNames[r839c.maxZoneIdx]} third — ${r839c.maxZoneCount} of ${r839c.count} world-establishing scenes`,
+        rule: 'CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r839c.maxZoneCount / r839c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r839c.zoneNames[r839c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the causal chain has no ground to build fresh cause-and-effect from anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r839c.zoneNames[r839c.maxZoneIdx]} third to establish the world so the causal chain keeps building fresh cause-and-effect more evenly across the story.`,
       });
     }
   }

@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 839 — causalityPass: causality climax zone cluster, causality resolution zone cluster, causality establish world zone cluster', async () => {
+    const runCA839 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs839a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA839(recs839a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_ZONE_CLUSTER'), 'CAUSALITY_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs839an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA839(recs839an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_ZONE_CLUSTER'), 'CAUSALITY_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs839b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runCA839(recs839b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_ZONE_CLUSTER'), 'CAUSALITY_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs839bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runCA839(recs839bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_ZONE_CLUSTER'), 'CAUSALITY_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs839c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA839(recs839c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER'), 'CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs839cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA839(recs839cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER'), 'CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 825 — causalityPass: causality introduce conflict drought run, causality positive emotion zone cluster, causality positive emotion drought run', async () => {
     const runCA825 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
