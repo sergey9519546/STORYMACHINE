@@ -318,6 +318,20 @@
 // never been applied to it), CONFLICT_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes'
 // absence — purpose has only ever anchored a hand-rolled co-occurrence/decoupling check
 // [stakesScenes299]; the run-based drought mode has never been applied to it).
+// Wave 772 additions: CONFLICT_STAKES_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'raise_stakes' presence × structural thirds — Wave 758's CONFLICT_STAKES_DROUGHT_RUN applied
+// the run-based drought mode to this value; the zone-cluster mode has never been applied to it,
+// completing the trio), CONFLICT_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude × 2-scene lookback — CONFLICT_REVELATION_DROUGHT_RUN [Wave 671] and
+// CONFLICT_REVELATION_ZONE_CLUSTER [Wave 758] completed the drought/cluster half of the trio; the
+// existing CONFLICT_PEAK_REVELATION_ABSENT audits whether revelation co-occurs with the peak
+// RUPTURE scene, a different signal's peak — the backward-cause peak mode has never been applied
+// to revelation's own peak scene. hasCause here deliberately references only dramaticTurn, never
+// revelation, to avoid a circular/self-referential audit), CONFLICT_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift !== 'neutral' presence × structural thirds —
+// emotionalShift as a primary signal has only ever anchored co-occurrence-decoupling and
+// aftermath-void checks in this pass; none of the three shared-library trio modes has ever been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4493,6 +4507,78 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r758c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r758c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the conflict flat without mounting pressure for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r758c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the conflict under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 772: CONFLICT_STAKES_ZONE_CLUSTER, CONFLICT_REVELATION_PEAK_UNCAUSED,
+  //              CONFLICT_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CONFLICT_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // stakes-raising scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Wave 758's CONFLICT_STAKES_DROUGHT_RUN applied the run-based drought mode to this value; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r772a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r772a.fires) {
+      issues.push({
+        location: `${r772a.zoneNames[r772a.maxZoneIdx]} third — ${r772a.maxZoneCount} of ${r772a.count} stakes-raising scenes`,
+        rule: 'CONFLICT_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r772a.maxZoneCount / r772a.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r772a.zoneNames[r772a.maxZoneIdx]} third. When every escalation lands in the same structural window, the conflict has no mounting pressure testing it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r772a.zoneNames[r772a.maxZoneIdx]} third to raise stakes so the conflict keeps mounting pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the peak (earliest, on magnitude ties) revelation scene has no dramatic
+  // turn in the 2 scenes preceding it. CONFLICT_REVELATION_DROUGHT_RUN and
+  // CONFLICT_REVELATION_ZONE_CLUSTER completed the drought/cluster half of the trio; the existing
+  // CONFLICT_PEAK_REVELATION_ABSENT audits whether revelation co-occurs with the peak RUPTURE
+  // scene, a different signal's peak — the backward-cause peak mode has never been applied to
+  // revelation's own peak scene. hasCause deliberately references only dramaticTurn, never
+  // revelation, to avoid a circular/self-referential audit.
+  {
+    const r772b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r772b.fires) {
+      issues.push({
+        location: `scene ${r772b.peakIdx + 1} — the story's peak revelation scene`,
+        rule: 'CONFLICT_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r772b.peakIdx + 1} is the earliest of ${r772b.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the conflict slack right before the reveal.`,
+        suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r772b.peakIdx + 1} so the conflict builds pressure into the revelation instead of arriving flat.`,
+      });
+    }
+  }
+
+  // CONFLICT_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // emotionally charged scenes, fires when more than 75% of those scenes cluster in a single
+  // third. emotionalShift as a primary signal has only ever anchored co-occurrence-decoupling and
+  // aftermath-void checks in this pass; none of the three shared-library trio modes has ever been
+  // applied to it.
+  {
+    const r772c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r772c.fires) {
+      issues.push({
+        location: `${r772c.zoneNames[r772c.maxZoneIdx]} third — ${r772c.maxZoneCount} of ${r772c.count} emotionally charged scenes`,
+        rule: 'CONFLICT_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r772c.maxZoneCount / r772c.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r772c.zoneNames[r772c.maxZoneIdx]} third. When every emotional shift lands in the same structural window, the conflict has no felt stakes registering anywhere else in the story.`,
+        suggestedFix: `Give at least one scene outside the ${r772c.zoneNames[r772c.maxZoneIdx]} third an emotional charge so the conflict keeps registering as felt experience more evenly across the story.`,
       });
     }
   }

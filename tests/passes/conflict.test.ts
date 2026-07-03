@@ -1535,6 +1535,84 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 772 — conflictPass: conflict stakes zone cluster, conflict revelation peak uncaused, conflict emotion zone cluster', async () => {
+    const makeRec772 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF772 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs772a = Array.from({ length: 9 }, (_, i) => makeRec772(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runCF772(recs772a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_ZONE_CLUSTER'), 'CONFLICT_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes spread across thirds', async () => {
+      const recs772an = Array.from({ length: 9 }, (_, i) => makeRec772(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runCF772(recs772an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_ZONE_CLUSTER'), 'CONFLICT_STAKES_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 (peak, earliest) and 5; no dramaticTurn at 0 or 1 (2-scene
+    // lookback of the peak at index 2).
+    it('CONFLICT_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs772b = Array.from({ length: 8 }, (_, i) => makeRec772(i));
+      recs772b[2] = makeRec772(2, { revelation: 'truth revealed' });
+      recs772b[5] = makeRec772(5, { revelation: 'second truth revealed' });
+      const res = await runCF772(recs772b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PEAK_UNCAUSED'), 'CONFLICT_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('CONFLICT_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation', async () => {
+      const recs772bn = Array.from({ length: 8 }, (_, i) => makeRec772(i));
+      recs772bn[2] = makeRec772(2, { revelation: 'truth revealed' });
+      recs772bn[5] = makeRec772(5, { revelation: 'second truth revealed' });
+      recs772bn[1] = makeRec772(1, { dramaticTurn: 'reversal' });
+      const res = await runCF772(recs772bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PEAK_UNCAUSED'), 'CONFLICT_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // CONFLICT_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally charged scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_EMOTION_ZONE_CLUSTER fires when >75% of emotionally charged scenes cluster in one third', async () => {
+      const recs772c = Array.from({ length: 9 }, (_, i) => makeRec772(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF772(recs772c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_ZONE_CLUSTER'), 'CONFLICT_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_EMOTION_ZONE_CLUSTER does not fire when emotionally charged scenes spread across thirds', async () => {
+      const recs772cn = Array.from({ length: 9 }, (_, i) => makeRec772(i,
+        (i === 0 || i === 4 || i === 8) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF772(recs772cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_ZONE_CLUSTER'), 'CONFLICT_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 758 — conflictPass: conflict curiosity drought run, conflict revelation zone cluster, conflict stakes drought run', async () => {
     const makeRec758 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
