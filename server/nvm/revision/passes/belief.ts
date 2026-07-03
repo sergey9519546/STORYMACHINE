@@ -398,6 +398,14 @@
 // BELIEF_RESOLUTION_ABSENT, which audits witnessed-revelation timing rather than this purpose
 // enum value). Only unresolvedClues, visualBeats, and character_moment had ever been audited by
 // this analytical mode before this wave.
+//
+// Wave 894 additions: BELIEF_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 852; peak mode conventionally skipped for this categorical field). Continuing
+// the checkZoneImbalance rollout from Wave 880, this wave applies the 4-zone bloat+empty-zone
+// mode to two more purpose values with complete 3-zone/run-based trios: BELIEF_TURNING_POINT_
+// ZONE_IMBALANCE (purpose === 'turning_point') and BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE
+// (purpose === 'introduce_conflict').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4941,6 +4949,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r880c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName880c} contains ${r880c.counts[r880c.bloatZoneIdx]} of them (${Math.round((r880c.counts[r880c.bloatZoneIdx] / r880c.totalCount) * 100)}%) while ${emptyNames880c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the belief-tracking layer's closure an uneven structural rhythm.`,
         suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames880c} — so every structural quarter carries some capacity to affirm convictions, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 894: BELIEF_COMPLICATE_DROUGHT_RUN, BELIEF_TURNING_POINT_ZONE_IMBALANCE,
+  //              BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // BELIEF_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 852 (peak mode conventionally skipped for this categorical field).
+  {
+    const r894a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r894a.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r894a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r894a.longestRun} consecutive scenes with no complicating purpose at all, even though ${r894a.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the belief-tracking layer without fresh trouble to test convictions against for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r894a.longestRun}-scene stretch to complicate the story so the belief-tracking layer keeps facing fresh trouble to test convictions against throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // turning-point scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone BELIEF_TURNING_POINT_ZONE_CLUSTER and run-based BELIEF_TURNING_POINT_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r894b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r894b.fires) {
+      const emptyNames894b = r894b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName894b = FOUR_ZONE_NAMES[r894b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames894b} empty; ${bloatName894b} has ${r894b.counts[r894b.bloatZoneIdx]}/${r894b.totalCount} turning-point scenes`,
+        rule: 'BELIEF_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r894b.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName894b} contains ${r894b.counts[r894b.bloatZoneIdx]} of them (${Math.round((r894b.counts[r894b.bloatZoneIdx] / r894b.totalCount) * 100)}%) while ${emptyNames894b} contains none. Turning points bloat in one structural quarter and vanish from another, giving the belief-tracking layer's pivots an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames894b} — so the belief-tracking layer's pivots land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'introduce_conflict' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library. n≥10, ≥4 conflict-introducing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER and
+  // run-based BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r894c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r894c.fires) {
+      const emptyNames894c = r894c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName894c = FOUR_ZONE_NAMES[r894c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames894c} empty; ${bloatName894c} has ${r894c.counts[r894c.bloatZoneIdx]}/${r894c.totalCount} conflict-introducing scenes`,
+        rule: 'BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r894c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName894c} contains ${r894c.counts[r894c.bloatZoneIdx]} of them (${Math.round((r894c.counts[r894c.bloatZoneIdx] / r894c.totalCount) * 100)}%) while ${emptyNames894c} contains none. New fronts of conflict bloat in one structural quarter and vanish from another, giving the belief-tracking layer's tests an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames894c} — so the belief-tracking layer faces fresh friction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

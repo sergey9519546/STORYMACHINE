@@ -1204,6 +1204,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 894 — beliefPass: belief complicate drought run, belief turning point zone imbalance, belief introduce conflict zone imbalance', async () => {
+    const runBF894 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs894a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF894(recs894a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_DROUGHT_RUN'), 'BELIEF_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs894an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF894(recs894an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_DROUGHT_RUN'), 'BELIEF_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_TURNING_POINT_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); turning_point at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('BELIEF_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs894b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runBF894(recs894b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURNING_POINT_ZONE_IMBALANCE'), 'BELIEF_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs894bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runBF894(recs894bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURNING_POINT_ZONE_IMBALANCE'), 'BELIEF_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    // BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs894c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runBF894(recs894c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs894cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runBF894(recs894cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 880 — beliefPass: belief climax zone imbalance, belief establish world zone imbalance, belief resolution zone imbalance', async () => {
     const runBF880 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
