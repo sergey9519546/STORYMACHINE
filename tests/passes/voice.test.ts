@@ -1438,6 +1438,76 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 767 — voicePass: voice clock delta zone cluster, voice curiosity peak uncaused, voice suspense drought run', async () => {
+    const runV767 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('VOICE_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs767a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs767a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs767a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs767a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runV767(recs767a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_ZONE_CLUSTER'), 'VOICE_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-shifting scenes spread across thirds', async () => {
+      const recs767an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs767an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs767an[4] = makeSharedRecord(4, { clockDelta: -1 });
+      recs767an[8] = makeSharedRecord(8, { clockDelta: 1 });
+      const res = await runV767(recs767an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_ZONE_CLUSTER'), 'VOICE_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('VOICE_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs767b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs767b[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs767b[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runV767(recs767b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_PEAK_UNCAUSED'), 'VOICE_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('VOICE_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs767bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs767bn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs767bn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs767bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runV767(recs767bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_PEAK_UNCAUSED'), 'VOICE_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs767c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runV767(recs767c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_DROUGHT_RUN'), 'VOICE_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs767cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runV767(recs767cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_DROUGHT_RUN'), 'VOICE_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 753 — voicePass: voice clock delta drought run, voice character moment drought run, voice curiosity zone cluster', async () => {
     const runV753 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

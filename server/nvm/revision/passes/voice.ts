@@ -293,6 +293,15 @@
 // applied to it), VOICE_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence ×
 // structural thirds — Wave 683 applied the run-based drought mode to curiosityDelta; the
 // zone-cluster mode has never been applied to it).
+// Wave 767 additions: VOICE_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 641/753 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), VOICE_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityDelta-as-magnitude × 2-scene
+// lookback — Waves 683/739 applied the run-based drought and zone-cluster modes to curiosityDelta;
+// the backward-cause peak mode has never been applied to it, completing the trio),
+// VOICE_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 683 applied the
+// zone-cluster mode to suspenseDelta [VOICE_SUSPENSE_ZONE_CLUSTER]; the drought-run mode has never
+// been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4656,6 +4665,74 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r753c.maxZoneCount / r753c.count) * 100)}% of the scenes where curiosity rises cluster in the ${r753c.zoneNames[r753c.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the story's voice goes quiet on fresh questions for the rest of the story.`,
         suggestedFix: `Raise curiosity in at least one scene outside the ${r753c.zoneNames[r753c.maxZoneIdx]} third so the story's voice keeps generating fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 767: VOICE_CLOCK_DELTA_ZONE_CLUSTER, VOICE_CURIOSITY_PEAK_UNCAUSED,
+  //              VOICE_SUSPENSE_DROUGHT_RUN ──────────────────────────────────────
+
+  // VOICE_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-shifting
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 641/753
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r767a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r767a.fires) {
+      issues.push({
+        location: `${r767a.zoneNames[r767a.maxZoneIdx]} third — ${r767a.maxZoneCount} of ${r767a.count} clock-shifting scenes`,
+        rule: 'VOICE_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r767a.maxZoneCount / r767a.count) * 100)}% of the scenes where the clock shifts cluster in the ${r767a.zoneNames[r767a.maxZoneIdx]} third. When every deadline pressure shift lands in the same structural window, the story's voice has no urgency pressing on it anywhere else across the story.`,
+        suggestedFix: `Shift the clock in at least one scene outside the ${r767a.zoneNames[r767a.maxZoneIdx]} third so urgency keeps pressing on the story's voice more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Waves 683/739 applied the run-based drought and zone-cluster modes to
+  // curiosityDelta; the backward-cause peak mode has never been applied to it, completing the
+  // trio.
+  {
+    const r767b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.curiosityDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r767b.fires) {
+      issues.push({
+        location: `scene ${r767b.peakIdx} (peak curiosityDelta ${r767b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'VOICE_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r767b.peakIdx}, curiosityDelta ${r767b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r767b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the story's voice hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r767b.peakIdx} so the story's voice earns its peak curiosity instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no suspense rise reaches 6. Wave 683 applied the
+  // zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to it,
+  // completing the trio.
+  {
+    const r767c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r767c.fires) {
+      issues.push({
+        location: `longest stretch with no rising tension: ${r767c.longestRun} consecutive scenes`,
+        rule: 'VOICE_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r767c.longestRun} consecutive scenes with no rise in suspense at all, even though ${r767c.presentCount} scenes elsewhere do raise tension. A long unbroken stretch with nothing tightening the screws leaves the story's voice flat for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r767c.longestRun}-scene stretch so the story's voice keeps a live thread of tension running through that stretch.`,
       });
     }
   }
