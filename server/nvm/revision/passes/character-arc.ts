@@ -389,6 +389,16 @@
 // 'introduce_conflict' × structural thirds — this purpose value has never been referenced
 // anywhere in this pass; none of the three shared-library trio modes has ever been applied to
 // it).
+//
+// Wave 827 additions: ARC_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 813; peak mode conventionally skipped for this categorical
+// field), ARC_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field), ARC_COMPLICATE_ZONE_CLUSTER (distribution/timing × purpose === 'complicate' ×
+// structural thirds — 'complicate' has only ever appeared inside the dramaticPurposes composite
+// set [union with 'revelation', 'turning_point', 'climax', 'raise_stakes']; it has never been
+// audited as its own standalone signal by any of the three shared-library trio modes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4653,6 +4663,73 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r813c.maxZoneCount / r813c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r813c.zoneNames[r813c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the character's arc stops testing them with fresh friction anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r813c.zoneNames[r813c.maxZoneIdx]} third to introduce conflict so the character's arc keeps testing them with fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 827: ARC_INTRODUCE_CONFLICT_DROUGHT_RUN, ARC_ESTABLISH_WORLD_ZONE_CLUSTER,
+  //              ARC_COMPLICATE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ARC_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-introducing scenes
+  // overall, fires when the longest consecutive run of scenes with no conflict-introducing
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 813 (peak mode conventionally skipped for this categorical field).
+  {
+    const r827a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r827a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r827a.longestRun} consecutive scenes`,
+        rule: 'ARC_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r827a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r827a.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the character's arc coasting on old conflict for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r827a.longestRun}-scene stretch to introduce conflict so the character's arc keeps testing them with fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r827b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r827b.fires) {
+      issues.push({
+        location: `${r827b.zoneNames[r827b.maxZoneIdx]} third — ${r827b.maxZoneCount} of ${r827b.count} world-establishing scenes`,
+        rule: 'ARC_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r827b.maxZoneCount / r827b.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r827b.zoneNames[r827b.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the character's arc stops grounding the audience in setting or rules anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r827b.zoneNames[r827b.maxZoneIdx]} third to establish the world so the character's arc keeps grounding the audience more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 complicating
+  // scenes, fires when more than 75% of them fall in a single structural third. 'complicate' has
+  // only ever appeared inside the dramaticPurposes composite set (union with 'revelation',
+  // 'turning_point', 'climax', 'raise_stakes'); it has never been audited as its own standalone
+  // signal by any of the three shared-library trio modes.
+  {
+    const r827c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r827c.fires) {
+      issues.push({
+        location: `${r827c.zoneNames[r827c.maxZoneIdx]} third — ${r827c.maxZoneCount} of ${r827c.count} complicating scenes`,
+        rule: 'ARC_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r827c.maxZoneCount / r827c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r827c.zoneNames[r827c.maxZoneIdx]} third. When every complication lands in the same structural window, the character's arc stops deepening the trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r827c.zoneNames[r827c.maxZoneIdx]} third to complicate the story so the character's arc keeps deepening the trouble more evenly across the story.`,
       });
     }
   }

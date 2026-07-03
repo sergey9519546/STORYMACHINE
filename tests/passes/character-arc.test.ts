@@ -1080,6 +1080,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 827 — characterArcPass: arc introduce conflict drought run, arc establish world zone cluster, arc complicate zone cluster', async () => {
+    const makeRec827 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc827 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ARC_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs827a = Array.from({ length: 10 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc827(recs827a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'ARC_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs827an = Array.from({ length: 10 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc827(recs827an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'ARC_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('ARC_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs827b = Array.from({ length: 9 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runArc827(recs827b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_ESTABLISH_WORLD_ZONE_CLUSTER'), 'ARC_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs827bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runArc827(recs827bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_ESTABLISH_WORLD_ZONE_CLUSTER'), 'ARC_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('ARC_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs827c = Array.from({ length: 9 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runArc827(recs827c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_COMPLICATE_ZONE_CLUSTER'), 'ARC_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs827cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec827(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runArc827(recs827cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_COMPLICATE_ZONE_CLUSTER'), 'ARC_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 813 — characterArcPass: arc positive emotion zone cluster, arc positive emotion drought run, arc introduce conflict zone cluster', async () => {
     const makeRec813 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
