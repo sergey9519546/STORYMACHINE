@@ -413,6 +413,11 @@
 // conventionally skipped for this categorical field), plus PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE,
 // extending the 4-zone checkZoneImbalance mode to the emotionalShift valence signal (emotionalShift
 // === 'negative' has a complete 3-zone/run trio but has never been audited by it).
+// Wave 943 additions: extending the checkZoneImbalance rollout to three more signals whose 3-zone/
+// run trios were long complete but had never been 4-zone-audited, spanning three distinct signal
+// classes: PACING_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', trio completed Wave
+// 929), PACING_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — question-raising delta magnitude), and
+// PACING_SEED_ZONE_IMBALANCE (seededClueIds.length > 0 — clue-planting array field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5299,6 +5304,82 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r929c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName929c} contains ${r929c.counts[r929c.bloatZoneIdx]} of them (${Math.round((r929c.counts[r929c.bloatZoneIdx] / r929c.totalCount) * 100)}%) while ${emptyNames929c} contains none. Downturns bloat in one structural quarter and vanish from another, giving pacing's darker beats an uneven structural rhythm.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames929c} — so pacing's darker beats land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the 4-zone
+  // gap for this purpose value (its 3-zone/run trio was completed in Wave 929). n≥10, ≥4 revelation-
+  // purposed scenes total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Distinct from PACING_REVELATION_PURPOSE_
+  // ZONE_CLUSTER/DROUGHT_RUN (Wave 929) — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value, and distinct from the separate revelation-FIELD rules (PACING_REVELATION_
+  // ZONE_CLUSTER/DROUGHT_RUN audit the revelation string, not the purpose enum).
+  {
+    const r943a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r943a.fires) {
+      const emptyNames943a = r943a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName943a = FOUR_ZONE_NAMES[r943a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames943a} empty; ${bloatName943a} has ${r943a.counts[r943a.bloatZoneIdx]}/${r943a.totalCount} revelation-purposed scenes`,
+        rule: 'PACING_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r943a.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName943a} contains ${r943a.counts[r943a.bloatZoneIdx]} of them (${Math.round((r943a.counts[r943a.bloatZoneIdx] / r943a.totalCount) * 100)}%) while ${emptyNames943a} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so pacing surges with new information in one part of the story and stays flat elsewhere.`,
+        suggestedFix: `Redistribute disclosures: purpose at least one scene inside the empty zone(s) — ${emptyNames943a} — as a revelation so pacing keeps surging with new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone PACING_
+  // CURIOSITY_ZONE_CLUSTER and run-based PACING_CURIOSITY_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on
+  // question-raising change rather than categorical purpose or emotional valence.
+  {
+    const r943b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r943b.fires) {
+      const emptyNames943b = r943b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName943b = FOUR_ZONE_NAMES[r943b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames943b} empty; ${bloatName943b} has ${r943b.counts[r943b.bloatZoneIdx]}/${r943b.totalCount} curiosity-raising scenes`,
+        rule: 'PACING_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r943b.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName943b} contains ${r943b.counts[r943b.bloatZoneIdx]} of them (${Math.round((r943b.counts[r943b.bloatZoneIdx] / r943b.totalCount) * 100)}%) while ${emptyNames943b} contains none. New questions bloat in one structural quarter and never open in another, so pacing quickens with curiosity in one part of the story and stalls elsewhere.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames943b} — so pacing keeps quickening with fresh questions across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone PACING_SEED_
+  // ZONE_CLUSTER and run-based PACING_SEED_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the seed array-field signal in this pass, keying on clues-being-planted
+  // rather than purpose, valence, or delta magnitude.
+  {
+    const r943c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r943c.fires) {
+      const emptyNames943c = r943c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName943c = FOUR_ZONE_NAMES[r943c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames943c} empty; ${bloatName943c} has ${r943c.counts[r943c.bloatZoneIdx]}/${r943c.totalCount} seeding scenes`,
+        rule: 'PACING_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r943c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName943c} contains ${r943c.counts[r943c.bloatZoneIdx]} of them (${Math.round((r943c.counts[r943c.bloatZoneIdx] / r943c.totalCount) * 100)}%) while ${emptyNames943c} contains none. Setups bloat in one structural quarter and never get planted in another, so pacing accretes forward momentum in one part of the story and coasts elsewhere.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames943c} — so pacing keeps accruing forward momentum across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

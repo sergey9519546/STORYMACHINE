@@ -934,6 +934,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 943 — pacingPass: pacing revelation purpose zone imbalance, pacing curiosity zone imbalance, pacing seed zone imbalance', async () => {
+    const runP943 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PACING_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs943a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runP943(recs943a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'PACING_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs943an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runP943(recs943an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'PACING_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs943b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runP943(recs943b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_ZONE_IMBALANCE'), 'PACING_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs943bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runP943(recs943bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_ZONE_IMBALANCE'), 'PACING_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs943c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runP943(recs943c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SEED_ZONE_IMBALANCE'), 'PACING_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs943cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runP943(recs943cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SEED_ZONE_IMBALANCE'), 'PACING_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 929 — pacingPass: pacing revelation purpose zone cluster, pacing revelation purpose drought run, pacing negative emotion zone imbalance', async () => {
     const runP929 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
