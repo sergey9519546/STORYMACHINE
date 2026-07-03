@@ -435,6 +435,12 @@
 // CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in
 // Wave 898), and CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence
 // signal with a complete 3-zone/run trio).
+//
+// Wave 940 additions: continuing the checkZoneImbalance rollout, this wave extends the 4-zone mode
+// to three more signals that each already have a complete 3-zone/run-based trio but had never been
+// audited by it: CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive'), CONFLICT_
+// CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0), and CONFLICT_OPEN_THREAD_ZONE_IMBALANCE
+// (unresolvedClues.length > 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5448,6 +5454,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r926c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName926c} contains ${r926c.counts[r926c.bloatZoneIdx]} of them (${Math.round((r926c.counts[r926c.bloatZoneIdx] / r926c.totalCount) * 100)}%) while ${emptyNames926c} contains none. Downturns bloat in one structural quarter and vanish from another, so the conflict's cost lands on the character in only part of the story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames926c} — so the conflict's cost is felt across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 positive-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone CONFLICT_POSITIVE_EMOTION_
+  // ZONE_CLUSTER and run-based CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r940a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r940a.fires) {
+      const emptyNames940a = r940a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName940a = FOUR_ZONE_NAMES[r940a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames940a} empty; ${bloatName940a} has ${r940a.counts[r940a.bloatZoneIdx]}/${r940a.totalCount} positive-shift scenes`,
+        rule: 'CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r940a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName940a} contains ${r940a.counts[r940a.bloatZoneIdx]} of them (${Math.round((r940a.counts[r940a.bloatZoneIdx] / r940a.totalCount) * 100)}%) while ${emptyNames940a} contains none. Upswings bloat in one structural quarter and vanish from another, so the conflict grants respite in only part of the story.`,
+        suggestedFix: `Redistribute upswings: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames940a} — so the conflict grants respite across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × curiosityDelta > 0 × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to
+  // the curiosityDelta magnitude signal. n≥10, ≥4 curiosity-raising scenes total, divided across
+  // four equal structural zones. Fires only when one zone has zero such scenes while another holds
+  // ≥50% of the total. Distinct from the existing 3-zone CONFLICT_CURIOSITY_ZONE_CLUSTER and
+  // run-based CONFLICT_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to this signal.
+  {
+    const r940b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r940b.fires) {
+      const emptyNames940b = r940b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName940b = FOUR_ZONE_NAMES[r940b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames940b} empty; ${bloatName940b} has ${r940b.counts[r940b.bloatZoneIdx]}/${r940b.totalCount} curiosity-raising scenes`,
+        rule: 'CONFLICT_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r940b.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName940b} contains ${r940b.counts[r940b.bloatZoneIdx]} of them (${Math.round((r940b.counts[r940b.bloatZoneIdx] / r940b.totalCount) * 100)}%) while ${emptyNames940b} contains none. New questions bloat in one structural quarter and vanish from another, so the conflict raises fresh mysteries in only part of the story.`,
+        suggestedFix: `Redistribute curiosity beats: raise a fresh question in at least one scene inside the empty zone(s) — ${emptyNames940b} — so the conflict raises fresh mysteries across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues.length > 0 × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, extending the
+  // 4-zone mode to the unresolvedClues array-field signal. n≥10, ≥4 open-thread scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone CONFLICT_OPEN_THREAD_ZONE_
+  // CLUSTER and run-based CONFLICT_OPEN_THREAD_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this signal.
+  {
+    const r940c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r940c.fires) {
+      const emptyNames940c = r940c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName940c = FOUR_ZONE_NAMES[r940c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames940c} empty; ${bloatName940c} has ${r940c.counts[r940c.bloatZoneIdx]}/${r940c.totalCount} open-thread scenes`,
+        rule: 'CONFLICT_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r940c.totalCount} scenes that leave a thread unresolved are unevenly distributed across its four structural zones: ${bloatName940c} contains ${r940c.counts[r940c.bloatZoneIdx]} of them (${Math.round((r940c.counts[r940c.bloatZoneIdx] / r940c.totalCount) * 100)}%) while ${emptyNames940c} contains none. Open threads bloat in one structural quarter and vanish from another, so the conflict's dangling questions pile up in only part of the story.`,
+        suggestedFix: `Redistribute open threads: leave a thread unresolved in at least one scene inside the empty zone(s) — ${emptyNames940c} — so the conflict keeps dangling questions alive across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

@@ -1535,6 +1535,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 940 — conflictPass: conflict positive emotion zone imbalance, conflict curiosity zone imbalance, conflict open thread zone imbalance', async () => {
+    const makeRec940 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF940 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs940a = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runCF940(recs940a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs940an = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runCF940(recs940an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs940b = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 1, 2, 8, 9].includes(i) ? { curiosityDelta: 2 } : {}));
+      const res = await runCF940(recs940b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_ZONE_IMBALANCE'), 'CONFLICT_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs940bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 3, 5, 8].includes(i) ? { curiosityDelta: 2 } : {}));
+      const res = await runCF940(recs940bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_ZONE_IMBALANCE'), 'CONFLICT_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs940c = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 1, 2, 8, 9].includes(i) ? { unresolvedClues: ['c'] } : {}));
+      const res = await runCF940(recs940c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_ZONE_IMBALANCE'), 'CONFLICT_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs940cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec940(i, [0, 3, 5, 8].includes(i) ? { unresolvedClues: ['c'] } : {}));
+      const res = await runCF940(recs940cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_ZONE_IMBALANCE'), 'CONFLICT_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 926 — conflictPass: conflict stakes zone imbalance, conflict revelation purpose zone imbalance, conflict negative emotion zone imbalance', async () => {
     const makeRec926 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
