@@ -1535,6 +1535,92 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 702 — conflictPass: conflict open thread peak uncaused, conflict clock zone cluster, conflict relationship drought run', async () => {
+    const makeRec702 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF702 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('CONFLICT_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs702a = Array.from({ length: 8 }, (_, i) => makeRec702(i,
+        i === 2 ? { unresolvedClues: ['a'] }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF702(recs702a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_OPEN_THREAD_PEAK_UNCAUSED'), 'CONFLICT_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // CONFLICT_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CONFLICT_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs702an = Array.from({ length: 8 }, (_, i) => makeRec702(i,
+        i === 2 ? { unresolvedClues: ['a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF702(recs702an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_OPEN_THREAD_PEAK_UNCAUSED'), 'CONFLICT_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // CONFLICT_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-raised scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_CLOCK_ZONE_CLUSTER fires when >75% of clock-raised scenes cluster in one third', async () => {
+      const recs702b = Array.from({ length: 9 }, (_, i) => makeRec702(i,
+        (i === 0 || i === 1 || i === 2) ? { clockRaised: true } : {}
+      ));
+      const res = await runCF702(recs702b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_CLOCK_ZONE_CLUSTER'), 'CONFLICT_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // CONFLICT_CLOCK_ZONE_CLUSTER no-fire:
+    // clock-raised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CONFLICT_CLOCK_ZONE_CLUSTER does not fire when clock-raised scenes are distributed across thirds', async () => {
+      const recs702bn = Array.from({ length: 9 }, (_, i) => makeRec702(i,
+        (i === 0 || i === 4 || i === 7) ? { clockRaised: true } : {}
+      ));
+      const res = await runCF702(recs702bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_CLOCK_ZONE_CLUSTER'), 'CONFLICT_CLOCK_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CONFLICT_RELATIONSHIP_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs702c = Array.from({ length: 10 }, (_, i) => makeRec702(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] } : {}
+      ));
+      const res = await runCF702(recs702c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_RELATIONSHIP_DROUGHT_RUN'), 'CONFLICT_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CONFLICT_RELATIONSHIP_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs702cn = Array.from({ length: 10 }, (_, i) => makeRec702(i,
+        (i === 0 || i === 4 || i === 9) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] } : {}
+      ));
+      const res = await runCF702(recs702cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_RELATIONSHIP_DROUGHT_RUN'), 'CONFLICT_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 688 — conflictPass: conflict highlight peak uncaused, conflict seed zone cluster, conflict staging drought run', async () => {
     const makeRec688 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

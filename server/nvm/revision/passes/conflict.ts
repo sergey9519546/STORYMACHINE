@@ -275,6 +275,15 @@
 // peak-absent hand-rolled coverage), CONFLICT_STAGING_DROUGHT_RUN (run-based × visualBeats
 // absence — Wave 646 applied the peak-uncaused mode and Wave 660 applied the zone-cluster mode
 // to this channel; the drought-run mode has never been applied to it).
+// Wave 702 additions (built on the shared checks library): CONFLICT_OPEN_THREAD_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × unresolvedClues magnitude — Wave 646 applied the
+// drought-run mode and Wave 674 applied the zone-cluster mode to this channel; the backward-cause
+// peak mode has never been applied to it, completing the trio), CONFLICT_CLOCK_ZONE_CLUSTER
+// (distribution/timing × clockRaised × structural thirds — clockRaised anchors extensive
+// hand-rolled aggregate/threshold logic in this pass but has never been zone-cluster-audited via
+// the shared library), CONFLICT_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence
+// — relationshipShifts is this pass's most heavily used field [76 accesses] but has never been
+// drought-audited via the shared library).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4110,6 +4119,76 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r688c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r688c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the conflict without any staged action to anchor it.`,
         suggestedFix: `Add a physical staging beat somewhere within the ${r688c.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the conflict stays physically grounded throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 702: CONFLICT_OPEN_THREAD_PEAK_UNCAUSED, CONFLICT_CLOCK_ZONE_CLUSTER,
+  //              CONFLICT_RELATIONSHIP_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // CONFLICT_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 646 applied the drought-run mode and Wave 674 applied the
+  // zone-cluster mode to this channel; the backward-cause peak mode has never been applied,
+  // completing the trio.
+  {
+    const r702a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r702a.fires) {
+      issues.push({
+        location: `scene ${r702a.peakIdx + 1} — peak open-thread density (${r702a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r702a.peakIdx + 1}, with ${r702a.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r702a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the conflict rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 clock-raised scenes, fires when >75%
+  // of them fall in a single structural third. clockRaised anchors extensive hand-rolled
+  // aggregate/threshold logic in this pass but has never been zone-cluster-audited via the shared
+  // library.
+  {
+    const r702b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r702b.fires) {
+      const zoneName702b = r702b.zoneNames[r702b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName702b} third — ${r702b.maxZoneCount}/${r702b.count} clock-raised scenes`,
+        rule: 'CONFLICT_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r702b.maxZoneCount} of the story's ${r702b.count} clock-raised scenes (${Math.round((r702b.maxZoneCount / r702b.count) * 100)}%) cluster in the ${zoneName702b} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no urgency bearing on the conflict.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${zoneName702b} third — spreading time pressure across the story lets every structural third carry some urgency on the conflict.`,
+      });
+    }
+  }
+
+  // CONFLICT_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6.
+  // relationshipShifts is this pass's most heavily used field but has never been drought-audited
+  // via the shared library.
+  {
+    const r702c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r702c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r702c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r702c.longestRun} consecutive scenes with no relationship shift at all, even though ${r702c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the conflict's interpersonal dimension dormant for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r702c.longestRun}-scene stretch — even a small movement keeps the conflict tied to changing interpersonal stakes throughout.`,
       });
     }
   }
