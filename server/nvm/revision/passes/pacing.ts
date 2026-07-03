@@ -291,6 +291,14 @@
 // backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been applied to
 // it), PACING_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 677 applied the
 // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
+// Wave 747 additions: PACING_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence —
+// Waves 663/733 applied the backward-cause peak and zone-cluster modes to relationshipShifts; the
+// drought-run mode has never been applied to it, completing the trio),
+// PACING_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0 presence × structural
+// thirds — Waves 677/733 applied the backward-cause peak and run-based drought modes to
+// clockDelta; the zone-cluster mode has never been applied to it, completing the trio),
+// PACING_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — Wave 677 applied
+// the zone-cluster mode to this signal; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4220,6 +4228,71 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r733c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r733c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves pacing without any mechanical pressure driving momentum for an extended run.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r733c.longestRun}-scene stretch so pacing keeps a mechanical pressure acting on momentum throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 747: PACING_RELATIONSHIP_DROUGHT_RUN, PACING_CLOCK_DELTA_ZONE_CLUSTER,
+  //              PACING_STAKES_DROUGHT_RUN ─────────────────────────────────────────────────
+
+  // PACING_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no bond change reaches 6. Waves
+  // 663/733 applied the backward-cause peak and zone-cluster modes to relationshipShifts; the
+  // drought-run mode has never been applied to it, completing the trio.
+  {
+    const r747a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r747a.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r747a.longestRun} consecutive scenes`,
+        rule: 'PACING_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r747a.longestRun} consecutive scenes with no relationship shift at all, even though ${r747a.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters leaves pacing without relational movement to lean on for an extended run.`,
+        suggestedFix: `Shift at least one relationship — however slightly — within the ${r747a.longestRun}-scene stretch so pacing keeps relational movement available throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-shifting
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 677/733
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r747b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r747b.fires) {
+      issues.push({
+        location: `${r747b.zoneNames[r747b.maxZoneIdx]} third — ${r747b.maxZoneCount} of ${r747b.count} clock-shifting scenes`,
+        rule: 'PACING_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r747b.maxZoneCount / r747b.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r747b.zoneNames[r747b.maxZoneIdx]} third. When every clock movement lands in the same structural window, pacing loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r747b.zoneNames[r747b.maxZoneIdx]} third so pacing tightens or eases more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. Wave 677 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r747c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r747c.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r747c.longestRun} consecutive scenes`,
+        rule: 'PACING_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r747c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r747c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves pacing flat without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r747c.longestRun}-scene stretch to raise stakes — even a small escalation keeps pacing under mounting pressure throughout that stretch.`,
       });
     }
   }
