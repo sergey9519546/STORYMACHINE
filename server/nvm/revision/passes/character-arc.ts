@@ -419,6 +419,18 @@
 // ARC_RESOLUTION_PURPOSE_DROUGHT_RUN (run-based × purpose === 'resolution' absence — completes 2
 // of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave; peak
 // mode conventionally skipped for this categorical field).
+//
+// Wave 869 additions: with every primary purpose value now trio-complete via checkDroughtRun/
+// checkZoneCluster, this wave applies the distinct 4-zone checkZoneImbalance mode (act-based
+// buckets, fires on an empty zone plus a >=50%-share bloat zone — categorically different from
+// checkZoneCluster's 3-zone >75%-concentration test) to three purpose values that have never
+// been audited by it: ARC_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
+// ARC_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
+// ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE (purpose === 'resolution' — distinct from the existing
+// ARC_RESOLUTION_ABSENT/ARC_RESOLUTION_DROUGHT_RUN, which audit payoffSetupIds resolution rather
+// than this purpose enum value). Only ARC_CHARACTER_MOMENT_ZONE_IMBALANCE and a dialogueHighlights
+// zone-imbalance check existed before this wave; all three purpose values below are virgin for
+// this analytical mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4884,6 +4896,85 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r855c.longestRun} consecutive scenes purposed otherwise than resolving the story, even though ${r855c.presentCount} scenes elsewhere settle a thread. A long unbroken stretch with nothing resolved leaves the character's arc's own threads dangling for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r855c.longestRun}-scene stretch to resolve the story so the character's arc keeps settling its threads throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 869: ARC_CLIMAX_ZONE_IMBALANCE, ARC_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // ARC_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing
+  // ARC_CLIMAX_ZONE_CLUSTER (3-zone >75%-concentration test) and ARC_CLIMAX_DROUGHT_RUN
+  // (run-based absence) — this is the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r869a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r869a.fires) {
+      const emptyNames869a = r869a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName869a = FOUR_ZONE_NAMES[r869a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames869a} empty; ${bloatName869a} has ${r869a.counts[r869a.bloatZoneIdx]}/${r869a.totalCount} climax-purposed scenes`,
+        rule: 'ARC_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r869a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName869a} contains ${r869a.counts[r869a.bloatZoneIdx]} of them (${Math.round((r869a.counts[r869a.bloatZoneIdx] / r869a.totalCount) * 100)}%) while ${emptyNames869a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the arc's biggest tests an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames869a} — so every structural quarter carries some capacity for the story's biggest test, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing ARC_ESTABLISH_WORLD_ZONE_CLUSTER (3-zone >75%-concentration test) and
+  // ARC_ESTABLISH_WORLD_DROUGHT_RUN (run-based absence) — this is the first application of the
+  // 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r869b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r869b.fires) {
+      const emptyNames869b = r869b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName869b = FOUR_ZONE_NAMES[r869b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames869b} empty; ${bloatName869b} has ${r869b.counts[r869b.bloatZoneIdx]}/${r869b.totalCount} world-establishing scenes`,
+        rule: 'ARC_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r869b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName869b} contains ${r869b.counts[r869b.bloatZoneIdx]} of them (${Math.round((r869b.counts[r869b.bloatZoneIdx] / r869b.totalCount) * 100)}%) while ${emptyNames869b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the arc's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames869b} — so every structural quarter carries some fresh ground for the arc to build from, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing ARC_RESOLUTION_ABSENT/ARC_RESOLUTION_DROUGHT_RUN (which audit payoffSetupIds
+  // resolution rather than this purpose enum value) and from ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER/
+  // ARC_RESOLUTION_PURPOSE_DROUGHT_RUN (3-zone concentration and run-based absence respectively)
+  // — this is the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r869c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r869c.fires) {
+      const emptyNames869c = r869c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName869c = FOUR_ZONE_NAMES[r869c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames869c} empty; ${bloatName869c} has ${r869c.counts[r869c.bloatZoneIdx]}/${r869c.totalCount} resolution-purposed scenes`,
+        rule: 'ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r869c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName869c} contains ${r869c.counts[r869c.bloatZoneIdx]} of them (${Math.round((r869c.counts[r869c.bloatZoneIdx] / r869c.totalCount) * 100)}%) while ${emptyNames869c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the arc's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames869c} — so every structural quarter carries some capacity to affirm closure, not only the quarter currently carrying most of them.`,
       });
     }
   }

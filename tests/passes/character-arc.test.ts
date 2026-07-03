@@ -1080,6 +1080,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 869 — characterArcPass: arc climax zone imbalance, arc establish world zone imbalance, arc resolution purpose zone imbalance', async () => {
+    const makeRec869 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc869 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('ARC_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs869a = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'development' }),
+      );
+      const res = await runArc869(recs869a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLIMAX_ZONE_IMBALANCE'), 'ARC_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs869an = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'development' }),
+      );
+      const res = await runArc869(recs869an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLIMAX_ZONE_IMBALANCE'), 'ARC_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // ARC_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('ARC_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs869b = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runArc869(recs869b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'ARC_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs869bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runArc869(recs869bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'ARC_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs869c = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runArc869(recs869c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE'), 'ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs869cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec869(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runArc869(recs869cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE'), 'ARC_RESOLUTION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 855 — characterArcPass: arc climax drought run, arc resolution purpose zone cluster, arc resolution purpose drought run', async () => {
     const makeRec855 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
