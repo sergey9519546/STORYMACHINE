@@ -327,6 +327,19 @@
 // slots), INTENTION_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn !== 'nothing' presence
 // × structural thirds — Wave 773 applied the run-based drought mode to dramaticTurn; the
 // zone-cluster mode has never been applied to it, completing 2 of 3 slots).
+// Wave 801 additions: INTENTION_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-
+// magnitude × 2-scene lookback — completes the trio for suspenseDelta alongside the zone-cluster
+// mode (Wave 773) and the run-based drought mode (Wave 787); the backward-cause peak mode has
+// never been applied to it), INTENTION_CURIOSITY_PEAK_UNCAUSED (backward-cause ×
+// curiosityDelta-as-magnitude × 2-scene lookback — completes the trio for curiosityDelta
+// alongside the run-based drought mode (Wave 773) and the zone-cluster mode (Wave 787); the
+// backward-cause peak mode has never been applied to it), INTENTION_POSITIVE_EMOTION_DROUGHT_RUN
+// (run-based × emotionalShift === 'positive' absence — completes 2 of 3 slots for this valence
+// alongside the zone-cluster mode added at Wave 675; peak mode conventionally skipped for this
+// categorical field). Reconnaissance for this wave also confirmed that REVELATION_DROUGHT_RUN
+// (Wave 563, hand-rolled) and REVELATION_ZONE_CLUSTER (Wave 563, hand-rolled) already complete
+// the drought/cluster half of the revelation trio alongside the shared-lib INTENTION_REVELATION_
+// PEAK_UNCAUSED (Wave 759), so revelation was correctly skipped as a non-distinct candidate.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4559,6 +4572,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r787c.maxZoneCount / r787c.count) * 100)}% of the story's dramatic turns cluster in the ${r787c.zoneNames[r787c.maxZoneIdx]} third. When every pivot lands in the same structural window, the character's pursuit of their goal loses a structural pivot to react to everywhere else in the story.`,
         suggestedFix: `Introduce a dramatic turn in at least one scene outside the ${r787c.zoneNames[r787c.maxZoneIdx]} third so the character's intention keeps a pivot to react to more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 801: INTENTION_SUSPENSE_PEAK_UNCAUSED, INTENTION_CURIOSITY_PEAK_UNCAUSED,
+  //              INTENTION_POSITIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // INTENTION_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for suspenseDelta alongside the zone-cluster mode
+  // (Wave 773) and the run-based drought mode (Wave 787) — the backward-cause peak mode has never
+  // been applied to it.
+  {
+    const r801a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r801a.fires) {
+      issues.push({
+        location: `scene ${r801a.peakIdx} (peak suspenseDelta ${r801a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'INTENTION_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r801a.peakIdx}, suspenseDelta ${r801a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801a.qualifyingCount} scenes elsewhere carry tension. The moment the character's pursuit of their goal is under the most pressure lands out of nowhere — nothing has built toward the danger testing their intention.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801a.peakIdx} so the character's peak moment of pressure reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // INTENTION_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in
+  // the 2 scenes preceding it. Completes the trio for curiosityDelta alongside the run-based
+  // drought mode (Wave 773) and the zone-cluster mode (Wave 787) — the backward-cause peak mode
+  // has never been applied to it.
+  {
+    const r801b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r801b.fires) {
+      issues.push({
+        location: `scene ${r801b.peakIdx} (peak curiosityDelta ${r801b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'INTENTION_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r801b.peakIdx}, curiosityDelta ${r801b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r801b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the character's pursuit of their goal prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r801b.peakIdx} so the character's peak curiosity reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // INTENTION_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive charge reaches 6.
+  // Completes 2 of 3 slots for this valence alongside the zone-cluster mode added at Wave 675
+  // (peak mode conventionally skipped for this categorical field).
+  {
+    const r801c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r801c.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r801c.longestRun} consecutive scenes`,
+        rule: 'INTENTION_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r801c.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r801c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no uplift leaves the character's pursuit of their goal without any earned relief for an extended run.`,
+        suggestedFix: `Give the character a moment of positive-emotion charge within the ${r801c.longestRun}-scene stretch so the pursuit of their goal carries some relief throughout that stretch.`,
       });
     }
   }

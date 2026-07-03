@@ -1352,6 +1352,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 801 — intentionPass: intention suspense peak uncaused, intention curiosity peak uncaused, intention positive emotion drought run', async () => {
+    const makeRec801 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN801 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('INTENTION_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs801a = Array.from({ length: 8 }, (_, i) => makeRec801(i,
+        (i === 2 || i === 5) ? { suspenseDelta: 3 } : {}
+      ));
+      const res = await runIN801(recs801a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_SUSPENSE_PEAK_UNCAUSED'), 'INTENTION_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('INTENTION_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs801an = Array.from({ length: 8 }, (_, i) => makeRec801(i,
+        i === 1 ? { dramaticTurn: 'reversal' } :
+        (i === 2 || i === 5) ? { suspenseDelta: 3 } : {}
+      ));
+      const res = await runIN801(recs801an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_SUSPENSE_PEAK_UNCAUSED'), 'INTENTION_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('INTENTION_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs801b = Array.from({ length: 8 }, (_, i) => makeRec801(i,
+        (i === 2 || i === 5) ? { curiosityDelta: 3 } : {}
+      ));
+      const res = await runIN801(recs801b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_CURIOSITY_PEAK_UNCAUSED'), 'INTENTION_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('INTENTION_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs801bn = Array.from({ length: 8 }, (_, i) => makeRec801(i,
+        i === 1 ? { dramaticTurn: 'reversal' } :
+        (i === 2 || i === 5) ? { curiosityDelta: 3 } : {}
+      ));
+      const res = await runIN801(recs801bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_CURIOSITY_PEAK_UNCAUSED'), 'INTENTION_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs801c = Array.from({ length: 10 }, (_, i) => makeRec801(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runIN801(recs801c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_POSITIVE_EMOTION_DROUGHT_RUN'), 'INTENTION_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs801cn = Array.from({ length: 10 }, (_, i) => makeRec801(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runIN801(recs801cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_POSITIVE_EMOTION_DROUGHT_RUN'), 'INTENTION_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 787 — intentionPass: intention suspense drought run, intention curiosity zone cluster, intention turn zone cluster', async () => {
     const makeRec787 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
