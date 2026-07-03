@@ -934,6 +934,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 775 — pacingPass: pacing suspense zone cluster, pacing curiosity drought run, pacing staging zone cluster', async () => {
+    const runP775 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('PACING_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs775a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runP775(recs775a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_ZONE_CLUSTER'), 'PACING_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs775an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runP775(recs775an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_ZONE_CLUSTER'), 'PACING_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs775b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runP775(recs775b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_DROUGHT_RUN'), 'PACING_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs775bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runP775(recs775bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_DROUGHT_RUN'), 'PACING_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; staging-heavy scenes (>=2 visualBeats) at 0,1,2 → 100% opening third
+    it('PACING_STAGING_ZONE_CLUSTER fires when >75% of staging-heavy scenes cluster in one third', async () => {
+      const recs775c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs775c[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs775c[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs775c[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runP775(recs775c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAGING_ZONE_CLUSTER'), 'PACING_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_STAGING_ZONE_CLUSTER does not fire when staging-heavy scenes spread across thirds', async () => {
+      const recs775cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs775cn[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs775cn[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs775cn[8] = makeSharedRecord(8, { visualBeats: ['a', 'b'] });
+      const res = await runP775(recs775cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAGING_ZONE_CLUSTER'), 'PACING_STAGING_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 761 — pacingPass: pacing staging drought run, pacing suspense drought run, pacing curiosity zone cluster', async () => {
     const runP761 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

@@ -307,6 +307,17 @@
 // PACING_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence × structural
 // thirds — curiosityDelta has only ever anchored aftermath/decoupling and average/aggregate
 // checks in this pass; none of the three shared-library trio modes has ever been applied to it).
+// Wave 775 additions: PACING_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0
+// presence × structural thirds — Wave 761's PACING_SUSPENSE_DROUGHT_RUN and the hand-rolled
+// SUSPENSE_PEAK_UNCAUSED [Wave 481b, backward-cause] completed the drought/peak half of the
+// trio; the zone-cluster mode has never been applied to it, completing the trio),
+// PACING_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — Wave 761's
+// PACING_CURIOSITY_ZONE_CLUSTER and the hand-rolled CURIOSITY_PEAK_UNCAUSED [Wave 495c,
+// backward-cause] completed the cluster/peak half of the trio; the run-based drought mode has
+// never been applied to it, completing the trio), PACING_STAGING_ZONE_CLUSTER
+// (distribution/timing × visualBeats presence × structural thirds — PACING_STAGING_PEAK_UNCAUSED
+// and PACING_STAGING_DROUGHT_RUN [Wave 761] completed the peak/drought half of the trio; the
+// zone-cluster mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4367,6 +4378,75 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r761c.maxZoneCount / r761c.count) * 100)}% of the scenes where curiosity rises cluster in the ${r761c.zoneNames[r761c.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, pacing has no fresh question to drive momentum anywhere else in the story.`,
         suggestedFix: `Raise curiosity in at least one scene outside the ${r761c.zoneNames[r761c.maxZoneIdx]} third so pacing keeps generating fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 775: PACING_SUSPENSE_ZONE_CLUSTER, PACING_CURIOSITY_DROUGHT_RUN,
+  //              PACING_STAGING_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 761's
+  // PACING_SUSPENSE_DROUGHT_RUN and the hand-rolled SUSPENSE_PEAK_UNCAUSED completed the
+  // drought/peak half of the trio; the zone-cluster mode has never been applied to it, completing
+  // the trio.
+  {
+    const r775a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r775a.fires) {
+      issues.push({
+        location: `${r775a.zoneNames[r775a.maxZoneIdx]} third — ${r775a.maxZoneCount} of ${r775a.count} suspense-positive scenes`,
+        rule: 'PACING_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r775a.maxZoneCount / r775a.count) * 100)}% of the scenes where tension rises cluster in the ${r775a.zoneNames[r775a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, pacing has no rising pressure testing it anywhere else across the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r775a.zoneNames[r775a.maxZoneIdx]} third so pacing keeps rising pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no curiosity rise reaches 6. Wave 761's
+  // PACING_CURIOSITY_ZONE_CLUSTER and the hand-rolled CURIOSITY_PEAK_UNCAUSED completed the
+  // cluster/peak half of the trio; the run-based drought mode has never been applied to it,
+  // completing the trio.
+  {
+    const r775b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r775b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r775b.longestRun} consecutive scenes`,
+        rule: 'PACING_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r775b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r775b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves pacing flat without a driving question for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r775b.longestRun}-scene stretch so pacing keeps a live question driving momentum throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 staging-heavy
+  // scenes, fires when more than 75% of those scenes cluster in a single third.
+  // PACING_STAGING_PEAK_UNCAUSED and PACING_STAGING_DROUGHT_RUN (Wave 761) completed the
+  // peak/drought half of the trio; the zone-cluster mode has never been applied to it, completing
+  // the trio.
+  {
+    const r775c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r775c.fires) {
+      issues.push({
+        location: `${r775c.zoneNames[r775c.maxZoneIdx]} third — ${r775c.maxZoneCount} of ${r775c.count} staging-heavy scenes`,
+        rule: 'PACING_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r775c.maxZoneCount / r775c.count) * 100)}% of the story's staging-heavy scenes cluster in the ${r775c.zoneNames[r775c.maxZoneIdx]} third. When every burst of visual staging lands in the same structural window, pacing has no visual texture anchoring it anywhere else across the story.`,
+        suggestedFix: `Add staging detail to at least one scene outside the ${r775c.zoneNames[r775c.maxZoneIdx]} third so pacing keeps visual texture more evenly distributed across the story.`,
       });
     }
   }
