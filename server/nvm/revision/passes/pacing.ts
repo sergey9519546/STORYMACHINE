@@ -327,6 +327,16 @@
 // modes has ever been applied to it), PACING_REVELATION_DROUGHT_RUN (run-based × revelation
 // absence — completing 2 of 3 slots for revelation alongside the zone-cluster mode added in this
 // same wave).
+// Wave 803 additions: PACING_REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude
+// [0/1] × 2-scene lookback — completes the trio for revelation; none of the existing revelation
+// checks in this pass [scene-length, aftermath, fixed-middle-zone-absence] are backward-cause,
+// and hasCause deliberately omits revelation to avoid circularity), PACING_NEGATIVE_EMOTION_
+// ZONE_CLUSTER (distribution/timing × emotionalShift === 'negative' × structural thirds — the
+// hand-rolled EMOTIONAL_FLATLINE_RUN [Wave 453] and this pass's PACING_EMOTION_ZONE_CLUSTER
+// [Wave 789] both operate on the combined non-neutral signal; neither valence has ever been
+// isolated on its own), PACING_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'negative' absence — completing 2 of 3 slots for this valence alongside the zone-cluster mode
+// added in this same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4521,6 +4531,75 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r789c.longestRun} consecutive scenes with no revelation at all, even though ${r789c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves pacing with no fresh disclosure reshaping momentum for an extended run.`,
         suggestedFix: `Let a truth surface somewhere within the ${r789c.longestRun}-scene stretch so pacing keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 803: PACING_REVELATION_PEAK_UNCAUSED, PACING_NEGATIVE_EMOTION_ZONE_CLUSTER,
+  //              PACING_NEGATIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // PACING_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Completes the trio for revelation — none of the existing revelation
+  // checks in this pass are backward-cause. hasCause deliberately omits revelation to avoid
+  // circularity.
+  {
+    const r803a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r803a.fires) {
+      issues.push({
+        location: `scene ${r803a.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'PACING_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r803a.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r803a.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something pacing's own momentum forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r803a.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of pacing's own momentum rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // PACING_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from the hand-rolled EMOTIONAL_FLATLINE_RUN (Wave 453) and this pass's PACING_
+  // EMOTION_ZONE_CLUSTER (Wave 789), both of which operate on the combined non-neutral signal —
+  // neither valence has ever been isolated on its own.
+  {
+    const r803b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r803b.fires) {
+      issues.push({
+        location: `${r803b.zoneNames[r803b.maxZoneIdx]} third — ${r803b.maxZoneCount} of ${r803b.count} negative-emotion scenes`,
+        rule: 'PACING_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r803b.maxZoneCount / r803b.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r803b.zoneNames[r803b.maxZoneIdx]} third. When all the darkness concentrates in one structural window, pacing's emotional cost registers in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r803b.zoneNames[r803b.maxZoneIdx]} third so pacing's emotional cost registers more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative charge reaches 6.
+  // Completes 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+  // wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r803c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r803c.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r803c.longestRun} consecutive scenes`,
+        rule: 'PACING_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r803c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r803c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves pacing without any adversity testing momentum for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r803c.longestRun}-scene stretch so pacing keeps testing momentum with adversity throughout that stretch.`,
       });
     }
   }
