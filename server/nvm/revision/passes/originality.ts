@@ -278,6 +278,17 @@
 // — Wave 676 applied the zone-cluster mode to visualBeats; the backward-cause peak mode has never
 // been applied to it — a learnable, causally unmotivated spike in the story's most heavily staged
 // scene is itself a predictable pattern).
+// Wave 718 additions (built on the shared checks library): ORIGINALITY_SEED_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × seededClueIds magnitude — Waves 662/704 applied the
+// drought-run and zone-cluster modes to seededClueIds; the backward-cause peak mode has never
+// been applied to it, completing the trio), ORIGINALITY_STAGING_DROUGHT_RUN (run-based ×
+// visualBeats absence — Waves 676/704 applied the zone-cluster and backward-cause peak modes to
+// visualBeats; the drought-run mode has never been applied to it, completing the trio — a
+// learnable stretch where nothing is ever physically staged is itself a predictable pattern),
+// ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × relationshipShifts × structural
+// thirds — Wave 648 applied the backward-cause peak mode to relationshipShifts; the zone-cluster
+// mode has never been applied to it — a predictable, front- or back-loaded distribution of
+// relational movement is itself a learnable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4401,6 +4412,76 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for physical staging (scene ${r704c.peakIdx + 1}, with ${r704c.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated spike that reads as a convenient peak rather than an earned one.`,
         suggestedFix: `Give scene ${r704c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 718: ORIGINALITY_SEED_PEAK_UNCAUSED, ORIGINALITY_STAGING_DROUGHT_RUN,
+  //              ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER ─────────────────────────────────────────
+
+  // ORIGINALITY_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous clues planted; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Waves 662/704 applied the drought-run and zone-cluster modes to seededClueIds;
+  // the backward-cause peak mode has never been applied to it, completing the trio.
+  {
+    const r718a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r718a.fires) {
+      issues.push({
+        location: `scene ${r718a.peakIdx + 1} — peak seed density (${r718a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r718a.peakIdx + 1}, with ${r718a.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated spike that reads as a convenient peak rather than an earned one.`,
+        suggestedFix: `Give scene ${r718a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the
+  // longest consecutive run of scenes with zero visual beats reaches 6. Waves 676/704 applied the
+  // zone-cluster and backward-cause peak modes to visualBeats; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r718b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r718b.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r718b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r718b.longestRun} consecutive scenes with no visual staging beats at all, even though ${r718b.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown is itself a learnable pattern — the audience can predict that no staged image will arrive for an extended stretch.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r718b.longestRun}-scene stretch so the audience can't predict a long, visually inert lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when >75% of them fall in a single structural third. Wave 648 applied the
+  // backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been applied
+  // to it — a predictable, front- or back-loaded distribution of relational movement is itself a
+  // learnable pattern.
+  {
+    const r718c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r718c.fires) {
+      const zoneName718c = r718c.zoneNames[r718c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName718c} third — ${r718c.maxZoneCount}/${r718c.count} relationship-shift scenes`,
+        rule: 'ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r718c.maxZoneCount} of the story's ${r718c.count} relationship-shift scenes (${Math.round((r718c.maxZoneCount / r718c.count) * 100)}%) cluster in the ${zoneName718c} third. Bond changes concentrate almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect relational movement in rather than experiencing a genuinely unpredictable rhythm.`,
+        suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName718c} third — spreading relational movement across the story keeps its timing genuinely unpredictable.`,
       });
     }
   }
