@@ -284,6 +284,13 @@
 // PACING_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backward-cause × dialogueHighlights
 // magnitude — Wave 649 applied the zone-cluster mode to dialogueHighlights; the backward-cause
 // peak mode has never been applied to it).
+// Wave 733 additions: PACING_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence —
+// Waves 649/719 applied the zone-cluster and backward-cause peak modes to dialogueHighlights; the
+// drought-run mode has never been applied to it, completing the trio), PACING_RELATIONSHIP_ZONE_
+// CLUSTER (distribution/timing × relationshipShifts × structural thirds — Wave 663 applied the
+// backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been applied to
+// it), PACING_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 677 applied the
+// backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4148,6 +4155,71 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for highlighted dialogue (scene ${r719c.peakIdx + 1}, with ${r719c.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most verbally dense beat on causally unearned momentum.`,
         suggestedFix: `Give scene ${r719c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 733: PACING_HIGHLIGHT_DROUGHT_RUN, PACING_RELATIONSHIP_ZONE_CLUSTER,
+  //              PACING_CLOCK_DELTA_DROUGHT_RUN ────────────────────────────────────────────
+
+  // PACING_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Waves 649/719 applied the zone-cluster and backward-cause peak modes to dialogueHighlights;
+  // the drought-run mode has never been applied to it, completing the trio.
+  {
+    const r733a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r733a.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r733a.longestRun} consecutive scenes`,
+        rule: 'PACING_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r733a.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r733a.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves pacing running on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r733a.longestRun}-scene stretch a standout line of dialogue — a beat that snaps pacing back to life throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 663 applied
+  // the backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been
+  // applied to it.
+  {
+    const r733b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r733b.fires) {
+      issues.push({
+        location: `${r733b.zoneNames[r733b.maxZoneIdx]} third — ${r733b.maxZoneCount} of ${r733b.count} relationship-shift scenes`,
+        rule: 'PACING_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r733b.maxZoneCount / r733b.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r733b.zoneNames[r733b.maxZoneIdx]} third. When every bond change lands in the same structural window, pacing has no relational movement to lean on anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r733b.zoneNames[r733b.maxZoneIdx]} third so pacing keeps relational movement available more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Wave 677 applied the
+  // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it.
+  {
+    const r733c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r733c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r733c.longestRun} consecutive scenes`,
+        rule: 'PACING_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r733c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r733c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves pacing without any mechanical pressure driving momentum for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r733c.longestRun}-scene stretch so pacing keeps a mechanical pressure acting on momentum throughout that stretch.`,
       });
     }
   }

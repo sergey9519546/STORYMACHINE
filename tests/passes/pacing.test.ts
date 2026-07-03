@@ -934,6 +934,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 733 — pacingPass: pacing highlight drought run, pacing relationship zone cluster, pacing clock delta drought run', async () => {
+    const runP733 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_HIGHLIGHT_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry highlighted dialogue (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PACING_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run reaches 6', async () => {
+      const recs733a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs733a[0] = makeSharedRecord(0, { dialogueHighlights: ['line a'] });
+      recs733a[1] = makeSharedRecord(1, { dialogueHighlights: ['line b'] });
+      recs733a[2] = makeSharedRecord(2, { dialogueHighlights: ['line c'] });
+      const res = await runP733(recs733a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_DROUGHT_RUN'), 'PACING_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // PACING_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlighted-dialogue scenes spread out so no gap reaches 6 consecutive scenes
+    it('PACING_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is spread through the story', async () => {
+      const recs733an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs733an[0] = makeSharedRecord(0, { dialogueHighlights: ['line a'] });
+      recs733an[3] = makeSharedRecord(3, { dialogueHighlights: ['line b'] });
+      recs733an[6] = makeSharedRecord(6, { dialogueHighlights: ['line c'] });
+      recs733an[9] = makeSharedRecord(9, { dialogueHighlights: ['line d'] });
+      const res = await runP733(recs733an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_DROUGHT_RUN'), 'PACING_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_RELATIONSHIP_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; relationship-shift scenes at 0,1,2 → 100% opening third
+    it('PACING_RELATIONSHIP_ZONE_CLUSTER fires when >75% of relationship-shift scenes cluster in one third', async () => {
+      const recs733b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs733b[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs733b[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs733b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runP733(recs733b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_ZONE_CLUSTER'), 'PACING_RELATIONSHIP_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_RELATIONSHIP_ZONE_CLUSTER no-fire:
+    // relationship-shift scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_RELATIONSHIP_ZONE_CLUSTER does not fire when relationship-shift scenes are distributed across thirds', async () => {
+      const recs733bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs733bn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs733bn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs733bn[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runP733(recs733bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_ZONE_CLUSTER'), 'PACING_RELATIONSHIP_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PACING_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs733c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs733c[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs733c[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs733c[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runP733(recs733c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_DROUGHT_RUN'), 'PACING_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // PACING_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('PACING_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs733cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs733cn[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs733cn[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs733cn[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs733cn[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runP733(recs733cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_DROUGHT_RUN'), 'PACING_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 719 — pacingPass: pacing open thread zone cluster, pacing payoff drought run, pacing highlight peak uncaused', async () => {
     const runP719 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
