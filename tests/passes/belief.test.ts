@@ -1204,6 +1204,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 782 — beliefPass: belief curiosity zone cluster, belief curiosity peak uncaused, belief clock raised zone cluster', async () => {
+    const runBF782 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('BELIEF_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs782a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runBF782(recs782a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_ZONE_CLUSTER'), 'BELIEF_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs782an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runBF782(recs782an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_ZONE_CLUSTER'), 'BELIEF_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('BELIEF_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs782b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs782b[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs782b[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runBF782(recs782b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_PEAK_UNCAUSED'), 'BELIEF_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('BELIEF_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs782bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs782bn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs782bn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs782bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runBF782(recs782bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_PEAK_UNCAUSED'), 'BELIEF_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_CLOCK_RAISED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised scenes at 0,1,2 → 100% opening third
+    it('BELIEF_CLOCK_RAISED_ZONE_CLUSTER fires when >75% of clock-raising scenes cluster in one third', async () => {
+      const recs782c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs782c[0] = makeSharedRecord(0, { clockRaised: true });
+      recs782c[1] = makeSharedRecord(1, { clockRaised: true });
+      recs782c[2] = makeSharedRecord(2, { clockRaised: true });
+      const res = await runBF782(recs782c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_RAISED_ZONE_CLUSTER'), 'BELIEF_CLOCK_RAISED_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_CLOCK_RAISED_ZONE_CLUSTER does not fire when clock-raising scenes spread across thirds', async () => {
+      const recs782cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs782cn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs782cn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs782cn[8] = makeSharedRecord(8, { clockRaised: true });
+      const res = await runBF782(recs782cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_RAISED_ZONE_CLUSTER'), 'BELIEF_CLOCK_RAISED_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 768 — beliefPass: belief relationship zone cluster, belief character moment drought run, belief suspense drought run', async () => {
     const runBF768 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

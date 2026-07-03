@@ -314,6 +314,17 @@
 // been applied to it), BELIEF_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Waves
 // 684/754 applied the backward-cause peak and zone-cluster modes to suspenseDelta; the drought-run
 // mode has never been applied to it, completing the trio).
+// Wave 782 additions: BELIEF_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0
+// presence × structural thirds — Wave 642 applied the run-based drought mode to curiosityDelta;
+// the zone-cluster mode has never been applied to it), BELIEF_CURIOSITY_PEAK_UNCAUSED
+// (backward-cause × curiosityDelta-as-magnitude × 2-scene lookback — the existing
+// REVELATION_CURIOSITY_PEAK_ABSENT/TOLD_BELIEF_CURIOSITY_PEAK_ABSENT audit co-occurrence AT the
+// peak curiosity scene, and REVELATION_CURIOSITY_PEAK_EARLY audits a fixed early-quarter zone;
+// none looks backward from the peak for a preparing cause, so the shared-library backward-cause
+// mode has never been applied to curiosityDelta, completing the trio), BELIEF_CLOCK_RAISED_ZONE_
+// CLUSTER (distribution/timing × clockRaised === true presence × structural thirds — Wave 642
+// applied the run-based drought mode to clockRaised; the zone-cluster mode has never been applied
+// to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4302,6 +4313,76 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r768c.longestRun} consecutive scenes with no rise in suspense at all, even though ${r768c.presentCount} scenes elsewhere do raise tension. A long unbroken stretch with nothing testing characters under pressure leaves the belief-tracking layer with no danger to expose convictions for an extended run.`,
         suggestedFix: `Raise suspense somewhere within the ${r768c.longestRun}-scene stretch so the belief-tracking layer keeps a live thread of tension exposing convictions through that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 782: BELIEF_CURIOSITY_ZONE_CLUSTER, BELIEF_CURIOSITY_PEAK_UNCAUSED,
+  //              BELIEF_CLOCK_RAISED_ZONE_CLUSTER ──────────────────────────────────────
+
+  // BELIEF_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 642 applied
+  // the run-based drought mode to curiosityDelta; the zone-cluster mode has never been applied to
+  // it.
+  {
+    const r782a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r782a.fires) {
+      issues.push({
+        location: `${r782a.zoneNames[r782a.maxZoneIdx]} third — ${r782a.maxZoneCount} of ${r782a.count} curiosity-positive scenes`,
+        rule: 'BELIEF_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r782a.maxZoneCount / r782a.count) * 100)}% of the scenes where curiosity rises cluster in the ${r782a.zoneNames[r782a.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the belief-tracking layer has no fresh question testing convictions anywhere else in the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r782a.zoneNames[r782a.maxZoneIdx]} third so the belief-tracking layer keeps a fresh question testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in
+  // the 2 scenes preceding it. The existing REVELATION_CURIOSITY_PEAK_ABSENT/TOLD_BELIEF_
+  // CURIOSITY_PEAK_ABSENT audit co-occurrence AT the peak curiosity scene, and REVELATION_
+  // CURIOSITY_PEAK_EARLY audits a fixed early-quarter zone; none looks backward from the peak for
+  // a preparing cause, so the shared-library backward-cause mode has never been applied to
+  // curiosityDelta, completing the trio.
+  {
+    const r782b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r782b.fires) {
+      issues.push({
+        location: `scene ${r782b.peakIdx} (peak curiosityDelta ${r782b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'BELIEF_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r782b.peakIdx}, curiosityDelta ${r782b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r782b.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the belief-tracking layer hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r782b.peakIdx} so the belief-tracking layer earns its peak curiosity instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_RAISED_ZONE_CLUSTER — Distribution/timing × clockRaised === true presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-raising scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Wave 642 applied the run-based drought mode to clockRaised; the zone-cluster mode has never
+  // been applied to it.
+  {
+    const r782c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r782c.fires) {
+      issues.push({
+        location: `${r782c.zoneNames[r782c.maxZoneIdx]} third — ${r782c.maxZoneCount} of ${r782c.count} clock-raising scenes`,
+        rule: 'BELIEF_CLOCK_RAISED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r782c.maxZoneCount / r782c.count) * 100)}% of the story's clock-raising scenes cluster in the ${r782c.zoneNames[r782c.maxZoneIdx]} third. When every deadline arrives in the same structural window, the belief-tracking layer has no sustained urgency testing convictions anywhere else in the story.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${r782c.zoneNames[r782c.maxZoneIdx]} third so the belief-tracking layer keeps urgency testing convictions more evenly across the story.`,
       });
     }
   }
