@@ -1080,6 +1080,101 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 645 — characterArcPass: arc highlight peak uncaused, arc seed drought run, arc open thread curiosity decoupled', async () => {
+    const makeRec645 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc645 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('ARC_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs645a = Array.from({ length: 8 }, (_, i) =>
+        makeRec645(i, {
+          dialogueHighlights: i === 2 ? ['line-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+        })
+      );
+      const res = await runArc645(recs645a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_HIGHLIGHT_PEAK_UNCAUSED'), 'ARC_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // ARC_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ARC_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs645an = Array.from({ length: 8 }, (_, i) =>
+        makeRec645(i, {
+          dialogueHighlights: i === 2 ? ['line-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+          dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runArc645(recs645an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_HIGHLIGHT_PEAK_UNCAUSED'), 'ARC_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // ARC_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeded at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs645b = Array.from({ length: 10 }, (_, i) =>
+        makeRec645(i, { seededClueIds: i === 0 || i === 1 || i === 2 || i === 9 ? ['clue-x'] : [] })
+      );
+      const res = await runArc645(recs645b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_SEED_DROUGHT_RUN'), 'ARC_SEED_DROUGHT_RUN should fire');
+    });
+
+    // ARC_SEED_DROUGHT_RUN no-fire:
+    // seeded at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_SEED_DROUGHT_RUN does not fire when seeding is distributed without a long drought', async () => {
+      const recs645bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec645(i, { seededClueIds: i === 0 || i === 4 || i === 9 ? ['clue-x'] : [] })
+      );
+      const res = await runArc645(recs645bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_SEED_DROUGHT_RUN'), 'ARC_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_OPEN_THREAD_CURIOSITY_DECOUPLED fire:
+    // n=6; open threads at 0,1 (no curiosity rise); curiosity rises at 4,5 (no open thread) →
+    // zero overlap → fires
+    it('ARC_OPEN_THREAD_CURIOSITY_DECOUPLED fires when open-thread scenes and rising-curiosity scenes never overlap', async () => {
+      const recs645c = Array.from({ length: 6 }, (_, i) =>
+        makeRec645(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['unpaid-clue'] : [],
+          curiosityDelta: i === 4 || i === 5 ? 1 : 0,
+        })
+      );
+      const res = await runArc645(recs645c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_CURIOSITY_DECOUPLED'), 'ARC_OPEN_THREAD_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // ARC_OPEN_THREAD_CURIOSITY_DECOUPLED no-fire:
+    // scene 0 carries BOTH an open thread and a curiosity rise → overlap exists
+    it('ARC_OPEN_THREAD_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs645cn = Array.from({ length: 6 }, (_, i) =>
+        makeRec645(i, {
+          unresolvedClues: i === 0 || i === 1 ? ['unpaid-clue'] : [],
+          curiosityDelta: i === 0 || i === 5 ? 1 : 0,
+        })
+      );
+      const res = await runArc645(recs645cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_CURIOSITY_DECOUPLED'), 'ARC_OPEN_THREAD_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 631 — characterArcPass: arc dialogue highlight staging decoupled, arc open thread staging aftermath void, arc dialogue highlight zone imbalance', async () => {
     const makeRec631 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

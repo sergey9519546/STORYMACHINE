@@ -238,10 +238,24 @@
 // of these two fields), ARC_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
 // dialogueHighlights × four structural zones — Wave 617 applied this template to purpose only;
 // dialogueHighlights itself has never been zone-audited here).
+// Wave 645 additions (built on the shared checks library, audit M2.2): ARC_HIGHLIGHT_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × dialogueHighlights magnitude — the scene with
+// the single densest count of highlighted lines has no dramatic turn or revelation in itself or
+// the two scenes before it; first checkPeakUncaused use in this 108-rule pass — every prior
+// single-peak check here [suspense, curiosity, relational, clock, positive-emotion] measures a
+// numeric delta or shift-density peak, never the dialogueHighlights channel), ARC_SEED_DROUGHT_
+// RUN (run-based × seededClueIds absence — a 6+ consecutive-scene stretch with no clue seeded at
+// all, while seeding occurs ≥3 times elsewhere; this pass already hand-rolls drought-run logic
+// for suspenseDelta [Wave 561] and curiosityDelta [Wave 519], but never via the shared
+// checkDroughtRun helper and never on the seededClueIds channel), ARC_OPEN_THREAD_CURIOSITY_
+// DECOUPLED (co-occurrence/decoupling × unresolvedClues × curiosityDelta>0 — zero overlap between
+// scenes carrying open clue-debt and scenes where curiosity is actively rising; unresolvedClues
+// has only ever been paired with dialogueHighlights [Wave 603] and used as an aftermath-void
+// trigger [Waves 603, 631] in this file, never cross-checked against the curiosity channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function characterArcPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, annotations, approvedSpans } = input;
@@ -3598,6 +3612,80 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r631c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName631c} contains ${r631c.counts[r631c.bloatZoneIdx]} of them (${Math.round((r631c.counts[r631c.bloatZoneIdx] / r631c.totalCount) * 100)}%) while ${emptyNames631c} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the arc's verbal high points an uneven structural rhythm.`,
         suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames631c}, so every structural quarter carries some verbal high point for the arc, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 645: ARC_HIGHLIGHT_PEAK_UNCAUSED, ARC_SEED_DROUGHT_RUN, ARC_OPEN_THREAD_CURIOSITY_
+  //              DECOUPLED ───────────────────────────────────────────────────────────────────
+
+  // ARC_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. First checkPeakUncaused use in this pass — every prior single-peak check here
+  // (ARC_PEAK_SUSPENSE_EMOTION_ABSENT, ARC_PEAK_CURIOSITY_EMOTION_ABSENT, ARC_PEAK_RELATIONAL_
+  // UNCAUSED, ARC_PEAK_POSITIVE_UNCAUSED, ARC_CLOCK_PEAK_EMOTION_ABSENT) measures a numeric delta
+  // or shift-density peak, never the dialogueHighlights channel.
+  {
+    const r645a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r645a.fires) {
+      issues.push({
+        location: `scene ${r645a.peakIdx + 1} — peak highlighted-dialogue density (${r645a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for highlighted dialogue (scene ${r645a.peakIdx + 1}, with ${r645a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the character's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of narrative causality never coincide.`,
+        suggestedFix: `Give scene ${r645a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most quotable moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ARC_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive run
+  // of scenes with no clue seeded reaches 6. This pass already hand-rolls drought-run logic for
+  // suspenseDelta (Wave 561) and curiosityDelta (Wave 519), but never via the shared
+  // checkDroughtRun helper and never on the seededClueIds channel — a long unbroken stretch where
+  // the arc plants nothing new leaves its forward momentum running on prior material alone.
+  {
+    const r645b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r645b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r645b.longestRun} consecutive scenes`,
+        rule: 'ARC_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r645b.longestRun} consecutive scenes with no clue seeded at all, even though ${r645b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the character's arc coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r645b.longestRun}-scene stretch so the arc keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // curiosityDelta>0. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 scenes carrying outstanding clue-debt, ≥2 scenes where curiosity is actively rising, zero
+  // overlap → fire. unresolvedClues has only ever been paired with dialogueHighlights (Wave 603)
+  // and used as an aftermath-void trigger (Waves 603, 631) in this file — never cross-checked
+  // against the curiosity channel. A scene where a mystery sits open is a natural place for
+  // wonder to spike further, but that pairing never occurs here.
+  {
+    const r645c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r645c.fires) {
+      issues.push({
+        location: `${r645c.aCount} open-thread scene(s), ${r645c.bCount} rising-curiosity scene(s) — zero overlap`,
+        rule: 'ARC_OPEN_THREAD_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r645c.aCount} scenes carrying outstanding clue-debt never coincide with the ${r645c.bCount} scenes where curiosity is actively rising — the arc's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, giving the arc's open threads a causal tie to its rising intrigue.`,
       });
     }
   }
