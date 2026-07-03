@@ -347,6 +347,16 @@
 // timing × emotionalShift === 'positive' × structural thirds — mirrors the completed negative-
 // valence trio; the positive valence has never been isolated by any of the three shared-library
 // trio modes in this pass).
+//
+// Wave 848 additions: RHYTHM_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 834; peak mode conventionally skipped for this categorical field),
+// RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose === 'introduce_conflict' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 834; peak mode conventionally skipped for this categorical field),
+// RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'positive' absence —
+// completes 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave 834; peak
+// mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4225,6 +4235,73 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r834c.maxZoneCount / r834c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r834c.zoneNames[r834c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the story's rhythm carries its emotional payoff in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r834c.zoneNames[r834c.maxZoneIdx]} third so the rhythm delivers its emotional payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 848: RHYTHM_STAKES_DROUGHT_RUN, RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // RHYTHM_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 834 (peak mode conventionally skipped for this categorical field).
+  {
+    const r848a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r848a.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising: ${r848a.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r848a.longestRun} consecutive scenes with no stakes-raising purpose at all, even though ${r848a.presentCount} scenes elsewhere escalate. A long unbroken stretch with no mounting pressure leaves the story's rhythm coasting for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r848a.longestRun}-scene stretch to raise stakes so the rhythm keeps mounting pressure to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 834 (peak mode conventionally skipped for this
+  // categorical field).
+  {
+    const r848b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r848b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r848b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r848b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r848b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the story's rhythm coasting on old conflict for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r848b.longestRun}-scene stretch to introduce conflict so the rhythm keeps facing fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 834 (peak mode conventionally skipped for this categorical field).
+  {
+    const r848c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r848c.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r848c.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r848c.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r848c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the story's rhythm without an emotional payoff for an extended run.`,
+        suggestedFix: `Give the story a moment of relief within the ${r848c.longestRun}-scene stretch so the rhythm keeps delivering an emotional payoff throughout that stretch.`,
       });
     }
   }

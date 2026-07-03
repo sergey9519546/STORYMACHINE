@@ -1136,6 +1136,71 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 848 — rhythmPass: rhythm stakes drought run, rhythm introduce conflict drought run, rhythm positive emotion drought run', async () => {
+    const runR848 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_STAKES_DROUGHT_RUN fire:
+    // n=10; raise_stakes at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_STAKES_DROUGHT_RUN fires when a long run has no stakes-raising purpose', async () => {
+      const recs848a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runR848(recs848a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_DROUGHT_RUN'), 'RHYTHM_STAKES_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are evenly spread', async () => {
+      const recs848an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runR848(recs848an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_DROUGHT_RUN'), 'RHYTHM_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs848b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runR848(recs848b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs848bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runR848(recs848bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs848c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runR848(recs848c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN'), 'RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs848cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runR848(recs848cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN'), 'RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 834 — rhythmPass: rhythm stakes zone cluster, rhythm introduce conflict zone cluster, rhythm positive emotion zone cluster', async () => {
     const runR834 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
