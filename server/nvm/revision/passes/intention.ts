@@ -429,6 +429,11 @@
 // INTENTION_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and INTENTION_
 // PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field). Three distinct
 // signal classes (valence, delta, array), each keyed independently of authored purpose.
+// Wave 955 additions: completing the non-purpose 4-zone rollout with the complementary signal in
+// each of Wave 941's three classes: INTENTION_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift ===
+// 'negative', the negative-valence mirror of 941's positive one), INTENTION_CURIOSITY_ZONE_IMBALANCE
+// (curiosityDelta > 0 — the question-raising delta beside 941's suspense one), and INTENTION_SEED_
+// ZONE_IMBALANCE (seededClueIds.length > 0 — the seed array beside 941's payoff one).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5435,6 +5440,81 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r941c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName941c} contains ${r941c.counts[r941c.bloatZoneIdx]} of them (${Math.round((r941c.counts[r941c.bloatZoneIdx] / r941c.totalCount) * 100)}%) while ${emptyNames941c} contains none. Setups get paid off in a bloated cluster in one structural quarter and nowhere in another, so the character's pursuit of their goal only closes prior threads in part of the story.`,
         suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames941c} — so the character's intention keeps resolving planted threads across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // negative-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER and run-based INTENTION_NEGATIVE_EMOTION_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to this valence signal, and the
+  // negative-valence mirror of the Wave 941 INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r955a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r955a.fires) {
+      const emptyNames955a = r955a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName955a = FOUR_ZONE_NAMES[r955a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames955a} empty; ${bloatName955a} has ${r955a.counts[r955a.bloatZoneIdx]}/${r955a.totalCount} negative-shift scenes`,
+        rule: 'INTENTION_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r955a.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName955a} contains ${r955a.counts[r955a.bloatZoneIdx]} of them (${Math.round((r955a.counts[r955a.bloatZoneIdx] / r955a.totalCount) * 100)}%) while ${emptyNames955a} contains none. Setbacks bloat in one structural quarter and never arrive in another, so the character's pursuit of their goal only meets real cost in part of the story.`,
+        suggestedFix: `Redistribute setbacks: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames955a} — so the character's intention meets cost across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // INTENTION_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone INTENTION_
+  // CURIOSITY_ZONE_CLUSTER and run-based INTENTION_CURIOSITY_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying
+  // on question-raising change rather than the suspense delta audited in Wave 941.
+  {
+    const r955b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r955b.fires) {
+      const emptyNames955b = r955b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName955b = FOUR_ZONE_NAMES[r955b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames955b} empty; ${bloatName955b} has ${r955b.counts[r955b.bloatZoneIdx]}/${r955b.totalCount} curiosity-raising scenes`,
+        rule: 'INTENTION_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r955b.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName955b} contains ${r955b.counts[r955b.bloatZoneIdx]} of them (${Math.round((r955b.counts[r955b.bloatZoneIdx] / r955b.totalCount) * 100)}%) while ${emptyNames955b} contains none. New questions bloat in one structural quarter and never open in another, so what the character still wants to find out drives only part of the story.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames955b} — so the character's intention keeps opening new questions across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone INTENTION_SEED_ZONE_CLUSTER
+  // and run-based INTENTION_SEED_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to the seededClueIds array field, distinct from the payoffSetupIds field audited in Wave 941
+  // (seeds are what the character plants; payoffs are what those plants later discharge).
+  {
+    const r955c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r955c.fires) {
+      const emptyNames955c = r955c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName955c = FOUR_ZONE_NAMES[r955c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames955c} empty; ${bloatName955c} has ${r955c.counts[r955c.bloatZoneIdx]}/${r955c.totalCount} seeding scenes`,
+        rule: 'INTENTION_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r955c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName955c} contains ${r955c.counts[r955c.bloatZoneIdx]} of them (${Math.round((r955c.counts[r955c.bloatZoneIdx] / r955c.totalCount) * 100)}%) while ${emptyNames955c} contains none. Setups bloat in one structural quarter and never get planted in another, so the character's pursuit of their goal lays groundwork in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames955c} — so the character's intention keeps laying groundwork across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
