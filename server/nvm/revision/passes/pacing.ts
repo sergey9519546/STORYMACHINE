@@ -212,11 +212,17 @@
 // OPEN_THREAD_AFTERMATH_EMOTION_FLAT (sequence/aftermath × suspense/curiosity/emotion × heavy
 // unresolved-clue-debt trigger — a 7th trigger row added to the aftermath matrix Wave 593 called
 // complete at 6 triggers; first use of the unresolvedClues field anywhere in this 103-rule pass).
+// Wave 621 additions: PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
+// dialogueHighlights × four structural zones — first use of dialogueHighlights anywhere in this
+// 106-rule pass), PACING_PAYOFF_STAGING_DECOUPLED (co-occurrence/decoupling × payoffSetupIds ×
+// visualBeats — first use of visualBeats anywhere in this pass), REVELATION_AFTERMATH_STAGING_
+// FLAT (sequence/aftermath × visualBeats × revelation trigger — a 4th channel added to the
+// revelation row of the trigger×channel aftermath matrix, alongside suspense/curiosity/emotion).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkAftermathVoid } from './lib/checks.ts';
+import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /**
  * Compute weighted line counts per scene.
@@ -3508,6 +3514,83 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `After at least one heavy clue-debt scene, let the following scene carry a non-neutral emotional beat rooted in the unresolved pressure — a character's visible frustration, a flash of anxiety, or a moment of hope that the open threads are about to close. The weight of accumulated debt should be felt, not only tracked.`,
         });
       }
+    }
+  }
+
+  // ── Wave 621: PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE, PACING_PAYOFF_STAGING_DECOUPLED,
+  //              REVELATION_AFTERMATH_STAGING_FLAT ───────────────────────────────────────────
+
+  // PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a curated dialogue highlight, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. First use of the
+  // dialogueHighlights field anywhere in this 106-rule pass — every existing check here audits
+  // suspense/curiosity/emotion/clock/payoff/revelation/stakes/open-thread signals, never the
+  // story's own record of which lines stood out.
+  {
+    const r621a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r621a.fires) {
+      const emptyNames621a = r621a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName621a = FOUR_ZONE_NAMES[r621a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames621a} empty; ${bloatName621a} has ${r621a.counts[r621a.bloatZoneIdx]}/${r621a.totalCount} dialogue-highlight scenes`,
+        rule: 'PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r621a.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName621a} contains ${r621a.counts[r621a.bloatZoneIdx]} of them (${Math.round((r621a.counts[r621a.bloatZoneIdx] / r621a.totalCount) * 100)}%) while ${emptyNames621a} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the story's verbal rhythm an uneven pulse across its four quarters.`,
+        suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames621a}, so every structural quarter carries some verbal high point rather than only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. First use of the
+  // visualBeats field anywhere in this pass. A resolution and a scene rich in physical staging
+  // never happen together — every payoff lands through dialogue or interiority alone, with no
+  // physical beat carrying the weight of what just resolved.
+  {
+    const r621b = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r621b.fires) {
+      issues.push({
+        location: `${r621b.aCount} payoff scene(s), ${r621b.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'PACING_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r621b.aCount} scenes where a planted thread resolves never coincide with the ${r621b.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more force when a character's action embodies what the resolution means, rather than the moment being carried entirely through dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or object a character handles that embodies what just resolved, pacing the release of tension through something visible rather than only through what is said.`,
+      });
+    }
+  }
+
+  // REVELATION_AFTERMATH_STAGING_FLAT — Sequence/aftermath × visualBeats × revelation trigger.
+  // Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying revelation
+  // scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a 2-scene lookahead
+  // window. Fires when every revelation's two-scene aftermath contains no visually dense scene,
+  // while such scenes do occur elsewhere. A 4th channel for the revelation row of this pass's
+  // trigger×channel aftermath matrix, alongside REVELATION_SUSPENSE_AFTERMATH_FLAT (Wave 467),
+  // REVELATION_CURIOSITY_AFTERMATH_FLAT, and REVELATION_EMOTIONAL_AFTERMATH_FLAT (Wave 495) — a
+  // disclosed truth should register physically somewhere nearby, not only as a tension, curiosity,
+  // or emotional signal.
+  {
+    const r621c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r621c.fires) {
+      issues.push({
+        location: `${r621c.triggerCount} revelation scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'REVELATION_AFTERMATH_STAGING_FLAT',
+        severity: 'minor',
+        description: `Every one of the story's ${r621c.triggerCount} revelation scenes is followed by two scenes with no substantial physical staging, even though ${r621c.aftermathCount} such scenes exist elsewhere in the script. A disclosed truth often changes how a character moves through the world — what they now handle differently, avoid, or seek out — and when that physical aftermath consistently stays unstaged, the revelation's consequences are only ever discussed, never shown.`,
+        suggestedFix: `After at least one revelation, let one of the following two scenes carry substantial physical staging — a character's changed behavior made visible through action, object, or space, not only through what they say about it.`,
+      });
     }
   }
 

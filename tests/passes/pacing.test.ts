@@ -934,6 +934,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 621 — pacingPass: pacing dialogue highlight zone imbalance, pacing payoff staging decoupled, revelation aftermath staging flat', async () => {
+    const runP621 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); highlights at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty of dialogue highlights while another is bloated', async () => {
+      const recs621a = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs621a[6] = makeSharedRecord(6, { dialogueHighlights: ['line-a'] });
+      recs621a[7] = makeSharedRecord(7, { dialogueHighlights: ['line-b'] });
+      recs621a[8] = makeSharedRecord(8, { dialogueHighlights: ['line-c'] });
+      recs621a[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runP621(recs621a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    // PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE no-fire:
+    // one highlight per zone (1,4,7,10) → no zone is empty
+    it('PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlights are spread across all zones', async () => {
+      const recs621an = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs621an[1] = makeSharedRecord(1, { dialogueHighlights: ['line-a'] });
+      recs621an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs621an[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      recs621an[10] = makeSharedRecord(10, { dialogueHighlights: ['line-d'] });
+      const res = await runP621(recs621an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'PACING_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    // PACING_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('PACING_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs621b = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs621b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs621b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs621b[4] = makeSharedRecord(4, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621b[5] = makeSharedRecord(5, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      const res = await runP621(recs621b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_STAGING_DECOUPLED'), 'PACING_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // PACING_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('PACING_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs621bn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs621bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'], visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621bn[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs621bn[5] = makeSharedRecord(5, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      const res = await runP621(recs621bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_STAGING_DECOUPLED'), 'PACING_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // REVELATION_AFTERMATH_STAGING_FLAT fire:
+    // n=8, window=2; revelation triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('REVELATION_AFTERMATH_STAGING_FLAT fires when no revelation is followed by a visually dense scene within 2 scenes', async () => {
+      const recs621c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs621c[0] = makeSharedRecord(0, { revelation: 'The truth comes out' });
+      recs621c[1] = makeSharedRecord(1, { revelation: 'Another truth' });
+      recs621c[5] = makeSharedRecord(5, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621c[6] = makeSharedRecord(6, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621c[7] = makeSharedRecord(7, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      const res = await runP621(recs621c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_STAGING_FLAT'), 'REVELATION_AFTERMATH_STAGING_FLAT should fire');
+    });
+
+    // REVELATION_AFTERMATH_STAGING_FLAT no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('REVELATION_AFTERMATH_STAGING_FLAT does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs621cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs621cn[0] = makeSharedRecord(0, { revelation: 'The truth comes out' });
+      recs621cn[1] = makeSharedRecord(1, { revelation: 'Another truth' });
+      recs621cn[3] = makeSharedRecord(3, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621cn[5] = makeSharedRecord(5, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621cn[6] = makeSharedRecord(6, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      recs621cn[7] = makeSharedRecord(7, { visualBeats: ['unlocks the drawer', 'reads the letter'] });
+      const res = await runP621(recs621cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_AFTERMATH_STAGING_FLAT'), 'REVELATION_AFTERMATH_STAGING_FLAT should not fire');
+    });
+  });
+
   describe('Wave 607 — pacingPass: open thread aftermath suspense flat, open thread aftermath curiosity flat, open thread aftermath emotion flat', async () => {
     const runP607 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
