@@ -257,6 +257,15 @@
 // CONFLICT_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural thirds — Wave 646
 // applied the peak-uncaused mode to visualBeats; this applies the zone-cluster mode to the same
 // channel, a genuinely different question — concentration vs. causal isolation).
+// Wave 674 additions (built on the shared checks library, audit M2.2): CONFLICT_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — this pass has extensive
+// clockRaised coverage across decoupling, aftermath-void, and peak-absent hand-rolled checks, but
+// clockDelta itself has never been backward-cause peak-audited via the shared helper),
+// CONFLICT_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence — Wave 646 applied the
+// zone-cluster mode to dialogueHighlights; the drought-run mode has never been applied to this
+// channel), CONFLICT_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues × structural
+// thirds — Wave 646 applied the drought-run mode to unresolvedClues; the zone-cluster mode has
+// never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3954,6 +3963,75 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r660c.maxZoneCount} of the story's ${r660c.count} visually dense scenes (${Math.round((r660c.maxZoneCount / r660c.count) * 100)}%) cluster in the ${zoneName660c} third. Physical staging concentrates almost exclusively in that stretch of the conflict rather than surfacing throughout, leaving other structural thirds with no physical anchor for the confrontation.`,
         suggestedFix: `Give at least one scene outside the ${zoneName660c} third substantial physical staging — spreading physical confrontation across the story lets each structural third carry its own staged weight.`,
+      });
+    }
+  }
+
+  // ── Wave 674: CONFLICT_CLOCK_DELTA_PEAK_UNCAUSED, CONFLICT_HIGHLIGHT_DROUGHT_RUN,
+  //              CONFLICT_OPEN_THREAD_ZONE_CLUSTER ──────────────────────────────────────────
+
+  // CONFLICT_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. This pass has extensive clockRaised coverage across decoupling, aftermath-void,
+  // and peak-absent hand-rolled checks, but clockDelta itself has never been backward-cause
+  // peak-audited via the shared helper.
+  {
+    const r674a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r674a.fires) {
+      issues.push({
+        location: `scene ${r674a.peakIdx + 1} — peak clockDelta (${r674a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r674a.peakIdx + 1}, at ${r674a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r674a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the conflict's sharpest deadline compression is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Wave 646 applied the zone-cluster mode to dialogueHighlights; the drought-run mode has never
+  // been applied to this channel.
+  {
+    const r674b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r674b.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r674b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r674b.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r674b.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the conflict running on unremarkable dialogue for an extended stretch.`,
+        suggestedFix: `Give at least one scene within the ${r674b.longestRun}-scene stretch a standout line of dialogue — a character naming what's at stake in the confrontation memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes,
+  // fires when >75% of them fall in a single structural third. Wave 646 applied the drought-run
+  // mode to unresolvedClues; the zone-cluster mode has never been applied to this channel.
+  {
+    const r674c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r674c.fires) {
+      const zoneName674c = r674c.zoneNames[r674c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName674c} third — ${r674c.maxZoneCount}/${r674c.count} open-thread scenes`,
+        rule: 'CONFLICT_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r674c.maxZoneCount} of the story's ${r674c.count} scenes carrying outstanding clue-debt (${Math.round((r674c.maxZoneCount / r674c.count) * 100)}%) cluster in the ${zoneName674c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery pressing on the conflict.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName674c} third — spreading open threads across the story gives every structural third some unresolved pressure bearing on the conflict.`,
       });
     }
   }
