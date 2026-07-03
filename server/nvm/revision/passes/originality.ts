@@ -415,6 +415,15 @@
 // ORIGINALITY_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
 // structural thirds -- this purpose value has never been referenced anywhere in this pass; a
 // virgin field).
+//
+// Wave 886 additions: ORIGINALITY_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 872; peak mode conventionally skipped for this categorical field). Also, no
+// purpose value had ever been audited by the distinct 4-zone checkZoneImbalance mode in this
+// pass (only visualBeats, payoffSetupIds, and seededClueIds had); this wave applies it to two
+// purpose values with complete 3-zone/run-based trios: ORIGINALITY_CLIMAX_ZONE_IMBALANCE
+// (purpose === 'climax') and ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose ===
+// 'establish_world').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5374,6 +5383,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r872c.maxZoneCount / r872c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r872c.zoneNames[r872c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than closure distributed unevenly across the whole story.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r872c.zoneNames[r872c.maxZoneIdx]} third so closure stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 886: ORIGINALITY_RESOLUTION_DROUGHT_RUN, ORIGINALITY_CLIMAX_ZONE_IMBALANCE,
+  //              ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // ORIGINALITY_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 872 (peak mode conventionally skipped for this categorical field).
+  {
+    const r886a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r886a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r886a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r886a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r886a.presentCount} scenes elsewhere are — a long, predictable stretch without any closure the audience can learn to anticipate.`,
+        suggestedFix: `Purpose a scene within the ${r886a.longestRun}-scene stretch to resolve part of the story, so closure stays unpredictable throughout the story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // climax-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone ORIGINALITY_CLIMAX_ZONE_CLUSTER and run-based ORIGINALITY_CLIMAX_DROUGHT_RUN
+  // — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r886b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r886b.fires) {
+      const emptyNames886b = r886b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName886b = FOUR_ZONE_NAMES[r886b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames886b} empty; ${bloatName886b} has ${r886b.counts[r886b.bloatZoneIdx]}/${r886b.totalCount} climax-purposed scenes`,
+        rule: 'ORIGINALITY_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r886b.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName886b} contains ${r886b.counts[r886b.bloatZoneIdx]} of them (${Math.round((r886b.counts[r886b.bloatZoneIdx] / r886b.totalCount) * 100)}%) while ${emptyNames886b} contains none — a predictable concentration the audience can learn to anticipate rather than peak moments distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames886b} — so the story's biggest moments stay less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'establish_world' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library. n≥10, ≥4 world-establishing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER and
+  // run-based ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r886c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r886c.fires) {
+      const emptyNames886c = r886c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName886c = FOUR_ZONE_NAMES[r886c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames886c} empty; ${bloatName886c} has ${r886c.counts[r886c.bloatZoneIdx]}/${r886c.totalCount} world-establishing scenes`,
+        rule: 'ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r886c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName886c} contains ${r886c.counts[r886c.bloatZoneIdx]} of them (${Math.round((r886c.counts[r886c.bloatZoneIdx] / r886c.totalCount) * 100)}%) while ${emptyNames886c} contains none — a predictable concentration the audience can learn to anticipate rather than world-building distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames886c} — so world-building stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }

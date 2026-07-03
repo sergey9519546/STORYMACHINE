@@ -1210,6 +1210,100 @@ He sits at his desk.
   });
 
 
+  describe('Wave 886 — originalityPass: originality resolution drought run, originality climax zone imbalance, originality establish world zone imbalance', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830/844/858/872
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const EMOTION_POOL_886 = ['neutral', 'neutral', 'neutral'];
+    const PURPOSE_POOL_886 = ['complicate', 'raise_stakes', 'turning_point', 'character_moment'];
+    const SENTENCE_POOL_886 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor886 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec886 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor886(idx),
+      emotionalShift: EMOTION_POOL_886[idx % EMOTION_POOL_886.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_886[idx % PURPOSE_POOL_886.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain886 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor886(i)}\n\n${SENTENCE_POOL_886[i % SENTENCE_POOL_886.length]}`).join('\n\n');
+    const runO886 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain886(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ORIGINALITY_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs886a = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'resolution' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_RESOLUTION_DROUGHT_RUN'), 'ORIGINALITY_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs886an = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: (i === 0 || i === 3 || i === 6 || i === 9) ? 'resolution' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_RESOLUTION_DROUGHT_RUN'), 'ORIGINALITY_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('ORIGINALITY_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs886b = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLIMAX_ZONE_IMBALANCE'), 'ORIGINALITY_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs886bn = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: [0, 3, 5, 8].includes(i) ? 'climax' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLIMAX_ZONE_IMBALANCE'), 'ORIGINALITY_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs886c = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs886cn = Array.from({ length: 10 }, (_, i) => makeRec886(i, {
+        purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : PURPOSE_POOL_886[i % PURPOSE_POOL_886.length],
+      }));
+      const res = await runO886(recs886cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'ORIGINALITY_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 872 — originalityPass: originality climax drought run, originality establish world drought run, originality resolution zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830/844/858
     // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
