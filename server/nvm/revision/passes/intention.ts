@@ -221,10 +221,22 @@
 // fields), INTENTION_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four
 // structural zones — Wave 605 applied this template to visualBeats only; unresolvedClues itself
 // has never been zone-audited here).
+// Wave 647 additions (built on the shared checks library, audit M2.2): INTENTION_HIGHLIGHT_
+// DROUGHT_RUN (run-based × dialogueHighlights absence — first checkDroughtRun use in this
+// 108-rule pass; a 6+ consecutive-scene stretch with no highlighted dialogue while such scenes
+// occur ≥3 times elsewhere — distinct from this file's existing hand-rolled drought-run checks
+// [REVELATION_DROUGHT_RUN], which track a different channel entirely), INTENTION_OPEN_THREAD_
+// ZONE_CLUSTER (distribution/timing × unresolvedClues × structural thirds — first checkZoneCluster
+// use via the shared library here; this pass already hand-rolls zone-cluster logic for revelation
+// and seed [REVELATION_ZONE_CLUSTER, SEED_ZONE_CLUSTER], but never on the open-thread channel),
+// INTENTION_STAGING_CURIOSITY_DECOUPLED (co-occurrence/decoupling × visualBeats × curiosityDelta>0
+// — zero overlap between visually-staged scenes and scenes where curiosity is actively rising;
+// visualBeats had only ever been paired with payoffSetupIds, seededClueIds, dramaticTurn,
+// revelation, and clockRaised in this file, never with the curiosity channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract unique character IDs from dialogue highlights across all records */
 function extractCharacterIds(records: PassInput['records']): Set<string> {
@@ -3702,6 +3714,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r633c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName633c} contains ${r633c.counts[r633c.bloatZoneIdx]} of them (${Math.round((r633c.counts[r633c.bloatZoneIdx] / r633c.totalCount) * 100)}%) while ${emptyNames633c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's sense of active mystery an uneven structural rhythm.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames633c} — so every structural quarter carries some sense of active, unanswered setup.`,
+      });
+    }
+  }
+
+  // ── Wave 647: INTENTION_HIGHLIGHT_DROUGHT_RUN, INTENTION_OPEN_THREAD_ZONE_CLUSTER,
+  //              INTENTION_STAGING_CURIOSITY_DECOUPLED ─────────────────────────────────────────
+
+  // INTENTION_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // First checkDroughtRun use via the shared library in this pass — distinct from the existing
+  // hand-rolled REVELATION_DROUGHT_RUN, which tracks the revelation channel, not dialogue.
+  {
+    const r647a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r647a.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r647a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r647a.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r647a.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the protagonist's stated intentions running on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r647a.longestRun}-scene stretch a standout line of dialogue — a character's intention voiced memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes,
+  // fires when >75% of them fall in a single structural third. First checkZoneCluster use via the
+  // shared library here — this pass already hand-rolls zone-cluster logic for revelation and seed
+  // (REVELATION_ZONE_CLUSTER, SEED_ZONE_CLUSTER), but never on the open-thread channel.
+  {
+    const r647b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r647b.fires) {
+      const zoneName647b = r647b.zoneNames[r647b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName647b} third — ${r647b.maxZoneCount}/${r647b.count} open-thread scenes`,
+        rule: 'INTENTION_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r647b.maxZoneCount} of the story's ${r647b.count} scenes carrying outstanding clue-debt (${Math.round((r647b.maxZoneCount / r647b.count) * 100)}%) cluster in the ${zoneName647b} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery to sharpen the protagonist's intentions against.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName647b} third — spreading open threads across the story keeps the protagonist's intentions sharpened by unanswered questions in every structural third.`,
+      });
+    }
+  }
+
+  // INTENTION_STAGING_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × visualBeats ×
+  // curiosityDelta>0. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 visually-staged scenes, ≥2 scenes where curiosity is actively rising, zero overlap → fire.
+  // visualBeats had only ever been paired with payoffSetupIds, seededClueIds, dramaticTurn,
+  // revelation, and clockRaised in this file — never with the curiosity channel. A scene rich in
+  // physical staging is a natural place for a new question to surface, but that pairing never
+  // occurs here.
+  {
+    const r647c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.visualBeats ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r647c.fires) {
+      issues.push({
+        location: `${r647c.aCount} visually-staged scene(s), ${r647c.bCount} rising-curiosity scene(s) — zero overlap`,
+        rule: 'INTENTION_STAGING_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r647c.aCount} scenes leaning on physical staging never coincide with the ${r647c.bCount} scenes where curiosity is actively rising — the story's most visible physical action and its moments of climbing intrigue run on separate tracks. A scene rich in staged action is a natural place for a new question to surface, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one heavily staged scene also raise curiosity — a physical action that provokes a new question, giving the story's staging a causal tie to its rising intrigue.`,
       });
     }
   }

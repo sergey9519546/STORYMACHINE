@@ -1352,6 +1352,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 647 — intentionPass: intention highlight drought run, intention open thread zone cluster, intention staging curiosity decoupled', async () => {
+    const makeRec647 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN647 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs647a = Array.from({ length: 10 }, (_, i) => makeRec647(i));
+      recs647a[0] = makeRec647(0, { dialogueHighlights: ['line-a'] });
+      recs647a[1] = makeRec647(1, { dialogueHighlights: ['line-b'] });
+      recs647a[2] = makeRec647(2, { dialogueHighlights: ['line-c'] });
+      recs647a[9] = makeRec647(9, { dialogueHighlights: ['line-d'] });
+      const res = await runIN647(recs647a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_DROUGHT_RUN'), 'INTENTION_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs647an = Array.from({ length: 10 }, (_, i) => makeRec647(i));
+      recs647an[0] = makeRec647(0, { dialogueHighlights: ['line-a'] });
+      recs647an[4] = makeRec647(4, { dialogueHighlights: ['line-b'] });
+      recs647an[9] = makeRec647(9, { dialogueHighlights: ['line-c'] });
+      const res = await runIN647(recs647an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_DROUGHT_RUN'), 'INTENTION_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('INTENTION_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs647b = Array.from({ length: 9 }, (_, i) => makeRec647(i));
+      recs647b[0] = makeRec647(0, { unresolvedClues: ['a'] });
+      recs647b[1] = makeRec647(1, { unresolvedClues: ['b'] });
+      recs647b[2] = makeRec647(2, { unresolvedClues: ['c'] });
+      const res = await runIN647(recs647b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_ZONE_CLUSTER'), 'INTENTION_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs647bn = Array.from({ length: 9 }, (_, i) => makeRec647(i));
+      recs647bn[0] = makeRec647(0, { unresolvedClues: ['a'] });
+      recs647bn[4] = makeRec647(4, { unresolvedClues: ['b'] });
+      recs647bn[7] = makeRec647(7, { unresolvedClues: ['c'] });
+      const res = await runIN647(recs647bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_ZONE_CLUSTER'), 'INTENTION_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_STAGING_CURIOSITY_DECOUPLED fire:
+    // n=6; staged at 0,1 (no curiosity rise); curiosity rises at 4,5 (no staging) → zero overlap → fires
+    it('INTENTION_STAGING_CURIOSITY_DECOUPLED fires when visually-staged scenes and rising-curiosity scenes never overlap', async () => {
+      const recs647c = Array.from({ length: 6 }, (_, i) => makeRec647(i));
+      recs647c[0] = makeRec647(0, { visualBeats: ['grabs the phone'] });
+      recs647c[1] = makeRec647(1, { visualBeats: ['checks the screen'] });
+      recs647c[4] = makeRec647(4, { curiosityDelta: 1 });
+      recs647c[5] = makeRec647(5, { curiosityDelta: 1 });
+      const res = await runIN647(recs647c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAGING_CURIOSITY_DECOUPLED'), 'INTENTION_STAGING_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // INTENTION_STAGING_CURIOSITY_DECOUPLED no-fire:
+    // scene 0 carries BOTH visual staging and a curiosity rise → overlap exists
+    it('INTENTION_STAGING_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs647cn = Array.from({ length: 6 }, (_, i) => makeRec647(i));
+      recs647cn[0] = makeRec647(0, { visualBeats: ['grabs the phone'], curiosityDelta: 1 });
+      recs647cn[1] = makeRec647(1, { visualBeats: ['checks the screen'] });
+      recs647cn[5] = makeRec647(5, { curiosityDelta: 1 });
+      const res = await runIN647(recs647cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAGING_CURIOSITY_DECOUPLED'), 'INTENTION_STAGING_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 633 — intentionPass: intention highlight open thread decoupled, intention clock staging aftermath void, intention open thread zone imbalance', async () => {
     const makeRec633 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
