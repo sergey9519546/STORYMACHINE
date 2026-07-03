@@ -1080,6 +1080,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 925 — characterArcPass: arc suspense zone imbalance, arc curiosity zone imbalance, arc clock delta zone imbalance', async () => {
+    const makeRec925 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc925 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ARC_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs925a = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 1, 2, 8, 9].includes(i) ? { suspenseDelta: 2 } : {}));
+      const res = await runArc925(recs925a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_ZONE_IMBALANCE'), 'ARC_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs925an = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 3, 5, 8].includes(i) ? { suspenseDelta: 2 } : {}));
+      const res = await runArc925(recs925an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_ZONE_IMBALANCE'), 'ARC_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs925b = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 1, 2, 8, 9].includes(i) ? { curiosityDelta: 2 } : {}));
+      const res = await runArc925(recs925b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_ZONE_IMBALANCE'), 'ARC_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs925bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 3, 5, 8].includes(i) ? { curiosityDelta: 2 } : {}));
+      const res = await runArc925(recs925bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_ZONE_IMBALANCE'), 'ARC_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-advancing scenes', async () => {
+      const recs925c = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 1, 2, 8, 9].includes(i) ? { clockDelta: 2 } : {}));
+      const res = await runArc925(recs925c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DELTA_ZONE_IMBALANCE'), 'ARC_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-advancing scenes touch every zone', async () => {
+      const recs925cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec925(i, [0, 3, 5, 8].includes(i) ? { clockDelta: 2 } : {}));
+      const res = await runArc925(recs925cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DELTA_ZONE_IMBALANCE'), 'ARC_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 911 — characterArcPass: arc revelation purpose zone imbalance, arc positive emotion zone imbalance, arc negative emotion zone imbalance', async () => {
     const makeRec911 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

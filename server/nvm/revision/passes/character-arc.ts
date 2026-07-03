@@ -459,6 +459,12 @@
 // trios (ARC_POSITIVE/NEGATIVE_EMOTION_ZONE_CLUSTER + _DROUGHT_RUN) but have never been audited by
 // it: ARC_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive') and ARC_NEGATIVE_
 // EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative').
+//
+// Wave 925 additions: with every purpose enum value and both emotion valences now 4-zone-audited,
+// this wave extends the checkZoneImbalance mode to the three delta-magnitude signals, each of which
+// has a complete 3-zone/run-based trio (zone-cluster + drought-run) but has never been audited by
+// the 4-zone mode: ARC_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0), ARC_CURIOSITY_ZONE_IMBALANCE
+// (curiosityDelta > 0), and ARC_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta > 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5225,6 +5231,78 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r911c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName911c} contains ${r911c.counts[r911c.bloatZoneIdx]} of them (${Math.round((r911c.counts[r911c.bloatZoneIdx] / r911c.totalCount) * 100)}%) while ${emptyNames911c} contains none. The protagonist's downturns bloat in one structural quarter and vanish from another, giving the arc's adversity an uneven structural rhythm.`,
         suggestedFix: `Redistribute downturns: give the protagonist a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames911c} — so pressure threads through every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × suspenseDelta > 0 × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to the
+  // suspenseDelta magnitude signal. n≥10, ≥4 suspense-raising scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone ARC_SUSPENSE_ZONE_CLUSTER and run-based ARC_
+  // SUSPENSE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this signal.
+  {
+    const r925a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r925a.fires) {
+      const emptyNames925a = r925a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName925a = FOUR_ZONE_NAMES[r925a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames925a} empty; ${bloatName925a} has ${r925a.counts[r925a.bloatZoneIdx]}/${r925a.totalCount} suspense-raising scenes`,
+        rule: 'ARC_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r925a.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName925a} contains ${r925a.counts[r925a.bloatZoneIdx]} of them (${Math.round((r925a.counts[r925a.bloatZoneIdx] / r925a.totalCount) * 100)}%) while ${emptyNames925a} contains none. Tension spikes bloat in one structural quarter and vanish from another, giving the arc's grip on the audience an uneven structural rhythm.`,
+        suggestedFix: `Redistribute suspense beats: raise tension in at least one scene inside the empty zone(s) — ${emptyNames925a} — so the arc keeps its grip across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × curiosityDelta > 0 × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to the
+  // curiosityDelta magnitude signal. n≥10, ≥4 curiosity-raising scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone ARC_CURIOSITY_ZONE_CLUSTER and run-based ARC_
+  // CURIOSITY_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this signal.
+  {
+    const r925b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r925b.fires) {
+      const emptyNames925b = r925b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName925b = FOUR_ZONE_NAMES[r925b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames925b} empty; ${bloatName925b} has ${r925b.counts[r925b.bloatZoneIdx]}/${r925b.totalCount} curiosity-raising scenes`,
+        rule: 'ARC_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r925b.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName925b} contains ${r925b.counts[r925b.bloatZoneIdx]} of them (${Math.round((r925b.counts[r925b.bloatZoneIdx] / r925b.totalCount) * 100)}%) while ${emptyNames925b} contains none. New questions bloat in one structural quarter and vanish from another, giving the arc's pull on the audience an uneven structural rhythm.`,
+        suggestedFix: `Redistribute curiosity beats: raise a fresh question in at least one scene inside the empty zone(s) — ${emptyNames925b} — so the arc keeps pulling the audience forward across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × clockDelta > 0 × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to the
+  // clockDelta magnitude signal. n≥10, ≥4 clock-advancing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of the
+  // total. Distinct from the existing 3-zone ARC_CLOCK_DELTA_ZONE_CLUSTER and run-based ARC_CLOCK_
+  // DELTA_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this signal.
+  {
+    const r925c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r925c.fires) {
+      const emptyNames925c = r925c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName925c = FOUR_ZONE_NAMES[r925c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames925c} empty; ${bloatName925c} has ${r925c.counts[r925c.bloatZoneIdx]}/${r925c.totalCount} clock-advancing scenes`,
+        rule: 'ARC_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r925c.totalCount} clock-advancing scenes are unevenly distributed across its four structural zones: ${bloatName925c} contains ${r925c.counts[r925c.bloatZoneIdx]} of them (${Math.round((r925c.counts[r925c.bloatZoneIdx] / r925c.totalCount) * 100)}%) while ${emptyNames925c} contains none. Ticks of the clock bloat in one structural quarter and vanish from another, giving the arc's sense of time pressure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute clock beats: advance the clock in at least one scene inside the empty zone(s) — ${emptyNames925c} — so time pressure builds across every structural quarter, not only the quarter currently carrying most of it.`,
       });
     }
   }
