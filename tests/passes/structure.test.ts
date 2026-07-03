@@ -1006,6 +1006,65 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 919 — structurePass: structure revelation purpose zone cluster, structure revelation purpose drought run, structure character moment zone imbalance', async () => {
+    const runST919 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs919a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runST919(recs919a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER'), 'STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs919an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runST919(recs919an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER'), 'STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs919b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runST919(recs919b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN'), 'STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs919bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runST919(recs919bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN'), 'STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7},
+    // Z3={8,9}; character_moment at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of character-moment scenes', async () => {
+      const recs919c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runST919(recs919c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const recs919cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runST919(recs919cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 905 — structurePass: structure turning point zone imbalance, structure complicate zone imbalance, structure introduce conflict zone imbalance', async () => {
     const runST905 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

@@ -408,6 +408,14 @@
 // by it: STRUCTURE_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
 // STRUCTURE_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate'), and
 // STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
+//
+// Wave 919 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing STRUCTURE_REVELATION_ZONE_CLUSTER/DROUGHT_RUN audit the separate revelation
+// string|null field, not this purpose enum value) -- a genuinely virgin field. This wave adds
+// STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER and STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN (peak
+// mode conventionally skipped for this categorical field), plus STRUCTURE_CHARACTER_MOMENT_ZONE_
+// IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
+// a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5073,6 +5081,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r905c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName905c} contains ${r905c.counts[r905c.bloatZoneIdx]} of them (${Math.round((r905c.counts[r905c.bloatZoneIdx] / r905c.totalCount) * 100)}%) while ${emptyNames905c} contains none. New conflicts bloat in one structural quarter and vanish from another, leaving the story's architecture lopsided around where fresh friction enters.`,
         suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames905c} — so the structure introduces fresh friction across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from STRUCTURE_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r919a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r919a.fires) {
+      issues.push({
+        location: `${r919a.zoneNames[r919a.maxZoneIdx]} third — ${r919a.maxZoneCount} of ${r919a.count} revelation-purposed scenes`,
+        rule: 'STRUCTURE_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r919a.maxZoneCount / r919a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r919a.zoneNames[r919a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the story's architecture front- or back-loads its turns of information instead of spacing them across the whole shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r919a.zoneNames[r919a.maxZoneIdx]} third as a revelation so the structure spaces its disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r919b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r919b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r919b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r919b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r919b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with no turns of new information leaves the story's architecture structurally flat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r919b.longestRun}-scene stretch as a revelation so the structure keeps turning on new information throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 891. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based STRUCTURE_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r919c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r919c.fires) {
+      const emptyNames919c = r919c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName919c = FOUR_ZONE_NAMES[r919c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames919c} empty; ${bloatName919c} has ${r919c.counts[r919c.bloatZoneIdx]}/${r919c.totalCount} character-moment scenes`,
+        rule: 'STRUCTURE_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r919c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName919c} contains ${r919c.counts[r919c.bloatZoneIdx]} of them (${Math.round((r919c.counts[r919c.bloatZoneIdx] / r919c.totalCount) * 100)}%) while ${emptyNames919c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, leaving the story's architecture lopsided around where it pauses for character.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames919c} — so the structure pauses for character across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
