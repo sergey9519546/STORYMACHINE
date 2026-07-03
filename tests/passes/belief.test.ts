@@ -1204,6 +1204,69 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 796 — beliefPass: belief revelation peak uncaused, belief negative emotion zone cluster, belief negative emotion drought run', async () => {
+    const runBF796 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('BELIEF_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs796a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs796a[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs796a[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      const res = await runBF796(recs796a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PEAK_UNCAUSED'), 'BELIEF_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('BELIEF_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs796an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs796an[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs796an[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      recs796an[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runBF796(recs796an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PEAK_UNCAUSED'), 'BELIEF_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs796b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runBF796(recs796b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs796bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runBF796(recs796bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs796c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runBF796(recs796c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN'), 'BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs796cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runBF796(recs796cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN'), 'BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 782 — beliefPass: belief curiosity zone cluster, belief curiosity peak uncaused, belief clock raised zone cluster', async () => {
     const runBF782 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

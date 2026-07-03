@@ -325,6 +325,22 @@
 // CLUSTER (distribution/timing × clockRaised === true presence × structural thirds — Wave 642
 // applied the run-based drought mode to clockRaised; the zone-cluster mode has never been applied
 // to it).
+// Wave 796 additions: BELIEF_REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude
+// [0/1] × 2-scene lookback, anchored on the FIRST revelation scene, hasCause referencing only
+// dramaticTurn — distinct from REVELATION_UNPREPARED_CLIMAX (Wave 432), which anchors on the
+// LAST revelation and looks for a prior character ASSERTION rather than a dramatic turn; distinct
+// from REVELATION_DROUGHT (Wave 446, a true hand-rolled equivalent of checkDroughtRun already
+// covering the run-based mode) and REVELATION_TEMPORAL_CLUSTER (Wave 488, a true hand-rolled
+// equivalent of checkZoneCluster already covering the distribution/timing mode) — this is the
+// only one of the three shared-library trio modes that has never been hand-rolled for revelation
+// in this pass), BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift='negative' × structural thirds — every existing negative-emotion check in this
+// pass couples it to a revelation or assertion scene [REVELATION_EMOTIONAL_MONOTONE,
+// REVELATION_EMOTIONAL_AFTERMATH_FLAT, ASSERTION_EMOTIONAL_AFTERMATH_FLAT]; the shared-library
+// cluster mode on emotionalShift as a standalone global signal has never been applied),
+// BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift='negative' absence — completing
+// 2 of 3 trio slots for emotionalShift alongside the zone-cluster mode added in this same wave;
+// the peak mode is conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4383,6 +4399,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r782c.maxZoneCount / r782c.count) * 100)}% of the story's clock-raising scenes cluster in the ${r782c.zoneNames[r782c.maxZoneIdx]} third. When every deadline arrives in the same structural window, the belief-tracking layer has no sustained urgency testing convictions anywhere else in the story.`,
         suggestedFix: `Raise a clock in at least one scene outside the ${r782c.zoneNames[r782c.maxZoneIdx]} third so the belief-tracking layer keeps urgency testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 796: BELIEF_REVELATION_PEAK_UNCAUSED, BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER,
+  //              BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // BELIEF_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Distinct from REVELATION_UNPREPARED_CLIMAX (Wave 432), which anchors on
+  // the LAST revelation and checks for a prior character ASSERTION, not a dramatic turn.
+  // REVELATION_DROUGHT (Wave 446) and REVELATION_TEMPORAL_CLUSTER (Wave 488) are true hand-rolled
+  // equivalents of checkDroughtRun and checkZoneCluster respectively, so this backward-cause peak
+  // mode is the only one of the three shared-library trio modes never hand-rolled for revelation
+  // in this pass. hasCause deliberately omits revelation to avoid circularity.
+  {
+    const r796a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r796a.fires) {
+      issues.push({
+        location: `scene ${r796a.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'BELIEF_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r796a.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r796a.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the belief-tracking layer's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r796a.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift='negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Every existing negative-emotion check in this pass couples it to a revelation or assertion
+  // scene (REVELATION_EMOTIONAL_MONOTONE, REVELATION_EMOTIONAL_AFTERMATH_FLAT, ASSERTION_
+  // EMOTIONAL_AFTERMATH_FLAT); the shared-library cluster mode on emotionalShift as a standalone
+  // global signal has never been applied.
+  {
+    const r796b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r796b.fires) {
+      issues.push({
+        location: `${r796b.zoneNames[r796b.maxZoneIdx]} third — ${r796b.maxZoneCount} of ${r796b.count} negative-emotion scenes`,
+        rule: 'BELIEF_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r796b.maxZoneCount / r796b.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r796b.zoneNames[r796b.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the belief-tracking layer carries its emotional cost in only one part of the story instead of testing convictions throughout.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r796b.zoneNames[r796b.maxZoneIdx]} third so the belief-tracking layer's emotional cost tests convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift='negative' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no negative charge reaches 6. Completes
+  // 2 of 3 trio slots for emotionalShift alongside the zone-cluster mode added in this same wave
+  // (the peak mode is conventionally skipped for this categorical field).
+  {
+    const r796c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r796c.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r796c.longestRun} consecutive scenes`,
+        rule: 'BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r796c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r796c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the belief-tracking layer with nothing testing convictions under emotional cost for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r796c.longestRun}-scene stretch a negative emotional charge so the belief-tracking layer keeps testing convictions against cost throughout that stretch.`,
       });
     }
   }
