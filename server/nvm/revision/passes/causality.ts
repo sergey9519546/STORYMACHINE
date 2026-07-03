@@ -235,10 +235,24 @@
 // CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four structural
 // zones — Waves 601/615 applied this template to dialogueHighlights and visualBeats;
 // unresolvedClues itself has never been zone-audited here).
+// Wave 643 additions (built on the shared checks library, audit M2.2): CAUSALITY_VISUAL_BEAT_
+// DROUGHT_RUN (run-based × visualBeats absence — first checkDroughtRun use in this 114-rule
+// pass; a 6+ scene stretch with zero physical staging while staged scenes exist elsewhere,
+// distinct from VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE [underweight/bloat across four zones] and
+// VISUAL_BEAT_PEAK_UNCAUSED [backward-cause on a single density peak] — this is a contiguous-
+// run measure, not a zone or peak measure), CAUSAL_HIGHLIGHT_ZONE_CLUSTER (distribution/timing ×
+// dialogueHighlights × structural thirds — first checkZoneCluster use in this pass; fires when
+// >75% of memorable-dialogue scenes cluster in one third, distinct from Wave 601's stated-belief
+// zone imbalance [four-zone bloat/empty check] which uses a different zone granularity and a
+// different threshold shape), CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED (co-occurrence/
+// decoupling × unresolvedClues × curiosityDelta>0 — zero overlap between scenes carrying open
+// clue-debt and scenes where audience curiosity is actively rising; distinct from Wave 629's
+// CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED [unresolvedClues × dialogueHighlights] and from every
+// other unresolvedClues pairing in this file, none of which cross it with the curiosity channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function causalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3752,6 +3766,84 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r629c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName629c} contains ${r629c.counts[r629c.bloatZoneIdx]} of them (${Math.round((r629c.counts[r629c.bloatZoneIdx] / r629c.totalCount) * 100)}%) while ${emptyNames629c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's causal chain of open questions an uneven structural rhythm.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames629c} — so every structural quarter carries some causal pressure from an unanswered question.`,
+      });
+    }
+  }
+
+  // ── Wave 643: CAUSALITY_VISUAL_BEAT_DROUGHT_RUN, CAUSAL_HIGHLIGHT_ZONE_CLUSTER,
+  //              CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED ─────────────────────────────────
+
+  // CAUSALITY_VISUAL_BEAT_DROUGHT_RUN — Run-based × visualBeats absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 physically-staged scenes overall,
+  // fires when the longest consecutive run of scenes with zero visual beats reaches 6. First
+  // checkDroughtRun use in this pass. Distinct from VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE
+  // (Wave 615 — underweight/bloat across four structural zones, a distributional measure) and
+  // VISUAL_BEAT_PEAK_UNCAUSED (Wave 615 — backward-cause on a single density peak): this check
+  // measures a contiguous run of absence, catching a long unbroken stretch of pure dialogue/
+  // exposition with no physical staging even when the zone-level distribution looks balanced.
+  {
+    const r643a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r643a.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r643a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_VISUAL_BEAT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r643a.longestRun} consecutive scenes with no visual staging beats at all, even though ${r643a.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the causal chain of events without any staged action to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r643a.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the causal thread stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // CAUSAL_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes carrying a
+  // highlighted line of dialogue, fires when >75% of them fall in a single structural third.
+  // First checkZoneCluster use in this pass. Distinct from Wave 601's stated-belief zone
+  // imbalance (a four-zone bloat/empty check on a different signal, dialogueHighlights-presence
+  // as a belief-assertion proxy) and from every other dialogueHighlights rule in this file: this
+  // is a three-zone concentration measure on the raw highlighted-dialogue signal itself, firing
+  // on skew even when no zone is fully empty.
+  {
+    const r643b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r643b.fires) {
+      const zoneName643b = r643b.zoneNames[r643b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName643b} third — ${r643b.maxZoneCount}/${r643b.count} highlighted-dialogue scenes`,
+        rule: 'CAUSAL_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r643b.maxZoneCount} of the story's ${r643b.count} scenes carrying a standout line of dialogue (${Math.round((r643b.maxZoneCount / r643b.count) * 100)}%) cluster in the ${zoneName643b} third. Memorable dialogue concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry their causal weight.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName643b} third a standout line of dialogue — spreading memorable dialogue across the story lets each structural third carry its own causal weight in speech, not just one.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // curiosityDelta>0. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 scenes carrying outstanding clue-debt, ≥2 scenes where curiosity is actively rising, zero
+  // overlap → fire. Distinct from Wave 629's CAUSAL_HIGHLIGHT_OPEN_THREAD_DECOUPLED (unresolved
+  // Clues × dialogueHighlights) and from CAUSALITY_OPEN_THREAD_ZONE_IMBALANCE (a distributional,
+  // not co-occurrence, measure on the same field): this is the first check pairing the open-
+  // thread signal with the curiosity channel specifically — a scene where a mystery sits open
+  // never coincides with a scene where the audience's wonder is measurably climbing, so the
+  // story's live questions and its rising intrigue run on separate tracks.
+  {
+    const r643c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r643c.fires) {
+      issues.push({
+        location: `${r643c.aCount} open-thread scene(s), ${r643c.bCount} rising-curiosity scene(s) — zero overlap`,
+        rule: 'CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r643c.aCount} scenes carrying outstanding clue-debt never coincide with the ${r643c.bCount} scenes where curiosity is actively rising — the story's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, giving the story's open threads a causal tie to its rising intrigue.`,
       });
     }
   }

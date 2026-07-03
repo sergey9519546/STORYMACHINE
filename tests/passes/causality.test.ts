@@ -1247,6 +1247,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 643 — causalityPass: causality visual beat drought run, causal highlight zone cluster, causality open thread curiosity decoupled', async () => {
+    const runCA643 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_VISUAL_BEAT_DROUGHT_RUN fire:
+    // 10 scenes; staged at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CAUSALITY_VISUAL_BEAT_DROUGHT_RUN fires when the longest no-staging run is ≥6', async () => {
+      const recs643a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs643a[0] = makeSharedRecord(0, { visualBeats: ['a'] });
+      recs643a[1] = makeSharedRecord(1, { visualBeats: ['b'] });
+      recs643a[2] = makeSharedRecord(2, { visualBeats: ['c'] });
+      recs643a[9] = makeSharedRecord(9, { visualBeats: ['d'] });
+      const res = await runCA643(recs643a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_VISUAL_BEAT_DROUGHT_RUN'), 'CAUSALITY_VISUAL_BEAT_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_VISUAL_BEAT_DROUGHT_RUN no-fire:
+    // staged at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CAUSALITY_VISUAL_BEAT_DROUGHT_RUN does not fire when staging is distributed without a long drought', async () => {
+      const recs643an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs643an[0] = makeSharedRecord(0, { visualBeats: ['a'] });
+      recs643an[4] = makeSharedRecord(4, { visualBeats: ['b'] });
+      recs643an[9] = makeSharedRecord(9, { visualBeats: ['c'] });
+      const res = await runCA643(recs643an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_VISUAL_BEAT_DROUGHT_RUN'), 'CAUSALITY_VISUAL_BEAT_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSAL_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('CAUSAL_HIGHLIGHT_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs643b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs643b[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs643b[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs643b[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runCA643(recs643b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSAL_HIGHLIGHT_ZONE_CLUSTER'), 'CAUSAL_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSAL_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSAL_HIGHLIGHT_ZONE_CLUSTER does not fire when highlighted-dialogue scenes are distributed across thirds', async () => {
+      const recs643bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs643bn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs643bn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs643bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runCA643(recs643bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSAL_HIGHLIGHT_ZONE_CLUSTER'), 'CAUSAL_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED fire:
+    // n=6; open threads at 0,1 (no curiosity rise); curiosity rises at 4,5 (no open thread) → zero overlap → fires
+    it('CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED fires when open-thread scenes and rising-curiosity scenes never overlap', async () => {
+      const recs643c = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs643c[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs643c[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs643c[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs643c[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runCA643(recs643c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED'), 'CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED no-fire:
+    // scene 0 carries BOTH an open thread and a curiosity rise → overlap exists
+    it('CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs643cn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs643cn[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'], curiosityDelta: 1 });
+      recs643cn[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs643cn[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runCA643(recs643cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED'), 'CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 629 — causalityPass: causal highlight open thread decoupled, visual beat dialogue highlight aftermath void, causality open thread zone imbalance', async () => {
     const runCA629 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
