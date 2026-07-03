@@ -399,6 +399,16 @@
 // structural thirds — 'complicate' has only ever appeared inside the dramaticPurposes composite
 // set [union with 'revelation', 'turning_point', 'climax', 'raise_stakes']; it has never been
 // audited as its own standalone signal by any of the three shared-library trio modes).
+//
+// Wave 841 additions: ARC_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose === 'establish_world'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 827; peak mode conventionally skipped for this categorical field), ARC_COMPLICATE_
+// DROUGHT_RUN (run-based × purpose === 'complicate' absence — completes 2 of 3 slots for this
+// purpose value alongside the zone-cluster mode added in Wave 827; peak mode conventionally
+// skipped for this categorical field), ARC_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'climax' × structural thirds — distinct from ARC_CLIMAX_VOID, a co-occurrence check on the
+// fixed climax scene's content; none of the three shared-library trio modes has ever isolated
+// this purpose value as a standalone distributional signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4730,6 +4740,73 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r827c.maxZoneCount / r827c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r827c.zoneNames[r827c.maxZoneIdx]} third. When every complication lands in the same structural window, the character's arc stops deepening the trouble anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r827c.zoneNames[r827c.maxZoneIdx]} third to complicate the story so the character's arc keeps deepening the trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 841: ARC_ESTABLISH_WORLD_DROUGHT_RUN, ARC_COMPLICATE_DROUGHT_RUN,
+  //              ARC_CLIMAX_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ARC_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes overall,
+  // fires when the longest consecutive run of scenes with no world-establishing purpose reaches
+  // 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 827 (peak mode conventionally skipped for this categorical field).
+  {
+    const r841a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r841a.fires) {
+      issues.push({
+        location: `longest stretch with no world-building: ${r841a.longestRun} consecutive scenes`,
+        rule: 'ARC_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r841a.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r841a.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves the character's arc without a stable frame for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r841a.longestRun}-scene stretch to establish the world so the character's arc keeps grounding the audience throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 827 (peak mode conventionally skipped for this categorical field).
+  {
+    const r841b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r841b.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r841b.longestRun} consecutive scenes`,
+        rule: 'ARC_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r841b.longestRun} consecutive scenes with no complicating purpose at all, even though ${r841b.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing complicating events leaves the character's arc coasting for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r841b.longestRun}-scene stretch to complicate the story so the character's arc keeps deepening the trouble throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed scenes,
+  // fires when more than 75% of them fall in a single structural third. Distinct from
+  // ARC_CLIMAX_VOID, a co-occurrence check on the fixed climax scene's content; none of the three
+  // shared-library trio modes has ever isolated this purpose value as a standalone
+  // distributional signal.
+  {
+    const r841c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r841c.fires) {
+      issues.push({
+        location: `${r841c.zoneNames[r841c.maxZoneIdx]} third — ${r841c.maxZoneCount} of ${r841c.count} climax-purposed scenes`,
+        rule: 'ARC_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r841c.maxZoneCount / r841c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r841c.zoneNames[r841c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the character's arc builds toward its payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r841c.zoneNames[r841c.maxZoneIdx]} third so the character's arc builds toward its payoff more evenly across the story.`,
       });
     }
   }
