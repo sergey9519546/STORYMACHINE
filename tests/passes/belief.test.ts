@@ -1204,6 +1204,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 642 — beliefPass: belief open thread drought run, belief staging zone cluster, belief seed curiosity decoupled', async () => {
+    const runBF642 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; debt at 0,8,9; drought run 1-7 = 7 consecutive scenes ≥ 6
+    it('BELIEF_OPEN_THREAD_DROUGHT_RUN fires when the longest no-debt run is ≥6', async () => {
+      const recs642a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs642a[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs642a[8] = makeSharedRecord(8, { unresolvedClues: ['b'] });
+      recs642a[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runBF642(recs642a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_DROUGHT_RUN'), 'BELIEF_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // debt at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_OPEN_THREAD_DROUGHT_RUN does not fire when debt is distributed without a long drought', async () => {
+      const recs642an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs642an[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs642an[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs642an[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runBF642(recs642an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_DROUGHT_RUN'), 'BELIEF_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes (visualBeats≥2) at 0,1,2 → 100% opening third
+    it('BELIEF_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs642b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs642b[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs642b[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs642b[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runBF642(recs642b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_ZONE_CLUSTER'), 'BELIEF_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs642bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs642bn[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs642bn[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs642bn[7] = makeSharedRecord(7, { visualBeats: ['a', 'b'] });
+      const res = await runBF642(recs642bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_ZONE_CLUSTER'), 'BELIEF_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_SEED_CURIOSITY_DECOUPLED fire:
+    // n=6; seeds at 0,1 (no curiosity); curiosity at 4,5 (no seed) → zero overlap → fires
+    it('BELIEF_SEED_CURIOSITY_DECOUPLED fires when seed scenes and curiosity-spike scenes never overlap', async () => {
+      const recs642c = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs642c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs642c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs642c[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs642c[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runBF642(recs642c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_CURIOSITY_DECOUPLED'), 'BELIEF_SEED_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // BELIEF_SEED_CURIOSITY_DECOUPLED no-fire:
+    // scene 0 carries BOTH a seed and a curiosity spike → overlap exists
+    it('BELIEF_SEED_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs642cn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs642cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'], curiosityDelta: 1 });
+      recs642cn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs642cn[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runBF642(recs642cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_CURIOSITY_DECOUPLED'), 'BELIEF_SEED_CURIOSITY_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 628 — beliefPass: belief payoff seed decoupled, clock delta peak uncaused, belief character moment zone imbalance', async () => {
     const runBF628 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

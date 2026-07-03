@@ -231,10 +231,15 @@
 // cause — first backward-cause check in this pass), BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE
 // (underweight/bloat × purpose === 'character_moment' × four structural zones — first genuine use
 // of the purpose field, whose only prior appearance was the word "purpose" inside prose).
+// Wave 642 additions: BELIEF_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence — first
+// use of the run-based mode in this 111-rule pass), BELIEF_STAGING_ZONE_CLUSTER
+// (distribution/timing × visualBeats × structural thirds — first zone-cluster mode applied to
+// records here), BELIEF_SEED_CURIOSITY_DECOUPLED (co-occurrence/decoupling × seededClueIds ×
+// curiosityDelta — first pairing of these two fields).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function beliefPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3543,6 +3548,75 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r628c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName628c} contains ${r628c.counts[r628c.bloatZoneIdx]} of them (${Math.round((r628c.counts[r628c.bloatZoneIdx] / r628c.totalCount) * 100)}%) while ${emptyNames628c} contains none. Dedicated reflection beats — where a character's stated belief is most likely to be tested or revealed — bloat in one structural quarter and vanish from another.`,
         suggestedFix: `Redistribute character-development beats: move at least one character-moment scene into the empty zone(s) — ${emptyNames628c} — so every structural quarter carries some opportunity for belief and self-deception to surface.`,
+      });
+    }
+  }
+
+  // ── Wave 642: BELIEF_OPEN_THREAD_DROUGHT_RUN, BELIEF_STAGING_ZONE_CLUSTER,
+  //              BELIEF_SEED_CURIOSITY_DECOUPLED ────────────────────────────────────────────
+
+  // BELIEF_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 debt-carrying scenes elsewhere,
+  // longest consecutive run with no outstanding clue-debt ≥6 → fire. First use of the run-based
+  // mode in this 111-rule pass. An extended stretch where nothing is left unresolved at all —
+  // even though the story does carry debt elsewhere — means the belief-tracking layer's sense of
+  // active mystery goes fully dark for a long run.
+  {
+    const r642a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r642a.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r642a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r642a.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r642a.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the belief/deception layer's sense of active questioning goes fully dark for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r642a.longestRun}-scene stretch so the story maintains some outstanding mystery throughout, keeping the belief-tracking layer's sense of open questions alive.`,
+      });
+    }
+  }
+
+  // BELIEF_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes
+  // (visualBeats.length≥2), more than 75% falling in a single structural third → fire. First
+  // zone-cluster (thirds) mode applied to records in this pass — Wave 614's BELIEF_STAGING_ZONE_
+  // IMBALANCE used the four-zone template instead.
+  {
+    const r642b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r642b.fires) {
+      const zoneName642b = r642b.zoneNames[r642b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName642b} third — ${r642b.maxZoneCount}/${r642b.count} visually dense scenes`,
+        rule: 'BELIEF_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r642b.maxZoneCount} of the story's ${r642b.count} visually dense scenes (${Math.round((r642b.maxZoneCount / r642b.count) * 100)}%) cluster in the ${zoneName642b} third. Physical staging concentrates almost exclusively in that stretch, leaving the belief-tracking layer's opportunities to show (rather than state) a character's true belief unevenly rationed across the story.`,
+        suggestedFix: `Bring at least one heavily staged scene outside the ${zoneName642b} third, spreading opportunities for belief and deception to surface physically across the whole story.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × seededClueIds × curiosityDelta.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 seed scenes, ≥2
+  // curiosity-positive scenes. Zero overlap → fire. First pairing of these two fields in this
+  // pass. A clue being planted is a natural occasion for the audience's curiosity to spike, but
+  // that pairing never occurs here.
+  {
+    const r642c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.seededClueIds ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r642c.fires) {
+      issues.push({
+        location: `${r642c.aCount} seed scene(s), ${r642c.bCount} curiosity-spike scene(s) — zero overlap`,
+        rule: 'BELIEF_SEED_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r642c.aCount} scenes where a clue is planted never coincide with the ${r642c.bCount} scenes where curiosity spikes — the seed and wonder-engine channels run on separate tracks. Planting a clue is a natural occasion for the audience's curiosity to visibly rise, but that pairing never happens here.`,
+        suggestedFix: `Let at least one seed scene also spike curiosity — a planted detail that immediately makes the audience wonder what it means, tying the clue-planting and wonder-generation channels together.`,
       });
     }
   }
