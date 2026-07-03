@@ -341,6 +341,15 @@
 // BELIEF_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift='negative' absence — completing
 // 2 of 3 trio slots for emotionalShift alongside the zone-cluster mode added in this same wave;
 // the peak mode is conventionally skipped for this categorical field).
+// Wave 810 additions: BELIEF_STAKES_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'raise_stakes' × structural thirds — this purpose value has never been referenced anywhere in
+// this pass; none of the three shared-library trio modes has ever been applied to it),
+// BELIEF_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — completing 2 of 3
+// slots for this purpose value alongside the zone-cluster mode added in this same wave; peak
+// mode conventionally skipped for this categorical field), BELIEF_TURNING_POINT_ZONE_CLUSTER
+// (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose value
+// has never been referenced anywhere in this pass either; none of the three shared-library trio
+// modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4472,6 +4481,72 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r796c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r796c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the belief-tracking layer with nothing testing convictions under emotional cost for an extended run.`,
         suggestedFix: `Give at least one scene within the ${r796c.longestRun}-scene stretch a negative emotional charge so the belief-tracking layer keeps testing convictions against cost throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 810: BELIEF_STAKES_ZONE_CLUSTER, BELIEF_STAKES_DROUGHT_RUN,
+  //              BELIEF_TURNING_POINT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // BELIEF_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass; none of the three shared-library trio
+  // modes has ever been applied to it.
+  {
+    const r810a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r810a.fires) {
+      issues.push({
+        location: `${r810a.zoneNames[r810a.maxZoneIdx]} third — ${r810a.maxZoneCount} of ${r810a.count} stakes-raising scenes`,
+        rule: 'BELIEF_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r810a.maxZoneCount / r810a.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r810a.zoneNames[r810a.maxZoneIdx]} third. When every escalation lands in the same structural window, the belief-tracking layer has no mounting pressure testing convictions anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r810a.zoneNames[r810a.maxZoneIdx]} third to raise stakes so the belief-tracking layer keeps mounting pressure testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r810b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r810b.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising scene: ${r810b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r810b.longestRun} consecutive scenes with no stakes-raising purpose at all, even though ${r810b.presentCount} scenes elsewhere escalate. A long unbroken stretch with nothing raising the stakes leaves the belief-tracking layer coasting without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r810b.longestRun}-scene stretch to raise stakes so the belief-tracking layer keeps mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass either; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r810c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r810c.fires) {
+      issues.push({
+        location: `${r810c.zoneNames[r810c.maxZoneIdx]} third — ${r810c.maxZoneCount} of ${r810c.count} turning-point scenes`,
+        rule: 'BELIEF_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r810c.maxZoneCount / r810c.count) * 100)}% of the story's turning-point scenes cluster in the ${r810c.zoneNames[r810c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the belief-tracking layer has no redirection testing convictions anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r810c.zoneNames[r810c.maxZoneIdx]} third as a turning point so the belief-tracking layer keeps redirection testing convictions more evenly across the story.`,
       });
     }
   }
