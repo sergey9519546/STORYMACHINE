@@ -1210,6 +1210,156 @@ He sits at his desk.
   });
 
 
+  describe('Wave 592 — originalityPass: dramatic turn zone cluster, purpose consecutive run, scene closer ellipsis flood', async () => {
+    const makeRec592 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runO592 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n');
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('DRAMATIC_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      // 9 scenes; thirds=[0-2],[3-5],[6-8]; turns at 0,1,2 → 100% in opening third.
+      // Purpose/emotion/slug/dialogue deliberately varied per scene so this fixture doesn't
+      // also trip UNIFORM_SCENE_PURPOSES, SCENE_PURPOSE_MONOTONE_ACT3, EMOTIONAL_ARC_PLATEAU,
+      // or SCENE_SHAPE_TEMPLATING — originalityPass caps its returned issues to the top 8 by
+      // severity (all 'major' before any 'minor'), and those four are 'major', so a bland
+      // uniform fixture crowds this 'minor' rule out of the truncated result even though it
+      // legitimately fired internally.
+      const purposes592a = ['establish_world', 'development', 'conflict', 'development', 'confrontation', 'development', 'climax', 'resolution', 'aftermath'];
+      const emotions592a = ['neutral', 'positive', 'negative', 'positive', 'neutral', 'negative', 'positive', 'negative', 'neutral'];
+      const recs592a = Array.from({ length: 9 }, (_, i) => makeRec592(i, {
+        purpose: purposes592a[i], emotionalShift: emotions592a[i],
+        dialogueHighlights: i % 2 === 0 ? [`alice: believes point ${i}`] : [],
+      }));
+      recs592a[0] = makeRec592(0, { purpose: purposes592a[0], emotionalShift: emotions592a[0], dramaticTurn: 'reversal' });
+      recs592a[1] = makeRec592(1, { purpose: purposes592a[1], emotionalShift: emotions592a[1], dramaticTurn: 'reversal' });
+      recs592a[2] = makeRec592(2, { purpose: purposes592a[2], emotionalShift: emotions592a[2], dramaticTurn: 'reversal' });
+      const sentences592a = [
+        'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+        'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+        'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+        'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+        'Dust settles on the piano keys.',
+      ];
+      const fountain592a = recs592a.map((_, i) =>
+        `${i % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${i} - ${i % 3 === 0 ? 'DAY' : i % 3 === 1 ? 'NIGHT' : 'DUSK'}\n\n${sentences592a[i]}`,
+      ).join('\n\n');
+      const res = await runO592(recs592a, fountain592a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_ZONE_CLUSTER'), 'DRAMATIC_TURN_ZONE_CLUSTER should fire');
+    });
+
+    it('DRAMATIC_TURN_ZONE_CLUSTER does not fire when dramatic turns are distributed across thirds', async () => {
+      // turns at 0, 4, 7 (one per third) → maxZone/total = 1/3
+      const recs592a = Array.from({ length: 9 }, (_, i) => makeRec592(i));
+      recs592a[0] = makeRec592(0, { dramaticTurn: 'reversal' });
+      recs592a[4] = makeRec592(4, { dramaticTurn: 'revelation' });
+      recs592a[7] = makeRec592(7, { dramaticTurn: 'reversal' });
+      const res = await runO592(recs592a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_ZONE_CLUSTER'), 'DRAMATIC_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    it('PURPOSE_CONSECUTIVE_RUN fires when ≥4 consecutive scenes share the same purpose', async () => {
+      // 6 scenes; purposes: development,development,development,development,climax,confrontation
+      const recs592b = [
+        makeRec592(0, { purpose: 'development' }),
+        makeRec592(1, { purpose: 'development' }),
+        makeRec592(2, { purpose: 'development' }),
+        makeRec592(3, { purpose: 'development' }),
+        makeRec592(4, { purpose: 'climax' }),
+        makeRec592(5, { purpose: 'confrontation' }),
+      ];
+      const res = await runO592(recs592b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PURPOSE_CONSECUTIVE_RUN'), 'PURPOSE_CONSECUTIVE_RUN should fire');
+    });
+
+    it('PURPOSE_CONSECUTIVE_RUN does not fire when no run of same purpose reaches 4 scenes', async () => {
+      // alternating purposes — longest run is 2
+      const recs592b = [
+        makeRec592(0, { purpose: 'development' }),
+        makeRec592(1, { purpose: 'development' }),
+        makeRec592(2, { purpose: 'confrontation' }),
+        makeRec592(3, { purpose: 'confrontation' }),
+        makeRec592(4, { purpose: 'climax' }),
+        makeRec592(5, { purpose: 'climax' }),
+      ];
+      const res = await runO592(recs592b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PURPOSE_CONSECUTIVE_RUN'), 'PURPOSE_CONSECUTIVE_RUN should not fire');
+    });
+
+    it('SCENE_CLOSER_ELLIPSIS_FLOOD fires when ≥50% of scenes end their final line in an ellipsis', async () => {
+      // 6 scenes; 4 end in "...", 2 do not
+      const fountain592c = `INT. ONE - DAY
+
+Alice enters the room slowly...
+
+INT. TWO - DAY
+
+Bob waits by the window...
+
+INT. THREE - DAY
+
+She finally speaks the truth.
+
+INT. FOUR - DAY
+
+The clock ticks toward midnight...
+
+INT. FIVE - DAY
+
+He slams the door shut.
+
+INT. SIX - DAY
+
+Nothing more needs to be said...`;
+      const res = await runO592([], fountain592c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SCENE_CLOSER_ELLIPSIS_FLOOD'), 'SCENE_CLOSER_ELLIPSIS_FLOOD should fire');
+    });
+
+    it('SCENE_CLOSER_ELLIPSIS_FLOOD does not fire when most scenes end without an ellipsis', async () => {
+      // 6 scenes; only 1 ends in "..."
+      const fountain592cnr = `INT. ONE - DAY
+
+Alice enters the room and sits down.
+
+INT. TWO - DAY
+
+Bob waits by the window and watches.
+
+INT. THREE - DAY
+
+She finally speaks the truth.
+
+INT. FOUR - DAY
+
+The clock ticks toward midnight...
+
+INT. FIVE - DAY
+
+He slams the door shut.
+
+INT. SIX - DAY
+
+Nothing more needs to be said.`;
+      const res = await runO592([], fountain592cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SCENE_CLOSER_ELLIPSIS_FLOOD'), 'SCENE_CLOSER_ELLIPSIS_FLOOD should not fire');
+    });
+  });
+
   describe('Wave 578 — originalityPass: slug same-location run, action present-continuous flood, dialogue backstory opener flood', async () => {
     const runO578 = async (fountain: string) => {
       const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');

@@ -183,6 +183,24 @@
 // "bring," "hold," "let's"; characters only issue orders, no emotional or exploratory register;
 // distinct from DIALOGUE_HEDGING_FLOOD which targets uncertainty, DIALOGUE_QUESTION_FLOOD which
 // targets questions, and all action-line opener checks which target non-dialogue text).
+// Wave 592 additions: dramatic turn zone cluster (distribution/timing × dramaticTurn presence ×
+// structural thirds — n≥9, ≥3 dramatic-turn scenes [dramaticTurn !== 'nothing'], >75% in a single
+// third; the story's pivots are predictably ghettoized into one zone rather than spread across the
+// structure — the audience learns which third to expect a turn in; first check in this pass to
+// touch the dramaticTurn signal at all, distinct from every other zone-cluster-style check in this
+// file which operates on lexical/textual signals rather than per-scene structural records), purpose
+// consecutive run (run-based × purpose — ≥4 consecutive scenes share the identical purpose value;
+// a local, position-independent repetition distinct from UNIFORM_SCENE_PURPOSES [global aggregate:
+// ≤2 distinct purposes across the whole script] and PURPOSE_BOOKEND_REPEAT [compares Act 1's vs
+// Act 3's dominant purpose] and REVELATION_PURPOSE_MONOTONE [filters to revelation scenes only];
+// first run-based check on the purpose channel in this pass), scene closer ellipsis flood
+// (positional/distribution × the last line of each scene — ≥50% of scenes [n≥6] end their final
+// non-blank line in an ellipsis; every scene trails off the same way, so the audience learns to
+// expect the same rhythmic exit beat before it arrives; distinct from ELLIPSIS_OVERUSE [any-position
+// frequency across all action lines] and DIALOGUE_ELLIPSIS_FLOOD [any-position frequency across all
+// dialogue lines] — this is the first check in this pass to isolate a fixed STRUCTURAL POSITION
+// within each scene, the closer, mirroring the extensive existing opener-position coverage but for
+// the opposite end of the scene).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3596,6 +3614,129 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         description: `${backstoryCount578c} of ${dlgTotal578c} dialogue lines (${Math.round(backstoryCount578c / dlgTotal578c * 100)}%) open with a past-temporal backstory anchor — "Years ago," "Back then," "Before you," "When I was," and similar phrases that pause the present drama to deliver a report from the past. Used occasionally, these openers legitimately ground a character's behavior in their history. When more than a fifth of all dialogue lines begin this way, the script has organized its emotional work around retrospective narration rather than present conflict: characters speak in the past tense about events the audience cannot see, while the drama actually happening in the scene plays out in summary. The audience watches characters recall rather than act.`,
         suggestedFix: `Find the backstory moments that are doing the most dramatic work and dramatize them as scenes: show the event rather than having a character report it. For remaining backstory dialogue, test whether the temporal anchor is necessary — often "Years ago, I made a mistake" can be trimmed to "I made a mistake" because the past-ness is understood. Reserve explicit temporal backstory openers for the single defining formative moment that must be named aloud, then trust the present conflict to carry the drama. What characters do now, in front of the audience, is always more dramatic than what they remember.`,
       });
+    }
+  }
+
+  // ── Wave 592: DRAMATIC_TURN_ZONE_CLUSTER, PURPOSE_CONSECUTIVE_RUN,
+  //              SCENE_CLOSER_ELLIPSIS_FLOOD ─────────────────────────────────────────────────
+
+  // DRAMATIC_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural thirds.
+  // n≥9, ≥3 scenes with a dramatic turn (dramaticTurn !== 'nothing'). Divides the story into
+  // thirds; if >75% of turn-bearing scenes fall in a single third → fire. The story's structural
+  // pivots are ghettoized into one zone rather than spread across the arc — once the audience
+  // notices which third of the screenplay carries the turns, they learn where (and when) to expect
+  // the next pivot, which is precisely the kind of learned predictability this pass exists to catch.
+  // First check in this pass to use the dramaticTurn signal at all; every other zone/cluster-style
+  // check in this file operates on lexical/textual patterns (openers, punctuation, clichés) rather
+  // than per-scene structural records.
+  if (records.length >= 9) {
+    const turnRecs592a = (records as any[]).filter(r => (r.dramaticTurn ?? 'nothing') !== 'nothing');
+    if (turnRecs592a.length >= 3) {
+      const n592a = records.length;
+      const thirdCounts592a = [0, 0, 0];
+      for (const r of turnRecs592a) {
+        const idx = (records as any[]).indexOf(r);
+        const zoneIdx = Math.min(2, Math.floor((idx / n592a) * 3));
+        thirdCounts592a[zoneIdx]++;
+      }
+      const maxCount592a = Math.max(...thirdCounts592a);
+      if (maxCount592a / turnRecs592a.length > 0.75) {
+        const zoneNames592a = ['opening', 'middle', 'closing'];
+        const zoneIdx592a = thirdCounts592a.indexOf(maxCount592a);
+        issues.push({
+          location: `${maxCount592a}/${turnRecs592a.length} dramatic-turn scene(s) in the ${zoneNames592a[zoneIdx592a]} third`,
+          rule: 'DRAMATIC_TURN_ZONE_CLUSTER',
+          severity: 'minor',
+          description: `${Math.round((maxCount592a / turnRecs592a.length) * 100)}% of the story's ${turnRecs592a.length} dramatic-turn scenes (${maxCount592a} of them) cluster in the ${zoneNames592a[zoneIdx592a]} third of the screenplay. When pivots concentrate this heavily in one structural zone, the audience learns — consciously or not — which part of the story carries the surprises, and stops expecting a turn anywhere else. A truly unpredictable structure keeps pivots capable of arriving in any third.`,
+          suggestedFix: `Relocate or add at least one dramatic turn outside the ${zoneNames592a[zoneIdx592a]} third. A pivot that can land anywhere in the structure — early, at the midpoint, or late — keeps the audience from mapping "when the surprises happen" onto a fixed zone of the script.`,
+        });
+      }
+    }
+  }
+
+  // PURPOSE_CONSECUTIVE_RUN — Run-based × purpose (local consecutive repetition).
+  // ≥4 consecutive scenes share the identical `purpose` value → fire. This is a LOCAL,
+  // position-independent run check, distinct from UNIFORM_SCENE_PURPOSES (a GLOBAL aggregate:
+  // ≤2 distinct purposes across the whole script, which can fire even when the repeats are spread
+  // out and never touch), PURPOSE_BOOKEND_REPEAT (compares Act 1's dominant purpose against Act
+  // 3's — a two-point structural comparison, not a run), and REVELATION_PURPOSE_MONOTONE (filters
+  // to revelation scenes specifically). A run of 4+ consecutive same-purpose scenes means the
+  // audience experiences the same FUNCTIONAL BEAT four times in a row regardless of surface
+  // content — four consecutive "development" scenes, or four consecutive "establish_world" scenes
+  // — which reads as structurally repetitive even if the dialogue and description vary. First
+  // run-based check on the purpose channel in this pass.
+  if (records.length >= 4) {
+    let longestRun592b = 1;
+    let longestPurpose592b = (records as any[])[0]?.purpose;
+    let longestStart592b = 0;
+    let curRun592b = 1;
+    let curStart592b = 0;
+    for (let i = 1; i < records.length; i++) {
+      if ((records as any[])[i].purpose === (records as any[])[i - 1].purpose) {
+        curRun592b++;
+      } else {
+        curRun592b = 1;
+        curStart592b = i;
+      }
+      if (curRun592b > longestRun592b) {
+        longestRun592b = curRun592b;
+        longestPurpose592b = (records as any[])[i].purpose;
+        longestStart592b = curStart592b;
+      }
+    }
+    if (longestRun592b >= 4) {
+      issues.push({
+        location: `Scenes ${longestStart592b}–${longestStart592b + longestRun592b - 1} — ${longestRun592b} consecutive "${longestPurpose592b}" scenes`,
+        rule: 'PURPOSE_CONSECUTIVE_RUN',
+        severity: 'minor',
+        description: `Scenes ${longestStart592b} through ${longestStart592b + longestRun592b - 1} (${longestRun592b} in a row) all share the identical scene purpose "${longestPurpose592b}". Even when the surface content — dialogue, setting, characters — varies from scene to scene, four or more consecutive scenes performing the same functional job reads as structurally repetitive: the audience settles into a rhythm of "another one of these" rather than feeling the story's gears shift.`,
+        suggestedFix: `Break up the run by inserting a scene with a different functional purpose somewhere in the middle of the streak — a confrontation, a revelation, or a decision point that performs a different structural job than the surrounding scenes. Varying the FUNCTION of consecutive scenes, not just their content, keeps the story's rhythm from flattening.`,
+      });
+    }
+  }
+
+  // SCENE_CLOSER_ELLIPSIS_FLOOD — Positional/distribution × the final line of each scene.
+  // n≥6 scenes (sluglines). For each scene segment (bounded by scene-heading lines using the same
+  // slugline regex as SLUG_INTERIOR_DOMINANCE), find its last non-blank line; if ≥50% of scenes end
+  // that final line in an ellipsis ("..." or "…") → fire. This is the first check in this pass to
+  // isolate a fixed STRUCTURAL POSITION within each scene — the closer — mirroring the file's
+  // extensive existing opener-position coverage (ACTION_OPENER_MONOTONY, GERUND_OPENER_DOMINANCE,
+  // DIALOGUE_FILLER_OPENER, and others) but for the opposite end of the scene. Distinct from
+  // ELLIPSIS_OVERUSE (any-position frequency of ellipses across all action lines, regardless of
+  // where in the scene they fall) and DIALOGUE_ELLIPSIS_FLOOD (same, but scoped to dialogue lines) —
+  // both are global frequency counts; this one is anchored to a specific position, the last line of
+  // each scene, so it can fire even when the OVERALL ellipsis frequency is unremarkable, as long as
+  // scenes are trailing off on the same rhythmic beat every time.
+  {
+    const sceneClosers592c: string[] = [];
+    let currentScene592c: string[] = [];
+    const flushScene592c = () => {
+      for (let k = currentScene592c.length - 1; k >= 0; k--) {
+        const t = currentScene592c[k].trim();
+        if (t.length > 0) { sceneClosers592c.push(t); break; }
+      }
+      currentScene592c = [];
+    };
+    for (const line of lines) {
+      const t = line.trim();
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) {
+        if (currentScene592c.length > 0) flushScene592c();
+      }
+      currentScene592c.push(line);
+    }
+    if (currentScene592c.length > 0) flushScene592c();
+
+    if (sceneClosers592c.length >= 6) {
+      const ellipsisClosers592c = sceneClosers592c.filter(t => /(\.\.\.|…)\s*$/.test(t)).length;
+      if (ellipsisClosers592c / sceneClosers592c.length >= 0.5) {
+        issues.push({
+          location: `${ellipsisClosers592c} of ${sceneClosers592c.length} scenes end their final line in an ellipsis`,
+          rule: 'SCENE_CLOSER_ELLIPSIS_FLOOD',
+          severity: 'minor',
+          description: `${ellipsisClosers592c} of the screenplay's ${sceneClosers592c.length} scenes (${Math.round((ellipsisClosers592c / sceneClosers592c.length) * 100)}%) end their final line trailing off in an ellipsis. Used occasionally, a trailing ellipsis signals suspended thought or unresolved tension; used as the default exit for most scenes, it becomes a rhythmic tic — every scene fades the same way, and the audience learns to anticipate the exact shape of each transition before it arrives.`,
+          suggestedFix: `Vary how scenes end: let some close on a hard action, a declarative line, an interruption, or a sound cue instead of a trailing ellipsis. Reserve the ellipsis exit for the scenes where suspended thought is specifically the point — its impact depends on it being the exception, not the rule.`,
+        });
+      }
     }
   }
 
