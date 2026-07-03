@@ -263,6 +263,16 @@
 // ARC_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds — this pass
 // already applies the zone-cluster mode to dramaticTurn, relationshipShifts, and curiosityDelta;
 // payoffSetupIds itself has never been cluster-audited here).
+// Wave 673 additions (built on the shared checks library, audit M2.2): ARC_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — distinct from the
+// existing ARC_CLOCK_PEAK_EMOTION_ABSENT, which checks whether the peak-clockDelta scene is
+// itself emotionally neutral; this instead asks whether that scene is structurally caused by a
+// dramatic turn or revelation), ARC_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence
+// — Wave 645 applied the peak-uncaused mode to dialogueHighlights; the drought-run mode has never
+// been applied to this channel), ARC_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds ×
+// structural thirds — Wave 645 applied the drought-run mode to seededClueIds; the zone-cluster
+// mode has never been applied to this channel despite it already anchoring two aftermath-void
+// checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3766,6 +3776,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r659c.maxZoneCount} of the arc's ${r659c.count} thread-resolution scenes (${Math.round((r659c.maxZoneCount / r659c.count) * 100)}%) cluster in the ${zoneName659c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the character's arc paying off.`,
         suggestedFix: `Let at least one thread resolve outside the ${zoneName659c} third — spreading resolutions across the story lets the character's arc pay off gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 673: ARC_CLOCK_DELTA_PEAK_UNCAUSED, ARC_HIGHLIGHT_DROUGHT_RUN, ARC_SEED_ZONE_CLUSTER ──
+
+  // ARC_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with clockDelta>0,
+  // a 2-scene lookback. Finds the single scene with the highest clockDelta; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Distinct
+  // from the existing ARC_CLOCK_PEAK_EMOTION_ABSENT, which checks whether the peak-clockDelta
+  // scene is itself emotionally neutral; this instead asks whether that scene is structurally
+  // caused by a dramatic turn or revelation.
+  {
+    const r673a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r673a.fires) {
+      issues.push({
+        location: `scene ${r673a.peakIdx + 1} — peak clockDelta (${r673a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the arc's single highest clockDelta (scene ${r673a.peakIdx + 1}, at ${r673a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r673a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's sharpest deadline compression is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ARC_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall, fires when the
+  // longest consecutive run of scenes with no highlighted dialogue reaches 6. Wave 645 applied
+  // the peak-uncaused mode to dialogueHighlights; the drought-run mode has never been applied to
+  // this channel.
+  {
+    const r673b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r673b.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r673b.longestRun} consecutive scenes`,
+        rule: 'ARC_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r673b.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r673b.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the character's arc running on unremarkable dialogue for an extended stretch.`,
+        suggestedFix: `Give at least one scene within the ${r673b.longestRun}-scene stretch a standout line of dialogue — a character voicing something close to their arc memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // ARC_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Wave 645 applied the drought-run mode to seededClueIds;
+  // the zone-cluster mode has never been applied to this channel despite it already anchoring two
+  // aftermath-void checks.
+  {
+    const r673c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r673c.fires) {
+      const zoneName673c = r673c.zoneNames[r673c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName673c} third — ${r673c.maxZoneCount}/${r673c.count} seed scenes`,
+        rule: 'ARC_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r673c.maxZoneCount} of the arc's ${r673c.count} clue-planting scenes (${Math.round((r673c.maxZoneCount / r673c.count) * 100)}%) cluster in the ${zoneName673c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new material feeding the character's arc.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName673c} third — spreading foreshadowing across the story lets every structural third carry some fresh material for the character's arc to draw on.`,
       });
     }
   }
