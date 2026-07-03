@@ -1365,6 +1365,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 846 — payoffPass: payoff positive emotion drought run, payoff establish world zone cluster, payoff climax zone cluster', async () => {
+    const runPY846 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs846a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runPY846(recs846a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN'), 'PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs846an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runPY846(recs846an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN'), 'PAYOFF_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs846b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runPY846(recs846b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER'), 'PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs846bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runPY846(recs846bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER'), 'PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs846c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runPY846(recs846c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLIMAX_ZONE_CLUSTER'), 'PAYOFF_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs846cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runPY846(recs846cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLIMAX_ZONE_CLUSTER'), 'PAYOFF_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 832 — payoffPass: payoff introduce conflict zone cluster, payoff introduce conflict drought run, payoff positive emotion zone cluster', async () => {
     const runPY832 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
