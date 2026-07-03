@@ -421,6 +421,12 @@
 // BELIEF_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in
 // Wave 908), and BELIEF_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence
 // signal with a complete 3-zone/run trio).
+//
+// Wave 936 additions: continuing the checkZoneImbalance rollout, this wave extends the 4-zone mode
+// to three more signals that each already have a complete 3-zone/run-based trio but had never been
+// audited by it: BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive'), BELIEF_
+// SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0), and BELIEF_CURIOSITY_ZONE_IMBALANCE (curiosityDelta
+// > 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5179,6 +5185,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r922c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName922c} contains ${r922c.counts[r922c.bloatZoneIdx]} of them (${Math.round((r922c.counts[r922c.bloatZoneIdx] / r922c.totalCount) * 100)}%) while ${emptyNames922c} contains none. Downturns bloat in one structural quarter and vanish from another, so the belief-tracking layer's shaken convictions cluster in only part of the story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames922c} — so the belief-tracking layer's convictions are tested across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 positive-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone BELIEF_POSITIVE_EMOTION_
+  // ZONE_CLUSTER and run-based BELIEF_POSITIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r936a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r936a.fires) {
+      const emptyNames936a = r936a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName936a = FOUR_ZONE_NAMES[r936a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames936a} empty; ${bloatName936a} has ${r936a.counts[r936a.bloatZoneIdx]}/${r936a.totalCount} positive-shift scenes`,
+        rule: 'BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r936a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName936a} contains ${r936a.counts[r936a.bloatZoneIdx]} of them (${Math.round((r936a.counts[r936a.bloatZoneIdx] / r936a.totalCount) * 100)}%) while ${emptyNames936a} contains none. Upswings bloat in one structural quarter and vanish from another, so the belief-tracking layer's affirmed convictions cluster in only part of the story.`,
+        suggestedFix: `Redistribute upswings: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames936a} — so the belief-tracking layer's convictions are affirmed across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × suspenseDelta > 0 × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to the
+  // suspenseDelta magnitude signal. n≥10, ≥4 suspense-raising scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone BELIEF_SUSPENSE_ZONE_CLUSTER and run-based
+  // BELIEF_SUSPENSE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this
+  // signal.
+  {
+    const r936b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r936b.fires) {
+      const emptyNames936b = r936b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName936b = FOUR_ZONE_NAMES[r936b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames936b} empty; ${bloatName936b} has ${r936b.counts[r936b.bloatZoneIdx]}/${r936b.totalCount} suspense-raising scenes`,
+        rule: 'BELIEF_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r936b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName936b} contains ${r936b.counts[r936b.bloatZoneIdx]} of them (${Math.round((r936b.counts[r936b.bloatZoneIdx] / r936b.totalCount) * 100)}%) while ${emptyNames936b} contains none. Tension spikes bloat in one structural quarter and vanish from another, so the belief-tracking layer's doubts are stirred in only part of the story.`,
+        suggestedFix: `Redistribute suspense beats: raise tension in at least one scene inside the empty zone(s) — ${emptyNames936b} — so the belief-tracking layer's doubts are stirred across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × curiosityDelta > 0 × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to
+  // the curiosityDelta magnitude signal. n≥10, ≥4 curiosity-raising scenes total, divided across
+  // four equal structural zones. Fires only when one zone has zero such scenes while another holds
+  // ≥50% of the total. Distinct from the existing 3-zone BELIEF_CURIOSITY_ZONE_CLUSTER and run-based
+  // BELIEF_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this
+  // signal.
+  {
+    const r936c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r936c.fires) {
+      const emptyNames936c = r936c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName936c = FOUR_ZONE_NAMES[r936c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames936c} empty; ${bloatName936c} has ${r936c.counts[r936c.bloatZoneIdx]}/${r936c.totalCount} curiosity-raising scenes`,
+        rule: 'BELIEF_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r936c.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName936c} contains ${r936c.counts[r936c.bloatZoneIdx]} of them (${Math.round((r936c.counts[r936c.bloatZoneIdx] / r936c.totalCount) * 100)}%) while ${emptyNames936c} contains none. New questions bloat in one structural quarter and vanish from another, so the belief-tracking layer's open questions cluster in only part of the story.`,
+        suggestedFix: `Redistribute curiosity beats: raise a fresh question in at least one scene inside the empty zone(s) — ${emptyNames936c} — so the belief-tracking layer's open questions span every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

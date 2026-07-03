@@ -1204,6 +1204,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 936 — beliefPass: belief positive emotion zone imbalance, belief suspense zone imbalance, belief curiosity zone imbalance', async () => {
+    const runBF936 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs936a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runBF936(recs936a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs936an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runBF936(recs936an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs936b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 2 : 0 }));
+      const res = await runBF936(recs936b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_ZONE_IMBALANCE'), 'BELIEF_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs936bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 2 : 0 }));
+      const res = await runBF936(recs936bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_ZONE_IMBALANCE'), 'BELIEF_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs936c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 2 : 0 }));
+      const res = await runBF936(recs936c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_ZONE_IMBALANCE'), 'BELIEF_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs936cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 2 : 0 }));
+      const res = await runBF936(recs936cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CURIOSITY_ZONE_IMBALANCE'), 'BELIEF_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 922 — beliefPass: belief stakes zone imbalance, belief revelation purpose zone imbalance, belief negative emotion zone imbalance', async () => {
     const runBF922 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
