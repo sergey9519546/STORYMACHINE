@@ -277,6 +277,15 @@
 // the backward-cause peak mode has never been applied to it), VOICE_OPEN_THREAD_DROUGHT_RUN
 // (run-based × unresolvedClues absence — Wave 683 applied the backward-cause peak mode to
 // unresolvedClues; the drought-run mode has never been applied to it).
+// Wave 739 additions: VOICE_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues ×
+// structural thirds — Waves 599/683 applied the run-based drought and backward-cause peak modes
+// to unresolvedClues; the zone-cluster mode has never been applied to it, completing the trio),
+// VOICE_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural thirds —
+// Waves 669/725 applied the backward-cause peak and run-based drought modes to
+// dialogueHighlights; the zone-cluster mode has never been applied to it, completing the trio),
+// VOICE_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence — Waves 669/725 applied
+// the zone-cluster and backward-cause peak modes to relationshipShifts; the drought-run mode has
+// never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4509,6 +4518,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r725c.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r725c.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved leaves the story's voice without any unanswered question to press against for an extended run.`,
         suggestedFix: `Seed a new thread somewhere within the ${r725c.longestRun}-scene stretch so the story's voice keeps some outstanding mystery to work against throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 739: VOICE_OPEN_THREAD_ZONE_CLUSTER, VOICE_HIGHLIGHT_ZONE_CLUSTER,
+  //              VOICE_RELATIONSHIP_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // VOICE_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Waves 599/683 applied the
+  // run-based drought and backward-cause peak modes to unresolvedClues; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r739a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r739a.fires) {
+      issues.push({
+        location: `${r739a.zoneNames[r739a.maxZoneIdx]} third — ${r739a.maxZoneCount} of ${r739a.count} open-thread scenes`,
+        rule: 'VOICE_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r739a.maxZoneCount / r739a.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the story's ${r739a.zoneNames[r739a.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the story's voice has no unresolved mystery pressing on it anywhere else.`,
+        suggestedFix: `Seed or carry forward at least one open thread outside the ${r739a.zoneNames[r739a.maxZoneIdx]} third so unresolved mystery keeps pressing on the story's voice throughout.`,
+      });
+    }
+  }
+
+  // VOICE_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 669/725
+  // applied the backward-cause peak and run-based drought modes to dialogueHighlights; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r739b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r739b.fires) {
+      issues.push({
+        location: `${r739b.zoneNames[r739b.maxZoneIdx]} third — ${r739b.maxZoneCount} of ${r739b.count} highlighted-dialogue scenes`,
+        rule: 'VOICE_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r739b.maxZoneCount / r739b.count) * 100)}% of the story's standout dialogue clusters in the ${r739b.zoneNames[r739b.maxZoneIdx]} third. When every memorable line lands in the same structural window, the story's voice goes quiet for the rest of the story.`,
+        suggestedFix: `Give at least one scene outside the ${r739b.zoneNames[r739b.maxZoneIdx]} third a standout line of dialogue so the story's voice stays alive more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no bond change reaches 6. Waves 669/725
+  // applied the zone-cluster and backward-cause peak modes to relationshipShifts; the drought-run
+  // mode has never been applied to it, completing the trio.
+  {
+    const r739c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r739c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r739c.longestRun} consecutive scenes`,
+        rule: 'VOICE_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r739c.longestRun} consecutive scenes with no relationship shift at all, even though ${r739c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters leaves the story's voice with no relational movement to speak through for an extended run.`,
+        suggestedFix: `Shift at least one relationship — however slightly — within the ${r739c.longestRun}-scene stretch so the story's voice keeps something relational to speak through throughout that stretch.`,
       });
     }
   }

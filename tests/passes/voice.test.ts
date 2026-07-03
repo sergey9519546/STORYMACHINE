@@ -1438,6 +1438,84 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 739 — voicePass: voice open thread zone cluster, voice highlight zone cluster, voice relationship drought run', async () => {
+    const runV739 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('VOICE_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs739a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs739a[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs739a[1] = makeSharedRecord(1, { unresolvedClues: ['clue-b'] });
+      recs739a[2] = makeSharedRecord(2, { unresolvedClues: ['clue-c'] });
+      const res = await runV739(recs739a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_ZONE_CLUSTER'), 'VOICE_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs739an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs739an[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs739an[4] = makeSharedRecord(4, { unresolvedClues: ['clue-b'] });
+      recs739an[7] = makeSharedRecord(7, { unresolvedClues: ['clue-c'] });
+      const res = await runV739(recs739an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_ZONE_CLUSTER'), 'VOICE_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('VOICE_HIGHLIGHT_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs739b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs739b[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs739b[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs739b[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runV739(recs739b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_ZONE_CLUSTER'), 'VOICE_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_HIGHLIGHT_ZONE_CLUSTER does not fire when highlighted dialogue is distributed across thirds', async () => {
+      const recs739bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs739bn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs739bn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs739bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runV739(recs739bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_ZONE_CLUSTER'), 'VOICE_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_RELATIONSHIP_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a relationship shift (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('VOICE_RELATIONSHIP_DROUGHT_RUN fires when the longest no-relationship-shift run reaches 6', async () => {
+      const recs739c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs739c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs739c[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs739c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runV739(recs739c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_DROUGHT_RUN'), 'VOICE_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // relationship-shift scenes spread out so no gap reaches 6 consecutive scenes
+    it('VOICE_RELATIONSHIP_DROUGHT_RUN does not fire when relationship shifts are spread through the story', async () => {
+      const recs739cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs739cn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs739cn[3] = makeSharedRecord(3, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs739cn[6] = makeSharedRecord(6, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs739cn[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runV739(recs739cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_DROUGHT_RUN'), 'VOICE_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 725 — voicePass: voice highlight drought run, voice relationship peak uncaused, voice open thread drought run', async () => {
     const runV725 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
