@@ -1352,6 +1352,105 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 633 — intentionPass: intention highlight open thread decoupled, intention clock staging aftermath void, intention open thread zone imbalance', async () => {
+    const makeRec633 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN633 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no debt); debt at 4,5 (no highlight) → zero overlap → fires
+    it('INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when dialogue highlights and open-thread scenes never overlap', async () => {
+      const recs633a = Array.from({ length: 6 }, (_, i) => makeRec633(i));
+      recs633a[0] = makeRec633(0, { dialogueHighlights: ['line-a'] });
+      recs633a[1] = makeRec633(1, { dialogueHighlights: ['line-b'] });
+      recs633a[4] = makeRec633(4, { unresolvedClues: ['unpaid-clue'] });
+      recs633a[5] = makeRec633(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runIN633(recs633a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and open debt → overlap exists
+    it('INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs633an = Array.from({ length: 6 }, (_, i) => makeRec633(i));
+      recs633an[0] = makeRec633(0, { dialogueHighlights: ['line-a'], unresolvedClues: ['unpaid-clue'] });
+      recs633an[1] = makeRec633(1, { dialogueHighlights: ['line-b'] });
+      recs633an[5] = makeRec633(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runIN633(recs633an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // INTENTION_CLOCK_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; clock triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('INTENTION_CLOCK_STAGING_AFTERMATH_VOID fires when no clock-raising scene is followed by a visually dense scene within 2 scenes', async () => {
+      const recs633b = Array.from({ length: 8 }, (_, i) => makeRec633(i));
+      recs633b[0] = makeRec633(0, { clockRaised: true });
+      recs633b[1] = makeRec633(1, { clockRaised: true });
+      recs633b[5] = makeRec633(5, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      recs633b[6] = makeRec633(6, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      recs633b[7] = makeRec633(7, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      const res = await runIN633(recs633b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_STAGING_AFTERMATH_VOID'), 'INTENTION_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // INTENTION_CLOCK_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('INTENTION_CLOCK_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs633bn = Array.from({ length: 8 }, (_, i) => makeRec633(i));
+      recs633bn[0] = makeRec633(0, { clockRaised: true });
+      recs633bn[1] = makeRec633(1, { clockRaised: true });
+      recs633bn[3] = makeRec633(3, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      recs633bn[5] = makeRec633(5, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      recs633bn[6] = makeRec633(6, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      recs633bn[7] = makeRec633(7, { visualBeats: ['grabs the bag', 'checks the exit'] });
+      const res = await runIN633(recs633bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_STAGING_AFTERMATH_VOID'), 'INTENTION_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // INTENTION_OPEN_THREAD_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); debt at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('INTENTION_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty of open-thread scenes while another is bloated', async () => {
+      const recs633c = Array.from({ length: 12 }, (_, i) => makeRec633(i));
+      recs633c[6] = makeRec633(6, { unresolvedClues: ['a'] });
+      recs633c[7] = makeRec633(7, { unresolvedClues: ['b'] });
+      recs633c[8] = makeRec633(8, { unresolvedClues: ['c'] });
+      recs633c[9] = makeRec633(9, { unresolvedClues: ['d'] });
+      const res = await runIN633(recs633c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_ZONE_IMBALANCE'), 'INTENTION_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    // INTENTION_OPEN_THREAD_ZONE_IMBALANCE no-fire:
+    // one open-thread scene per zone (1,4,7,10) → no zone is empty
+    it('INTENTION_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes are spread across all zones', async () => {
+      const recs633cn = Array.from({ length: 12 }, (_, i) => makeRec633(i));
+      recs633cn[1] = makeRec633(1, { unresolvedClues: ['a'] });
+      recs633cn[4] = makeRec633(4, { unresolvedClues: ['b'] });
+      recs633cn[7] = makeRec633(7, { unresolvedClues: ['c'] });
+      recs633cn[10] = makeRec633(10, { unresolvedClues: ['d'] });
+      const res = await runIN633(recs633cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_ZONE_IMBALANCE'), 'INTENTION_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 619 — intentionPass: payoff physical staging decoupled, seed staging aftermath void, physical staging peak uncaused', async () => {
     const makeRec619 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

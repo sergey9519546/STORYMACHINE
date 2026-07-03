@@ -214,6 +214,13 @@
 // check), SEED_STAGING_AFTERMATH_VOID (sequence/aftermath × seededClueIds trigger → visualBeats
 // absence), PHYSICAL_STAGING_PEAK_UNCAUSED (backward-cause × visualBeats-density peak ×
 // revelation/dramaticTurn cause).
+// Wave 633 additions (built on the shared checks library, audit M2.2): INTENTION_HIGHLIGHT_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first
+// pairing of these two fields in this 105-rule pass), INTENTION_CLOCK_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × clockRaised trigger → visualBeats absence — first pairing of these two
+// fields), INTENTION_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four
+// structural zones — Wave 605 applied this template to visualBeats only; unresolvedClues itself
+// has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3621,6 +3628,80 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The scene with the story's single densest physical staging (${r619c.peakMagnitude} visual beats, out of ${r619c.qualifyingCount} scenes with any staging at all) has no revelation and no dramatic turn in itself or in either of the 2 scenes before it. The moment the story invests most heavily in physical description arrives with no disclosure or pivot explaining why — the staging is dense but unmotivated by anything the plot is doing.`,
         suggestedFix: `Add a revelation or a dramatic turn in the scene with the densest physical staging, or in one of the two scenes before it, so the audience understands why this particular moment earns such heavy physical attention.`,
+      });
+    }
+  }
+
+  // ── Wave 633: INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED, INTENTION_CLOCK_STAGING_AFTERMATH_
+  //              VOID, INTENTION_OPEN_THREAD_ZONE_IMBALANCE ─────────────────────────────────
+
+  // INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 scenes carrying outstanding clue-debt. Zero overlap
+  // → fire. First pairing of these two fields in this 105-rule pass. A line the story flags as
+  // memorable never lands while a setup sits unresolved — the memorable-dialogue channel and the
+  // seed/payoff economy's open-debt channel never intersect.
+  {
+    const r633a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r633a.fires) {
+      issues.push({
+        location: `${r633a.aCount} dialogue-highlight scene(s), ${r633a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r633a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r633a.bCount} scenes carrying outstanding clue-debt — the story's most memorable dialogue and its open setups run on separate tracks. A revealing line often lands hardest when a character is actively holding an unresolved question.`,
+        suggestedFix: `Let at least one standout line of dialogue land in a scene that is also carrying open clue-debt — a character voicing suspicion or naming what's still unresolved, tying the story's most memorable dialogue to its live setups.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clockRaised scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging,
+  // a 2-scene lookahead window. Fires when every clock-raising scene's two-scene aftermath
+  // contains no visually dense scene, while such scenes do occur elsewhere. First pairing of
+  // clockRaised with visualBeats in this pass — a tightening deadline should register physically
+  // somewhere nearby, not only as narrated urgency.
+  {
+    const r633b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r633b.fires) {
+      issues.push({
+        location: `${r633b.triggerCount} clock-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'INTENTION_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r633b.triggerCount} clock-raising scenes is followed by two scenes with no substantial physical staging, even though ${r633b.aftermathCount} such scenes exist elsewhere in the script. A tightening deadline often shows up physically — hurried movement, a glance at the time — and when that aftermath consistently stays unstaged, the mounting time pressure is only ever mentioned.`,
+        suggestedFix: `After at least one clock-raising scene, let one of the following two scenes carry substantial physical staging — the deadline's pressure made visible through a character's rushed action rather than only through dialogue about time.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Wave 605 applied this template to
+  // visualBeats only; unresolvedClues itself has never been zone-audited in this file, despite
+  // being the file's most natural complement to the seed/payoff economy.
+  {
+    const r633c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r633c.fires) {
+      const emptyNames633c = r633c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName633c = FOUR_ZONE_NAMES[r633c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames633c} empty; ${bloatName633c} has ${r633c.counts[r633c.bloatZoneIdx]}/${r633c.totalCount} debt-carrying scenes`,
+        rule: 'INTENTION_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r633c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName633c} contains ${r633c.counts[r633c.bloatZoneIdx]} of them (${Math.round((r633c.counts[r633c.bloatZoneIdx] / r633c.totalCount) * 100)}%) while ${emptyNames633c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's sense of active mystery an uneven structural rhythm.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames633c} — so every structural quarter carries some sense of active, unanswered setup.`,
       });
     }
   }
