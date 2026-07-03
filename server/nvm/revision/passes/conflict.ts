@@ -332,6 +332,14 @@
 // emotionalShift as a primary signal has only ever anchored co-occurrence-decoupling and
 // aftermath-void checks in this pass; none of the three shared-library trio modes has ever been
 // applied to it).
+// Wave 786 additions: CONFLICT_EMOTION_DROUGHT_RUN (run-based × emotionalShift !== 'neutral'
+// absence — Wave 772 applied the zone-cluster mode to this signal; the drought-run mode has never
+// been applied to it, completing the trio), CONFLICT_TURN_ZONE_CLUSTER (distribution/timing ×
+// dramaticTurn !== 'nothing' presence × structural thirds — dramaticTurn as a primary signal has
+// only ever anchored co-occurrence-decoupling checks [CONFLICT_DRAMATIC_TURN_VOID] in this pass;
+// none of the three shared-library trio modes has ever been applied to it), CONFLICT_TURN_
+// DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — completing 2 of 3 slots for
+// dramaticTurn alongside the zone-cluster mode added in this same wave).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4579,6 +4587,71 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r772c.maxZoneCount / r772c.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r772c.zoneNames[r772c.maxZoneIdx]} third. When every emotional shift lands in the same structural window, the conflict has no felt stakes registering anywhere else in the story.`,
         suggestedFix: `Give at least one scene outside the ${r772c.zoneNames[r772c.maxZoneIdx]} third an emotional charge so the conflict keeps registering as felt experience more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 786: CONFLICT_EMOTION_DROUGHT_RUN, CONFLICT_TURN_ZONE_CLUSTER,
+  //              CONFLICT_TURN_DROUGHT_RUN ──────────────────────────────────────
+
+  // CONFLICT_EMOTION_DROUGHT_RUN — Run-based × emotionalShift !== 'neutral' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 emotionally charged scenes overall,
+  // fires when the longest consecutive run of scenes with no emotional charge reaches 6. Wave 772
+  // applied the zone-cluster mode to this signal; the drought-run mode has never been applied to
+  // it, completing the trio.
+  {
+    const r786a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r786a.fires) {
+      issues.push({
+        location: `longest stretch with no emotional charge: ${r786a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r786a.longestRun} consecutive scenes with no emotional charge at all, even though ${r786a.presentCount} scenes elsewhere carry one. A long unbroken stretch with nothing felt leaves the conflict with no registered stakes for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r786a.longestRun}-scene stretch an emotional charge so the conflict keeps registering as felt experience throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 turn
+  // scenes, fires when more than 75% of those scenes cluster in a single third. dramaticTurn as a
+  // primary signal has only ever anchored co-occurrence-decoupling checks in this pass; none of
+  // the three shared-library trio modes has ever been applied to it.
+  {
+    const r786b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r786b.fires) {
+      issues.push({
+        location: `${r786b.zoneNames[r786b.maxZoneIdx]} third — ${r786b.maxZoneCount} of ${r786b.count} turn scenes`,
+        rule: 'CONFLICT_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r786b.maxZoneCount / r786b.count) * 100)}% of the story's dramatic turns cluster in the ${r786b.zoneNames[r786b.maxZoneIdx]} third. When every pivot lands in the same structural window, the conflict has no reversal testing it anywhere else in the story.`,
+        suggestedFix: `Introduce a dramatic turn in at least one scene outside the ${r786b.zoneNames[r786b.maxZoneIdx]} third so the conflict keeps pivots redirecting it more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. Completing 2 of 3 slots
+  // for dramaticTurn alongside the zone-cluster mode added in this same wave.
+  {
+    const r786c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r786c.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r786c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r786c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r786c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the conflict flat without a structural pivot for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r786c.longestRun}-scene stretch so the conflict keeps a pivot to redirect it throughout that stretch.`,
       });
     }
   }

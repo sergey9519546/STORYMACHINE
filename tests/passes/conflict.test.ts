@@ -1535,6 +1535,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 786 — conflictPass: conflict emotion drought run, conflict turn zone cluster, conflict turn drought run', async () => {
+    const makeRec786 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF786 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_EMOTION_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry an emotional charge (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('CONFLICT_EMOTION_DROUGHT_RUN fires when the longest no-emotional-charge run reaches 6', async () => {
+      const recs786a = Array.from({ length: 10 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF786(recs786a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_DROUGHT_RUN'), 'CONFLICT_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_EMOTION_DROUGHT_RUN does not fire when emotional charges are evenly spread', async () => {
+      const recs786an = Array.from({ length: 10 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runCF786(recs786an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_DROUGHT_RUN'), 'CONFLICT_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turn scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_TURN_ZONE_CLUSTER fires when >75% of turn scenes cluster in one third', async () => {
+      const recs786b = Array.from({ length: 9 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 1 || i === 2) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runCF786(recs786b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_ZONE_CLUSTER'), 'CONFLICT_TURN_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_TURN_ZONE_CLUSTER does not fire when turn scenes spread across thirds', async () => {
+      const recs786bn = Array.from({ length: 9 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 4 || i === 8) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runCF786(recs786bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_ZONE_CLUSTER'), 'CONFLICT_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_TURN_DROUGHT_RUN fire:
+    // n=10; dramaticTurn present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_TURN_DROUGHT_RUN fires when a long run has no dramatic turn', async () => {
+      const recs786c = Array.from({ length: 10 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 1 || i === 2) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runCF786(recs786c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_DROUGHT_RUN'), 'CONFLICT_TURN_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_TURN_DROUGHT_RUN does not fire when dramatic turns are evenly spread', async () => {
+      const recs786cn = Array.from({ length: 10 }, (_, i) => makeRec786(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runCF786(recs786cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_DROUGHT_RUN'), 'CONFLICT_TURN_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 772 — conflictPass: conflict stakes zone cluster, conflict revelation peak uncaused, conflict emotion zone cluster', async () => {
     const makeRec772 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
