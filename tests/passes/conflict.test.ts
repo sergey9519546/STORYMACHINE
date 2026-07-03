@@ -1535,6 +1535,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 968 — conflictPass: conflict seed zone imbalance, conflict clock delta zone imbalance, conflict clock zone imbalance', async () => {
+    const makeRec968 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF968 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CONFLICT_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs968a = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 1, 2, 8, 9].includes(i) ? { seededClueIds: ['c1'] } : {}));
+      const res = await runCF968(recs968a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_ZONE_IMBALANCE'), 'CONFLICT_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs968an = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 3, 5, 8].includes(i) ? { seededClueIds: ['c1'] } : {}));
+      const res = await runCF968(recs968an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_ZONE_IMBALANCE'), 'CONFLICT_SEED_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-advancing scenes', async () => {
+      const recs968b = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 1, 2, 8, 9].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runCF968(recs968b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE'), 'CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-advancing scenes touch every zone', async () => {
+      const recs968bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 3, 5, 8].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runCF968(recs968bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE'), 'CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs968c = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 1, 2, 8, 9].includes(i) ? { clockRaised: true } : {}));
+      const res = await runCF968(recs968c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_ZONE_IMBALANCE'), 'CONFLICT_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs968cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec968(i, [0, 3, 5, 8].includes(i) ? { clockRaised: true } : {}));
+      const res = await runCF968(recs968cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_ZONE_IMBALANCE'), 'CONFLICT_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 954 — conflictPass: conflict relationship zone imbalance, conflict turn zone imbalance, conflict revelation zone imbalance', async () => {
     const makeRec954 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

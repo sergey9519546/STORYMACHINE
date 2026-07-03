@@ -446,6 +446,11 @@
 // classes: CONFLICT_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array), CONFLICT_TURN_ZONE_
 // IMBALANCE (dramaticTurn !== 'nothing' categorical), and CONFLICT_REVELATION_ZONE_IMBALANCE
 // (revelation string field, != null — distinct from the purpose-enum CONFLICT_REVELATION_PURPOSE one).
+// Wave 968 additions: auditing the three remaining cleanly-defined trio-complete signals in this pass,
+// spanning three distinct classes: CONFLICT_SEED_ZONE_IMBALANCE (seededClueIds array, distinct from the
+// audited payoff/open-thread arrays), CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta > 0 — a delta
+// distinct from Wave 940's curiosity one), and CONFLICT_CLOCK_ZONE_IMBALANCE (clockRaised boolean —
+// whether a ticking clock is introduced at all, distinct from the numeric clockDelta above).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5610,6 +5615,80 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r954c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName954c} contains ${r954c.counts[r954c.bloatZoneIdx]} of them (${Math.round((r954c.counts[r954c.bloatZoneIdx] / r954c.totalCount) * 100)}%) while ${emptyNames954c} contains none. Disclosures bloat in one structural quarter and never land in another, so new information reframes the conflict in only part of the story.`,
         suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames954c} — so new information keeps reframing the conflict across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone CONFLICT_SEED_ZONE_CLUSTER and
+  // run-based CONFLICT_SEED_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // the seededClueIds array field, distinct from the payoffSetupIds/unresolvedClues arrays already audited.
+  {
+    const r968a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r968a.fires) {
+      const emptyNames968a = r968a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName968a = FOUR_ZONE_NAMES[r968a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames968a} empty; ${bloatName968a} has ${r968a.counts[r968a.bloatZoneIdx]}/${r968a.totalCount} seeding scenes`,
+        rule: 'CONFLICT_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r968a.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName968a} contains ${r968a.counts[r968a.bloatZoneIdx]} of them (${Math.round((r968a.counts[r968a.bloatZoneIdx] / r968a.totalCount) * 100)}%) while ${emptyNames968a} contains none. Setups bloat in one structural quarter and never get planted in another, so the groundwork the conflict later escalates from is laid in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames968a} — so the conflict keeps laying groundwork across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-advancing
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Uses the same clockDelta > 0 predicate as the
+  // existing 3-zone CONFLICT_CLOCK_DELTA_ZONE_CLUSTER and run-based CONFLICT_CLOCK_DELTA_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this delta signal, distinct from the
+  // curiosity delta already audited (Wave 940) and from the boolean CONFLICT_CLOCK signal below.
+  {
+    const r968b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r968b.fires) {
+      const emptyNames968b = r968b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName968b = FOUR_ZONE_NAMES[r968b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames968b} empty; ${bloatName968b} has ${r968b.counts[r968b.bloatZoneIdx]}/${r968b.totalCount} clock-advancing scenes`,
+        rule: 'CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r968b.totalCount} clock-advancing scenes are unevenly distributed across its four structural zones: ${bloatName968b} contains ${r968b.counts[r968b.bloatZoneIdx]} of them (${Math.round((r968b.counts[r968b.bloatZoneIdx] / r968b.totalCount) * 100)}%) while ${emptyNames968b} contains none. Deadline pressure bloats in one structural quarter and never advances in another, so the conflict runs against the clock in only part of the story.`,
+        suggestedFix: `Redistribute clock pressure: move or add a scene that advances the clock (clockDelta > 0) into the empty zone(s) — ${emptyNames968b} — so the conflict keeps racing a deadline across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_ZONE_IMBALANCE — Underweight/bloat × (clockRaised === true) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockRaised === true predicate as the existing
+  // 3-zone CONFLICT_CLOCK_ZONE_CLUSTER and run-based CONFLICT_CLOCK_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to the clockRaised BOOLEAN field, distinct from the numeric
+  // clockDelta signal audited just above (whether a clock was introduced at all, not by how much it moved).
+  {
+    const r968c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r968c.fires) {
+      const emptyNames968c = r968c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName968c = FOUR_ZONE_NAMES[r968c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames968c} empty; ${bloatName968c} has ${r968c.counts[r968c.bloatZoneIdx]}/${r968c.totalCount} clock-raising scenes`,
+        rule: 'CONFLICT_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r968c.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName968c} contains ${r968c.counts[r968c.bloatZoneIdx]} of them (${Math.round((r968c.counts[r968c.bloatZoneIdx] / r968c.totalCount) * 100)}%) while ${emptyNames968c} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the conflict is put on a deadline in only part of the story.`,
+        suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) — ${emptyNames968c} — so the conflict operates under a deadline across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
