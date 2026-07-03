@@ -214,6 +214,12 @@
 // sequence/aftermath × resonance × visualBeats — the same three-mode treatment Wave 598 gave
 // unresolvedClues, applied here to visualBeats, the one record field this 102-rule pass had never
 // used at all despite pairing resonance with nearly every other channel).
+// Wave 626 additions: THEME_PAYOFF_STAGING_DECOUPLED, THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID, THEME_PAYOFF_ZONE_IMBALANCE. Departs from this file's dominant "resonance × X" pattern —
+// every record field has now been crossed with resonance at least once across Waves 598/612 and
+// the many hand-rolled checks before them. These three instead pair two non-resonance record
+// fields directly (payoffSetupIds × visualBeats, seededClueIds × dialogueHighlights, payoffSetupIds
+// alone), none of which have been combined with each other anywhere in this 105-rule pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3559,6 +3565,83 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `None of the story's ${r612c.triggerCount} heavily staged scenes are followed by a thematically resonant scene within the next two, even though ${r612c.aftermathCount} resonant scene(s) exist elsewhere. The aftermath of a physically dense moment is a natural window for reflection — a character processing what they just did or examined is exactly the moment to voice what the story is really about — but that window consistently goes thematically silent.`,
         suggestedFix: `After at least one heavily staged scene, let the following scene or the one after voice the theme — a beat where a character's reaction to what just happened physically connects to "${themeRaw}". The aftermath of physical action is a natural home for the story's central idea to surface.`,
+      });
+    }
+  }
+
+  // ── Wave 626: THEME_PAYOFF_STAGING_DECOUPLED, THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  //              THEME_PAYOFF_ZONE_IMBALANCE ─────────────────────────────────────────────────
+  // Every record field has now been crossed with resonance at least once (Waves 598/612 plus the
+  // hand-rolled checks before them). These three instead pair non-resonance record fields
+  // directly with each other — a departure from this file's dominant pattern, but a genuinely
+  // untried angle on the same seed/payoff/voice machinery the theme lens depends on.
+
+  // THEME_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. A resolution and a scene
+  // rich in physical staging never happen together — every payoff lands through dialogue alone,
+  // with no physical action embodying what the theme's payoff means for how the story resolves.
+  {
+    const r626a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r626a.fires) {
+      issues.push({
+        location: `${r626a.aCount} payoff scene(s), ${r626a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'THEME_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r626a.aCount} scenes where a planted thread resolves never coincide with the ${r626a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more thematic weight when a character's physical action embodies what the resolution means, rather than the moment being carried entirely through dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or object a character handles that embodies the theme's resolution, giving the payoff a physical anchor alongside whatever is said.`,
+      });
+    }
+  }
+
+  // THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a 2-scene
+  // lookahead window. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while highlighted dialogue does occur elsewhere. Seeds are the story's long-horizon
+  // deposits; when their immediate aftermath never carries a memorable line, the planted material
+  // gets no verbal texture nearby, living purely as structural bookkeeping until its payoff.
+  {
+    const r626b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r626b.fires) {
+      issues.push({
+        location: `${r626b.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r626b.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r626b.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when a nearby line of dialogue gives them verbal presence, but that opportunity consistently passes unremarked in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material or reacting to it, giving it verbal texture before its eventual payoff.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero payoffs while
+  // another holds ≥50% of the total. First zone-based check on the payoff channel in this file —
+  // payoffSetupIds has been used as a trigger and a co-occurrence subject but never audited for
+  // its own structural distribution.
+  {
+    const r626c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r626c.fires) {
+      const emptyNames626c = r626c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName626c = FOUR_ZONE_NAMES[r626c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames626c} empty; ${bloatName626c} has ${r626c.counts[r626c.bloatZoneIdx]}/${r626c.totalCount} payoff scenes`,
+        rule: 'THEME_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r626c.totalCount} thread-resolution scenes are unevenly distributed across its four structural zones: ${bloatName626c} contains ${r626c.counts[r626c.bloatZoneIdx]} of them (${Math.round((r626c.counts[r626c.bloatZoneIdx] / r626c.totalCount) * 100)}%) while ${emptyNames626c} contains none. Resolution bloats in one structural quarter and vanishes from another, giving the story's sense of thematic closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute resolutions: let at least one thread pay off in the empty zone(s) — ${emptyNames626c} — so every structural quarter carries some sense of the theme resolving, not only the quarter currently carrying most of them.`,
       });
     }
   }

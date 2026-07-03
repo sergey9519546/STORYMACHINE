@@ -931,6 +931,94 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 626 — themePass: theme payoff staging decoupled, theme seed dialogue highlight aftermath void, theme payoff zone imbalance', async () => {
+    const runT626 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('THEME_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs626a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs626a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs626a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs626a[4] = makeSharedRecord(4, { visualBeats: ['returns the ring', 'closes the box'] });
+      recs626a[5] = makeSharedRecord(5, { visualBeats: ['returns the ring', 'closes the box'] });
+      const res = await runT626(recs626a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_STAGING_DECOUPLED'), 'THEME_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // THEME_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('THEME_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs626an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs626an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'], visualBeats: ['returns the ring', 'closes the box'] });
+      recs626an[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs626an[5] = makeSharedRecord(5, { visualBeats: ['returns the ring', 'closes the box'] });
+      const res = await runT626(recs626an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_STAGING_DECOUPLED'), 'THEME_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no seed is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs626b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs626b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs626b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs626b[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs626b[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs626b[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runT626(recs626b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs626bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs626bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs626bn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs626bn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs626bn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs626bn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs626bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runT626(recs626bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    // THEME_PAYOFF_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); payoffs at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('THEME_PAYOFF_ZONE_IMBALANCE fires when one zone is empty of payoffs while another is bloated', async () => {
+      const recs626c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs626c[6] = makeSharedRecord(6, { payoffSetupIds: ['thread'] });
+      recs626c[7] = makeSharedRecord(7, { payoffSetupIds: ['thread'] });
+      recs626c[8] = makeSharedRecord(8, { payoffSetupIds: ['thread'] });
+      recs626c[9] = makeSharedRecord(9, { payoffSetupIds: ['thread'] });
+      const res = await runT626(recs626c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_ZONE_IMBALANCE'), 'THEME_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    // THEME_PAYOFF_ZONE_IMBALANCE no-fire:
+    // one payoff per zone (1,4,7,10) → no zone is empty
+    it('THEME_PAYOFF_ZONE_IMBALANCE does not fire when payoffs are spread across all zones', async () => {
+      const recs626cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs626cn[1] = makeSharedRecord(1, { payoffSetupIds: ['thread'] });
+      recs626cn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread'] });
+      recs626cn[7] = makeSharedRecord(7, { payoffSetupIds: ['thread'] });
+      recs626cn[10] = makeSharedRecord(10, { payoffSetupIds: ['thread'] });
+      const res = await runT626(recs626cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_ZONE_IMBALANCE'), 'THEME_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 612 — themePass: visual beat decoupled, visual beat zone imbalance, visual beat aftermath silent', async () => {
     const THEME612 = 'redemption courage hope';
     const themed612 = ['act of redemption'];
