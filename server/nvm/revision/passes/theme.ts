@@ -274,6 +274,14 @@
 // backward-cause × seededClueIds magnitude — Waves 654/696 applied the zone-cluster and
 // drought-run modes to seededClueIds; the backward-cause peak mode has never been applied to it,
 // completing the trio).
+// Wave 724 additions: THEME_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues ×
+// structural thirds — Waves 654/710 applied the backward-cause peak and drought-run modes to
+// unresolvedClues; the zone-cluster mode has never been applied to it, completing the trio),
+// THEME_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backward-cause × dialogueHighlights
+// magnitude — Wave 654 applied the drought-run mode to dialogueHighlights; the backward-cause
+// peak mode has never been applied to it), THEME_RELATIONSHIP_DROUGHT_RUN (run-based ×
+// relationshipShifts absence — Wave 668 applied the backward-cause peak mode to
+// relationshipShifts; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4113,6 +4121,75 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for planting new clues (scene ${r710c.peakIdx + 1}, with ${r710c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the theme's sense of causal escalation.`,
         suggestedFix: `Give scene ${r710c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 724: THEME_OPEN_THREAD_ZONE_CLUSTER, THEME_HIGHLIGHT_PEAK_UNCAUSED,
+  //              THEME_RELATIONSHIP_DROUGHT_RUN ────────────────────────────────────────────
+
+  // THEME_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when >75% of them fall in a single structural third. Waves 654/710 applied the backward-
+  // cause peak and drought-run modes to unresolvedClues; the zone-cluster mode has never been
+  // applied to it, completing the trio.
+  {
+    const r724a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r724a.fires) {
+      const zoneName724a = r724a.zoneNames[r724a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName724a} third — ${r724a.maxZoneCount}/${r724a.count} open-thread scenes`,
+        rule: 'THEME_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r724a.maxZoneCount} of the story's ${r724a.count} scenes carrying outstanding clue-debt (${Math.round((r724a.maxZoneCount / r724a.count) * 100)}%) cluster in the ${zoneName724a} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, giving the theme's sense of gathering mystery an uneven structural rhythm.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName724a} third — spreading open threads across the story lets the theme's sense of accumulating mystery build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // THEME_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. Wave 654 applied the drought-run mode to dialogueHighlights; the backward-
+  // cause peak mode has never been applied to it.
+  {
+    const r724b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r724b.fires) {
+      issues.push({
+        location: `scene ${r724b.peakIdx + 1} — peak highlighted-dialogue density (${r724b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r724b.peakIdx + 1}, with ${r724b.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of thematic resonance never coincide.`,
+        suggestedFix: `Give scene ${r724b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // THEME_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6. Wave 668
+  // applied the backward-cause peak mode to relationshipShifts; the drought-run mode has never
+  // been applied to it.
+  {
+    const r724c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r724c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r724c.longestRun} consecutive scenes`,
+        rule: 'THEME_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r724c.longestRun} consecutive scenes with no relationship shift at all, even though ${r724c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the theme's human throughline dormant for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r724c.longestRun}-scene stretch — even a small movement keeps the theme's human throughline alive throughout that stretch.`,
       });
     }
   }

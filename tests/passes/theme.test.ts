@@ -931,6 +931,83 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 724 — themePass: theme open thread zone cluster, theme highlight peak uncaused, theme relationship drought run', async () => {
+    const runT724 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('THEME_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs724a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs724a[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs724a[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs724a[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      const res = await runT724(recs724a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_ZONE_CLUSTER'), 'THEME_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs724an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs724an[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs724an[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs724an[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      const res = await runT724(recs724an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_ZONE_CLUSTER'), 'THEME_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('THEME_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs724b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs724b[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs724b[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT724(recs724b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_PEAK_UNCAUSED'), 'THEME_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs724bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs724bn[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs724bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs724bn[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT724(recs724bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_PEAK_UNCAUSED'), 'THEME_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // THEME_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('THEME_RELATIONSHIP_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs724c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs724c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs724c[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs724c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs724c[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runT724(recs724c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_DROUGHT_RUN'), 'THEME_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // THEME_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_RELATIONSHIP_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs724cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs724cn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs724cn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs724cn[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runT724(recs724cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_DROUGHT_RUN'), 'THEME_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 710 — themePass: theme clock zone cluster, theme open thread drought run, theme seed peak uncaused', async () => {
     const runT710 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
