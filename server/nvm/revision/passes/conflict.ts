@@ -372,6 +372,14 @@
 // emotionalShift === 'positive' × structural thirds — mirrors the negative-valence trio completed
 // in Wave 800; the positive valence has never been isolated by any of the three shared-library
 // trio modes in this pass).
+//
+// Wave 842 additions: CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'positive' absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode
+// added in Wave 828; peak mode conventionally skipped for this categorical field),
+// CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field), CONFLICT_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
+// structural thirds — likewise a virgin field, never referenced in this pass before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4888,6 +4896,72 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r828c.maxZoneCount / r828c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r828c.zoneNames[r828c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the conflict delivers its emotional payoff in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r828c.zoneNames[r828c.maxZoneIdx]} third so the conflict delivers its emotional payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 842: CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN, CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER,
+  //              CONFLICT_CLIMAX_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 828 (peak mode conventionally skipped for this categorical field).
+  {
+    const r842a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r842a.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r842a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r842a.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r842a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the conflict without an emotional payoff for an extended run.`,
+        suggestedFix: `Give the story a moment of relief within the ${r842a.longestRun}-scene stretch so the conflict keeps delivering an emotional payoff throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r842b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r842b.fires) {
+      issues.push({
+        location: `${r842b.zoneNames[r842b.maxZoneIdx]} third — ${r842b.maxZoneCount} of ${r842b.count} world-establishing scenes`,
+        rule: 'CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r842b.maxZoneCount / r842b.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r842b.zoneNames[r842b.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the conflict has no fresh ground to escalate from anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r842b.zoneNames[r842b.maxZoneIdx]} third to establish the world so the conflict keeps fresh ground to escalate from more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r842c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r842c.fires) {
+      issues.push({
+        location: `${r842c.zoneNames[r842c.maxZoneIdx]} third — ${r842c.maxZoneCount} of ${r842c.count} climax-purposed scenes`,
+        rule: 'CONFLICT_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r842c.maxZoneCount / r842c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r842c.zoneNames[r842c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the conflict builds toward its payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r842c.zoneNames[r842c.maxZoneIdx]} third so the conflict builds toward its payoff more evenly across the story.`,
       });
     }
   }
