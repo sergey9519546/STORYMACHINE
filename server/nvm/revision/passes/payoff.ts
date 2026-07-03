@@ -215,6 +215,14 @@
 // PAYOFF_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four structural zones
 // — Waves 594/608 applied this template to seededClueIds and visualBeats; unresolvedClues itself
 // has never been zone-audited here).
+// Wave 636 additions (built on the shared checks library, audit M2.2): PAYOFF_HIGHLIGHT_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first
+// pairing of these two fields in this 110-rule pass), PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID
+// (sequence/aftermath × dramaticTurn trigger → dialogueHighlights absence — first pairing of
+// these two fields), PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
+// dialogueHighlights × four structural zones — Waves 594/608/622 applied this template to
+// seededClueIds, visualBeats, and unresolvedClues; dialogueHighlights itself has never been
+// zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3434,6 +3442,79 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r622c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName622c} contains ${r622c.counts[r622c.bloatZoneIdx]} of them (${Math.round((r622c.counts[r622c.bloatZoneIdx] / r622c.totalCount) * 100)}%) while ${emptyNames622c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's sense of active mystery an uneven structural rhythm.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames622c} — so every structural quarter carries some sense of active, unanswered mystery.`,
+      });
+    }
+  }
+
+  // ── Wave 636: PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED, PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID,
+  //              PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE ─────────────────────────────────
+
+  // PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 scenes carrying outstanding clue-debt. Zero overlap
+  // → fire. First pairing of these two fields in this 110-rule pass. A line the story flags as
+  // memorable never lands while a thread sits unresolved — the payoff economy's two most useful
+  // signals never intersect.
+  {
+    const r636a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r636a.fires) {
+      issues.push({
+        location: `${r636a.aCount} dialogue-highlight scene(s), ${r636a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r636a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r636a.bCount} scenes carrying outstanding clue-debt — the story's most memorable dialogue and its open setups run on separate tracks. A revealing line often lands hardest when a character is actively holding an unresolved question.`,
+        suggestedFix: `Let at least one standout line of dialogue land in a scene that is also carrying open clue-debt — a character voicing suspicion or naming what's still unresolved, tying the story's most memorable dialogue to its live setups.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a
+  // 2-scene lookahead window. Fires when every turn's two-scene aftermath contains no highlighted
+  // dialogue, while such scenes do occur elsewhere. First pairing of these two fields in this
+  // pass — a structural pivot should give a character something worth saying about it soon after.
+  {
+    const r636b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r636b.fires) {
+      issues.push({
+        location: `${r636b.triggerCount} dramatic-turn scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r636b.triggerCount} dramatic-turn scenes is followed by two scenes with no highlighted dialogue, even though ${r636b.aftermathCount} such scenes exist elsewhere in the script. A pivot's consequences are often best confirmed through a character's voice; when that aftermath is always verbally unremarkable, the turn registers structurally but no line commits to what it means.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry a line worth remembering — a character naming what changed or what it will cost, giving the pivot a voice, not just a structural marker.`,
+      });
+    }
+  }
+
+  // PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a dialogue highlight, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Waves 594/608/622
+  // applied this template to seededClueIds, visualBeats, and unresolvedClues respectively;
+  // dialogueHighlights itself has never been zone-audited in this file.
+  {
+    const r636c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r636c.fires) {
+      const emptyNames636c = r636c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName636c = FOUR_ZONE_NAMES[r636c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames636c} empty; ${bloatName636c} has ${r636c.counts[r636c.bloatZoneIdx]}/${r636c.totalCount} dialogue-highlight scenes`,
+        rule: 'PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r636c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName636c} contains ${r636c.counts[r636c.bloatZoneIdx]} of them (${Math.round((r636c.counts[r636c.bloatZoneIdx] / r636c.totalCount) * 100)}%) while ${emptyNames636c} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the story's verbal rhythm around its seed/payoff economy an uneven pulse.`,
+        suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames636c}, so every structural quarter carries some verbal high point, not only the quarter currently carrying most of them.`,
       });
     }
   }

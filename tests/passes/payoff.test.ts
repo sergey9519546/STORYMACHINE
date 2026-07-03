@@ -1365,6 +1365,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 636 — payoffPass: payoff highlight open thread decoupled, payoff turn highlight aftermath void, payoff dialogue highlight zone imbalance', async () => {
+    const runPY636 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no debt); debt at 4,5 (no highlight) → zero overlap → fires
+    it('PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when dialogue-highlight scenes and open-thread scenes never overlap', async () => {
+      const recs636a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs636a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs636a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs636a[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs636a[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runPY636(recs636a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and open debt → overlap exists
+    it('PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs636an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs636an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'], unresolvedClues: ['unpaid-clue'] });
+      recs636an[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs636an[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runPY636(recs636an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'PAYOFF_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; turn triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID fires when no dramatic turn is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs636b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs636b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs636b[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs636b[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs636b[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs636b[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runPY636(recs636b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs636bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs636bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs636bn[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs636bn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs636bn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs636bn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs636bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runPY636(recs636bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    // PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); highlights at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty of dialogue highlights while another is bloated', async () => {
+      const recs636c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs636c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-a'] });
+      recs636c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-b'] });
+      recs636c[8] = makeSharedRecord(8, { dialogueHighlights: ['line-c'] });
+      recs636c[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runPY636(recs636c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    // PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE no-fire:
+    // one highlight per zone (1,4,7,10) → no zone is empty
+    it('PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlights are spread across all zones', async () => {
+      const recs636cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs636cn[1] = makeSharedRecord(1, { dialogueHighlights: ['line-a'] });
+      recs636cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs636cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      recs636cn[10] = makeSharedRecord(10, { dialogueHighlights: ['line-d'] });
+      const res = await runPY636(recs636cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'PAYOFF_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 622 — payoffPass: visual beat open thread decoupled, clock staging aftermath void, payoff open thread zone imbalance', async () => {
     const runPY622 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
