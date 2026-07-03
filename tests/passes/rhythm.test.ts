@@ -1136,6 +1136,91 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 638 — rhythmPass: payoff signal zone cluster, open thread signal decoupled, dramatic turn payoff aftermath void', async () => {
+    const runR638 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoffs at 0,1,2 → 100% in opening third
+    it('PAYOFF_SIGNAL_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs638a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs638a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs638a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs638a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runR638(recs638a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_ZONE_CLUSTER'), 'PAYOFF_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_SIGNAL_ZONE_CLUSTER no-fire:
+    // payoffs at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_SIGNAL_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs638an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs638an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs638an[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs638an[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runR638(recs638an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_ZONE_CLUSTER'), 'PAYOFF_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+
+    // OPEN_THREAD_SIGNAL_DECOUPLED fire:
+    // n=6; debt at 0,1 (no highlight); highlights at 4,5 (no debt) → zero overlap → fires
+    it('OPEN_THREAD_SIGNAL_DECOUPLED fires when open-thread scenes and dialogue highlights never overlap', async () => {
+      const recs638b = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs638b[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs638b[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs638b[4] = makeSharedRecord(4, { dialogueHighlights: ['line-a'] });
+      recs638b[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      const res = await runR638(recs638b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_SIGNAL_DECOUPLED'), 'OPEN_THREAD_SIGNAL_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_SIGNAL_DECOUPLED no-fire:
+    // scene 0 carries BOTH open debt and a highlight → overlap exists
+    it('OPEN_THREAD_SIGNAL_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs638bn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs638bn[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'], dialogueHighlights: ['line-a'] });
+      recs638bn[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs638bn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      const res = await runR638(recs638bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_SIGNAL_DECOUPLED'), 'OPEN_THREAD_SIGNAL_DECOUPLED should not fire');
+    });
+
+    // DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID fire:
+    // n=8, window=2; turn triggers at 0,1; their windows {1,2} and {2,3} carry no payoff;
+    // payoffs exist elsewhere at 5,6,7 → fires
+    it('DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID fires when no dramatic turn is followed by a payoff within 2 scenes', async () => {
+      const recs638c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs638c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs638c[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs638c[5] = makeSharedRecord(5, { payoffSetupIds: ['thread-a'] });
+      recs638c[6] = makeSharedRecord(6, { payoffSetupIds: ['thread-b'] });
+      recs638c[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runR638(recs638c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID'), 'DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    // DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a payoff → that trigger's aftermath
+    // is no longer void
+    it('DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID does not fire when a trigger window contains a payoff', async () => {
+      const recs638cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs638cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs638cn[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs638cn[3] = makeSharedRecord(3, { payoffSetupIds: ['thread-a'] });
+      recs638cn[5] = makeSharedRecord(5, { payoffSetupIds: ['thread-b'] });
+      recs638cn[6] = makeSharedRecord(6, { payoffSetupIds: ['thread-c'] });
+      recs638cn[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-d'] });
+      const res = await runR638(recs638cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID'), 'DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 624 — rhythmPass: verbal staging signal decoupled, seed signal zone imbalance, clock signal drought run', async () => {
     const runR624 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

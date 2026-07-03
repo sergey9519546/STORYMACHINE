@@ -211,10 +211,16 @@
 // (underweight/bloat × seededClueIds × four structural zones — first use of seededClueIds in
 // this pass), CLOCK_SIGNAL_DROUGHT_RUN (run-based × clockRaised absence — first use of
 // clockRaised in this pass).
+// Wave 638 additions: PAYOFF_SIGNAL_ZONE_CLUSTER (distribution/timing × payoffSetupIds ×
+// structural thirds — first use of both the zone-cluster mode and the payoffSetupIds field on
+// records in this 107-rule pass), OPEN_THREAD_SIGNAL_DECOUPLED (co-occurrence/decoupling ×
+// unresolvedClues × dialogueHighlights — first use of unresolvedClues in this pass),
+// DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID (sequence/aftermath × dramaticTurn trigger →
+// payoffSetupIds absence — first pairing of these two fields).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, checkCoOccurrenceDecoupled, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action lines (non-dialogue, non-slug, non-transition) from fountain */
 function extractActionLines(fountain: string): Array<{ text: string; lineNum: number }> {
@@ -3066,6 +3072,81 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r624c.longestRun} consecutive scenes with no clock raised at all, even though ${r624c.presentCount} scenes elsewhere do raise deadline pressure. A long stretch where time pressure never registers means the story's clock-rhythm goes flat for an extended run — the audience feels no ticking urgency at all during that stretch, even if the plot itself keeps moving.`,
         suggestedFix: `Raise the clock somewhere within the ${r624c.longestRun}-scene stretch — even a small reminder of the deadline keeps the time-pressure channel alive rather than letting it sit dormant for an extended run.`,
+      });
+    }
+  }
+
+  // ── Wave 638: PAYOFF_SIGNAL_ZONE_CLUSTER, OPEN_THREAD_SIGNAL_DECOUPLED,
+  //              DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID ────────────────────────────────────────
+  // Continues the Wave 596/610/624 "narrative signal rhythm" extension. payoffSetupIds and
+  // unresolvedClues were still completely untouched in this 107-rule pass; the zone-cluster
+  // (thirds) mode had never been applied to records here at all.
+
+  // PAYOFF_SIGNAL_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, more than 75%
+  // falling in a single structural third → fire. First use of both the zone-cluster mode and the
+  // payoffSetupIds field on records in this pass. A story whose resolutions cluster overwhelmingly
+  // in one third has a learnable rhythm of when answers arrive rather than a felt, distributed
+  // release of tension.
+  {
+    const r638a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r638a.fires) {
+      const zoneName638a = r638a.zoneNames[r638a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName638a} third — ${r638a.maxZoneCount}/${r638a.count} payoff scenes`,
+        rule: 'PAYOFF_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r638a.maxZoneCount} of the story's ${r638a.count} payoff scenes (${Math.round((r638a.maxZoneCount / r638a.count) * 100)}%) cluster in the ${zoneName638a} third. Resolutions concentrate almost exclusively in that stretch of the story — once the audience notices the pattern, they learn which third to expect answers in rather than experiencing the release of tension as an unpredictable rhythm.`,
+        suggestedFix: `Resolve at least one thread outside the ${zoneName638a} third — spreading payoffs across the story keeps the release of tension structurally unpredictable rather than confined to a single learned stretch.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_SIGNAL_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // dialogueHighlights. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 scenes carrying outstanding clue-debt, ≥2 scenes carrying a dialogue highlight. Zero
+  // overlap → fire. First use of the unresolvedClues field anywhere in this pass. A story's open
+  // mysteries and its most memorable dialogue never sharing a scene means the two channels
+  // develop on entirely separate, predictable rhythms.
+  {
+    const r638b = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r638b.fires) {
+      issues.push({
+        location: `${r638b.aCount} open-thread scene(s), ${r638b.bCount} dialogue-highlight scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_SIGNAL_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r638b.aCount} scenes carrying outstanding clue-debt never coincide with the ${r638b.bCount} scenes flagged as containing a standout line of dialogue — the story's open mysteries and its most memorable dialogue run on separate rhythmic tracks. A mystery hanging open is a natural occasion for a character's voice to press on it.`,
+        suggestedFix: `Let at least one scene carrying open clue-debt also include a line worth remembering — a character voicing suspicion or naming what's still unresolved, so the story's verbal high points and its live mysteries occasionally converge.`,
+      });
+    }
+  }
+
+  // DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // payoffSetupIds absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥3 scenes anywhere with a payoff, a 2-scene
+  // lookahead window. Fires when every turn's two-scene aftermath contains no payoff, while
+  // payoffs do occur elsewhere. First pairing of these two fields in this pass. A structural pivot
+  // that never resolves anything nearby has a predictable rhythm of pivot-without-consequence.
+  {
+    const r638c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r638c.fires) {
+      issues.push({
+        location: `${r638c.triggerCount} dramatic-turn scene(s) — no payoff within 2 scenes of any`,
+        rule: 'DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r638c.triggerCount} dramatic-turn scenes is followed by two scenes with no payoff, even though ${r638c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, structural pivots read as predictably consequence-free in their immediate aftermath — the turn happens, but nothing resolves nearby.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes resolve a thread — tying the pivot to a concrete consequence rather than letting turns and payoffs run on separate, disconnected rhythms.`,
       });
     }
   }
