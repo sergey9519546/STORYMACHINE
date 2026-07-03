@@ -1080,6 +1080,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 883 — characterArcPass: arc complicate zone imbalance, arc introduce conflict zone imbalance, arc turning point zone imbalance', async () => {
+    const makeRec883 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc883 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_COMPLICATE_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); complicate at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('ARC_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs883a = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runArc883(recs883a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_COMPLICATE_ZONE_IMBALANCE'), 'ARC_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs883an = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runArc883(recs883an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_COMPLICATE_ZONE_IMBALANCE'), 'ARC_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    // ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs883b = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc883(recs883b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs883bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc883(recs883bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'ARC_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    // ARC_TURNING_POINT_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('ARC_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs883c = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc883(recs883c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_ZONE_IMBALANCE'), 'ARC_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs883cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec883(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc883(recs883cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_ZONE_IMBALANCE'), 'ARC_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 869 — characterArcPass: arc climax zone imbalance, arc establish world zone imbalance, arc resolution purpose zone imbalance', async () => {
     const makeRec869 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
