@@ -331,6 +331,15 @@
 // mirror], aftermath [THEME_NEGATIVE_EMOTION_AFTERMATH_SILENT], and average/aggregate
 // [THEME_RESONANCE_EMOTIONALLY_LOPSIDED]; the shared-library thirds-based cluster mode has never
 // been applied to emotionalShift).
+// Wave 808 additions: THEME_REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude
+// [0/1] × 2-scene lookback, anchored on the FIRST revelation scene — completes the trio for
+// revelation alongside the zone-cluster and drought-run modes added in Wave 794), THEME_NEGATIVE_
+// EMOTION_DROUGHT_RUN (run-based × emotionalShift='negative' absence — completes 2 of 3 slots for
+// this valence alongside the zone-cluster mode added in Wave 794; peak mode conventionally
+// skipped for this categorical field), THEME_STAKES_ZONE_CLUSTER (distribution/timing × purpose
+// === 'raise_stakes' × structural thirds — the existing THEME_RAISE_STAKES_SILENT is a
+// co-occurrence check [do stakes-raising scenes carry theme]; none of the three shared-library
+// trio modes has ever been applied to this purpose value).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4575,6 +4584,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r794c.maxZoneCount / r794c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r794c.zoneNames[r794c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the theme carries its emotional cost in only one part of the story instead of resonating through its full shape.`,
         suggestedFix: `Introduce a negative-emotion scene outside the ${r794c.zoneNames[r794c.maxZoneIdx]} third so the theme's emotional cost resonates more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 808: THEME_REVELATION_PEAK_UNCAUSED, THEME_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              THEME_STAKES_ZONE_CLUSTER ──────────────────────────────────────
+
+  // THEME_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Completes the trio for revelation alongside the zone-cluster and
+  // drought-run modes added in Wave 794. hasCause deliberately omits revelation to avoid
+  // circularity.
+  {
+    const r808a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r808a.fires) {
+      issues.push({
+        location: `scene ${r808a.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'THEME_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r808a.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r808a.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the theme's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r808a.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // THEME_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no negative charge reaches 6. Completes
+  // 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave 794 (peak mode
+  // conventionally skipped for this categorical field).
+  {
+    const r808b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r808b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r808b.longestRun} consecutive scenes`,
+        rule: 'THEME_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r808b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r808b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the theme's emotional cost untested for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r808b.longestRun}-scene stretch so the theme keeps testing its emotional cost throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of them fall in a single structural third. The existing
+  // THEME_RAISE_STAKES_SILENT is a co-occurrence check (do stakes-raising scenes carry theme);
+  // none of the three shared-library trio modes has ever been applied to this purpose value.
+  {
+    const r808c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r808c.fires) {
+      issues.push({
+        location: `${r808c.zoneNames[r808c.maxZoneIdx]} third — ${r808c.maxZoneCount} of ${r808c.count} stakes-raising scenes`,
+        rule: 'THEME_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r808c.maxZoneCount / r808c.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r808c.zoneNames[r808c.maxZoneIdx]} third. When every escalation lands in the same structural window, the theme has no mounting pressure testing it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r808c.zoneNames[r808c.maxZoneIdx]} third to raise stakes so the theme keeps mounting pressure testing it more evenly across the story.`,
       });
     }
   }
