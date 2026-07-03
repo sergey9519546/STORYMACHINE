@@ -245,6 +245,16 @@
 // drought-audited here), BELIEF_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds ×
 // structural thirds — Wave 642 applied the zone-cluster mode to visualBeats; seededClueIds itself
 // has never been cluster-audited here despite already anchoring BELIEF_SEED_CURIOSITY_DECOUPLED).
+// Wave 670 additions: BELIEF_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// dialogueHighlights magnitude — dialogueHighlights is this pass's most heavily used field [21
+// accesses], but has only ever anchored hand-rolled aggregate/co-occurrence logic, never the
+// shared-library backward-cause peak mode; the scene with the most highlighted lines has no
+// dramatic turn or revelation in itself or the two scenes before it), BELIEF_RELATIONSHIP_
+// DROUGHT_RUN (run-based × relationshipShifts absence — relationshipShifts anchors several
+// hand-rolled checks but has never been drought-audited via the shared helper),
+// BELIEF_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn presence × structural thirds —
+// dramaticTurn has only ever served as a hasCause/trigger condition in this pass, never as the
+// subject of a zone-cluster check). Completes the sixth full rotation cycle (657-670).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3693,6 +3703,75 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r656c.maxZoneCount} of the story's ${r656c.count} clue-planting scenes (${Math.round((r656c.maxZoneCount / r656c.count) * 100)}%) cluster in the ${zoneName656c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new seed feeding the belief-tracking layer.`,
         suggestedFix: `Plant at least one clue outside the ${zoneName656c} third — spreading foreshadowing across the story lets every structural third carry some material for the audience's beliefs to track.`,
+      });
+    }
+  }
+
+  // ── Wave 670: BELIEF_HIGHLIGHT_PEAK_UNCAUSED, BELIEF_RELATIONSHIP_DROUGHT_RUN,
+  //              BELIEF_TURN_ZONE_CLUSTER ────────────────────────────────────────────────────
+
+  // BELIEF_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. dialogueHighlights is this pass's most heavily used field but has only ever
+  // anchored hand-rolled aggregate/co-occurrence logic, never the shared-library backward-cause
+  // peak mode.
+  {
+    const r670a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r670a.fires) {
+      issues.push({
+        location: `scene ${r670a.peakIdx + 1} — peak highlighted-dialogue density (${r670a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r670a.peakIdx + 1}, with ${r670a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of asserted belief carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r670a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6.
+  // relationshipShifts anchors several hand-rolled checks in this pass but has never been
+  // drought-audited via the shared helper.
+  {
+    const r670b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r670b.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r670b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r670b.longestRun} consecutive scenes with no relationship shift at all, even though ${r670b.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the belief-tracking layer's sense of interpersonal stakes dormant for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r670b.longestRun}-scene stretch — even a small movement keeps the belief-tracking layer tied to changing interpersonal stakes throughout.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 dramatic-turn scenes, fires
+  // when >75% of them fall in a single structural third. dramaticTurn has only ever served as a
+  // hasCause/trigger condition in this pass, never as the subject of a zone-cluster check.
+  {
+    const r670c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r670c.fires) {
+      const zoneName670c = r670c.zoneNames[r670c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName670c} third — ${r670c.maxZoneCount}/${r670c.count} dramatic-turn scenes`,
+        rule: 'BELIEF_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r670c.maxZoneCount} of the story's ${r670c.count} dramatic-turn scenes (${Math.round((r670c.maxZoneCount / r670c.count) * 100)}%) cluster in the ${zoneName670c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no reversal to test the audience's beliefs against.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName670c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry a reversal that tests what the audience believes.`,
       });
     }
   }

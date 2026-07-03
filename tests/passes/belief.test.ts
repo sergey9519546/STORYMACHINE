@@ -1204,6 +1204,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 670 — beliefPass: belief highlight peak uncaused, belief relationship drought run, belief turn zone cluster', async () => {
+    const runBF670 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('BELIEF_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs670a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs670a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs670a[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF670(recs670a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_PEAK_UNCAUSED'), 'BELIEF_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs670an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs670an[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs670an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs670an[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF670(recs670an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_PEAK_UNCAUSED'), 'BELIEF_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_RELATIONSHIP_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs670b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs670b[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs670b[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs670b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs670b[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runBF670(recs670b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_DROUGHT_RUN'), 'BELIEF_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_RELATIONSHIP_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs670bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs670bn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs670bn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs670bn[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runBF670(recs670bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_DROUGHT_RUN'), 'BELIEF_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('BELIEF_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs670c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs670c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs670c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs670c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runBF670(recs670c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURN_ZONE_CLUSTER'), 'BELIEF_TURN_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_TURN_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs670cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs670cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs670cn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs670cn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runBF670(recs670cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURN_ZONE_CLUSTER'), 'BELIEF_TURN_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 656 — beliefPass: belief payoff peak uncaused, belief clock drought run, belief seed zone cluster', async () => {
     const runBF656 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
