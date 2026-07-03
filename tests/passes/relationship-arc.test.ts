@@ -1376,6 +1376,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 651 — relationshipArcPass: relational highlight peak uncaused, relational open thread drought run, relational staging zone cluster', async () => {
+    const runRA651 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs651a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs651a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs651a[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA651(recs651a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED'), 'RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs651an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs651an[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs651an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs651an[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA651(recs651an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED'), 'RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; debt at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_OPEN_THREAD_DROUGHT_RUN fires when the longest no-debt run is ≥6', async () => {
+      const recs651b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs651b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs651b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs651b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      recs651b[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runRA651(recs651b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_DROUGHT_RUN'), 'RELATIONAL_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // debt at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_OPEN_THREAD_DROUGHT_RUN does not fire when debt is distributed without a long drought', async () => {
+      const recs651bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs651bn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs651bn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs651bn[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runRA651(recs651bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_DROUGHT_RUN'), 'RELATIONAL_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes (visualBeats≥2) at 0,1,2 → 100% opening
+    // third
+    it('RELATIONAL_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs651c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs651c[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs651c[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs651c[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runRA651(recs651c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_ZONE_CLUSTER'), 'RELATIONAL_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs651cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs651cn[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs651cn[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs651cn[7] = makeSharedRecord(7, { visualBeats: ['a', 'b'] });
+      const res = await runRA651(recs651cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_ZONE_CLUSTER'), 'RELATIONAL_STAGING_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 637 — relationshipArcPass: relational highlight open thread decoupled, relational open thread staging aftermath void, relational open thread zone imbalance', async () => {
     const runRA637 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

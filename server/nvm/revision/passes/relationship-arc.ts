@@ -230,10 +230,24 @@
 // unresolvedClues × four structural zones — Waves 595/609/623 applied this template to
 // relationshipShifts, visualBeats, and dialogueHighlights; unresolvedClues itself has never been
 // zone-audited here).
+// Wave 651 additions (built on the shared checks library, audit M2.2): RELATIONAL_HIGHLIGHT_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × dialogueHighlights magnitude — the scene with
+// the single densest count of highlighted lines has no dramatic turn or revelation in itself or
+// the two scenes before it; first checkPeakUncaused use in this 111-rule pass — distinct from the
+// existing hand-rolled RELATIONSHIP_PEAK_UNCAUSED [Wave 581], which anchors on the peak
+// relationship-SHIFT scene, not the peak highlighted-dialogue scene), RELATIONAL_OPEN_THREAD_
+// DROUGHT_RUN (run-based × unresolvedClues absence — a 6+ consecutive-scene stretch with zero
+// outstanding clue-debt while such scenes occur ≥3 times elsewhere; this pass already hand-rolls
+// drought-run logic for relationshipShifts [RELATIONSHIP_SHIFT_DROUGHT], but never via the shared
+// helper and never on the open-thread channel), RELATIONAL_STAGING_ZONE_CLUSTER (distribution/
+// timing × visualBeats × structural thirds — >75% of visually-staged scenes concentrate in one
+// third; first checkZoneCluster use in this pass — distinct from the existing hand-rolled
+// RELATIONSHIP_WARMTH_CLUSTER and RUPTURE_THIRDS_CLUSTER, which track the warmth and rupture
+// channels rather than physical staging).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 // Minimum co-appearances before a never-shifting pair is considered static.
 const STATIC_COAPPEAR_THRESHOLD = 3;
@@ -3777,6 +3791,78 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r637c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName637c} contains ${r637c.counts[r637c.bloatZoneIdx]} of them (${Math.round((r637c.counts[r637c.bloatZoneIdx] / r637c.totalCount) * 100)}%) while ${emptyNames637c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the arc's sense of active mystery an uneven structural rhythm.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames637c} — so every structural quarter carries some sense of active, unanswered mystery between the characters.`,
+      });
+    }
+  }
+
+  // ── Wave 651: RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED, RELATIONAL_OPEN_THREAD_DROUGHT_RUN,
+  //              RELATIONAL_STAGING_ZONE_CLUSTER ────────────────────────────────────────────
+
+  // RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // dialogueHighlights magnitude. Built on checkPeakUncaused from the shared checks library.
+  // n≥8, ≥2 scenes carrying a dialogue highlight, a 2-scene lookback. Finds the single scene
+  // with the most highlighted lines; fires when neither that scene nor either of the two before
+  // it contains a dramatic turn or revelation. First checkPeakUncaused use in this pass — distinct
+  // from the existing hand-rolled RELATIONSHIP_PEAK_UNCAUSED (Wave 581), which anchors on the peak
+  // relationship-SHIFT scene, not the peak highlighted-dialogue scene.
+  {
+    const r651a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r651a.fires) {
+      issues.push({
+        location: `scene ${r651a.peakIdx + 1} — peak highlighted-dialogue density (${r651a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for highlighted dialogue (scene ${r651a.peakIdx + 1}, with ${r651a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the relationship's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of relational causality never coincide.`,
+        suggestedFix: `Give scene ${r651a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most quotable moment is earned by a shift in the relationship rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6. This
+  // pass already hand-rolls drought-run logic for relationshipShifts (RELATIONSHIP_SHIFT_
+  // DROUGHT), but never via the shared helper and never on the unresolvedClues channel — a long
+  // unbroken stretch where every mystery is settled leaves the relational arc with no unanswered
+  // question to press against.
+  {
+    const r651b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r651b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r651b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r651b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r651b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the relational arc has no unanswered question to press against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r651b.longestRun}-scene stretch so the relationship keeps some outstanding mystery to navigate throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes,
+  // fires when >75% of them fall in a single structural third. First checkZoneCluster use in
+  // this pass — distinct from the existing hand-rolled RELATIONSHIP_WARMTH_CLUSTER and RUPTURE_
+  // THIRDS_CLUSTER, which track the warmth and rupture channels rather than physical staging.
+  {
+    const r651c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r651c.fires) {
+      const zoneName651c = r651c.zoneNames[r651c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName651c} third — ${r651c.maxZoneCount}/${r651c.count} visually-staged scenes`,
+        rule: 'RELATIONAL_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r651c.maxZoneCount} of the story's ${r651c.count} visually-staged scenes (${Math.round((r651c.maxZoneCount / r651c.count) * 100)}%) cluster in the ${zoneName651c} third. Physical presence between the characters concentrates almost exclusively in that stretch rather than surfacing throughout the relationship's arc, leaving other structural thirds with no staged embodiment of the bond.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName651c} third substantial physical staging — spreading embodied presence across the story lets each structural third carry some visible sense of the relationship, not only one.`,
       });
     }
   }
