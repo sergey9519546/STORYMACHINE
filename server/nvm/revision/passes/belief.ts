@@ -265,6 +265,14 @@
 // suspenseDelta magnitude — suspenseDelta has only ever anchored average-based hand-rolled logic
 // [e.g. avgRevSusp, tenseRevScenes]; the scene where suspense spikes hardest has never been
 // checked for backward causation via the shared library).
+// Wave 698 additions: BELIEF_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absence — Wave 656
+// applied the backward-cause peak mode to payoffSetupIds; the drought-run mode has never been
+// applied to this channel), BELIEF_SEED_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// seededClueIds magnitude — Wave 656 applied the zone-cluster mode to seededClueIds; the
+// backward-cause peak mode has never been applied to this channel), BELIEF_HIGHLIGHT_ZONE_CLUSTER
+// (distribution/timing × dialogueHighlights × structural thirds — Wave 670 applied the
+// backward-cause peak mode to dialogueHighlights, this pass's most heavily used field [22
+// accesses]; the zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3851,6 +3859,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single sharpest suspense spike (scene ${r684c.peakIdx + 1}, delta ${r684c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where tension rises most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the belief-tracking layer's sense of causal escalation.`,
         suggestedFix: `Give scene ${r684c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest rise in tension is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 698: BELIEF_PAYOFF_DROUGHT_RUN, BELIEF_SEED_PEAK_UNCAUSED, BELIEF_HIGHLIGHT_ZONE_CLUSTER ──
+
+  // BELIEF_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest consecutive
+  // run of scenes with zero thread resolution reaches 6. Wave 656 applied the backward-cause peak
+  // mode to payoffSetupIds; the drought-run mode has never been applied to this channel.
+  {
+    const r698a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r698a.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r698a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r698a.longestRun} consecutive scenes with no thread resolving at all, even though ${r698a.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the belief-tracking layer's sense of accumulating clarity dormant for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r698a.longestRun}-scene stretch so the belief-tracking layer's sense of accumulating clarity keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Wave 656
+  // applied the zone-cluster mode to seededClueIds; the backward-cause peak mode has never been
+  // applied to this channel.
+  {
+    const r698b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r698b.fires) {
+      issues.push({
+        location: `scene ${r698b.peakIdx + 1} — peak seed density (${r698b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r698b.peakIdx + 1}, with ${r698b.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the belief-tracking layer's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r698b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue scenes,
+  // fires when >75% of them fall in a single structural third. Wave 670 applied the backward-cause
+  // peak mode to dialogueHighlights, this pass's most heavily used field; the zone-cluster mode has
+  // never been applied to it.
+  {
+    const r698c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r698c.fires) {
+      const zoneName698c = r698c.zoneNames[r698c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName698c} third — ${r698c.maxZoneCount}/${r698c.count} highlighted-dialogue scenes`,
+        rule: 'BELIEF_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r698c.maxZoneCount} of the story's ${r698c.count} scenes carrying a standout line of dialogue (${Math.round((r698c.maxZoneCount / r698c.count) * 100)}%) cluster in the ${zoneName698c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to anchor a character's stated belief.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName698c} third a standout line of dialogue — spreading memorable dialogue across the story lets belief and conviction surface verbally in every structural third.`,
       });
     }
   }
