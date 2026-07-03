@@ -208,6 +208,13 @@
 // (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere
 // in this pass), SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × seed trigger →
 // dialogueHighlights absence).
+// Wave 622 additions (built on the shared checks library, audit M2.2): VISUAL_BEAT_OPEN_THREAD_
+// DECOUPLED (co-occurrence/decoupling × visualBeats × unresolvedClues — first pairing of these
+// two fields in this 107-rule pass), CLOCK_STAGING_AFTERMATH_VOID (sequence/aftermath ×
+// clockRaised trigger → visualBeats absence — first pairing of these two fields),
+// PAYOFF_OPEN_THREAD_ZONE_IMBALANCE (underweight/bloat × unresolvedClues × four structural zones
+// — Waves 594/608 applied this template to seededClueIds and visualBeats; unresolvedClues itself
+// has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3352,6 +3359,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r608c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r608c.aftermathCount} such scenes exist elsewhere in the script. Seeds are the story's long-horizon deposits; when their immediate aftermath never carries a memorable line, the planted material gets no verbal texture nearby — it lives purely as structural bookkeeping until the eventual payoff.`,
         suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, an oblique reference that will read differently in retrospect, or a reaction that gives the seed emotional presence before its payoff arrives.`,
+      });
+    }
+  }
+
+  // ── Wave 622: VISUAL_BEAT_OPEN_THREAD_DECOUPLED, CLOCK_STAGING_AFTERMATH_VOID,
+  //              PAYOFF_OPEN_THREAD_ZONE_IMBALANCE ──────────────────────────────────────────
+
+  // VISUAL_BEAT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × visualBeats × unresolvedClues.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 visually-staged
+  // scenes (visualBeats.length≥2), ≥2 scenes carrying outstanding clue-debt. Zero overlap → fire.
+  // First pairing of these two fields in this 107-rule pass. Physical staging and open narrative
+  // debt never occupy the same scene — a mystery hanging open never gets a physical anchor, and
+  // every heavily staged scene carries no unresolved tension.
+  {
+    const r622a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.visualBeats ?? []).length >= 2,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r622a.fires) {
+      issues.push({
+        location: `${r622a.aCount} visually-staged scene(s), ${r622a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'VISUAL_BEAT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r622a.aCount} scenes leaning heavily on physical staging never coincide with the ${r622a.bCount} scenes carrying outstanding clue-debt — physical presence and unresolved mystery run on separate tracks. A scene rich in staging is a natural place to give an open thread a physical anchor — an object tied to the mystery, a space the audience will recognize later — but that opportunity is never taken.`,
+        suggestedFix: `Let at least one heavily staged scene also carry open clue-debt — the physical details a character examines or handles tied to what's still unresolved, giving the mystery a tangible presence in the world rather than existing only as a dangling narrative thread.`,
+      });
+    }
+  }
+
+  // CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clockRaised scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a 2-scene
+  // lookahead window. Fires when every clock-raising scene's two-scene aftermath contains no
+  // visually dense scene, while such scenes do occur elsewhere. First pairing of clockRaised with
+  // visualBeats in this pass — a tightening deadline should register physically somewhere nearby
+  // (a character moving faster, checking a clock, packing in haste), not only as narrated urgency.
+  {
+    const r622b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r622b.fires) {
+      issues.push({
+        location: `${r622b.triggerCount} clock-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r622b.triggerCount} clock-raising scenes is followed by two scenes with no substantial physical staging, even though ${r622b.aftermathCount} such scenes exist elsewhere in the script. A tightening deadline often shows up physically — hurried movement, a glance at the time, hasty preparation — and when that aftermath consistently stays unstaged, the mounting time pressure is only ever mentioned, never seen.`,
+        suggestedFix: `After at least one clock-raising scene, let one of the following two scenes carry substantial physical staging — the deadline's pressure made visible through a character's rushed action rather than only through dialogue about time.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Waves 594 and 608 applied this template to
+  // seededClueIds and visualBeats respectively; unresolvedClues — the carried-forward debt of
+  // clues not yet paid off — has never itself been audited for structural distribution in this
+  // file, despite being the file's most natural complement to the payoff channel.
+  {
+    const r622c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r622c.fires) {
+      const emptyNames622c = r622c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName622c = FOUR_ZONE_NAMES[r622c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames622c} empty; ${bloatName622c} has ${r622c.counts[r622c.bloatZoneIdx]}/${r622c.totalCount} debt-carrying scenes`,
+        rule: 'PAYOFF_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r622c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName622c} contains ${r622c.counts[r622c.bloatZoneIdx]} of them (${Math.round((r622c.counts[r622c.bloatZoneIdx] / r622c.totalCount) * 100)}%) while ${emptyNames622c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's sense of active mystery an uneven structural rhythm.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames622c} — so every structural quarter carries some sense of active, unanswered mystery.`,
       });
     }
   }

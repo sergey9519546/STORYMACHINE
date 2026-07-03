@@ -1365,6 +1365,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 622 — payoffPass: visual beat open thread decoupled, clock staging aftermath void, payoff open thread zone imbalance', async () => {
+    const runPY622 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VISUAL_BEAT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; staged at 0,1 (no debt); debt at 4,5 (no staging) → zero overlap → fires
+    it('VISUAL_BEAT_OPEN_THREAD_DECOUPLED fires when visually-staged scenes and open-thread scenes never overlap', async () => {
+      const recs622a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs622a[0] = makeSharedRecord(0, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622a[1] = makeSharedRecord(1, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622a[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs622a[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runPY622(recs622a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_OPEN_THREAD_DECOUPLED'), 'VISUAL_BEAT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // VISUAL_BEAT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH staging and open debt → overlap exists
+    it('VISUAL_BEAT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs622an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs622an[0] = makeSharedRecord(0, { visualBeats: ['opens the safe', 'counts the cash'], unresolvedClues: ['unpaid-clue'] });
+      recs622an[1] = makeSharedRecord(1, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622an[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runPY622(recs622an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_OPEN_THREAD_DECOUPLED'), 'VISUAL_BEAT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // CLOCK_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; clock triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('CLOCK_STAGING_AFTERMATH_VOID fires when no clock-raising scene is followed by a visually dense scene within 2 scenes', async () => {
+      const recs622b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs622b[0] = makeSharedRecord(0, { clockRaised: true });
+      recs622b[1] = makeSharedRecord(1, { clockRaised: true });
+      recs622b[5] = makeSharedRecord(5, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622b[6] = makeSharedRecord(6, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622b[7] = makeSharedRecord(7, { visualBeats: ['opens the safe', 'counts the cash'] });
+      const res = await runPY622(recs622b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_STAGING_AFTERMATH_VOID'), 'CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // CLOCK_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('CLOCK_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs622bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs622bn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs622bn[1] = makeSharedRecord(1, { clockRaised: true });
+      recs622bn[3] = makeSharedRecord(3, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622bn[5] = makeSharedRecord(5, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622bn[6] = makeSharedRecord(6, { visualBeats: ['opens the safe', 'counts the cash'] });
+      recs622bn[7] = makeSharedRecord(7, { visualBeats: ['opens the safe', 'counts the cash'] });
+      const res = await runPY622(recs622bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_STAGING_AFTERMATH_VOID'), 'CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); debt at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('PAYOFF_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty of open-thread scenes while another is bloated', async () => {
+      const recs622c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs622c[6] = makeSharedRecord(6, { unresolvedClues: ['a'] });
+      recs622c[7] = makeSharedRecord(7, { unresolvedClues: ['b'] });
+      recs622c[8] = makeSharedRecord(8, { unresolvedClues: ['c'] });
+      recs622c[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runPY622(recs622c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_ZONE_IMBALANCE'), 'PAYOFF_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    // PAYOFF_OPEN_THREAD_ZONE_IMBALANCE no-fire:
+    // one open-thread scene per zone (1,4,7,10) → no zone is empty
+    it('PAYOFF_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes are spread across all zones', async () => {
+      const recs622cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs622cn[1] = makeSharedRecord(1, { unresolvedClues: ['a'] });
+      recs622cn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs622cn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      recs622cn[10] = makeSharedRecord(10, { unresolvedClues: ['d'] });
+      const res = await runPY622(recs622cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_ZONE_IMBALANCE'), 'PAYOFF_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 608 — payoffPass: payoff dialogue highlight decoupled, visual staging zone imbalance, seed dialogue highlight aftermath void', async () => {
     const runPY608 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
