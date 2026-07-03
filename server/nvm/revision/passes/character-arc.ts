@@ -273,6 +273,16 @@
 // structural thirds — Wave 645 applied the drought-run mode to seededClueIds; the zone-cluster
 // mode has never been applied to this channel despite it already anchoring two aftermath-void
 // checks).
+// Wave 687 additions (built on the shared checks library): ARC_PAYOFF_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × payoffSetupIds magnitude — the scene with the most simultaneous
+// thread resolutions has no dramatic turn or revelation in itself or the two scenes before it;
+// payoffSetupIds has been zone-clustered [Wave 659] and drought-audited [hand-rolled Wave 505]
+// but never backward-cause peak-audited), ARC_STAGING_DROUGHT_RUN (run-based × visualBeats
+// absence — visualBeats has been zone-imbalanced [four-zone] and backward-cause peak-audited
+// [Wave 659], but never drought-audited), ARC_HIGHLIGHT_ZONE_CLUSTER (distribution/timing ×
+// dialogueHighlights × structural thirds — dialogueHighlights has been backward-cause
+// peak-audited [Wave 645] and drought-audited [Wave 673], but never cluster-audited, completing
+// the trio of shared-library modes on this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3845,6 +3855,73 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r673c.maxZoneCount} of the arc's ${r673c.count} clue-planting scenes (${Math.round((r673c.maxZoneCount / r673c.count) * 100)}%) cluster in the ${zoneName673c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new material feeding the character's arc.`,
         suggestedFix: `Plant at least one clue outside the ${zoneName673c} third — spreading foreshadowing across the story lets every structural third carry some fresh material for the character's arc to draw on.`,
+      });
+    }
+  }
+
+  // ── Wave 687: ARC_PAYOFF_PEAK_UNCAUSED, ARC_STAGING_DROUGHT_RUN, ARC_HIGHLIGHT_ZONE_CLUSTER ──
+
+  // ARC_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // payoffSetupIds has been zone-clustered (Wave 659) and drought-audited (hand-rolled, Wave 505)
+  // but never backward-cause peak-audited.
+  {
+    const r687a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r687a.fires) {
+      issues.push({
+        location: `scene ${r687a.peakIdx + 1} — peak payoff density (${r687a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for thread resolution (scene ${r687a.peakIdx + 1}, with ${r687a.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r687a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most convergent resolution is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ARC_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero visual beats reaches 6. visualBeats has been zone-
+  // imbalanced (four-zone) and backward-cause peak-audited (Wave 659), but never drought-audited.
+  {
+    const r687b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r687b.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r687b.longestRun} consecutive scenes`,
+        rule: 'ARC_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r687b.longestRun} consecutive scenes with no visual staging beats at all, even though ${r687b.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the character's arc without any staged action to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r687b.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the arc stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // ARC_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue scenes,
+  // fires when >75% of them fall in a single structural third. dialogueHighlights has been
+  // backward-cause peak-audited (Wave 645) and drought-audited (Wave 673), but never cluster-
+  // audited, completing the trio of shared-library modes on this channel.
+  {
+    const r687c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r687c.fires) {
+      const zoneName687c = r687c.zoneNames[r687c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName687c} third — ${r687c.maxZoneCount}/${r687c.count} highlighted-dialogue scenes`,
+        rule: 'ARC_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r687c.maxZoneCount} of the arc's ${r687c.count} scenes carrying a standout line of dialogue (${Math.round((r687c.maxZoneCount / r687c.count) * 100)}%) cluster in the ${zoneName687c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the character's arc.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName687c} third a standout line of dialogue — spreading memorable dialogue across the story lets the character's arc carry its own verbal high point in every structural third, not just one.`,
       });
     }
   }
