@@ -240,6 +240,17 @@
 // concentrate in one third; the first checkZoneCluster use in this pass, distinct from the
 // hand-rolled PAYOFF_TEMPORAL_CLUSTER and CLUE_SEED_TEMPORAL_CLUSTER, which track different
 // channels entirely).
+// Wave 664 additions (built on the shared checks library, audit M2.2): PAYOFF_RELATIONSHIP_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × relationshipShifts-count magnitude — the scene
+// with the most simultaneous bond changes has no dramatic turn or revelation in itself or the two
+// scenes before it; distinct from PAYOFF_RELATIONSHIP_PEAK_DECOUPLED [Wave 412], which anchors on
+// the scene with the single largest shift AMOUNT and checks whether it carries a payoff — a
+// different magnitude metric and a different question entirely), PAYOFF_CLOCK_DROUGHT_RUN
+// (run-based × clockRaised absence — this pass already drought-audits seed/payoff/highlight
+// channels; clockRaised itself has never been drought-audited), PAYOFF_STAGING_ZONE_CLUSTER
+// (distribution/timing × visualBeats × structural thirds — Wave 650 applied the zone-cluster mode
+// to unresolvedClues; visualBeats itself has only been backward-cause peak-audited, never
+// cluster-audited on the thirds granularity).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3604,6 +3615,75 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r650c.maxZoneCount} of the story's ${r650c.count} scenes carrying outstanding clue-debt (${Math.round((r650c.maxZoneCount / r650c.count) * 100)}%) cluster in the ${zoneName650c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery for the payoff engine to eventually resolve.`,
         suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName650c} third — spreading open threads across the story gives every structural third some outstanding debt for a later payoff to satisfy.`,
+      });
+    }
+  }
+
+  // ── Wave 664: PAYOFF_RELATIONSHIP_PEAK_UNCAUSED, PAYOFF_CLOCK_DROUGHT_RUN,
+  //              PAYOFF_STAGING_ZONE_CLUSTER ─────────────────────────────────────────────────
+
+  // PAYOFF_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts-
+  // count magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes
+  // carrying a relationship shift, a 2-scene lookback. Finds the single scene with the most
+  // simultaneous bond changes; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. Distinct from PAYOFF_RELATIONSHIP_PEAK_DECOUPLED
+  // (Wave 412), which anchors on the scene with the single largest shift AMOUNT and checks
+  // whether it carries a payoff — a different magnitude metric and a different question entirely.
+  {
+    const r664a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r664a.fires) {
+      issues.push({
+        location: `scene ${r664a.peakIdx + 1} — peak relationship-shift density (${r664a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r664a.peakIdx + 1}, with ${r664a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the story's payoff engine is causally connected.`,
+        suggestedFix: `Give scene ${r664a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. This pass already drought-audits
+  // seed/payoff/highlight channels; clockRaised itself has never been drought-audited.
+  {
+    const r664b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r664b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r664b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r664b.longestRun} consecutive scenes with no clock raised at all, even though ${r664b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the story's resolutions arriving without any urgency pressing toward them.`,
+        suggestedFix: `Raise a clock somewhere within the ${r664b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the story's payoffs feel pressed for rather than arriving at leisure.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes, fires when
+  // >75% of them fall in a single structural third. Wave 650 applied the zone-cluster mode to
+  // unresolvedClues; visualBeats itself has only been backward-cause peak-audited, never
+  // cluster-audited on the thirds granularity.
+  {
+    const r664c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r664c.fires) {
+      const zoneName664c = r664c.zoneNames[r664c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName664c} third — ${r664c.maxZoneCount}/${r664c.count} visually dense scenes`,
+        rule: 'PAYOFF_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r664c.maxZoneCount} of the story's ${r664c.count} visually dense scenes (${Math.round((r664c.maxZoneCount / r664c.count) * 100)}%) cluster in the ${zoneName664c} third. Physical staging concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no physically embodied resolution.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName664c} third substantial physical staging — spreading embodied resolution across the story lets each structural third carry its own physical weight.`,
       });
     }
   }
