@@ -267,6 +267,14 @@
 // the trio), STRUCTURE_SEED_PEAK_UNCAUSED (single-peak isolation/backward-cause × seededClueIds
 // magnitude — Waves 653/695 applied the zone-cluster and drought-run modes to seededClueIds; the
 // backward-cause peak mode has never been applied to it, completing the trio).
+// Wave 723 additions (built on the shared checks library): STRUCTURE_PAYOFF_ZONE_CLUSTER
+// (distribution/timing × payoffSetupIds × structural thirds — Wave 667 applied the backward-
+// cause peak mode to payoffSetupIds; the zone-cluster mode has never been applied to it),
+// STRUCTURE_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × relationshipShifts × structural
+// thirds — Wave 667 applied the drought-run mode to relationshipShifts; the zone-cluster mode
+// has never been applied to it), STRUCTURE_CLOCK_DROUGHT_RUN (run-based × clockRaised absence —
+// Wave 667 applied the zone-cluster mode to clockRaised; the drought-run mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3964,6 +3972,71 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for planting new clues (scene ${r709c.peakIdx + 1}, with ${r709c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of setup carries no causal weight behind it.`,
         suggestedFix: `Give scene ${r709c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 723: STRUCTURE_PAYOFF_ZONE_CLUSTER, STRUCTURE_RELATIONSHIP_ZONE_CLUSTER,
+  //              STRUCTURE_CLOCK_DROUGHT_RUN ─────────────────────────────────────────────────
+
+  // STRUCTURE_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // >75% of them fall in a single structural third. Wave 667 applied the backward-cause peak
+  // mode to payoffSetupIds; the zone-cluster mode has never been applied to it.
+  {
+    const r723a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r723a.fires) {
+      const zoneName723a = r723a.zoneNames[r723a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName723a} third — ${r723a.maxZoneCount}/${r723a.count} payoff scenes`,
+        rule: 'STRUCTURE_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r723a.maxZoneCount} of the story's ${r723a.count} thread-resolution scenes (${Math.round((r723a.maxZoneCount / r723a.count) * 100)}%) cluster in the ${zoneName723a} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of accumulated payoff.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName723a} third — spreading resolutions across the story lets each structural third carry its own sense of the story's structure paying off.`,
+      });
+    }
+  }
+
+  // STRUCTURE_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when >75% of them fall in a single structural third. Wave 667 applied the
+  // drought-run mode to relationshipShifts; the zone-cluster mode has never been applied to it.
+  {
+    const r723b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r723b.fires) {
+      const zoneName723b = r723b.zoneNames[r723b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName723b} third — ${r723b.maxZoneCount}/${r723b.count} relationship-shift scenes`,
+        rule: 'STRUCTURE_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r723b.maxZoneCount} of the story's ${r723b.count} relationship-shift scenes (${Math.round((r723b.maxZoneCount / r723b.count) * 100)}%) cluster in the ${zoneName723b} third. Bond changes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no relational movement bearing on the plot.`,
+        suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName723b} third — spreading relational movement across the story lets each structural third carry its own sense of changing dynamics.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. Wave 667 applied the zone-cluster
+  // mode to clockRaised; the drought-run mode has never been applied to it.
+  {
+    const r723c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r723c.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r723c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r723c.longestRun} consecutive scenes with no clock raised at all, even though ${r723c.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the story's structure without any urgency for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r723c.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the story's structure stays under some time pressure throughout that stretch.`,
       });
     }
   }
