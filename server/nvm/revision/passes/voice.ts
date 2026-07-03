@@ -302,6 +302,16 @@
 // VOICE_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 683 applied the
 // zone-cluster mode to suspenseDelta [VOICE_SUSPENSE_ZONE_CLUSTER]; the drought-run mode has never
 // been applied to it, completing the trio).
+// Wave 781 additions: VOICE_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence —
+// dramaticTurn as a primary signal has only ever anchored a co-occurrence-decoupling check
+// [DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED] in this pass; none of the three shared-library
+// trio modes has ever been applied to it), VOICE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift !== 'neutral' presence × structural thirds — emotionalShift has only ever
+// anchored an average-toneset check in this pass; none of the three shared-library trio modes has
+// ever been applied to it), VOICE_SUSPENSE_PEAK_UNCAUSED (backward-cause ×
+// suspenseDelta-as-magnitude × 2-scene lookback — Waves 683/753 applied the zone-cluster and
+// run-based drought modes to suspenseDelta; the backward-cause peak mode has never been applied
+// to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4733,6 +4743,74 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r767c.longestRun} consecutive scenes with no rise in suspense at all, even though ${r767c.presentCount} scenes elsewhere do raise tension. A long unbroken stretch with nothing tightening the screws leaves the story's voice flat for an extended run.`,
         suggestedFix: `Raise suspense somewhere within the ${r767c.longestRun}-scene stretch so the story's voice keeps a live thread of tension running through that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 781: VOICE_TURN_DROUGHT_RUN, VOICE_EMOTION_ZONE_CLUSTER,
+  //              VOICE_SUSPENSE_PEAK_UNCAUSED ──────────────────────────────────────
+
+  // VOICE_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn as a primary
+  // signal has only ever anchored a co-occurrence-decoupling check in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r781a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r781a.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r781a.longestRun} consecutive scenes`,
+        rule: 'VOICE_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r781a.longestRun} consecutive scenes with no dramatic turn at all, even though ${r781a.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the story's voice with no pivot to react to for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r781a.longestRun}-scene stretch so the story's voice keeps a pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // emotionally charged scenes, fires when more than 75% of those scenes cluster in a single
+  // third. emotionalShift has only ever anchored an average-toneset check in this pass; none of
+  // the three shared-library trio modes has ever been applied to it.
+  {
+    const r781b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r781b.fires) {
+      issues.push({
+        location: `${r781b.zoneNames[r781b.maxZoneIdx]} third — ${r781b.maxZoneCount} of ${r781b.count} emotionally charged scenes`,
+        rule: 'VOICE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r781b.maxZoneCount / r781b.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r781b.zoneNames[r781b.maxZoneIdx]} third. When every emotional shift lands in the same structural window, the story's voice has no felt stakes registering anywhere else in the story.`,
+        suggestedFix: `Give at least one scene outside the ${r781b.zoneNames[r781b.maxZoneIdx]} third an emotional charge so the story's voice keeps registering felt experience more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Waves 683/753 applied the zone-cluster and run-based drought modes to
+  // suspenseDelta; the backward-cause peak mode has never been applied to it, completing the
+  // trio.
+  {
+    const r781c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r781c.fires) {
+      issues.push({
+        location: `scene ${r781c.peakIdx} (peak suspenseDelta ${r781c.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'VOICE_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r781c.peakIdx}, suspenseDelta ${r781c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r781c.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — the story's voice has nothing building toward the peak to react against.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r781c.peakIdx} so the story's voice has something building toward the peak to react against instead of springing without preparation.`,
       });
     }
   }

@@ -1438,6 +1438,74 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 781 — voicePass: voice turn drought run, voice emotion zone cluster, voice suspense peak uncaused', async () => {
+    const runV781 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_TURN_DROUGHT_RUN fire:
+    // n=10; dramaticTurn present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_TURN_DROUGHT_RUN fires when a long run has no dramatic turn', async () => {
+      const recs781a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runV781(recs781a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURN_DROUGHT_RUN'), 'VOICE_TURN_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_TURN_DROUGHT_RUN does not fire when dramatic turns are evenly spread', async () => {
+      const recs781an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 6, 9].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runV781(recs781an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURN_DROUGHT_RUN'), 'VOICE_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally charged scenes at 0,1,2 → 100% opening third
+    it('VOICE_EMOTION_ZONE_CLUSTER fires when >75% of emotionally charged scenes cluster in one third', async () => {
+      const recs781b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runV781(recs781b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_EMOTION_ZONE_CLUSTER'), 'VOICE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_EMOTION_ZONE_CLUSTER does not fire when emotionally charged scenes spread across thirds', async () => {
+      const recs781bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runV781(recs781bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_EMOTION_ZONE_CLUSTER'), 'VOICE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('VOICE_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs781c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs781c[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs781c[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      const res = await runV781(recs781c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_PEAK_UNCAUSED'), 'VOICE_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('VOICE_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs781cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs781cn[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs781cn[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      recs781cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runV781(recs781cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_PEAK_UNCAUSED'), 'VOICE_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 767 — voicePass: voice clock delta zone cluster, voice curiosity peak uncaused, voice suspense drought run', async () => {
     const runV767 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
