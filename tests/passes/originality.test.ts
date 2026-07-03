@@ -1210,6 +1210,102 @@ He sits at his desk.
   });
 
 
+  describe('Wave 802 — originalityPass: originality suspense peak uncaused, originality curiosity drought run, originality emotion drought run', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_802 = ['establish_world', 'introduce_conflict', 'complicate', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_802 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_802 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor802 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec802 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor802(idx),
+      emotionalShift: EMOTION_POOL_802[idx % EMOTION_POOL_802.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_802[idx % PURPOSE_POOL_802.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain802 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor802(i)}\n\n${SENTENCE_POOL_802[i % SENTENCE_POOL_802.length]}`).join('\n\n');
+    const runO802 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain802(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('ORIGINALITY_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs802a = Array.from({ length: 8 }, (_, i) => makeRec802(i, {
+        suspenseDelta: (i === 2 || i === 5) ? 3 : 0,
+      }));
+      const res = await runO802(recs802a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED'), 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('ORIGINALITY_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs802an = Array.from({ length: 8 }, (_, i) => makeRec802(i, {
+        suspenseDelta: (i === 2 || i === 5) ? 3 : 0,
+        dramaticTurn: i === 1 ? 'reversal' : 'nothing',
+      }));
+      const res = await runO802(recs802an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED'), 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // ORIGINALITY_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ORIGINALITY_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs802b = Array.from({ length: 10 }, (_, i) => makeRec802(i, {
+        curiosityDelta: (i === 0 || i === 1 || i === 2) ? 2 : 0,
+      }));
+      const res = await runO802(recs802b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CURIOSITY_DROUGHT_RUN'), 'ORIGINALITY_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs802bn = Array.from({ length: 10 }, (_, i) => makeRec802(i, {
+        curiosityDelta: (i === 0 || i === 3 || i === 6 || i === 9) ? 2 : 0,
+      }));
+      const res = await runO802(recs802bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CURIOSITY_DROUGHT_RUN'), 'ORIGINALITY_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_EMOTION_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry an emotional charge; scenes 3-9 (7 scenes) are all neutral.
+    it('ORIGINALITY_EMOTION_DROUGHT_RUN fires when a long run has no emotional charge', async () => {
+      const recs802c = Array.from({ length: 10 }, (_, i) => makeRec802(i, {
+        emotionalShift: (i === 0 || i === 1 || i === 2) ? 'negative' : 'neutral',
+      }));
+      const res = await runO802(recs802c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_EMOTION_DROUGHT_RUN'), 'ORIGINALITY_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_EMOTION_DROUGHT_RUN does not fire when emotional charge is evenly spread', async () => {
+      const recs802cn = Array.from({ length: 10 }, (_, i) => makeRec802(i, {
+        emotionalShift: (i === 0 || i === 3 || i === 6 || i === 9) ? 'negative' : 'neutral',
+      }));
+      const res = await runO802(recs802cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_EMOTION_DROUGHT_RUN'), 'ORIGINALITY_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 788 — originalityPass: originality suspense drought run, originality curiosity zone cluster, originality emotion zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774
     // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid

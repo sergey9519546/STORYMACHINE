@@ -350,6 +350,20 @@
 // structural thirds — emotionalShift has only ever anchored an average/aggregate tonal check in
 // this pass; none of the three shared-library trio modes has ever been applied to it — every
 // emotional beat concentrated in one structural third is itself a predictable pattern).
+// Wave 802 additions: ORIGINALITY_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-
+// magnitude × 2-scene lookback — completes the trio for suspenseDelta alongside the zone-cluster
+// mode (Wave 774) and the run-based drought mode (Wave 788); a suspense peak with no preparing
+// cause is itself a predictable, learnable pattern), ORIGINALITY_CURIOSITY_DROUGHT_RUN
+// (run-based × curiosityDelta>0 absence — Wave 788 applied the zone-cluster mode to
+// curiosityDelta; the run-based drought mode has never been applied to it — a long unbroken
+// stretch with no fresh question is itself a predictable pattern), ORIGINALITY_EMOTION_
+// DROUGHT_RUN (run-based × emotionalShift !== 'neutral' absence — Wave 788 applied the
+// zone-cluster mode to emotionalShift; the drought-run mode has never been applied to it,
+// completing 2 of 3 slots for this categorical field — a long emotionally flat stretch is itself
+// a predictable pattern). Reconnaissance for this wave also confirmed the pre-existing
+// DRAMATIC_TURN_ZONE_CLUSTER (Wave 592, hand-rolled) already completes the dramaticTurn trio
+// alongside ORIGINALITY_TURN_DROUGHT_RUN, so dramaticTurn was correctly skipped as a non-distinct
+// candidate.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4901,6 +4915,76 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r788c.maxZoneCount / r788c.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r788c.zoneNames[r788c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than felt experience distributed unevenly across the whole story.`,
         suggestedFix: `Give at least one scene outside the ${r788c.zoneNames[r788c.maxZoneIdx]} third an emotional charge so felt experience stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 802: ORIGINALITY_SUSPENSE_PEAK_UNCAUSED, ORIGINALITY_CURIOSITY_DROUGHT_RUN,
+  //              ORIGINALITY_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // ORIGINALITY_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for suspenseDelta alongside the zone-cluster mode
+  // (Wave 774) and the run-based drought mode (Wave 788) — a suspense peak with no preparing
+  // cause is itself a predictable, learnable pattern.
+  {
+    const r802a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r802a.fires) {
+      issues.push({
+        location: `scene ${r802a.peakIdx} (peak suspenseDelta ${r802a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'ORIGINALITY_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r802a.peakIdx}, suspenseDelta ${r802a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r802a.qualifyingCount} scenes elsewhere carry tension — an uncaused spike is itself a learnable pattern the audience can come to expect.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r802a.peakIdx} so the peak tension reads as earned rather than a predictable, uncaused spike.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6. Wave 788
+  // applied the zone-cluster mode to curiosityDelta; the run-based drought mode has never been
+  // applied to it — a long unbroken stretch with no fresh question is itself a predictable
+  // pattern.
+  {
+    const r802b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r802b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r802b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r802b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r802b.presentCount} scenes elsewhere spark wonder — a predictable stretch of question-free flatline the audience can learn to expect rather than a story that keeps generating fresh questions unevenly throughout.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r802b.longestRun}-scene stretch so wonder stays unpredictable rather than settling into a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_EMOTION_DROUGHT_RUN — Run-based × emotionalShift !== 'neutral' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 emotionally charged scenes overall,
+  // fires when the longest consecutive run of scenes with no emotional charge reaches 6. Wave 788
+  // applied the zone-cluster mode to emotionalShift; the drought-run mode has never been applied
+  // to it, completing 2 of 3 slots for this categorical field — a long emotionally flat stretch
+  // is itself a predictable pattern.
+  {
+    const r802c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r802c.fires) {
+      issues.push({
+        location: `longest stretch with no emotional charge: ${r802c.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r802c.longestRun} consecutive scenes with no emotional charge at all, even though ${r802c.presentCount} scenes elsewhere carry one — a predictable emotionally-flat stretch the audience can learn to expect rather than felt experience distributed unevenly throughout.`,
+        suggestedFix: `Give at least one scene within the ${r802c.longestRun}-scene stretch an emotional charge so felt experience stays unpredictable rather than settling into a learnable lull.`,
       });
     }
   }
