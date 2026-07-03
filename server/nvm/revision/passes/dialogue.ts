@@ -432,6 +432,15 @@
 // CHARACTER_MOMENT_ZONE_IMBALANCE (purpose === 'character_moment'), DIALOGUE_STAKES_ZONE_IMBALANCE
 // (purpose === 'raise_stakes'), and DIALOGUE_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift ===
 // 'negative', a valence signal with a complete 3-zone/run trio).
+//
+// Wave 938 additions (opens the twenty-sixth rotation cycle): purpose === 'revelation' has never
+// been referenced anywhere in this pass (the pre-existing DIALOGUE_REVELATION_ZONE_CLUSTER/
+// DROUGHT_RUN audit the separate revelation string|null field, not this purpose enum value) -- a
+// genuinely virgin field. This wave adds DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER and DIALOGUE_
+// REVELATION_PURPOSE_DROUGHT_RUN (peak mode conventionally skipped for this categorical field),
+// plus DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE, extending the 4-zone checkZoneImbalance mode to
+// the emotionalShift valence signal (emotionalShift === 'positive' has a complete 3-zone/run trio
+// but has never been audited by it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5476,6 +5485,74 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r924c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName924c} contains ${r924c.counts[r924c.bloatZoneIdx]} of them (${Math.round((r924c.counts[r924c.bloatZoneIdx] / r924c.totalCount) * 100)}%) while ${emptyNames924c} contains none. Dialogue turns dark in one quarter and stays even elsewhere, giving its emotional register an uneven structural rhythm.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) -- ${emptyNames924c} -- so dialogue's darker register recurs across the whole story, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER -- Distribution/timing x purpose === 'revelation' x
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n>=9, >=3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from DIALOGUE_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value -- purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r938a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r938a.fires) {
+      issues.push({
+        location: `${r938a.zoneNames[r938a.maxZoneIdx]} third -- ${r938a.maxZoneCount} of ${r938a.count} revelation-purposed scenes`,
+        rule: 'DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r938a.maxZoneCount / r938a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r938a.zoneNames[r938a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, dialogue voices new information in one part of the story and stays flat elsewhere.`,
+        suggestedFix: `Purpose at least one scene outside the ${r938a.zoneNames[r938a.maxZoneIdx]} third as a revelation so dialogue keeps voicing new information more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN -- Run-based x purpose === 'revelation' absence. Built
+  // on checkDroughtRun from the shared checks library. n>=10, >=3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of 3
+  // slots for this purpose value alongside the zone-cluster mode added in this same wave (peak mode
+  // conventionally skipped for this categorical field).
+  {
+    const r938b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r938b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r938b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r938b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r938b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with no turns of new information leaves dialogue with nothing new to voice for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r938b.longestRun}-scene stretch as a revelation so dialogue keeps voicing new information throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE -- Underweight/bloat x emotionalShift === 'positive' x
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n>=10, >=4 positive-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds >=50% of the total. Distinct from the existing 3-zone DIALOGUE_POSITIVE_EMOTION_
+  // ZONE_CLUSTER and run-based DIALOGUE_POSITIVE_EMOTION_DROUGHT_RUN -- the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r938c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r938c.fires) {
+      const emptyNames938c = r938c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName938c = FOUR_ZONE_NAMES[r938c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames938c} empty; ${bloatName938c} has ${r938c.counts[r938c.bloatZoneIdx]}/${r938c.totalCount} positive-shift scenes`,
+        rule: 'DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r938c.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName938c} contains ${r938c.counts[r938c.bloatZoneIdx]} of them (${Math.round((r938c.counts[r938c.bloatZoneIdx] / r938c.totalCount) * 100)}%) while ${emptyNames938c} contains none. Dialogue lifts in one quarter and stays even elsewhere, giving its warmer register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute upswings: place a positive emotional beat in at least one scene inside the empty zone(s) -- ${emptyNames938c} -- so dialogue's warmer register recurs across the whole story, not only the quarter currently carrying most of them.`,
       });
     }
   }

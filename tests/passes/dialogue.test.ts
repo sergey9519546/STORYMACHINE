@@ -1598,6 +1598,77 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 938 — dialoguePass: dialogue revelation_purpose zone cluster, dialogue revelation_purpose drought run, dialogue positive_emotion zone imbalance', async () => {
+    const makeRec938 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes938 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD938 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler default 'establish_world'.
+    it('DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const records938a = Array.from({ length: 9 }, (_, i) =>
+        makeRec938(i, [0, 1, 2].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD938(buildScenes938(9), records938a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER'), 'DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const records938an = Array.from({ length: 9 }, (_, i) =>
+        makeRec938(i, [0, 4, 8].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD938(buildScenes938(9), records938an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER'), 'DIALOGUE_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const records938b = Array.from({ length: 10 }, (_, i) =>
+        makeRec938(i, [0, 8, 9].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD938(buildScenes938(10), records938b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN'), 'DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const records938bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec938(i, [0, 3, 6, 9].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD938(buildScenes938(10), records938bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN'), 'DIALOGUE_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // positive at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE fires when positive-shift scenes cluster in two zones and two are empty', async () => {
+      const records938c = Array.from({ length: 10 }, (_, i) =>
+        makeRec938(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runD938(buildScenes938(10), records938c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const records938cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec938(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runD938(buildScenes938(10), records938cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 924 — dialoguePass: dialogue character_moment zone imbalance, dialogue stakes zone imbalance, dialogue negative_emotion zone imbalance', async () => {
     const makeRec924 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
