@@ -402,6 +402,11 @@
 // conventionally skipped for this categorical field), plus RHYTHM_COMPLICATE_ZONE_IMBALANCE,
 // continuing the checkZoneImbalance rollout: purpose === 'complicate' had its 3-zone/run trio
 // completed in Wave 918 but has never been audited by the 4-zone bloat+empty-zone mode.
+// Wave 946 additions: extending the checkZoneImbalance rollout to three more trio-complete signals
+// spanning three distinct signal classes: RHYTHM_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes' —
+// purpose value), RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive', the
+// positive-valence mirror of Wave 918's negative one), and RHYTHM_SUSPENSE_ZONE_IMBALANCE
+// (suspenseDelta > 0 — tension-delta magnitude).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4765,6 +4770,80 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r932c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName932c} contains ${r932c.counts[r932c.bloatZoneIdx]} of them (${Math.round((r932c.counts[r932c.bloatZoneIdx] / r932c.totalCount) * 100)}%) while ${emptyNames932c} contains none. Complications bloat in one structural quarter and vanish from another, giving the rhythm's rising trouble an uneven structural pattern.`,
         suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames932c} — so the rhythm keeps pulsing with fresh trouble across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 stakes-raising scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone RHYTHM_STAKES_ZONE_
+  // CLUSTER and run-based RHYTHM_STAKES_DROUGHT_RUN — the first application of the 4-zone bloat+empty-
+  // zone mode to this purpose value in this pass.
+  {
+    const r946a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r946a.fires) {
+      const emptyNames946a = r946a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName946a = FOUR_ZONE_NAMES[r946a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames946a} empty; ${bloatName946a} has ${r946a.counts[r946a.bloatZoneIdx]}/${r946a.totalCount} stakes-raising scenes`,
+        rule: 'RHYTHM_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r946a.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName946a} contains ${r946a.counts[r946a.bloatZoneIdx]} of them (${Math.round((r946a.counts[r946a.bloatZoneIdx] / r946a.totalCount) * 100)}%) while ${emptyNames946a} contains none. Escalation bloats in one structural quarter and never rises in another, giving the rhythm's intensifying pulse an uneven structural pattern.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames946a} — so the rhythm keeps intensifying across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone RHYTHM_POSITIVE_EMOTION_ZONE_CLUSTER and run-based RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this valence signal, and the
+  // positive-valence mirror of the Wave 918 RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r946b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r946b.fires) {
+      const emptyNames946b = r946b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName946b = FOUR_ZONE_NAMES[r946b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames946b} empty; ${bloatName946b} has ${r946b.counts[r946b.bloatZoneIdx]}/${r946b.totalCount} positive-shift scenes`,
+        rule: 'RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r946b.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName946b} contains ${r946b.counts[r946b.bloatZoneIdx]} of them (${Math.round((r946b.counts[r946b.bloatZoneIdx] / r946b.totalCount) * 100)}%) while ${emptyNames946b} contains none. Upbeats bloat in one structural quarter and vanish from another, giving the rhythm's brighter beats an uneven structural pattern.`,
+        suggestedFix: `Redistribute upbeats: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames946b} — so the rhythm's brighter beats land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone RHYTHM_
+  // SUSPENSE_ZONE_CLUSTER and run-based RHYTHM_SUSPENSE_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than categorical purpose or emotional valence.
+  {
+    const r946c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r946c.fires) {
+      const emptyNames946c = r946c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName946c = FOUR_ZONE_NAMES[r946c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames946c} empty; ${bloatName946c} has ${r946c.counts[r946c.bloatZoneIdx]}/${r946c.totalCount} suspense-raising scenes`,
+        rule: 'RHYTHM_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r946c.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName946c} contains ${r946c.counts[r946c.bloatZoneIdx]} of them (${Math.round((r946c.counts[r946c.bloatZoneIdx] / r946c.totalCount) * 100)}%) while ${emptyNames946c} contains none. Tension bloats in one structural quarter and flatlines in another, giving the rhythm's taut beats an uneven structural pattern.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames946c} — so the rhythm keeps tightening across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

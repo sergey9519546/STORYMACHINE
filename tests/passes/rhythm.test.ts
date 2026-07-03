@@ -1136,6 +1136,61 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 946 — rhythmPass: rhythm stakes zone imbalance, rhythm positive emotion zone imbalance, rhythm suspense zone imbalance', async () => {
+    const runR946 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('RHYTHM_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs946a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runR946(recs946a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_ZONE_IMBALANCE'), 'RHYTHM_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs946an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runR946(recs946an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_ZONE_IMBALANCE'), 'RHYTHM_STAKES_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs946b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runR946(recs946b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs946bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runR946(recs946bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RHYTHM_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs946c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runR946(recs946c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_ZONE_IMBALANCE'), 'RHYTHM_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs946cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runR946(recs946cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SUSPENSE_ZONE_IMBALANCE'), 'RHYTHM_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 932 — rhythmPass: rhythm revelation purpose zone cluster, rhythm revelation purpose drought run, rhythm complicate zone imbalance', async () => {
     const runR932 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
