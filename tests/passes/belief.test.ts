@@ -1204,6 +1204,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 656 — beliefPass: belief payoff peak uncaused, belief clock drought run, belief seed zone cluster', async () => {
+    const runBF656 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_PAYOFF_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1 thread) and 6 (5 threads, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('BELIEF_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs656a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs656a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs656a[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF656(recs656a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_PEAK_UNCAUSED'), 'BELIEF_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs656an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs656an[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs656an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs656an[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF656(recs656an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_PEAK_UNCAUSED'), 'BELIEF_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clock raised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs656b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs656b[0] = makeSharedRecord(0, { clockRaised: true });
+      recs656b[1] = makeSharedRecord(1, { clockRaised: true });
+      recs656b[2] = makeSharedRecord(2, { clockRaised: true });
+      recs656b[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runBF656(recs656b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DROUGHT_RUN'), 'BELIEF_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_CLOCK_DROUGHT_RUN no-fire:
+    // clock raised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs656bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs656bn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs656bn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs656bn[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runBF656(recs656bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DROUGHT_RUN'), 'BELIEF_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('BELIEF_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs656c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs656c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs656c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs656c[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runBF656(recs656c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_ZONE_CLUSTER'), 'BELIEF_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs656cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs656cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs656cn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs656cn[7] = makeSharedRecord(7, { seededClueIds: ['clue-c'] });
+      const res = await runBF656(recs656cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_ZONE_CLUSTER'), 'BELIEF_SEED_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 642 — beliefPass: belief open thread drought run, belief staging zone cluster, belief seed curiosity decoupled', async () => {
     const runBF642 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

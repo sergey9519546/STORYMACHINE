@@ -236,6 +236,15 @@
 // (distribution/timing × visualBeats × structural thirds — first zone-cluster mode applied to
 // records here), BELIEF_SEED_CURIOSITY_DECOUPLED (co-occurrence/decoupling × seededClueIds ×
 // curiosityDelta — first pairing of these two fields).
+// Wave 656 additions: BELIEF_PAYOFF_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// payoffSetupIds magnitude — the scene with the most simultaneous thread resolutions has no
+// dramatic turn or revelation in itself or the two scenes before it; every prior peak check in
+// this 114-rule pass anchors on revelation/curiosity/suspense/relationship/clockDelta, never on
+// the payoff channel), BELIEF_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — Wave 642
+// applied the drought-run mode to unresolvedClues; clockRaised itself has never been
+// drought-audited here), BELIEF_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds ×
+// structural thirds — Wave 642 applied the zone-cluster mode to visualBeats; seededClueIds itself
+// has never been cluster-audited here despite already anchoring BELIEF_SEED_CURIOSITY_DECOUPLED).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3617,6 +3626,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The ${r642c.aCount} scenes where a clue is planted never coincide with the ${r642c.bCount} scenes where curiosity spikes — the seed and wonder-engine channels run on separate tracks. Planting a clue is a natural occasion for the audience's curiosity to visibly rise, but that pairing never happens here.`,
         suggestedFix: `Let at least one seed scene also spike curiosity — a planted detail that immediately makes the audience wonder what it means, tying the clue-planting and wonder-generation channels together.`,
+      });
+    }
+  }
+
+  // ── Wave 656: BELIEF_PAYOFF_PEAK_UNCAUSED, BELIEF_CLOCK_DROUGHT_RUN, BELIEF_SEED_ZONE_CLUSTER ──
+
+  // BELIEF_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Every prior peak check in this pass anchors on revelation/curiosity/suspense/relationship/
+  // clockDelta; this is the first application to the payoff channel.
+  {
+    const r656a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r656a.fires) {
+      issues.push({
+        location: `scene ${r656a.peakIdx + 1} — peak payoff density (${r656a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r656a.peakIdx + 1}, with ${r656a.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r656a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. Wave 642 applied the drought-run
+  // mode to unresolvedClues; clockRaised itself has never been drought-audited here.
+  {
+    const r656b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r656b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r656b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r656b.longestRun} consecutive scenes with no clock raised at all, even though ${r656b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the belief-tracking layer's sense of urgency dormant for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r656b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the story maintains some sense of time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Wave 642 applied the zone-cluster mode to visualBeats;
+  // seededClueIds itself has never been cluster-audited here despite already anchoring
+  // BELIEF_SEED_CURIOSITY_DECOUPLED.
+  {
+    const r656c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r656c.fires) {
+      const zoneName656c = r656c.zoneNames[r656c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName656c} third — ${r656c.maxZoneCount}/${r656c.count} seed scenes`,
+        rule: 'BELIEF_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r656c.maxZoneCount} of the story's ${r656c.count} clue-planting scenes (${Math.round((r656c.maxZoneCount / r656c.count) * 100)}%) cluster in the ${zoneName656c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new seed feeding the belief-tracking layer.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName656c} third — spreading foreshadowing across the story lets every structural third carry some material for the audience's beliefs to track.`,
       });
     }
   }
