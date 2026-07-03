@@ -931,6 +931,71 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 864 — themePass: theme climax drought run, theme establish world drought run, theme resolution zone cluster', async () => {
+    const runT864 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLIMAX_DROUGHT_RUN fire:
+    // n=10; climax at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_CLIMAX_DROUGHT_RUN fires when a long run has no climax-purposed scene', async () => {
+      const recs864a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT864(recs864a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_DROUGHT_RUN'), 'THEME_CLIMAX_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_CLIMAX_DROUGHT_RUN does not fire when climax-purposed scenes are evenly spread', async () => {
+      const recs864an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT864(recs864an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_DROUGHT_RUN'), 'THEME_CLIMAX_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_ESTABLISH_WORLD_DROUGHT_RUN fire:
+    // n=10; establish_world at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_ESTABLISH_WORLD_DROUGHT_RUN fires when a long run has no world-establishing scene', async () => {
+      const recs864b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT864(recs864b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_DROUGHT_RUN'), 'THEME_ESTABLISH_WORLD_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_ESTABLISH_WORLD_DROUGHT_RUN does not fire when world-establishing scenes are evenly spread', async () => {
+      const recs864bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT864(recs864bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_DROUGHT_RUN'), 'THEME_ESTABLISH_WORLD_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('THEME_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs864c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runT864(recs864c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_ZONE_CLUSTER'), 'THEME_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs864cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runT864(recs864cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RESOLUTION_ZONE_CLUSTER'), 'THEME_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 850 — themePass: theme positive emotion drought run, theme establish world zone cluster, theme climax zone cluster', async () => {
     const runT850 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
