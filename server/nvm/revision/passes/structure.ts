@@ -275,6 +275,14 @@
 // has never been applied to it), STRUCTURE_CLOCK_DROUGHT_RUN (run-based × clockRaised absence —
 // Wave 667 applied the zone-cluster mode to clockRaised; the drought-run mode has never been
 // applied to it).
+// Wave 737 additions: STRUCTURE_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absence — Waves
+// 667/723 applied the backward-cause peak and zone-cluster modes to payoffSetupIds; the
+// drought-run mode has never been applied to it, completing the trio),
+// STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/backward-cause × relationshipShifts
+// magnitude — Waves 667/723 applied the run-based drought and zone-cluster modes to
+// relationshipShifts; the backward-cause peak mode has never been applied to it, completing the
+// trio), STRUCTURE_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 681 applied
+// the backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4037,6 +4045,75 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r723c.longestRun} consecutive scenes with no clock raised at all, even though ${r723c.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the story's structure without any urgency for an extended run.`,
         suggestedFix: `Raise a clock somewhere within the ${r723c.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the story's structure stays under some time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 737: STRUCTURE_PAYOFF_DROUGHT_RUN, STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED,
+  //              STRUCTURE_CLOCK_DELTA_DROUGHT_RUN ─────────────────────────────────────────
+
+  // STRUCTURE_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with no thread resolution reaches 6. Waves 667/723 applied the
+  // backward-cause peak and zone-cluster modes to payoffSetupIds; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r737a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r737a.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r737a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r737a.longestRun} consecutive scenes with no thread resolution at all, even though ${r737a.presentCount} scenes elsewhere do deliver a payoff. A long unbroken stretch with nothing resolving leaves the story's structure without a satisfying beat for an extended run.`,
+        suggestedFix: `Resolve at least one planted thread within the ${r737a.longestRun}-scene stretch so the structure keeps delivering satisfaction throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // relationshipShifts magnitude. Built on checkPeakUncaused from the shared checks library. n≥8,
+  // ≥2 scenes carrying a relationship shift, a 2-scene lookback. Finds the single scene with the
+  // most simultaneous bond changes; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. Waves 667/723 applied the run-based drought and
+  // zone-cluster modes to relationshipShifts; the backward-cause peak mode has never been applied
+  // to it, completing the trio.
+  {
+    const r737b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r737b.fires) {
+      issues.push({
+        location: `scene ${r737b.peakIdx + 1} — peak relationship-shift density (${r737b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r737b.peakIdx + 1}, with ${r737b.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the story's structure is causally connected.`,
+        suggestedFix: `Give scene ${r737b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires
+  // when the longest consecutive run of scenes with zero clock movement reaches 6. Wave 681
+  // applied the backward-cause peak mode to clockDelta; the drought-run mode has never been
+  // applied to it.
+  {
+    const r737c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r737c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r737c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r737c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r737c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the story's structure without any mechanical pressure driving events forward for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r737c.longestRun}-scene stretch so the structure keeps a mechanical pressure acting on events throughout that stretch.`,
       });
     }
   }

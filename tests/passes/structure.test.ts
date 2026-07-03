@@ -1006,6 +1006,100 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 737 — structurePass: structure payoff drought run, structure relationship peak uncaused, structure clock delta drought run', async () => {
+    const runST737 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_PAYOFF_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a payoff (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('STRUCTURE_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run reaches 6', async () => {
+      const recs737a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs737a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs737a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs737a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runST737(recs737a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_DROUGHT_RUN'), 'STRUCTURE_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_PAYOFF_DROUGHT_RUN no-fire:
+    // payoff scenes spread out so no gap reaches 6 consecutive scenes
+    it('STRUCTURE_PAYOFF_DROUGHT_RUN does not fire when payoffs are spread through the story', async () => {
+      const recs737an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs737an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs737an[3] = makeSharedRecord(3, { payoffSetupIds: ['thread-b'] });
+      recs737an[6] = makeSharedRecord(6, { payoffSetupIds: ['thread-c'] });
+      recs737an[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runST737(recs737an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_DROUGHT_RUN'), 'STRUCTURE_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; relationship shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs737b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs737b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs737b[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runST737(recs737b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED'), 'STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs737bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs737bn[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs737bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs737bn[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runST737(recs737bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED'), 'STRUCTURE_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // STRUCTURE_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('STRUCTURE_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs737c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs737c[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs737c[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs737c[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runST737(recs737c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_DROUGHT_RUN'), 'STRUCTURE_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('STRUCTURE_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs737cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs737cn[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs737cn[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs737cn[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs737cn[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runST737(recs737cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_DROUGHT_RUN'), 'STRUCTURE_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 723 — structurePass: structure payoff zone cluster, structure relationship zone cluster, structure clock drought run', async () => {
     const runST723 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
