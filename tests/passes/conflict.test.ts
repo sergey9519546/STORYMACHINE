@@ -1535,6 +1535,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 954 — conflictPass: conflict relationship zone imbalance, conflict turn zone imbalance, conflict revelation zone imbalance', async () => {
+    const makeRec954 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF954 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CONFLICT_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs954a = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 1, 2, 8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runCF954(recs954a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RELATIONSHIP_ZONE_IMBALANCE'), 'CONFLICT_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs954an = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 3, 5, 8].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runCF954(recs954an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RELATIONSHIP_ZONE_IMBALANCE'), 'CONFLICT_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs954b = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 1, 2, 8, 9].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runCF954(recs954b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_ZONE_IMBALANCE'), 'CONFLICT_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs954bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 3, 5, 8].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runCF954(recs954bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_ZONE_IMBALANCE'), 'CONFLICT_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs954c = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 1, 2, 8, 9].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runCF954(recs954c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_ZONE_IMBALANCE'), 'CONFLICT_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs954cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec954(i, [0, 3, 5, 8].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runCF954(recs954cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_ZONE_IMBALANCE'), 'CONFLICT_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 940 — conflictPass: conflict positive emotion zone imbalance, conflict curiosity zone imbalance, conflict open thread zone imbalance', async () => {
     const makeRec940 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

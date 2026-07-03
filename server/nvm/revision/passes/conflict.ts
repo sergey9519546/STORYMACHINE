@@ -441,6 +441,11 @@
 // audited by it: CONFLICT_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive'), CONFLICT_
 // CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0), and CONFLICT_OPEN_THREAD_ZONE_IMBALANCE
 // (unresolvedClues.length > 0).
+// Wave 954 additions: with conflict's valence/delta/clue-array/purpose signals now saturated by the
+// 4-zone mode, this wave audits three remaining trio-complete signals spanning three distinct
+// classes: CONFLICT_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array), CONFLICT_TURN_ZONE_
+// IMBALANCE (dramaticTurn !== 'nothing' categorical), and CONFLICT_REVELATION_ZONE_IMBALANCE
+// (revelation string field, != null — distinct from the purpose-enum CONFLICT_REVELATION_PURPOSE one).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5529,6 +5534,82 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r940c.totalCount} scenes that leave a thread unresolved are unevenly distributed across its four structural zones: ${bloatName940c} contains ${r940c.counts[r940c.bloatZoneIdx]} of them (${Math.round((r940c.counts[r940c.bloatZoneIdx] / r940c.totalCount) * 100)}%) while ${emptyNames940c} contains none. Open threads bloat in one structural quarter and vanish from another, so the conflict's dangling questions pile up in only part of the story.`,
         suggestedFix: `Redistribute open threads: leave a thread unresolved in at least one scene inside the empty zone(s) — ${emptyNames940c} — so the conflict keeps dangling questions alive across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // scenes with a relationship shift total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone CONFLICT_RELATIONSHIP_ZONE_CLUSTER and run-based CONFLICT_RELATIONSHIP_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to the relationship-shift array
+  // field, keying on where interpersonal conflict actually shifts bonds.
+  {
+    const r954a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r954a.fires) {
+      const emptyNames954a = r954a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName954a = FOUR_ZONE_NAMES[r954a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames954a} empty; ${bloatName954a} has ${r954a.counts[r954a.bloatZoneIdx]}/${r954a.totalCount} relationship-shift scenes`,
+        rule: 'CONFLICT_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r954a.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName954a} contains ${r954a.counts[r954a.bloatZoneIdx]} of them (${Math.round((r954a.counts[r954a.bloatZoneIdx] / r954a.totalCount) * 100)}%) while ${emptyNames954a} contains none. Bonds shift in a bloated cluster in one structural quarter and stay static in another, so the story's interpersonal conflict reshapes relationships in only part of its span.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames954a} — a relationship shift so interpersonal conflict keeps reshaping bonds across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone CONFLICT_TURN_ZONE_CLUSTER and run-based CONFLICT_TURN_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical
+  // signal, keying on where the conflict actually pivots.
+  {
+    const r954b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r954b.fires) {
+      const emptyNames954b = r954b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName954b = FOUR_ZONE_NAMES[r954b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames954b} empty; ${bloatName954b} has ${r954b.counts[r954b.bloatZoneIdx]}/${r954b.totalCount} dramatic-turn scenes`,
+        rule: 'CONFLICT_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r954b.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName954b} contains ${r954b.counts[r954b.bloatZoneIdx]} of them (${Math.round((r954b.counts[r954b.bloatZoneIdx] / r954b.totalCount) * 100)}%) while ${emptyNames954b} contains none. Turns bloat in one structural quarter and never fire in another, so the conflict pivots in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames954b} — a dramatic turn so the conflict keeps pivoting across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone CONFLICT_REVELATION_
+  // ZONE_CLUSTER and run-based CONFLICT_REVELATION_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the revelation STRING field (revelation != null), and distinct from
+  // CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation'
+  // enum value.
+  {
+    const r954c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r954c.fires) {
+      const emptyNames954c = r954c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName954c = FOUR_ZONE_NAMES[r954c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames954c} empty; ${bloatName954c} has ${r954c.counts[r954c.bloatZoneIdx]}/${r954c.totalCount} revelation scenes`,
+        rule: 'CONFLICT_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r954c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName954c} contains ${r954c.counts[r954c.bloatZoneIdx]} of them (${Math.round((r954c.counts[r954c.bloatZoneIdx] / r954c.totalCount) * 100)}%) while ${emptyNames954c} contains none. Disclosures bloat in one structural quarter and never land in another, so new information reframes the conflict in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames954c} — so new information keeps reframing the conflict across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
