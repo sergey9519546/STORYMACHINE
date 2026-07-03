@@ -1136,6 +1136,84 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 694 — rhythmPass: relational signal peak uncaused, seed signal zone cluster, dialogue signal drought run', async () => {
+    const runR694 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('RELATIONAL_SIGNAL_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs694a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs694a[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs694a[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runR694(recs694a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_PEAK_UNCAUSED'), 'RELATIONAL_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONAL_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('RELATIONAL_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs694an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs694an[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs694an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs694an[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runR694(recs694an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_PEAK_UNCAUSED'), 'RELATIONAL_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+
+    // SEED_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('SEED_SIGNAL_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs694b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs694b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs694b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs694b[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runR694(recs694b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_ZONE_CLUSTER'), 'SEED_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // SEED_SIGNAL_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('SEED_SIGNAL_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs694bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs694bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs694bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs694bn[7] = makeSharedRecord(7, { seededClueIds: ['clue-c'] });
+      const res = await runR694(recs694bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_ZONE_CLUSTER'), 'SEED_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_SIGNAL_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs694c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs694c[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs694c[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs694c[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs694c[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runR694(recs694c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_DROUGHT_RUN'), 'DIALOGUE_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_SIGNAL_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_SIGNAL_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs694cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs694cn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs694cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs694cn[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runR694(recs694cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_DROUGHT_RUN'), 'DIALOGUE_SIGNAL_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 680 — rhythmPass: payoff signal peak uncaused, open thread signal drought run, relational signal zone cluster', async () => {
     const runR680 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

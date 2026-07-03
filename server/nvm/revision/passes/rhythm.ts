@@ -245,6 +245,16 @@
 // time), RELATIONAL_SIGNAL_ZONE_CLUSTER (distribution/timing × relationshipShifts × structural
 // thirds — Wave 610's RELATIONAL_SIGNAL_DROUGHT_RUN applied the drought-run mode to
 // relationshipShifts; the zone-cluster mode has never been applied to this channel).
+// Wave 694 additions: RELATIONAL_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// relationshipShifts magnitude — Waves 610/680 applied the drought-run and zone-cluster modes to
+// relationshipShifts; the backward-cause peak mode has never been applied to it, completing the
+// channel's coverage), SEED_SIGNAL_ZONE_CLUSTER (distribution/timing × seededClueIds × structural
+// thirds — distinct from Wave 624's four-zone SEED_SIGNAL_ZONE_IMBALANCE and Wave 666's
+// SEED_SIGNAL_DROUGHT_RUN; a thirds-based concentration measure never applied to this channel),
+// DIALOGUE_SIGNAL_DROUGHT_RUN (run-based × dialogueHighlights absence — Wave 666 applied the
+// backward-cause peak mode to dialogueHighlights, and Waves 624/638 paired it in co-occurrence
+// checks; the run-based drought mode has never been applied to it, completing the channel's
+// coverage).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3384,6 +3394,75 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r680c.maxZoneCount} of the story's ${r680c.count} relationship-shift scenes (${Math.round((r680c.maxZoneCount / r680c.count) * 100)}%) cluster in the ${zoneName680c} third. Bond changes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds without any relational movement carrying the rhythm.`,
         suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName680c} third — spreading relational movement across the story lets each structural third carry its own sense of changing dynamics.`,
+      });
+    }
+  }
+
+  // ── Wave 694: RELATIONAL_SIGNAL_PEAK_UNCAUSED, SEED_SIGNAL_ZONE_CLUSTER,
+  //              DIALOGUE_SIGNAL_DROUGHT_RUN ───────────────────────────────────────────────────
+
+  // RELATIONAL_SIGNAL_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 610/680 applied the drought-run and zone-cluster modes to
+  // relationshipShifts; the backward-cause peak mode has never been applied to it.
+  {
+    const r694a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r694a.fires) {
+      issues.push({
+        location: `scene ${r694a.peakIdx + 1} — peak relationship-shift density (${r694a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r694a.peakIdx + 1}, with ${r694a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's rhythm to spend its most relationally dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r694a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // SEED_SIGNAL_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Distinct from Wave 624's four-zone SEED_SIGNAL_ZONE_
+  // IMBALANCE and Wave 666's SEED_SIGNAL_DROUGHT_RUN; a thirds-based concentration measure never
+  // applied to this channel.
+  {
+    const r694b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r694b.fires) {
+      const zoneName694b = r694b.zoneNames[r694b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName694b} third — ${r694b.maxZoneCount}/${r694b.count} seed scenes`,
+        rule: 'SEED_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r694b.maxZoneCount} of the story's ${r694b.count} clue-planting scenes (${Math.round((r694b.maxZoneCount / r694b.count) * 100)}%) cluster in the ${zoneName694b} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the story's rhythm of planted promises an uneven pulse.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName694b} third — spreading foreshadowing across the story lets the rhythm of planted promises build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SIGNAL_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall, fires when the
+  // longest consecutive run of scenes with no highlighted dialogue reaches 6. Wave 666 applied the
+  // backward-cause peak mode to dialogueHighlights, and Waves 624/638 paired it in co-occurrence
+  // checks; the run-based drought mode has never been applied to it.
+  {
+    const r694c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r694c.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r694c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r694c.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r694c.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the story's rhythm running on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r694c.longestRun}-scene stretch a standout line of dialogue — keeping the verbal register of the story's rhythm alive throughout that stretch.`,
       });
     }
   }
