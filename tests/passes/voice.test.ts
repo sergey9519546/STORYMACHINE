@@ -1438,6 +1438,61 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 949 — voicePass: voice revelation purpose zone imbalance, voice suspense zone imbalance, voice payoff zone imbalance', async () => {
+    const runV949 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs949a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runV949(recs949a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs949an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runV949(recs949an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs949b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runV949(recs949b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_ZONE_IMBALANCE'), 'VOICE_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs949bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runV949(recs949bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_ZONE_IMBALANCE'), 'VOICE_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs949c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 1, 2, 8, 9].includes(i) ? ['s1'] : [] }));
+      const res = await runV949(recs949c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_ZONE_IMBALANCE'), 'VOICE_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs949cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 3, 5, 8].includes(i) ? ['s1'] : [] }));
+      const res = await runV949(recs949cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_ZONE_IMBALANCE'), 'VOICE_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 935 — voicePass: voice revelation purpose zone cluster, voice revelation purpose drought run, voice negative emotion zone imbalance', async () => {
     const runV935 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

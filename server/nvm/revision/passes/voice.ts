@@ -406,6 +406,11 @@
 // conventionally skipped for this categorical field), plus VOICE_NEGATIVE_EMOTION_ZONE_IMBALANCE,
 // extending the 4-zone checkZoneImbalance mode to the emotionalShift valence signal (emotionalShift
 // === 'negative' has a complete 3-zone/run trio but has never been audited by it).
+// Wave 949 additions: extending the checkZoneImbalance rollout to three more trio-complete signals
+// spanning three distinct signal classes: VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose ===
+// 'revelation', trio completed Wave 935), VOICE_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — tension-
+// delta magnitude), and VOICE_PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0 — a payoffSetupIds
+// array field distinct from the already-audited visualBeats/relationshipShifts imbalances).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5660,6 +5665,82 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r935c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName935c} contains ${r935c.counts[r935c.bloatZoneIdx]} of them (${Math.round((r935c.counts[r935c.bloatZoneIdx] / r935c.totalCount) * 100)}%) while ${emptyNames935c} contains none. Downturns bloat in one structural quarter and vanish from another, giving the voice's darker register an uneven structural rhythm.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames935c} — so the voice's darker register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the 4-zone
+  // gap for this purpose value (its 3-zone/run trio was completed in Wave 935). n≥10, ≥4 revelation-
+  // purposed scenes total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Distinct from VOICE_REVELATION_PURPOSE_
+  // ZONE_CLUSTER/DROUGHT_RUN (Wave 935) — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value, and distinct from the separate revelation-FIELD rules (VOICE_REVELATION_
+  // ZONE_CLUSTER/DROUGHT_RUN audit the revelation string, not the purpose enum).
+  {
+    const r949a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r949a.fires) {
+      const emptyNames949a = r949a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName949a = FOUR_ZONE_NAMES[r949a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames949a} empty; ${bloatName949a} has ${r949a.counts[r949a.bloatZoneIdx]}/${r949a.totalCount} revelation-purposed scenes`,
+        rule: 'VOICE_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r949a.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName949a} contains ${r949a.counts[r949a.bloatZoneIdx]} of them (${Math.round((r949a.counts[r949a.bloatZoneIdx] / r949a.totalCount) * 100)}%) while ${emptyNames949a} contains none. Disclosure scenes bloat in one structural quarter and vanish from another, giving the voice's register of revelation an uneven structural rhythm.`,
+        suggestedFix: `Redistribute disclosures: purpose at least one scene inside the empty zone(s) — ${emptyNames949a} — as a revelation so the voice's register of disclosure recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone VOICE_SUSPENSE_ZONE_
+  // CLUSTER and run-based VOICE_SUSPENSE_DROUGHT_RUN — the first application of the 4-zone bloat+
+  // empty-zone mode to the suspense-delta magnitude signal in this pass, keying on tension change
+  // rather than categorical purpose or emotional valence.
+  {
+    const r949b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r949b.fires) {
+      const emptyNames949b = r949b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName949b = FOUR_ZONE_NAMES[r949b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames949b} empty; ${bloatName949b} has ${r949b.counts[r949b.bloatZoneIdx]}/${r949b.totalCount} suspense-raising scenes`,
+        rule: 'VOICE_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r949b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName949b} contains ${r949b.counts[r949b.bloatZoneIdx]} of them (${Math.round((r949b.counts[r949b.bloatZoneIdx] / r949b.totalCount) * 100)}%) while ${emptyNames949b} contains none. Tension bloats in one structural quarter and flatlines in another, giving the voice's taut register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames949b} — so the voice's taut register recurs across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone VOICE_PAYOFF_ZONE_CLUSTER and
+  // run-based VOICE_PAYOFF_DROUGHT_RUN, and distinct from the already-audited array-field imbalances
+  // VOICE_STAGING_ZONE_IMBALANCE (visualBeats) and VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE
+  // (relationshipShifts) — this keys on the payoffSetupIds array, a genuinely different field.
+  {
+    const r949c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r949c.fires) {
+      const emptyNames949c = r949c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName949c = FOUR_ZONE_NAMES[r949c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames949c} empty; ${bloatName949c} has ${r949c.counts[r949c.bloatZoneIdx]}/${r949c.totalCount} payoff scenes`,
+        rule: 'VOICE_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r949c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName949c} contains ${r949c.counts[r949c.bloatZoneIdx]} of them (${Math.round((r949c.counts[r949c.bloatZoneIdx] / r949c.totalCount) * 100)}%) while ${emptyNames949c} contains none. Payoff scenes bloat in one structural quarter and never occur in another, giving the voice's register of return and callback an uneven structural rhythm.`,
+        suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames949c} — so the voice's register of callback recurs across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
