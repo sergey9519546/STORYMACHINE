@@ -202,9 +202,26 @@
 // scenes, >75% in one structural third; evidence planting is ghettoized into one zone; first
 // distribution/timing check on the seed channel, distinct from ASSERTION_TEMPORAL_CLUSTER [assertion
 // channel] and REVELATION_TEMPORAL_CLUSTER [revelation channel]).
+// Wave 600 additions: clue debt belief decoupled (co-occurrence/decoupling × unresolvedClues-present
+// × dialogueHighlights-present — n≥6, ≥2 debt-carrying scenes, ≥2 belief-assertion scenes, zero
+// overlap; a lingering open mystery and a character voicing a belief never share a scene; first use
+// of unresolvedClues in this 102-rule file — UNRESOLVED_BELIEF_EXCESS is the closest-sounding
+// existing rule but operates on toldBeliefs/witnessedBeliefs [derived from dialogueHighlights text
+// parsing against UPDATE_BELIEF ops], a completely different data source from the unresolvedClues
+// array [populated by SEED_CLUE/PAYOFF_SETUP ops]), clue debt clock aftermath void (sequence/
+// aftermath × unresolvedClues-present trigger → clockRaised aftermath, built on checkAftermathVoid
+// from the shared checks library — audit M2.2 — n≥8, ≥3 qualifying debt-carrying scenes, none
+// followed by a clock raise within 2 scenes while ≥2 clock scenes exist elsewhere; an open mystery
+// never gets a ticking deadline attached to it downstream), clue debt zone imbalance (underweight/
+// bloat × unresolvedClues × four structural zones, built on checkZoneImbalance — one zone with no
+// debt-carrying scenes while another holds ≥50%; named CLUE_DEBT_* rather than reusing this
+// session's THEME_UNRESOLVED_CLUE_* or bare UNRESOLVED_CLUE_* rule strings from other passes, to
+// keep rule names distinct across the whole system even though each pass's issues are independently
+// scoped).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function beliefPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3282,6 +3299,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 600: CLUE_DEBT_BELIEF_DECOUPLED, CLUE_DEBT_CLOCK_AFTERMATH_VOID,
+  //              CLUE_DEBT_ZONE_IMBALANCE ─────────────────────────────────────────────────
+  // First checks in this 102-rule file to use the unresolvedClues signal — UNRESOLVED_BELIEF_
+  // EXCESS is the closest-sounding existing rule but operates on toldBeliefs/witnessedBeliefs
+  // (derived from dialogueHighlights text against UPDATE_BELIEF ops), a completely different
+  // data source from the unresolvedClues array (populated by SEED_CLUE/PAYOFF_SETUP ops).
+
+  // CLUE_DEBT_BELIEF_DECOUPLED — Co-occurrence/decoupling × unresolvedClues × dialogueHighlights.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 debt-carrying
+  // scenes (unresolvedClues non-empty), ≥2 belief-assertion scenes (dialogueHighlights non-empty).
+  // Zero overlap → fire. A scene where a mystery sits open and a scene where a character asserts
+  // a belief never coincide — the two layers this pass most cares about (deception/belief-tracking
+  // and mystery/clue-tracking) run on separate tracks.
+  {
+    const r600a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r600a.fires) {
+      issues.push({
+        location: `${r600a.aCount} clue-debt scene(s) and ${r600a.bCount} belief-assertion scene(s) — zero overlap`,
+        rule: 'CLUE_DEBT_BELIEF_DECOUPLED',
+        severity: 'minor',
+        description: `The script has ${r600a.aCount} scene(s) carrying outstanding clue-debt and ${r600a.bCount} scene(s) where a character asserts a belief, but the two never coincide. A scene where a mystery sits open is a natural moment for a character to voice what they believe about it — a suspicion, a theory, a denial. When the two layers never share a scene, the story's mystery-tracking and its belief-tracking run on parallel, disconnected tracks.`,
+        suggestedFix: `Let at least one scene carrying open clue-debt also include a character stating a belief connected to it — a suspicion about what the unresolved thread means, or a confident (possibly wrong) theory. Tying belief assertions to open mysteries makes both layers reinforce each other.`,
+      });
+    }
+  }
+
+  // CLUE_DEBT_CLOCK_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues-present trigger →
+  // clockRaised aftermath. Built on checkAftermathVoid from the shared checks library. n≥8, ≥3
+  // qualifying debt-carrying scenes (pos < n-2), ≥2 clock-raising scenes existing elsewhere. None
+  // of the qualifying debt scenes are followed by a clock raise within 2 scenes → fire. An open
+  // mystery never gets a ticking deadline attached to it downstream — the story never uses time
+  // pressure to force the outstanding question toward resolution.
+  {
+    const r600b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => r.clockRaised === true,
+    });
+    if (r600b.fires) {
+      issues.push({
+        location: `${r600b.triggerCount} clue-debt scene(s) — no clock raised within 2 scenes of any`,
+        rule: 'CLUE_DEBT_CLOCK_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `None of the story's ${r600b.triggerCount} scenes carrying outstanding clue-debt are followed by a clock raise within the next two, even though ${r600b.aftermathCount} clock-raising scene(s) exist elsewhere. An open mystery is a natural candidate for a ticking deadline — a reason the question must be answered soon rather than whenever it's convenient — but that connection is never made.`,
+        suggestedFix: `After at least one scene where clue-debt is left outstanding, raise a clock in the following scene or the one after — a deadline that makes resolving the open mystery urgent rather than optional. Tying time pressure to unresolved questions gives the audience a reason to feel the mystery pressing forward.`,
+      });
+    }
+  }
+
+  // CLUE_DEBT_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total.
+  {
+    const r600c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r600c.fires) {
+      const emptyNames600c = r600c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName600c = FOUR_ZONE_NAMES[r600c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames600c} empty; ${bloatName600c} has ${r600c.counts[r600c.bloatZoneIdx]}/${r600c.totalCount} clue-debt scenes`,
+        rule: 'CLUE_DEBT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r600c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName600c} contains ${r600c.counts[r600c.bloatZoneIdx]} of them (${Math.round((r600c.counts[r600c.bloatZoneIdx] / r600c.totalCount) * 100)}%) while ${emptyNames600c} contains none. The story's sense of active mystery bloats in one structural quarter and vanishes from another.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames600c} — rather than resolving everything before that quarter begins.`,
+      });
     }
   }
 

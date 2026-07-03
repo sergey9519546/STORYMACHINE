@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1200,6 +1203,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 600 — beliefPass: clue debt belief decoupled, clue debt clock aftermath void, clue debt zone imbalance', async () => {
+    const runBF600 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('CLUE_DEBT_BELIEF_DECOUPLED fires when no clue-debt scene coincides with a belief assertion', async () => {
+      // 6 scenes; debt at 0,1; belief assertions at 4,5 — zero overlap
+      const recs600a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs600a[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs600a[1] = makeSharedRecord(1, { unresolvedClues: ['clue-b'] });
+      recs600a[4] = makeSharedRecord(4, { dialogueHighlights: ['alice: believes X'] });
+      recs600a[5] = makeSharedRecord(5, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runBF600(recs600a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_DEBT_BELIEF_DECOUPLED'), 'CLUE_DEBT_BELIEF_DECOUPLED should fire');
+    });
+
+    it('CLUE_DEBT_BELIEF_DECOUPLED does not fire when a clue-debt scene also carries a belief assertion', async () => {
+      const recs600a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs600a[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'], dialogueHighlights: ['alice: believes X'] });
+      recs600a[1] = makeSharedRecord(1, { unresolvedClues: ['clue-b'] });
+      recs600a[4] = makeSharedRecord(4, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runBF600(recs600a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_DEBT_BELIEF_DECOUPLED'), 'CLUE_DEBT_BELIEF_DECOUPLED should not fire');
+    });
+
+    it('CLUE_DEBT_CLOCK_AFTERMATH_VOID fires when no clue-debt scene is followed by a clock raise within 2 scenes', async () => {
+      // 9 scenes; debt at 0,1,2 (windows reach at most scene 4); clock raises at 7,8 (outside every window)
+      const recs600b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs600b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs600b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs600b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      recs600b[7] = makeSharedRecord(7, { clockRaised: true });
+      recs600b[8] = makeSharedRecord(8, { clockRaised: true });
+      const res = await runBF600(recs600b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_DEBT_CLOCK_AFTERMATH_VOID'), 'CLUE_DEBT_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    it('CLUE_DEBT_CLOCK_AFTERMATH_VOID does not fire when a clue-debt scene is followed by a clock raise within 2 scenes', async () => {
+      const recs600bnr = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs600bnr[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs600bnr[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs600bnr[2] = makeSharedRecord(2, { unresolvedClues: ['c'], clockRaised: true });
+      recs600bnr[7] = makeSharedRecord(7, { clockRaised: true });
+      const res = await runBF600(recs600bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_DEBT_CLOCK_AFTERMATH_VOID'), 'CLUE_DEBT_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    it('CLUE_DEBT_ZONE_IMBALANCE fires when one zone has zero clue-debt scenes and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: debt at 6,7,8 (zone 2) plus 9 (zone 3) to meet minCount=4
+      const recs600c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs600c[6] = makeSharedRecord(6, { unresolvedClues: ['a'] });
+      recs600c[7] = makeSharedRecord(7, { unresolvedClues: ['b'] });
+      recs600c[8] = makeSharedRecord(8, { unresolvedClues: ['c'] });
+      recs600c[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runBF600(recs600c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_DEBT_ZONE_IMBALANCE'), 'CLUE_DEBT_ZONE_IMBALANCE should fire');
+    });
+
+    it('CLUE_DEBT_ZONE_IMBALANCE does not fire when clue-debt scenes are spread across all zones', async () => {
+      const recs600cnr = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs600cnr[1] = makeSharedRecord(1, { unresolvedClues: ['a'] });
+      recs600cnr[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs600cnr[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      recs600cnr[10] = makeSharedRecord(10, { unresolvedClues: ['d'] });
+      const res = await runBF600(recs600cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_DEBT_ZONE_IMBALANCE'), 'CLUE_DEBT_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 586 — beliefPass: revelation dramatic-turn aftermath void, assertion relationship aftermath void, revelation payoff aftermath void', async () => {
     const makeRec586 = (idx: number, overrides: any = {}): any => ({
