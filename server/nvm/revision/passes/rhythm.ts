@@ -407,6 +407,11 @@
 // purpose value), RHYTHM_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive', the
 // positive-valence mirror of Wave 918's negative one), and RHYTHM_SUSPENSE_ZONE_IMBALANCE
 // (suspenseDelta > 0 — tension-delta magnitude).
+// Wave 960 additions: auditing the three remaining trio-complete signals in this pass, spanning three
+// distinct classes: RHYTHM_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — the question-raising delta
+// beside Wave 946's suspense one), RHYTHM_REVELATION_ZONE_IMBALANCE (revelation != null — the
+// revelation string field), and RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation',
+// whose trio was completed in Wave 932 — the purpose enum, distinct from the string-field rule).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4844,6 +4849,81 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r946c.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName946c} contains ${r946c.counts[r946c.bloatZoneIdx]} of them (${Math.round((r946c.counts[r946c.bloatZoneIdx] / r946c.totalCount) * 100)}%) while ${emptyNames946c} contains none. Tension bloats in one structural quarter and flatlines in another, giving the rhythm's taut beats an uneven structural pattern.`,
         suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames946c} — so the rhythm keeps tightening across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone RHYTHM_CURIOSITY_
+  // ZONE_CLUSTER and run-based RHYTHM_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on question-
+  // raising change rather than the suspense delta audited in Wave 946.
+  {
+    const r960a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r960a.fires) {
+      const emptyNames960a = r960a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName960a = FOUR_ZONE_NAMES[r960a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames960a} empty; ${bloatName960a} has ${r960a.counts[r960a.bloatZoneIdx]}/${r960a.totalCount} curiosity-raising scenes`,
+        rule: 'RHYTHM_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r960a.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName960a} contains ${r960a.counts[r960a.bloatZoneIdx]} of them (${Math.round((r960a.counts[r960a.bloatZoneIdx] / r960a.totalCount) * 100)}%) while ${emptyNames960a} contains none. New questions bloat in one structural quarter and never open in another, giving the rhythm's inquisitive beats an uneven structural pattern.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames960a} — so the rhythm keeps opening fresh questions across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone RHYTHM_REVELATION_ZONE_
+  // CLUSTER and run-based RHYTHM_REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+
+  // empty-zone mode to the revelation STRING field (revelation != null), and distinct from RHYTHM_
+  // REVELATION_PURPOSE_ZONE_IMBALANCE below, which audits the separate purpose === 'revelation' enum.
+  {
+    const r960b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r960b.fires) {
+      const emptyNames960b = r960b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName960b = FOUR_ZONE_NAMES[r960b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames960b} empty; ${bloatName960b} has ${r960b.counts[r960b.bloatZoneIdx]}/${r960b.totalCount} revelation scenes`,
+        rule: 'RHYTHM_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r960b.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName960b} contains ${r960b.counts[r960b.bloatZoneIdx]} of them (${Math.round((r960b.counts[r960b.bloatZoneIdx] / r960b.totalCount) * 100)}%) while ${emptyNames960b} contains none. Disclosures bloat in one structural quarter and never land in another, giving the rhythm's beats of new information an uneven structural pattern.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames960b} — so the rhythm keeps pulsing with new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the 4-zone
+  // gap for this purpose value (its 3-zone/run trio was completed in Wave 932). n≥10, ≥4 revelation-
+  // purposed scenes total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Distinct from RHYTHM_REVELATION_PURPOSE_
+  // ZONE_CLUSTER/DROUGHT_RUN (Wave 932) and from the revelation-FIELD rule above (which audits the
+  // revelation string, not the purpose enum).
+  {
+    const r960c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r960c.fires) {
+      const emptyNames960c = r960c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName960c = FOUR_ZONE_NAMES[r960c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames960c} empty; ${bloatName960c} has ${r960c.counts[r960c.bloatZoneIdx]}/${r960c.totalCount} revelation-purposed scenes`,
+        rule: 'RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r960c.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName960c} contains ${r960c.counts[r960c.bloatZoneIdx]} of them (${Math.round((r960c.counts[r960c.bloatZoneIdx] / r960c.totalCount) * 100)}%) while ${emptyNames960c} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, giving the rhythm's information surges an uneven structural pattern.`,
+        suggestedFix: `Redistribute disclosures: purpose at least one scene inside the empty zone(s) — ${emptyNames960c} — as a revelation so the rhythm keeps surging with new information across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

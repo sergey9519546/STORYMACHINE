@@ -1136,6 +1136,61 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 960 — rhythmPass: rhythm curiosity zone imbalance, rhythm revelation zone imbalance, rhythm revelation purpose zone imbalance', async () => {
+    const runR960 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('RHYTHM_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs960a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runR960(recs960a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_ZONE_IMBALANCE'), 'RHYTHM_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs960an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runR960(recs960an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CURIOSITY_ZONE_IMBALANCE'), 'RHYTHM_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RHYTHM_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs960b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runR960(recs960b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_ZONE_IMBALANCE'), 'RHYTHM_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs960bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runR960(recs960bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_ZONE_IMBALANCE'), 'RHYTHM_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs960c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR960(recs960c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs960cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR960(recs960cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 946 — rhythmPass: rhythm stakes zone imbalance, rhythm positive emotion zone imbalance, rhythm suspense zone imbalance', async () => {
     const runR946 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
