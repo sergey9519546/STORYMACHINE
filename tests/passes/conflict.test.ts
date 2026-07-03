@@ -1535,6 +1535,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 884 — conflictPass: conflict climax zone imbalance, conflict establish world zone imbalance, conflict resolution zone imbalance', async () => {
+    const makeRec884 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF884 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('CONFLICT_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs884a = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'development' }),
+      );
+      const res = await runCF884(recs884a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLIMAX_ZONE_IMBALANCE'), 'CONFLICT_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs884an = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'development' }),
+      );
+      const res = await runCF884(recs884an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLIMAX_ZONE_IMBALANCE'), 'CONFLICT_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs884b = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runCF884(recs884b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs884bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'development' }),
+      );
+      const res = await runCF884(recs884bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // CONFLICT_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('CONFLICT_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs884c = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runCF884(recs884c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_ZONE_IMBALANCE'), 'CONFLICT_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs884cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec884(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runCF884(recs884cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_ZONE_IMBALANCE'), 'CONFLICT_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 870 — conflictPass: conflict resolution drought run, conflict complicate zone cluster, conflict complicate drought run', async () => {
     const makeRec870 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

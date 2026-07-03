@@ -402,6 +402,15 @@
 // 'complicate' absence -- completes 2 of 3 slots for this purpose value alongside the
 // zone-cluster mode added in this same wave; peak mode conventionally skipped for this
 // categorical field).
+//
+// Wave 884 additions: no purpose value has ever been audited by the distinct 4-zone
+// checkZoneImbalance mode in this pass (only visualBeats, payoffSetupIds, and dialogueHighlights
+// had). This wave applies it to three purpose values that already have complete 3-zone/run-based
+// trios via checkZoneCluster/checkDroughtRun: CONFLICT_CLIMAX_ZONE_IMBALANCE (purpose ===
+// 'climax'), CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
+// CONFLICT_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution' -- distinct from
+// CONFLICT_RESOLUTION_PREMATURE, which checks timing relative to the climax, not distributional
+// zone imbalance).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5119,6 +5128,84 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r870c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r870c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the conflict stalled for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r870c.longestRun}-scene stretch to complicate the story so the conflict keeps deepening throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 884: CONFLICT_CLIMAX_ZONE_IMBALANCE, CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              CONFLICT_RESOLUTION_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // CONFLICT_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // CONFLICT_CLIMAX_ZONE_CLUSTER and run-based CONFLICT_CLIMAX_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r884a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r884a.fires) {
+      const emptyNames884a = r884a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName884a = FOUR_ZONE_NAMES[r884a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames884a} empty; ${bloatName884a} has ${r884a.counts[r884a.bloatZoneIdx]}/${r884a.totalCount} climax-purposed scenes`,
+        rule: 'CONFLICT_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r884a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName884a} contains ${r884a.counts[r884a.bloatZoneIdx]} of them (${Math.round((r884a.counts[r884a.bloatZoneIdx] / r884a.totalCount) * 100)}%) while ${emptyNames884a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the conflict's payoff an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames884a} — so every structural quarter carries some capacity for the conflict's payoff, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10,
+  // ≥4 world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone CONFLICT_ESTABLISH_WORLD_ZONE_CLUSTER and run-based CONFLICT_ESTABLISH_
+  // WORLD_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this
+  // purpose value.
+  {
+    const r884b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r884b.fires) {
+      const emptyNames884b = r884b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName884b = FOUR_ZONE_NAMES[r884b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames884b} empty; ${bloatName884b} has ${r884b.counts[r884b.bloatZoneIdx]}/${r884b.totalCount} world-establishing scenes`,
+        rule: 'CONFLICT_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r884b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName884b} contains ${r884b.counts[r884b.bloatZoneIdx]} of them (${Math.round((r884b.counts[r884b.bloatZoneIdx] / r884b.totalCount) * 100)}%) while ${emptyNames884b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the conflict's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames884b} — so every structural quarter carries some fresh ground for the conflict to escalate from, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from
+  // CONFLICT_RESOLUTION_PREMATURE (which checks timing of relationshipShifts negative events
+  // relative to the climax, not this purpose enum value) and from the existing 3-zone
+  // CONFLICT_RESOLUTION_ZONE_CLUSTER and run-based CONFLICT_RESOLUTION_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r884c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r884c.fires) {
+      const emptyNames884c = r884c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName884c = FOUR_ZONE_NAMES[r884c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames884c} empty; ${bloatName884c} has ${r884c.counts[r884c.bloatZoneIdx]}/${r884c.totalCount} resolution-purposed scenes`,
+        rule: 'CONFLICT_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r884c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName884c} contains ${r884c.counts[r884c.bloatZoneIdx]} of them (${Math.round((r884c.counts[r884c.bloatZoneIdx] / r884c.totalCount) * 100)}%) while ${emptyNames884c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the conflict's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames884c} — so every structural quarter carries some capacity to settle the conflict, not only the quarter currently carrying most of them.`,
       });
     }
   }
