@@ -310,6 +310,14 @@
 // isolation/backward-cause × curiosityDelta magnitude — curiosityDelta has only ever anchored
 // co-occurrence/decoupling, zone-presence/absence, front-loaded, and zone-cluster checks; the
 // backward-cause peak-isolation mode has never been applied to it).
+// Wave 758 additions: CONFLICT_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence —
+// Waves 702/744 applied the zone-cluster and backward-cause peak modes to curiosityDelta; the
+// drought-run mode has never been applied to it, completing the trio), CONFLICT_REVELATION_ZONE_
+// CLUSTER (distribution/timing × revelation × structural thirds — Wave 671 applied the run-based
+// drought mode to revelation != null [CONFLICT_REVELATION_DROUGHT_RUN]; the zone-cluster mode has
+// never been applied to it), CONFLICT_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes'
+// absence — purpose has only ever anchored a hand-rolled co-occurrence/decoupling check
+// [stakesScenes299]; the run-based drought mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4419,6 +4427,72 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single sharpest curiosity spike (scene ${r744c.peakIdx + 1}, a rise of ${r744c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the audience's hunger to know more peaks hardest arrives without any structural pivot or disclosure driving it — the conflict has nothing causal to hook that curiosity to.`,
         suggestedFix: `Give scene ${r744c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest curiosity spike is earned by the conflict's escalation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 758: CONFLICT_CURIOSITY_DROUGHT_RUN, CONFLICT_REVELATION_ZONE_CLUSTER,
+  //              CONFLICT_STAKES_DROUGHT_RUN ────────────────────────────────────────────
+
+  // CONFLICT_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6. Waves
+  // 702/744 applied the zone-cluster and backward-cause peak modes to curiosityDelta; the
+  // drought-run mode has never been applied to it, completing the trio.
+  {
+    const r758a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r758a.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r758a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r758a.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r758a.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the conflict without a mystery engine driving audience investment for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r758a.longestRun}-scene stretch so the conflict keeps a mystery engine driving audience investment throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Wave 671 applied the run-based
+  // drought mode to revelation != null (CONFLICT_REVELATION_DROUGHT_RUN); the zone-cluster mode
+  // has never been applied to it.
+  {
+    const r758b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r758b.fires) {
+      issues.push({
+        location: `${r758b.zoneNames[r758b.maxZoneIdx]} third — ${r758b.maxZoneCount} of ${r758b.count} revelation scenes`,
+        rule: 'CONFLICT_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r758b.maxZoneCount / r758b.count) * 100)}% of the story's revelation scenes cluster in the ${r758b.zoneNames[r758b.maxZoneIdx]} third. When every disclosure lands in the same structural window, the conflict has no fresh information reshaping it anywhere else in the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r758b.zoneNames[r758b.maxZoneIdx]} third so the conflict keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. purpose has only
+  // ever anchored a hand-rolled co-occurrence/decoupling check; the run-based drought mode has
+  // never been applied to it.
+  {
+    const r758c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r758c.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r758c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r758c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r758c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the conflict flat without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r758c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the conflict under mounting pressure throughout that stretch.`,
       });
     }
   }

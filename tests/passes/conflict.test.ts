@@ -1535,6 +1535,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 758 — conflictPass: conflict curiosity drought run, conflict revelation zone cluster, conflict stakes drought run', async () => {
+    const makeRec758 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF758 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 have rising curiosity (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('CONFLICT_CURIOSITY_DROUGHT_RUN fires when the longest no-rising-curiosity run reaches 6', async () => {
+      const recs758a = Array.from({ length: 10 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 1 || i === 2) ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runCF758(recs758a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_DROUGHT_RUN'), 'CONFLICT_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_CURIOSITY_DROUGHT_RUN no-fire:
+    // rising-curiosity scenes spread out so no gap reaches 6 consecutive scenes
+    it('CONFLICT_CURIOSITY_DROUGHT_RUN does not fire when rising curiosity is spread through the story', async () => {
+      const recs758an = Array.from({ length: 10 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runCF758(recs758an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CURIOSITY_DROUGHT_RUN'), 'CONFLICT_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs758b = Array.from({ length: 9 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 1 || i === 2) ? { revelation: 'a truth surfaces' } : {}
+      ));
+      const res = await runCF758(recs758b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_ZONE_CLUSTER'), 'CONFLICT_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    // CONFLICT_REVELATION_ZONE_CLUSTER no-fire:
+    // revelation scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CONFLICT_REVELATION_ZONE_CLUSTER does not fire when revelation scenes are distributed across thirds', async () => {
+      const recs758bn = Array.from({ length: 9 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 4 || i === 7) ? { revelation: 'a truth surfaces' } : {}
+      ));
+      const res = await runCF758(recs758bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_ZONE_CLUSTER'), 'CONFLICT_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_STAKES_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 purposed to raise stakes (>=3 present overall); scenes 3-9 (7 scenes) purposed otherwise
+    it('CONFLICT_STAKES_DROUGHT_RUN fires when the longest no-stakes-raise run reaches 6', async () => {
+      const recs758c = Array.from({ length: 10 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runCF758(recs758c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_DROUGHT_RUN'), 'CONFLICT_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising scenes spread out so no gap reaches 6 consecutive scenes
+    it('CONFLICT_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are spread through the story', async () => {
+      const recs758cn = Array.from({ length: 10 }, (_, i) => makeRec758(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runCF758(recs758cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_DROUGHT_RUN'), 'CONFLICT_STAKES_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 744 — conflictPass: conflict relationship zone cluster, conflict clock drought run, conflict curiosity peak uncaused', async () => {
     const makeRec744 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
