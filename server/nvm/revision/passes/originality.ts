@@ -451,6 +451,11 @@
 // ORIGINALITY_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and ORIGINALITY_
 // PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field). Three distinct signal
 // classes (valence, delta, array), each keyed independently of authored purpose.
+// Wave 956 additions: continuing the non-purpose 4-zone rollout with three more trio-complete signals
+// spanning three distinct classes: ORIGINALITY_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — the
+// question-raising delta beside Wave 942's suspense one), ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE
+// (unresolvedClues.length > 0 — an open-thread array beside 942's payoff one), and ORIGINALITY_
+// REVELATION_ZONE_IMBALANCE (revelation != null — the revelation string field, a new class).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5775,6 +5780,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r942c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName942c} contains ${r942c.counts[r942c.bloatZoneIdx]} of them (${Math.round((r942c.counts[r942c.bloatZoneIdx] / r942c.totalCount) * 100)}%) while ${emptyNames942c} contains none — a predictable resolution shape the audience can learn to anticipate rather than payoffs distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames942c} — so where planted threads land stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_
+  // CURIOSITY_ZONE_CLUSTER and run-based ORIGINALITY_CURIOSITY_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on
+  // question-raising change rather than the suspense delta audited in Wave 942.
+  {
+    const r956a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r956a.fires) {
+      const emptyNames956a = r956a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName956a = FOUR_ZONE_NAMES[r956a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames956a} empty; ${bloatName956a} has ${r956a.counts[r956a.bloatZoneIdx]}/${r956a.totalCount} curiosity-raising scenes`,
+        rule: 'ORIGINALITY_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r956a.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName956a} contains ${r956a.counts[r956a.bloatZoneIdx]} of them (${Math.round((r956a.counts[r956a.bloatZoneIdx] / r956a.totalCount) * 100)}%) while ${emptyNames956a} contains none — a predictable curiosity shape the audience can learn to anticipate rather than new questions distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames956a} — so where fresh questions open stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × (unresolvedClues.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // leaving an open thread total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone ORIGINALITY_OPEN_THREAD_ZONE_CLUSTER and run-based ORIGINALITY_OPEN_THREAD_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to the unresolvedClues array field,
+  // distinct from the payoffSetupIds field audited in Wave 942.
+  {
+    const r956b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r956b.fires) {
+      const emptyNames956b = r956b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName956b = FOUR_ZONE_NAMES[r956b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames956b} empty; ${bloatName956b} has ${r956b.counts[r956b.bloatZoneIdx]}/${r956b.totalCount} open-thread scenes`,
+        rule: 'ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r956b.totalCount} scenes leaving an open thread are unevenly distributed across its four structural zones: ${bloatName956b} contains ${r956b.counts[r956b.bloatZoneIdx]} of them (${Math.round((r956b.counts[r956b.bloatZoneIdx] / r956b.totalCount) * 100)}%) while ${emptyNames956b} contains none — a predictable mystery shape the audience can learn to anticipate rather than loose ends distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute open threads: leave an unresolved question (non-empty unresolvedClues) in at least one scene inside the empty zone(s) — ${emptyNames956b} — so where the story keeps questions open stays less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_REVELATION_
+  // ZONE_CLUSTER and run-based ORIGINALITY_REVELATION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the revelation STRING field (revelation != null), a string-field
+  // signal distinct from the delta and array signals audited above.
+  {
+    const r956c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r956c.fires) {
+      const emptyNames956c = r956c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName956c = FOUR_ZONE_NAMES[r956c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames956c} empty; ${bloatName956c} has ${r956c.counts[r956c.bloatZoneIdx]}/${r956c.totalCount} revelation scenes`,
+        rule: 'ORIGINALITY_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r956c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName956c} contains ${r956c.counts[r956c.bloatZoneIdx]} of them (${Math.round((r956c.counts[r956c.bloatZoneIdx] / r956c.totalCount) * 100)}%) while ${emptyNames956c} contains none — a predictable disclosure rhythm the audience can learn to anticipate rather than revelations distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames956c} — so where new truth surfaces stays less predictable across the story's whole shape.`,
       });
     }
   }
