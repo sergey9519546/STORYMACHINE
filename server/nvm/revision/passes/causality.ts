@@ -289,6 +289,14 @@
 // CAUSALITY_SUSPENSE_PEAK_UNCAUSED (single-peak isolation/backward-cause × suspenseDelta
 // magnitude — suspenseDelta anchors extensive hand-rolled aggregate/threshold logic but has never
 // been backward-cause peak-audited via the shared library).
+// Wave 713 additions (opens the tenth rotation cycle): CAUSALITY_OPEN_THREAD_ZONE_CLUSTER
+// (distribution/timing × unresolvedClues × structural thirds — Waves 657/671 applied the
+// drought-run and backward-cause peak modes to unresolvedClues; the zone-cluster mode has never
+// been applied to it, completing the trio), CAUSALITY_STAKES_DROUGHT_RUN (run-based × purpose
+// === 'raise_stakes' absence — Wave 671 applied the zone-cluster mode to this signal; the
+// drought-run mode has never been applied to it), CAUSALITY_SEED_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × seededClueIds magnitude — Wave 685 applied the zone-cluster mode to
+// seededClueIds; the backward-cause peak mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4160,6 +4168,75 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single sharpest suspense spike (scene ${r699c.peakIdx + 1}, delta ${r699c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where tension rises most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
         suggestedFix: `Give scene ${r699c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest rise in tension is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 713: CAUSALITY_OPEN_THREAD_ZONE_CLUSTER, CAUSALITY_STAKES_DROUGHT_RUN,
+  //              CAUSALITY_SEED_PEAK_UNCAUSED ──────────────────────────────────────────────────
+
+  // CAUSALITY_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes,
+  // fires when >75% of them fall in a single structural third. Waves 657/671 applied the
+  // drought-run and backward-cause peak modes to unresolvedClues; the zone-cluster mode has never
+  // been applied to it, completing the trio.
+  {
+    const r713a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r713a.fires) {
+      const zoneName713a = r713a.zoneNames[r713a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName713a} third — ${r713a.maxZoneCount}/${r713a.count} open-thread scenes`,
+        rule: 'CAUSALITY_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r713a.maxZoneCount} of the story's ${r713a.count} scenes carrying outstanding clue-debt (${Math.round((r713a.maxZoneCount / r713a.count) * 100)}%) cluster in the ${zoneName713a} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery pressing on the causal chain.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName713a} third — spreading open threads across the story gives every structural third some causal pressure from an unanswered question.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6. Wave 671
+  // applied the zone-cluster mode to this signal; the drought-run mode has never been applied to
+  // it.
+  {
+    const r713b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r713b.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising scene: ${r713b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r713b.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r713b.presentCount} scenes elsewhere do escalate the stakes. A long unbroken stretch with nothing pushing the stakes higher leaves the causal chain without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r713b.longestRun}-scene stretch to raise stakes — even a small escalation keeps the causal chain under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a
+  // 2-scene lookback. Finds the single scene with the most simultaneous clues planted; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Wave 685 applied the zone-cluster mode to seededClueIds; the backward-cause peak mode has
+  // never been applied to it.
+  {
+    const r713c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r713c.fires) {
+      issues.push({
+        location: `scene ${r713c.peakIdx + 1} — peak seed density (${r713c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r713c.peakIdx + 1}, with ${r713c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
+        suggestedFix: `Give scene ${r713c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
       });
     }
   }
