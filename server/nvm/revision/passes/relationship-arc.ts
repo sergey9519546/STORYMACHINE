@@ -380,6 +380,17 @@
 // structural thirds — this purpose value has never been referenced anywhere in this pass; a
 // virgin field), RELATIONAL_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
 // structural thirds — likewise a virgin field, never referenced in this pass before).
+//
+// Wave 861 additions: RELATIONAL_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 847; peak mode conventionally skipped for this categorical field),
+// RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 'establish_world' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+// Wave 847; peak mode conventionally skipped for this categorical field),
+// RELATIONAL_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- this purpose value has never been referenced anywhere in this pass;
+// none of the three shared-library trio modes has ever isolated it as its own standalone
+// signal; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4957,6 +4968,73 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${Math.round((r847c.maxZoneCount / r847c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r847c.zoneNames[r847c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the relationship builds toward its biggest test in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r847c.zoneNames[r847c.maxZoneIdx]} third so the relationship builds toward its biggest test more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 861: RELATIONAL_CLIMAX_DROUGHT_RUN, RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              RELATIONAL_RESOLUTION_ZONE_CLUSTER ──────────────────────────────
+
+  // RELATIONAL_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 847 (peak mode conventionally skipped for this categorical field).
+  {
+    const r861a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r861a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r861a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r861a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r861a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the relationship without a structural high point to build its biggest test toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r861a.longestRun}-scene stretch as the climax, or restructure so relationship-defining peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 847 (peak mode conventionally skipped for this categorical field).
+  {
+    const r861b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r861b.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r861b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r861b.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r861b.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the relationship with no fresh ground to develop against for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r861b.longestRun}-scene stretch to establish the world, so the relationship has fresh ground to develop against throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // RELATIONAL_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass; none of the
+  // three shared-library trio modes has ever isolated it as its own standalone signal — a
+  // virgin field.
+  {
+    const r861c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r861c.fires) {
+      issues.push({
+        location: `${r861c.zoneNames[r861c.maxZoneIdx]} third — ${r861c.maxZoneCount} of ${r861c.count} resolution-purposed scenes`,
+        rule: 'RELATIONAL_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r861c.maxZoneCount / r861c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r861c.zoneNames[r861c.maxZoneIdx]} third. When every relationship resolution beat concentrates in one structural window, the story has no room to let bonds settle gradually before the ending absorbs them all at once.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r861c.zoneNames[r861c.maxZoneIdx]} third so relationship closure is distributed across the story rather than concentrated in a single structural window.`,
       });
     }
   }
