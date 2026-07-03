@@ -369,6 +369,13 @@
 // peak mode conventionally skipped for this categorical field), BELIEF_ESTABLISH_WORLD_ZONE_
 // CLUSTER (distribution/timing × purpose === 'establish_world' × structural thirds — this
 // purpose value has never been referenced anywhere in this pass; a virgin field).
+//
+// Wave 852 additions: BELIEF_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field), BELIEF_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' ×
+// structural thirds — likewise a virgin field, never referenced in this pass before),
+// BELIEF_COMPLICATE_ZONE_CLUSTER (distribution/timing × purpose === 'complicate' × structural
+// thirds — also a virgin field, never referenced in this pass before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4699,6 +4706,72 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r838c.maxZoneCount / r838c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r838c.zoneNames[r838c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the belief-tracking layer loses ground for grounding convictions anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r838c.zoneNames[r838c.maxZoneIdx]} third to establish the world so the belief-tracking layer keeps grounding convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 852: BELIEF_CLIMAX_ZONE_CLUSTER, BELIEF_RESOLUTION_ZONE_CLUSTER,
+  //              BELIEF_COMPLICATE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // BELIEF_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed scenes,
+  // fires when more than 75% of them fall in a single structural third. This purpose value has
+  // never been referenced anywhere in this pass — a virgin field for all three shared-library
+  // trio modes.
+  {
+    const r852a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r852a.fires) {
+      issues.push({
+        location: `${r852a.zoneNames[r852a.maxZoneIdx]} third — ${r852a.maxZoneCount} of ${r852a.count} climax-purposed scenes`,
+        rule: 'BELIEF_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r852a.maxZoneCount / r852a.count) * 100)}% of the scenes purposed as the climax cluster in the ${r852a.zoneNames[r852a.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the belief-tracking layer builds toward its biggest test in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r852a.zoneNames[r852a.maxZoneIdx]} third so the belief-tracking layer builds toward its biggest test more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 resolution-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r852b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r852b.fires) {
+      issues.push({
+        location: `${r852b.zoneNames[r852b.maxZoneIdx]} third — ${r852b.maxZoneCount} of ${r852b.count} resolution-purposed scenes`,
+        rule: 'BELIEF_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r852b.maxZoneCount / r852b.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r852b.zoneNames[r852b.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the belief-tracking layer settles its convictions in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r852b.zoneNames[r852b.maxZoneIdx]} third so the belief-tracking layer settles its convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 complicating
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r852c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r852c.fires) {
+      issues.push({
+        location: `${r852c.zoneNames[r852c.maxZoneIdx]} third — ${r852c.maxZoneCount} of ${r852c.count} complicating scenes`,
+        rule: 'BELIEF_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r852c.maxZoneCount / r852c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r852c.zoneNames[r852c.maxZoneIdx]} third. When every complication lands in the same structural window, the belief-tracking layer stops deepening the trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r852c.zoneNames[r852c.maxZoneIdx]} third to complicate the story so the belief-tracking layer keeps deepening the trouble more evenly across the story.`,
       });
     }
   }

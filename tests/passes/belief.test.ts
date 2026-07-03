@@ -1204,6 +1204,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 852 — beliefPass: belief climax zone cluster, belief resolution zone cluster, belief complicate zone cluster', async () => {
+    const runBF852 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('BELIEF_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs852a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLIMAX_ZONE_CLUSTER'), 'BELIEF_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs852an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLIMAX_ZONE_CLUSTER'), 'BELIEF_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('BELIEF_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs852b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ZONE_CLUSTER'), 'BELIEF_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs852bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RESOLUTION_ZONE_CLUSTER'), 'BELIEF_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('BELIEF_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs852c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_ZONE_CLUSTER'), 'BELIEF_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs852cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF852(recs852cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_ZONE_CLUSTER'), 'BELIEF_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 838 — beliefPass: belief introduce conflict drought run, belief positive emotion drought run, belief establish world zone cluster', async () => {
     const runBF838 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
