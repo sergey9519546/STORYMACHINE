@@ -1080,6 +1080,93 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 729 — characterArcPass: arc open thread zone cluster, arc character moment drought run, arc curiosity peak uncaused', async () => {
+    const makeRec729 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc729 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('ARC_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs729a = Array.from({ length: 9 }, (_, i) => makeRec729(i,
+        (i === 0 || i === 1 || i === 2) ? { unresolvedClues: ['clue-a'] } : {}
+      ));
+      const res = await runArc729(recs729a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_ZONE_CLUSTER'), 'ARC_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs729an = Array.from({ length: 9 }, (_, i) => makeRec729(i,
+        (i === 0 || i === 4 || i === 7) ? { unresolvedClues: ['clue-a'] } : {}
+      ));
+      const res = await runArc729(recs729an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_ZONE_CLUSTER'), 'ARC_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // 10 scenes; character moments at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_CHARACTER_MOMENT_DROUGHT_RUN fires when the longest no-character-moment run is ≥6', async () => {
+      const recs729b = Array.from({ length: 10 }, (_, i) => makeRec729(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runArc729(recs729b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CHARACTER_MOMENT_DROUGHT_RUN'), 'ARC_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    // ARC_CHARACTER_MOMENT_DROUGHT_RUN no-fire:
+    // character moments at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are distributed without a long drought', async () => {
+      const recs729bn = Array.from({ length: 10 }, (_, i) => makeRec729(i,
+        (i === 0 || i === 4 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runArc729(recs729bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CHARACTER_MOMENT_DROUGHT_RUN'), 'ARC_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosity spikes at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('ARC_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity-spike scene has no dramatic turn or revelation nearby', async () => {
+      const recs729c = Array.from({ length: 8 }, (_, i) => makeRec729(i,
+        i === 2 ? { curiosityDelta: 1 }
+        : i === 6 ? { curiosityDelta: 5 }
+        : {}
+      ));
+      const res = await runArc729(recs729c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PEAK_UNCAUSED'), 'ARC_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    // ARC_CURIOSITY_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ARC_CURIOSITY_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs729cn = Array.from({ length: 8 }, (_, i) => makeRec729(i,
+        i === 2 ? { curiosityDelta: 1 }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { curiosityDelta: 5 }
+        : {}
+      ));
+      const res = await runArc729(recs729cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CURIOSITY_PEAK_UNCAUSED'), 'ARC_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 715 — characterArcPass: arc resolution drought run, arc clock delta drought run, arc open thread peak uncaused', async () => {
     const makeRec715 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

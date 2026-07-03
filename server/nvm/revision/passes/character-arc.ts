@@ -305,6 +305,17 @@
 // ARC_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause × unresolvedClues magnitude
 // — unresolvedClues has only ever anchored a co-occurrence/decoupling check [Wave 645]; the
 // backward-cause peak mode has never been applied to it).
+// Wave 729 additions: ARC_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues ×
+// structural thirds — Waves 659/715 applied the run-based drought and backward-cause peak modes
+// to unresolvedClues; the zone-cluster mode has never been applied to it, completing the trio),
+// ARC_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence — Wave 617
+// applied the four-zone-imbalance mode to this signal; the run-based drought mode has never been
+// applied to it), ARC_CURIOSITY_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// curiosityDelta magnitude via the shared checks library — distinct from the existing hand-rolled
+// peak-audits [ARC_PEAK_CURIOSITY_EMOTION_ABSENT, Wave 365; ARC_CURIOSITY_PEAK_RELATIONAL_VOID,
+// Wave 533], both of which examine the peak scene's OWN state; this checks whether the peak scene
+// or either of the two PRECEDING scenes contains a dramatic turn or revelation — a genuinely
+// distinct backward-looking causal audit never applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4084,6 +4095,77 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The arc's single densest scene for outstanding clue-debt (scene ${r715c.peakIdx + 1}, with ${r715c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
         suggestedFix: `Give scene ${r715c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most mystery-dense moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 729: ARC_OPEN_THREAD_ZONE_CLUSTER, ARC_CHARACTER_MOMENT_DROUGHT_RUN,
+  //              ARC_CURIOSITY_PEAK_UNCAUSED ───────────────────────────────────────────
+
+  // ARC_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Waves 659/715 applied the
+  // run-based drought and backward-cause peak modes to unresolvedClues; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r729a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r729a.fires) {
+      issues.push({
+        location: `${r729a.zoneNames[r729a.maxZoneIdx]} third — ${r729a.maxZoneCount} of ${r729a.count} open-thread scenes`,
+        rule: 'ARC_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r729a.maxZoneCount / r729a.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the arc's ${r729a.zoneNames[r729a.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the character's arc has no unresolved mystery pressing on them anywhere else in the story.`,
+        suggestedFix: `Seed or carry forward at least one open thread outside the ${r729a.zoneNames[r729a.maxZoneIdx]} third so unresolved mystery keeps pressing on the character throughout the arc.`,
+      });
+    }
+  }
+
+  // ARC_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Wave 617
+  // applied the four-zone-imbalance mode to this signal; the run-based drought mode has never been
+  // applied to it.
+  {
+    const r729b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r729b.fires) {
+      issues.push({
+        location: `longest stretch with no character-moment scene: ${r729b.longestRun} consecutive scenes`,
+        rule: 'ARC_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r729b.longestRun} consecutive scenes purposed otherwise than a character moment, even though ${r729b.presentCount} scenes elsewhere are dedicated to the protagonist's inner life. A long unbroken stretch with nothing but plot-forward scenes leaves the character's arc without a beat to breathe and reveal who they are for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r729b.longestRun}-scene stretch as a character moment — even a brief beat of reflection keeps the arc's interior thread alive throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_CURIOSITY_PEAK_UNCAUSED — Single-peak isolation/backward-cause × curiosityDelta magnitude,
+  // via the shared checks library. n≥8, ≥2 scenes with a positive curiosity spike, a 2-scene
+  // lookback. Finds the single scene with the sharpest curiosity rise; fires when neither that
+  // scene nor either of the two before it contains a dramatic turn or revelation. Distinct from
+  // the existing hand-rolled peak-audits (ARC_PEAK_CURIOSITY_EMOTION_ABSENT, Wave 365;
+  // ARC_CURIOSITY_PEAK_RELATIONAL_VOID, Wave 533), both of which examine the peak scene's OWN
+  // state (its emotion, its relationship shifts); this instead audits whether the peak scene or
+  // either of the two PRECEDING scenes contains a causal driver — a backward-looking check never
+  // applied to this channel.
+  {
+    const r729c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r729c.fires) {
+      issues.push({
+        location: `scene ${r729c.peakIdx + 1} — peak curiosity spike (${r729c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single sharpest curiosity spike (scene ${r729c.peakIdx + 1}, a rise of ${r729c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the audience's hunger to know more peaks hardest arrives without any structural pivot or disclosure driving it — an uncaused spike that gives the character's arc nothing to hook the wondering to.`,
+        suggestedFix: `Give scene ${r729c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's sharpest curiosity spike is earned by a shift in the character's circumstance rather than arriving in a causal vacuum.`,
       });
     }
   }
