@@ -240,6 +240,15 @@
 // (distribution/timing × clockRaised × structural thirds — Wave 639 applied the zone-cluster mode
 // to dialogueHighlights; clockRaised itself has never been cluster-audited despite anchoring an
 // entire hand-rolled run-based check family).
+// Wave 681 additions (built on the shared checks library, audit M2.2): STRUCTURE_CLOCK_DELTA_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — clockDelta has
+// only ever appeared as an OR-condition alongside clockRaised inside decoupled/aftermath
+// triggers; the backward-cause peak mode applied to it standalone for the first time),
+// STRUCTURE_STAGING_DROUGHT_RUN (run-based × visualBeats absence — Waves 625/667 applied the
+// peak-uncaused and zone-imbalance modes to visualBeats; the drought-run mode has never been
+// applied to this channel), STRUCTURE_STAKES_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'raise_stakes' × structural thirds — `purpose` has only ever appeared inside incidental
+// filter/set-collection contexts here, never as the standalone subject of its own check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3730,6 +3739,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r667c.maxZoneCount} of the story's ${r667c.count} clock-raised scenes (${Math.round((r667c.maxZoneCount / r667c.count) * 100)}%) cluster in the ${zoneName667c} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no urgency bearing on the plot.`,
         suggestedFix: `Raise a clock in at least one scene outside the ${zoneName667c} third — spreading time pressure across the story lets every structural third carry some urgency.`,
+      });
+    }
+  }
+
+  // ── Wave 681: STRUCTURE_CLOCK_DELTA_PEAK_UNCAUSED, STRUCTURE_STAGING_DROUGHT_RUN,
+  //              STRUCTURE_STAKES_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // STRUCTURE_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. clockDelta has only ever appeared as an OR-condition alongside clockRaised
+  // inside decoupled/aftermath triggers; the backward-cause peak mode applied to it standalone
+  // for the first time.
+  {
+    const r681a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r681a.fires) {
+      issues.push({
+        location: `scene ${r681a.peakIdx + 1} — peak clockDelta (${r681a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STRUCTURE_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r681a.peakIdx + 1}, at ${r681a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r681a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest deadline compression is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 visually-staged scenes overall, fires when the
+  // longest consecutive run of scenes with zero physical staging reaches 6. Waves 625/667 applied
+  // the peak-uncaused and zone-imbalance modes to visualBeats; the drought-run mode has never
+  // been applied to this channel.
+  {
+    const r681b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r681b.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r681b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r681b.longestRun} consecutive scenes with no visual staging beats at all, even though ${r681b.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves the story's structural rhythm running on pure dialogue and exposition for an extended run.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r681b.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the story's structure stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // stakes-raising scenes, fires when >75% of them fall in a single structural third. `purpose`
+  // has only ever appeared inside incidental filter/set-collection contexts here, never as the
+  // standalone subject of its own check.
+  {
+    const r681c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r681c.fires) {
+      const zoneName681c = r681c.zoneNames[r681c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName681c} third — ${r681c.maxZoneCount}/${r681c.count} stakes-raising scenes`,
+        rule: 'STRUCTURE_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r681c.maxZoneCount} of the story's ${r681c.count} scenes purposed to raise stakes (${Math.round((r681c.maxZoneCount / r681c.count) * 100)}%) cluster in the ${zoneName681c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure.`,
+        suggestedFix: `Purpose at least one scene outside the ${zoneName681c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting pressure.`,
       });
     }
   }
