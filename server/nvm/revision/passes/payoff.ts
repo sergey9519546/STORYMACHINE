@@ -287,6 +287,16 @@
 // PAYOFF_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence — Wave 664 applied the
 // backward-cause peak mode to relationshipShifts; the drought-run mode has never been applied to
 // it).
+// Wave 734 additions: PAYOFF_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × relationshipShifts
+// × structural thirds — Waves 664/720 applied the backward-cause peak and run-based drought modes
+// to relationshipShifts; the zone-cluster mode has never been applied to it, completing the
+// trio), PAYOFF_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds × structural thirds —
+// seededClueIds already anchors the hand-rolled SEED_DROUGHT_RUN [Wave 510] and the shared-library
+// backward-cause peak mode [Wave 692]; the thirds-ratio zone-cluster mode has never been applied
+// to it), PAYOFF_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — clockDelta has only
+// ever anchored single-peak-isolation checks [PAYOFF_CLOCK_PEAK_DECOUPLED, Wave 566;
+// PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED, Wave 678]; the run-based drought mode has never been applied
+// to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3998,6 +4008,73 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r720c.longestRun} consecutive scenes with no relationship shift at all, even though ${r720c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the payoff engine's interpersonal dimension dormant for an extended run.`,
         suggestedFix: `Let a bond shift somewhere within the ${r720c.longestRun}-scene stretch — even a small movement keeps the payoff engine tied to changing interpersonal stakes throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 734: PAYOFF_RELATIONSHIP_ZONE_CLUSTER, PAYOFF_SEED_ZONE_CLUSTER,
+  //              PAYOFF_CLOCK_DELTA_DROUGHT_RUN ────────────────────────────────────────────
+
+  // PAYOFF_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 664/720
+  // applied the backward-cause peak and run-based drought modes to relationshipShifts; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r734a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r734a.fires) {
+      issues.push({
+        location: `${r734a.zoneNames[r734a.maxZoneIdx]} third — ${r734a.maxZoneCount} of ${r734a.count} relationship-shift scenes`,
+        rule: 'PAYOFF_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r734a.maxZoneCount / r734a.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r734a.zoneNames[r734a.maxZoneIdx]} third. When every bond change lands in the same structural window, the payoff engine has no relational movement to cash in as a resolution anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r734a.zoneNames[r734a.maxZoneIdx]} third so the payoff engine has relational movement to resolve more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when more than 75%
+  // of those scenes cluster in a single third. seededClueIds already anchors the hand-rolled
+  // SEED_DROUGHT_RUN (Wave 510) and the shared-library backward-cause peak mode (Wave 692); the
+  // thirds-ratio zone-cluster mode has never been applied to it.
+  {
+    const r734b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r734b.fires) {
+      issues.push({
+        location: `${r734b.zoneNames[r734b.maxZoneIdx]} third — ${r734b.maxZoneCount} of ${r734b.count} seed scenes`,
+        rule: 'PAYOFF_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r734b.maxZoneCount / r734b.count) * 100)}% of the story's clue-planting scenes cluster in the ${r734b.zoneNames[r734b.maxZoneIdx]} third. When every seed is planted in the same structural window, the payoff engine has nothing new to draw on once that window closes — resolutions elsewhere in the story are left resolving only what was set up early.`,
+        suggestedFix: `Plant at least one clue outside the ${r734b.zoneNames[r734b.maxZoneIdx]} third so the payoff engine keeps fresh material to resolve throughout the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. clockDelta has only ever
+  // anchored single-peak-isolation checks (PAYOFF_CLOCK_PEAK_DECOUPLED, Wave 566;
+  // PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED, Wave 678); the run-based drought mode has never been applied
+  // to it.
+  {
+    const r734c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r734c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r734c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r734c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r734c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves payoffs landing without any accompanying pressure change for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r734c.longestRun}-scene stretch so the payoff engine keeps a mechanical pressure acting alongside resolutions throughout that stretch.`,
       });
     }
   }
