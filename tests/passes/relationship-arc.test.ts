@@ -1376,6 +1376,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 735 — relationshipArcPass: relational payoff zone cluster, relational clock delta drought run, relational open thread zone cluster', async () => {
+    const runRA735 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs735a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs735a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs735a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs735a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runRA735(recs735a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_ZONE_CLUSTER'), 'RELATIONAL_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs735an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs735an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs735an[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs735an[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runRA735(recs735an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_ZONE_CLUSTER'), 'RELATIONAL_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('RELATIONAL_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs735b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs735b[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs735b[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs735b[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runRA735(recs735b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_DROUGHT_RUN'), 'RELATIONAL_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('RELATIONAL_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs735bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs735bn[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs735bn[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs735bn[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs735bn[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runRA735(recs735bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_DROUGHT_RUN'), 'RELATIONAL_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs735c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs735c[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs735c[1] = makeSharedRecord(1, { unresolvedClues: ['clue-b'] });
+      recs735c[2] = makeSharedRecord(2, { unresolvedClues: ['clue-c'] });
+      const res = await runRA735(recs735c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_ZONE_CLUSTER'), 'RELATIONAL_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs735cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs735cn[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs735cn[4] = makeSharedRecord(4, { unresolvedClues: ['clue-b'] });
+      recs735cn[7] = makeSharedRecord(7, { unresolvedClues: ['clue-c'] });
+      const res = await runRA735(recs735cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_OPEN_THREAD_ZONE_CLUSTER'), 'RELATIONAL_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 721 — relationshipArcPass: relational highlight zone cluster, relational payoff drought run, relational stakes zone cluster', async () => {
     const runRA721 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

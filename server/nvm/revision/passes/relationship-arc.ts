@@ -290,6 +290,15 @@
 // drought-run mode has never been applied to it), RELATIONAL_STAKES_ZONE_CLUSTER (distribution/
 // timing × purpose === 'raise_stakes' × structural thirds — Wave 679 applied the drought-run mode
 // to this signal; the zone-cluster mode has never been applied to it).
+// Wave 735 additions: RELATIONAL_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds ×
+// structural thirds — Waves 665/721 applied the backward-cause peak and run-based drought modes
+// to payoffSetupIds; the zone-cluster mode has never been applied to it, completing the trio),
+// RELATIONAL_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 679 applied the
+// backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it),
+// RELATIONAL_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues × structural thirds
+// — Wave 651 applied the run-based drought mode to unresolvedClues; the existing
+// RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE checks a different mode [four-zone bloat/empty]; the
+// thirds-ratio zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4253,6 +4262,73 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${r721c.maxZoneCount} of the story's ${r721c.count} scenes purposed to raise stakes (${Math.round((r721c.maxZoneCount / r721c.count) * 100)}%) cluster in the ${zoneName721c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure on the relationship.`,
         suggestedFix: `Purpose at least one scene outside the ${zoneName721c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of pressure on the relationship.`,
+      });
+    }
+  }
+
+  // ── Wave 735: RELATIONAL_PAYOFF_ZONE_CLUSTER, RELATIONAL_CLOCK_DELTA_DROUGHT_RUN,
+  //              RELATIONAL_OPEN_THREAD_ZONE_CLUSTER ────────────────────────────────────────
+
+  // RELATIONAL_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Waves 665/721 applied the
+  // backward-cause peak and run-based drought modes to payoffSetupIds; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r735a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r735a.fires) {
+      issues.push({
+        location: `${r735a.zoneNames[r735a.maxZoneIdx]} third — ${r735a.maxZoneCount} of ${r735a.count} payoff scenes`,
+        rule: 'RELATIONAL_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r735a.maxZoneCount / r735a.count) * 100)}% of the story's thread resolutions cluster in the ${r735a.zoneNames[r735a.maxZoneIdx]} third. When every payoff lands in the same structural window, the relational arc has nothing resolving elsewhere to punctuate the bond's ongoing development.`,
+        suggestedFix: `Move at least one thread resolution outside the ${r735a.zoneNames[r735a.maxZoneIdx]} third so the relationship's payoffs land more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires
+  // when the longest consecutive run of scenes with zero clock movement reaches 6. Wave 679
+  // applied the backward-cause peak mode to clockDelta; the drought-run mode has never been
+  // applied to it.
+  {
+    const r735b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r735b.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r735b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r735b.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r735b.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the relationship's development without any external pressure testing it for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r735b.longestRun}-scene stretch so external pressure keeps testing the relationship throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes,
+  // fires when more than 75% of those scenes cluster in a single third. Wave 651 applied the
+  // run-based drought mode to unresolvedClues; the existing RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE
+  // checks a different mode (four-zone bloat/empty); the thirds-ratio zone-cluster mode has never
+  // been applied to it.
+  {
+    const r735c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r735c.fires) {
+      issues.push({
+        location: `${r735c.zoneNames[r735c.maxZoneIdx]} third — ${r735c.maxZoneCount} of ${r735c.count} open-thread scenes`,
+        rule: 'RELATIONAL_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r735c.maxZoneCount / r735c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the ${r735c.zoneNames[r735c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the relational arc has no unresolved mystery pressing on the bond anywhere else in the story.`,
+        suggestedFix: `Seed or carry forward at least one open thread outside the ${r735c.zoneNames[r735c.maxZoneIdx]} third so unresolved mystery keeps pressing on the relationship throughout the story.`,
       });
     }
   }
