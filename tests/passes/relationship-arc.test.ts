@@ -1376,6 +1376,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 875 — relationshipArcPass: relational resolution drought run, relational complicate zone cluster, relational complicate drought run', async () => {
+    const runRA875 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs875a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_RESOLUTION_DROUGHT_RUN'), 'RELATIONAL_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs875an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_RESOLUTION_DROUGHT_RUN'), 'RELATIONAL_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs875b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_COMPLICATE_ZONE_CLUSTER'), 'RELATIONAL_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs875bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_COMPLICATE_ZONE_CLUSTER'), 'RELATIONAL_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs875c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_COMPLICATE_DROUGHT_RUN'), 'RELATIONAL_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs875cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runRA875(recs875cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_COMPLICATE_DROUGHT_RUN'), 'RELATIONAL_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 861 — relationshipArcPass: relational climax drought run, relational establish world drought run, relational resolution zone cluster', async () => {
     const runRA861 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

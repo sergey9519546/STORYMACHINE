@@ -391,6 +391,15 @@
 // structural thirds -- this purpose value has never been referenced anywhere in this pass;
 // none of the three shared-library trio modes has ever isolated it as its own standalone
 // signal; a virgin field).
+//
+// Wave 875 additions: RELATIONAL_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 861; peak mode conventionally skipped for this categorical field),
+// RELATIONAL_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose === 'complicate' x
+// structural thirds -- this purpose value has never been referenced anywhere in this pass; a
+// virgin field), RELATIONAL_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in this same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5035,6 +5044,72 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${Math.round((r861c.maxZoneCount / r861c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r861c.zoneNames[r861c.maxZoneIdx]} third. When every relationship resolution beat concentrates in one structural window, the story has no room to let bonds settle gradually before the ending absorbs them all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r861c.zoneNames[r861c.maxZoneIdx]} third so relationship closure is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 875: RELATIONAL_RESOLUTION_DROUGHT_RUN, RELATIONAL_COMPLICATE_ZONE_CLUSTER,
+  //              RELATIONAL_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // RELATIONAL_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 861 (peak mode conventionally skipped for this categorical field).
+  {
+    const r875a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r875a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r875a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r875a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r875a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the relationship's threads dangling for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r875a.longestRun}-scene stretch to resolve part of the story, so the relationship keeps settling its threads throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // RELATIONAL_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r875b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r875b.fires) {
+      issues.push({
+        location: `${r875b.zoneNames[r875b.maxZoneIdx]} third — ${r875b.maxZoneCount} of ${r875b.count} complicating scenes`,
+        rule: 'RELATIONAL_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r875b.maxZoneCount / r875b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r875b.zoneNames[r875b.maxZoneIdx]} third. When every complication lands in the same structural window, the relationship stops facing fresh strain anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r875b.zoneNames[r875b.maxZoneIdx]} third to complicate the story so the relationship keeps facing fresh strain more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r875c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r875c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r875c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r875c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r875c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the relationship leaves it stalled for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r875c.longestRun}-scene stretch to complicate the story so the relationship keeps facing fresh strain throughout that stretch.`,
       });
     }
   }
