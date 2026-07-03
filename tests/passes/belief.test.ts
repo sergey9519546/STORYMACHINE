@@ -1204,6 +1204,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 768 — beliefPass: belief relationship zone cluster, belief character moment drought run, belief suspense drought run', async () => {
+    const runBF768 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_RELATIONSHIP_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; relationship-shift scenes at 0,1,2 → 100% opening third
+    it('BELIEF_RELATIONSHIP_ZONE_CLUSTER fires when >75% of relationship-shift scenes cluster in one third', async () => {
+      const mkShift768 = () => [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }];
+      const recs768a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs768a[0] = makeSharedRecord(0, { relationshipShifts: mkShift768() });
+      recs768a[1] = makeSharedRecord(1, { relationshipShifts: mkShift768() });
+      recs768a[2] = makeSharedRecord(2, { relationshipShifts: mkShift768() });
+      const res = await runBF768(recs768a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_ZONE_CLUSTER'), 'BELIEF_RELATIONSHIP_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_RELATIONSHIP_ZONE_CLUSTER does not fire when relationship-shift scenes spread across thirds', async () => {
+      const mkShift768 = () => [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }];
+      const recs768an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs768an[0] = makeSharedRecord(0, { relationshipShifts: mkShift768() });
+      recs768an[4] = makeSharedRecord(4, { relationshipShifts: mkShift768() });
+      recs768an[8] = makeSharedRecord(8, { relationshipShifts: mkShift768() });
+      const res = await runBF768(recs768an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_ZONE_CLUSTER'), 'BELIEF_RELATIONSHIP_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment scenes at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character-moment scene', async () => {
+      const recs768b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runBF768(recs768b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_DROUGHT_RUN'), 'BELIEF_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character-moment scenes are evenly spread', async () => {
+      const recs768bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runBF768(recs768bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_DROUGHT_RUN'), 'BELIEF_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs768c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runBF768(recs768c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_DROUGHT_RUN'), 'BELIEF_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs768cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runBF768(recs768cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_DROUGHT_RUN'), 'BELIEF_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 754 — beliefPass: belief relationship peak uncaused, belief turn drought run, belief suspense zone cluster', async () => {
     const runBF754 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

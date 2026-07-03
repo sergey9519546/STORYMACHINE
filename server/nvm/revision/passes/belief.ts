@@ -306,6 +306,14 @@
 // BELIEF_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 presence × structural
 // thirds — Wave 684 applied the backward-cause peak mode to suspenseDelta; the zone-cluster mode
 // has never been applied to it).
+// Wave 768 additions: BELIEF_RELATIONSHIP_ZONE_CLUSTER (distribution/timing × relationshipShifts
+// presence × structural thirds — Waves 670/754 applied the run-based drought and backward-cause
+// peak modes to relationshipShifts; the zone-cluster mode has never been applied to it, completing
+// the trio), BELIEF_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment'
+// absence — Wave 684 applied the zone-cluster mode to this signal; the drought-run mode has never
+// been applied to it), BELIEF_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Waves
+// 684/754 applied the backward-cause peak and zone-cluster modes to suspenseDelta; the drought-run
+// mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4228,6 +4236,72 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r754c.maxZoneCount / r754c.count) * 100)}% of the scenes where tension rises cluster in the ${r754c.zoneNames[r754c.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the belief-tracking layer has no rising danger testing characters' convictions anywhere else in the story.`,
         suggestedFix: `Raise suspense in at least one scene outside the ${r754c.zoneNames[r754c.maxZoneIdx]} third so the belief-tracking layer keeps tension testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 768: BELIEF_RELATIONSHIP_ZONE_CLUSTER, BELIEF_CHARACTER_MOMENT_DROUGHT_RUN,
+  //              BELIEF_SUSPENSE_DROUGHT_RUN ──────────────────────────────────────
+
+  // BELIEF_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // carrying a relationship shift, fires when more than 75% of those scenes cluster in a single
+  // third. Waves 670/754 applied the run-based drought and backward-cause peak modes to
+  // relationshipShifts; the zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r768a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r768a.fires) {
+      issues.push({
+        location: `${r768a.zoneNames[r768a.maxZoneIdx]} third — ${r768a.maxZoneCount} of ${r768a.count} relationship-shift scenes`,
+        rule: 'BELIEF_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r768a.maxZoneCount / r768a.count) * 100)}% of the scenes where a bond shifts cluster in the ${r768a.zoneNames[r768a.maxZoneIdx]} third. When every relational change lands in the same structural window, the belief-tracking layer has no bond movement testing convictions anywhere else in the story.`,
+        suggestedFix: `Shift a relationship in at least one scene outside the ${r768a.zoneNames[r768a.maxZoneIdx]} third so bond movement keeps testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes purposed otherwise reaches 6. Wave
+  // 684 applied the zone-cluster mode to this signal; the drought-run mode has never been applied
+  // to it.
+  {
+    const r768b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r768b.fires) {
+      issues.push({
+        location: `longest stretch with no character-moment scene: ${r768b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r768b.longestRun} consecutive scenes purposed otherwise than a character moment, even though ${r768b.presentCount} scenes elsewhere are dedicated to the protagonist's inner life. A long unbroken stretch with nothing but plot-forward scenes leaves the belief-tracking layer with no interior beat to surface convictions through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r768b.longestRun}-scene stretch as a character moment so the belief-tracking layer keeps a beat of interior reflection throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no suspense rise reaches 6. Waves 684/754 applied the
+  // backward-cause peak and zone-cluster modes to suspenseDelta; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r768c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r768c.fires) {
+      issues.push({
+        location: `longest stretch with no rising tension: ${r768c.longestRun} consecutive scenes`,
+        rule: 'BELIEF_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r768c.longestRun} consecutive scenes with no rise in suspense at all, even though ${r768c.presentCount} scenes elsewhere do raise tension. A long unbroken stretch with nothing testing characters under pressure leaves the belief-tracking layer with no danger to expose convictions for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r768c.longestRun}-scene stretch so the belief-tracking layer keeps a live thread of tension exposing convictions through that stretch.`,
       });
     }
   }
