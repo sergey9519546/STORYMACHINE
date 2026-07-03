@@ -249,6 +249,15 @@
 // CLUSTER (distribution/timing × payoffSetupIds × structural thirds — payoffSetupIds anchors
 // three aftermath-flat checks and a peak-uncaused check already, but has never been
 // cluster-audited; the zone-cluster template applied to a third channel after clock/highlight).
+// Wave 677 additions (built on the shared checks library, audit M2.2): PACING_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — clockDelta has only
+// ever appeared as an OR-condition alongside clockRaised inside aftermath triggers; the
+// backward-cause peak mode applied to it standalone for the first time), PACING_TURN_DROUGHT_RUN
+// (run-based × dramaticTurn presence absence — dramaticTurn has only ever served as an
+// aftermath-void trigger or hasCause condition; the drought-run mode applied to this channel for
+// the first time), PACING_STAKES_ZONE_CLUSTER (distribution/timing × purpose === 'raise_stakes'
+// × structural thirds — `purpose` has only ever anchored a single aftermath-flat trigger
+// [STAKES_AFTERMATH_EMOTION_FLAT]; the zone-cluster mode applied to it for the first time).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3836,6 +3845,76 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r663c.maxZoneCount} of the story's ${r663c.count} thread-resolution scenes (${Math.round((r663c.maxZoneCount / r663c.count) * 100)}%) cluster in the ${zoneName663c} third. Resolution concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds paced without a sense of accumulated payoff.`,
         suggestedFix: `Let at least one thread resolve outside the ${zoneName663c} third — spreading resolutions across the story lets each structural third carry its own sense of payoff.`,
+      });
+    }
+  }
+
+  // ── Wave 677: PACING_CLOCK_DELTA_PEAK_UNCAUSED, PACING_TURN_DROUGHT_RUN,
+  //              PACING_STAKES_ZONE_CLUSTER ──────────────────────────────────────────────────
+
+  // PACING_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. clockDelta has only ever appeared as an OR-condition alongside clockRaised
+  // inside aftermath triggers; the backward-cause peak mode applied to it standalone for the
+  // first time.
+  {
+    const r677a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r677a.fires) {
+      issues.push({
+        location: `scene ${r677a.peakIdx + 1} — peak clockDelta (${r677a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r677a.peakIdx + 1}, at ${r677a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its sharpest urgency beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r677a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest deadline compression is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PACING_TURN_DROUGHT_RUN — Run-based × dramaticTurn presence absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 dramatic-turn scenes overall, fires
+  // when the longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn has
+  // only ever served as an aftermath-void trigger or hasCause condition in this pass; the
+  // drought-run mode applied to this channel for the first time.
+  {
+    const r677b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r677b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r677b.longestRun} consecutive scenes`,
+        rule: 'PACING_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r677b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r677b.presentCount} scenes elsewhere do carry a structural pivot. A long stretch with no reversal or twist leaves the story's pacing running flat, without a structural joint to punctuate it for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r677b.longestRun}-scene stretch a dramatic turn — even a modest reversal keeps the pacing structurally punctuated throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when >75% of them fall in a single structural third. `purpose` has only ever
+  // anchored a single aftermath-flat trigger (STAKES_AFTERMATH_EMOTION_FLAT); the zone-cluster
+  // mode applied to it for the first time.
+  {
+    const r677c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r677c.fires) {
+      const zoneName677c = r677c.zoneNames[r677c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName677c} third — ${r677c.maxZoneCount}/${r677c.count} stakes-raising scenes`,
+        rule: 'PACING_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r677c.maxZoneCount} of the story's ${r677c.count} scenes purposed to raise stakes (${Math.round((r677c.maxZoneCount / r677c.count) * 100)}%) cluster in the ${zoneName677c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds paced without any mounting pressure.`,
+        suggestedFix: `Purpose at least one scene outside the ${zoneName677c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting pressure.`,
       });
     }
   }
