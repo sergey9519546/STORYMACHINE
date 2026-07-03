@@ -1080,6 +1080,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 813 — characterArcPass: arc positive emotion zone cluster, arc positive emotion drought run, arc introduce conflict zone cluster', async () => {
+    const makeRec813 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc813 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('ARC_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs813a = Array.from({ length: 9 }, (_, i) =>
+        makeRec813(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runArc813(recs813a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_ZONE_CLUSTER'), 'ARC_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes spread across thirds', async () => {
+      const recs813an = Array.from({ length: 9 }, (_, i) =>
+        makeRec813(i, { emotionalShift: [0, 4, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runArc813(recs813an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_ZONE_CLUSTER'), 'ARC_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ARC_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs813b = Array.from({ length: 10 }, (_, i) =>
+        makeRec813(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runArc813(recs813b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_DROUGHT_RUN'), 'ARC_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs813bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec813(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runArc813(recs813bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_DROUGHT_RUN'), 'ARC_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; introduce_conflict scenes at 0,1,2 → 100% opening third
+    it('ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER fires when >75% of conflict-introducing scenes cluster in one third', async () => {
+      const recs813c = Array.from({ length: 9 }, (_, i) =>
+        makeRec813(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc813(recs813c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER does not fire when conflict-introducing scenes spread across thirds', async () => {
+      const recs813cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec813(i, { purpose: [0, 4, 8].includes(i) ? 'introduce_conflict' : 'development' }),
+      );
+      const res = await runArc813(recs813cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 799 — characterArcPass: arc negative emotion drought run, arc turning point zone cluster, arc turning point drought run', async () => {
     const makeRec799 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

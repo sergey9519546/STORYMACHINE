@@ -377,6 +377,18 @@
 // ARC_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence — completing 2
 // of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave; peak
 // mode conventionally skipped for this categorical field).
+// Wave 813 additions: ARC_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift ===
+// 'positive' × structural thirds — the existing ARC_POSITIVE_EMOTION_RUN audits consecutive
+// PRESENCE [run-based], and ARC_PEAK_POSITIVE_UNCAUSED is a hand-rolled backward-cause check
+// anchored on the LAST positive scene with a broader 3-signal hasCause; the general thirds-based
+// cluster mode has never been applied to this valence), ARC_POSITIVE_EMOTION_DROUGHT_RUN
+// (run-based × emotionalShift === 'positive' absence — distinct from ARC_POSITIVE_EMOTION_RUN's
+// presence-run in the same mirror-image way as ARC_NEGATIVE_EMOTION_DROUGHT_RUN vs ARC_NEGATIVE_
+// EMOTION_RUN; completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+// this same wave), ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; none of the three shared-library trio modes has ever been applied to
+// it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4572,6 +4584,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r799c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r799c.presentCount} scenes elsewhere redirect the character. A long unbroken stretch with no redirection leaves the character's arc coasting without a pivot for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r799c.longestRun}-scene stretch as a turning point so the arc keeps redirecting the character throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 813: ARC_POSITIVE_EMOTION_ZONE_CLUSTER, ARC_POSITIVE_EMOTION_DROUGHT_RUN,
+  //              ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ARC_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // The existing ARC_POSITIVE_EMOTION_RUN audits consecutive PRESENCE (run-based), and ARC_PEAK_
+  // POSITIVE_UNCAUSED is a hand-rolled backward-cause check anchored on the LAST positive scene
+  // with a broader 3-signal hasCause; the general thirds-based cluster mode has never been
+  // applied to this valence.
+  {
+    const r813a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r813a.fires) {
+      issues.push({
+        location: `${r813a.zoneNames[r813a.maxZoneIdx]} third — ${r813a.maxZoneCount} of ${r813a.count} positive-emotion scenes`,
+        rule: 'ARC_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r813a.maxZoneCount / r813a.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r813a.zoneNames[r813a.maxZoneIdx]} third. When every uplift concentrates in one structural window, the character's arc has no relief or triumph testing them anywhere else in the story.`,
+        suggestedFix: `Give the character a moment of uplift in at least one scene outside the ${r813a.zoneNames[r813a.maxZoneIdx]} third so the arc keeps offering relief more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no positive charge reaches 6. Distinct
+  // from ARC_POSITIVE_EMOTION_RUN's presence-run in the same mirror-image way as ARC_NEGATIVE_
+  // EMOTION_DROUGHT_RUN vs ARC_NEGATIVE_EMOTION_RUN. Completing 2 of 3 slots for this valence
+  // alongside the zone-cluster mode added in this same wave.
+  {
+    const r813b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r813b.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r813b.longestRun} consecutive scenes`,
+        rule: 'ARC_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r813b.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r813b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the character's arc without a moment of uplift for an extended run.`,
+        suggestedFix: `Give the character a moment of relief or small victory within the ${r813b.longestRun}-scene stretch so the arc keeps offering uplift throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose === 'introduce_conflict'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // conflict-introducing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r813c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r813c.fires) {
+      issues.push({
+        location: `${r813c.zoneNames[r813c.maxZoneIdx]} third — ${r813c.maxZoneCount} of ${r813c.count} conflict-introducing scenes`,
+        rule: 'ARC_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r813c.maxZoneCount / r813c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r813c.zoneNames[r813c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the character's arc stops testing them with fresh friction anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r813c.zoneNames[r813c.maxZoneIdx]} third to introduce conflict so the character's arc keeps testing them with fresh friction more evenly across the story.`,
       });
     }
   }
