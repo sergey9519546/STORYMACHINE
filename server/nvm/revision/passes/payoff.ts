@@ -333,6 +333,19 @@
 // shared-library trio modes has ever been applied to it), PAYOFF_REVELATION_DROUGHT_RUN
 // (run-based × revelation absence — completing 2 of 3 slots for revelation alongside the
 // zone-cluster mode added in this same wave).
+// Wave 804 additions: PAYOFF_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-magnitude
+// × 2-scene lookback — completes the trio for suspenseDelta alongside the zone-cluster mode
+// (Wave 776) and the run-based drought mode (Wave 790); the backward-cause peak mode has never
+// been applied to it), PAYOFF_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude [0/1] × 2-scene lookback — completes the trio for revelation;
+// hasCause deliberately omits revelation to avoid circularity), PAYOFF_CHARACTER_MOMENT_
+// ZONE_CLUSTER (distribution/timing × purpose === 'character_moment' × structural thirds — this
+// purpose value has never been referenced anywhere in this pass; none of the three
+// shared-library trio modes has ever been applied to it). Reconnaissance for this wave also
+// confirmed that SEED_DROUGHT_RUN (Wave 510, hand-rolled) already completes the seededClueIds
+// trio, and PAYOFF_TEMPORAL_CLUSTER (Wave 496, hand-rolled) plus PAYOFF_DROUGHT_RUN (Wave 552,
+// hand-rolled) already complete the payoffSetupIds trio, so both fields were correctly skipped
+// as non-distinct candidates.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4374,6 +4387,75 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r790c.longestRun} consecutive scenes with no revelation at all, even though ${r790c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the payoff engine with no fresh disclosure to resolve for an extended run.`,
         suggestedFix: `Let a truth surface somewhere within the ${r790c.longestRun}-scene stretch so the payoff engine keeps resolving new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 804: PAYOFF_SUSPENSE_PEAK_UNCAUSED, PAYOFF_REVELATION_PEAK_UNCAUSED,
+  //              PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PAYOFF_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for suspenseDelta alongside the zone-cluster mode
+  // (Wave 776) and the run-based drought mode (Wave 790) — the backward-cause peak mode has never
+  // been applied to it.
+  {
+    const r804a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r804a.fires) {
+      issues.push({
+        location: `scene ${r804a.peakIdx} (peak suspenseDelta ${r804a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'PAYOFF_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r804a.peakIdx}, suspenseDelta ${r804a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r804a.qualifyingCount} scenes elsewhere carry tension. The moment the payoff engine is under the most pressure lands out of nowhere — nothing has built toward the danger testing which threads survive.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r804a.peakIdx} so the peak tension reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Completes the trio for revelation. hasCause deliberately omits
+  // revelation to avoid circularity.
+  {
+    const r804b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r804b.fires) {
+      issues.push({
+        location: `scene ${r804b.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'PAYOFF_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r804b.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r804b.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the payoff engine's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r804b.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has never been referenced anywhere in this pass; none
+  // of the three shared-library trio modes has ever been applied to it.
+  {
+    const r804c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r804c.fires) {
+      issues.push({
+        location: `${r804c.zoneNames[r804c.maxZoneIdx]} third — ${r804c.maxZoneCount} of ${r804c.count} character-moment scenes`,
+        rule: 'PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r804c.maxZoneCount / r804c.count) * 100)}% of the story's character-moment scenes cluster in the ${r804c.zoneNames[r804c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the payoff engine has no room to let a resolved thread register on the protagonist anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r804c.zoneNames[r804c.maxZoneIdx]} third as a character moment so the payoff engine keeps room for interior reflection more evenly across the story.`,
       });
     }
   }

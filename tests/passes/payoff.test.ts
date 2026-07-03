@@ -1365,6 +1365,77 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 804 — payoffPass: payoff suspense peak uncaused, payoff revelation peak uncaused, payoff character moment zone cluster', async () => {
+    const runPY804 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('PAYOFF_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs804a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs804a[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs804a[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      const res = await runPY804(recs804a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_PEAK_UNCAUSED'), 'PAYOFF_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs804an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs804an[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs804an[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      recs804an[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runPY804(recs804an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_PEAK_UNCAUSED'), 'PAYOFF_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('PAYOFF_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs804b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs804b[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs804b[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      const res = await runPY804(recs804b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PEAK_UNCAUSED'), 'PAYOFF_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('PAYOFF_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs804bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs804bn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs804bn[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      recs804bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runPY804(recs804bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PEAK_UNCAUSED'), 'PAYOFF_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs804c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runPY804(recs804c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER'), 'PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs804cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runPY804(recs804cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER'), 'PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 790 — payoffPass: payoff suspense drought run, payoff revelation zone cluster, payoff revelation drought run', async () => {
     const runPY790 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
