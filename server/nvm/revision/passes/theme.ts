@@ -209,6 +209,11 @@
 // qualifying debt-carrying scenes, none followed by a resonant scene in the next 2; distinct from
 // the same-scene co-occurrence check above by aftermath mode, and from every other THEME_*_AFTERMATH_
 // SILENT check by trigger channel).
+// Wave 612 additions: THEME_VISUAL_BEAT_DECOUPLED, THEME_VISUAL_BEAT_ZONE_IMBALANCE,
+// THEME_VISUAL_BEAT_AFTERMATH_SILENT (co-occurrence/decoupling, underweight/bloat, and
+// sequence/aftermath × resonance × visualBeats — the same three-mode treatment Wave 598 gave
+// unresolvedClues, applied here to visualBeats, the one record field this 102-rule pass had never
+// used at all despite pairing resonance with nearly every other channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3475,6 +3480,85 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `None of the story's ${r598c.triggerCount} scenes carrying outstanding clue-debt are followed by a thematically resonant scene within the next two, even though ${r598c.aftermathCount} resonant scene(s) exist elsewhere. The aftermath of an open question is a natural window for thematic reflection — a character sitting with an unanswered mystery is exactly the moment to voice what the story is really about — but that window consistently goes thematically silent.`,
         suggestedFix: `After at least one scene where clue-debt is left outstanding, let the following scene or the one after voice the theme — a beat where a character's response to the lingering question connects to "${themeRaw}". The unresolved thread's aftermath is a natural home for the story's central idea to surface.`,
+      });
+    }
+  }
+
+  // ── Wave 612: THEME_VISUAL_BEAT_DECOUPLED, THEME_VISUAL_BEAT_ZONE_IMBALANCE,
+  //              THEME_VISUAL_BEAT_AFTERMATH_SILENT ─────────────────────────────────────────
+  // First checks in this pass to use the visualBeats signal — the last record field theme.ts had
+  // never touched, despite pairing resonance with unresolvedClues (Wave 598), seededClueIds,
+  // suspenseDelta, curiosityDelta, revelation, clockRaised, dramaticTurn, relationshipShifts,
+  // dialogueHighlights, emotionalShift, and purpose already. Mirrors Wave 598's exact three-mode
+  // treatment (co-occurrence, zone-imbalance, aftermath), applied to physical staging instead of
+  // clue-debt.
+  const isVisuallyStaged612 = (r: any): boolean => ((r.visualBeats ?? []) as unknown[]).length >= 2;
+
+  // THEME_VISUAL_BEAT_DECOUPLED — Co-occurrence/decoupling × resonance × visualBeats. Built on
+  // checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 visually-staged scenes
+  // (visualBeats.length≥2), ≥2 resonant scenes existing elsewhere. Zero overlap → fire. The
+  // scenes that lean most heavily on physical staging never carry the story's central idea — the
+  // theme surfaces only through dialogue or interior reflection, never through what a character
+  // physically does or examines.
+  {
+    const r612a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: isVisuallyStaged612, isB: isResonant598,
+    });
+    if (r612a.fires) {
+      issues.push({
+        location: `${r612a.aCount} visually-staged scene(s) — zero thematically resonant`,
+        rule: 'THEME_VISUAL_BEAT_DECOUPLED',
+        severity: 'minor',
+        description: `${r612a.aCount} scenes lean heavily on physical staging, but none of them carry thematic language related to "${themeRaw}", even though ${r612a.bCount} resonant scene(s) exist elsewhere. The scenes richest in physical action or examined detail never become an occasion for the story's central idea to surface — the theme is carried entirely by speech or interior reflection, never by what a character does with their hands or eyes.`,
+        suggestedFix: `Let at least one heavily staged scene double as a thematic beat — an object a character examines, or an action they perform, that embodies "${themeRaw}" without needing a line of dialogue to explain it. Physical staging is often where a theme lands hardest, shown rather than spoken.`,
+      });
+    }
+  }
+
+  // THEME_VISUAL_BEAT_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 visually-staged scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total — audits WHERE physical staging concentrates
+  // structurally, orthogonal to THEME_RESONANCE_THIRDS_CLUSTER (resonance distribution, not
+  // staging distribution) and THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE (Wave 598: clue-debt channel).
+  {
+    const r612b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: isVisuallyStaged612,
+    });
+    if (r612b.fires) {
+      const emptyNames612b = r612b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName612b = FOUR_ZONE_NAMES[r612b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames612b} empty; ${bloatName612b} has ${r612b.counts[r612b.bloatZoneIdx]}/${r612b.totalCount} visually-staged scenes`,
+        rule: 'THEME_VISUAL_BEAT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r612b.totalCount} visually-staged scenes are unevenly distributed across its four structural zones: ${bloatName612b} contains ${r612b.counts[r612b.bloatZoneIdx]} of them (${Math.round((r612b.counts[r612b.bloatZoneIdx] / r612b.totalCount) * 100)}%) while ${emptyNames612b} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's opportunities for the theme to manifest physically an uneven structural rhythm.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames612b}, so every structural quarter carries some opportunity for "${themeRaw}" to surface through physical action, not only through the quarter where staging is currently concentrated.`,
+      });
+    }
+  }
+
+  // THEME_VISUAL_BEAT_AFTERMATH_SILENT — Sequence/aftermath × visualBeats-present trigger →
+  // resonance aftermath. Built on checkAftermathVoid from the shared checks library. n≥8, ≥3
+  // qualifying visually-staged scenes (pos < n-2), ≥2 resonant scenes existing elsewhere. None of
+  // the qualifying staged scenes are followed by a resonant scene within 2 scenes → fire. A
+  // heavily staged moment never gets connected to the theme even in its aftermath — distinct from
+  // THEME_VISUAL_BEAT_DECOUPLED above by mode (aftermath window vs. same-scene), and from
+  // THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT (Wave 598: clue-debt trigger channel).
+  {
+    const r612c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+      isTrigger: isVisuallyStaged612, isAftermath: isResonant598,
+    });
+    if (r612c.fires) {
+      issues.push({
+        location: `${r612c.triggerCount} visually-staged scene(s) — no resonant scene within 2 scenes of any`,
+        rule: 'THEME_VISUAL_BEAT_AFTERMATH_SILENT',
+        severity: 'minor',
+        description: `None of the story's ${r612c.triggerCount} heavily staged scenes are followed by a thematically resonant scene within the next two, even though ${r612c.aftermathCount} resonant scene(s) exist elsewhere. The aftermath of a physically dense moment is a natural window for reflection — a character processing what they just did or examined is exactly the moment to voice what the story is really about — but that window consistently goes thematically silent.`,
+        suggestedFix: `After at least one heavily staged scene, let the following scene or the one after voice the theme — a beat where a character's reaction to what just happened physically connects to "${themeRaw}". The aftermath of physical action is a natural home for the story's central idea to surface.`,
       });
     }
   }

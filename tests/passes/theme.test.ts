@@ -931,6 +931,85 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 612 — themePass: visual beat decoupled, visual beat zone imbalance, visual beat aftermath silent', async () => {
+    const THEME612 = 'redemption courage hope';
+    const themed612 = ['act of redemption'];
+    const staged612 = ['examines the photograph', 'grips the railing'];
+    const runT612 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: THEME612 },
+      });
+    };
+
+    it('THEME_VISUAL_BEAT_DECOUPLED fires when no visually-staged scene is thematically resonant', async () => {
+      // 6 scenes; staged at 0,1 (visualBeats≥2); resonant at 4,5 — zero overlap
+      const recs612a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs612a[0] = makeSharedRecord(0, { visualBeats: staged612 });
+      recs612a[1] = makeSharedRecord(1, { visualBeats: staged612 });
+      recs612a[4] = makeSharedRecord(4, { dialogueHighlights: themed612 });
+      recs612a[5] = makeSharedRecord(5, { dialogueHighlights: themed612 });
+      const res = await runT612(recs612a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_DECOUPLED'), 'THEME_VISUAL_BEAT_DECOUPLED should fire');
+    });
+
+    it('THEME_VISUAL_BEAT_DECOUPLED does not fire when a visually-staged scene is also resonant', async () => {
+      const recs612a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs612a[0] = makeSharedRecord(0, { visualBeats: staged612, dialogueHighlights: themed612 });
+      recs612a[1] = makeSharedRecord(1, { visualBeats: staged612 });
+      recs612a[4] = makeSharedRecord(4, { dialogueHighlights: themed612 });
+      const res = await runT612(recs612a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_DECOUPLED'), 'THEME_VISUAL_BEAT_DECOUPLED should not fire');
+    });
+
+    it('THEME_VISUAL_BEAT_ZONE_IMBALANCE fires when one zone has zero visually-staged scenes and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: staged at 6,7,8 (zone 2) plus 9 (zone 3) to meet minCount=4
+      const recs612b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs612b[6] = makeSharedRecord(6, { visualBeats: staged612 });
+      recs612b[7] = makeSharedRecord(7, { visualBeats: staged612 });
+      recs612b[8] = makeSharedRecord(8, { visualBeats: staged612 });
+      recs612b[9] = makeSharedRecord(9, { visualBeats: staged612 });
+      const res = await runT612(recs612b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_ZONE_IMBALANCE'), 'THEME_VISUAL_BEAT_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_VISUAL_BEAT_ZONE_IMBALANCE does not fire when visually-staged scenes are spread across all zones', async () => {
+      const recs612b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs612b[1] = makeSharedRecord(1, { visualBeats: staged612 });
+      recs612b[4] = makeSharedRecord(4, { visualBeats: staged612 });
+      recs612b[7] = makeSharedRecord(7, { visualBeats: staged612 });
+      recs612b[10] = makeSharedRecord(10, { visualBeats: staged612 });
+      const res = await runT612(recs612b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_ZONE_IMBALANCE'), 'THEME_VISUAL_BEAT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_VISUAL_BEAT_AFTERMATH_SILENT fires when no visually-staged scene is followed by a resonant scene within 2', async () => {
+      // 9 scenes; staged at 0,1,2 (windows reach at most scene 4); resonant at 7,8 (outside every window)
+      const recs612c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs612c[0] = makeSharedRecord(0, { visualBeats: staged612 });
+      recs612c[1] = makeSharedRecord(1, { visualBeats: staged612 });
+      recs612c[2] = makeSharedRecord(2, { visualBeats: staged612 });
+      recs612c[7] = makeSharedRecord(7, { dialogueHighlights: themed612 });
+      recs612c[8] = makeSharedRecord(8, { dialogueHighlights: themed612 });
+      const res = await runT612(recs612c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_AFTERMATH_SILENT'), 'THEME_VISUAL_BEAT_AFTERMATH_SILENT should fire');
+    });
+
+    it('THEME_VISUAL_BEAT_AFTERMATH_SILENT does not fire when a visually-staged scene is followed by a resonant scene within 2', async () => {
+      // staged at 0,1,2; scene 2 is ALSO resonant — within trigger@0's window (off=2) and
+      // trigger@1's window (off=1), breaking void for both regardless of trigger@2
+      const recs612cnr = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs612cnr[0] = makeSharedRecord(0, { visualBeats: staged612 });
+      recs612cnr[1] = makeSharedRecord(1, { visualBeats: staged612 });
+      recs612cnr[2] = makeSharedRecord(2, { visualBeats: staged612, dialogueHighlights: themed612 });
+      recs612cnr[7] = makeSharedRecord(7, { dialogueHighlights: themed612 });
+      const res = await runT612(recs612cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_VISUAL_BEAT_AFTERMATH_SILENT'), 'THEME_VISUAL_BEAT_AFTERMATH_SILENT should not fire');
+    });
+  });
+
   describe('Wave 598 — themePass: unresolved clue decoupled, unresolved clue zone imbalance, unresolved clue aftermath silent', async () => {
     const THEME598 = 'redemption courage hope';
     const themed598 = ['act of redemption'];
