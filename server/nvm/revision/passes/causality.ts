@@ -348,6 +348,23 @@
 // CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment'
 // presence × structural thirds — this specific purpose value has never been referenced anywhere
 // in this pass; none of the three shared-library trio modes has ever been applied to it).
+// Wave 797 additions (closes the fifteenth rotation cycle, 784-797): CAUSALITY_CHARACTER_
+// MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence — Wave 783 applied the
+// zone-cluster mode to this purpose value; the drought-run mode has never been applied to it,
+// completing the trio for this categorical field, peak conventionally skipped). Reconnaissance
+// for this wave also confirmed two near-misses via the hand-rolled-equivalent diligence process:
+// a suspenseDelta zone-cluster candidate is blocked by the pre-existing SUSPENSE_TEMPORAL_CLUSTER
+// (Wave 573, an exact hand-rolled equivalent of checkZoneCluster at the same n≥9/minCount-3/75%
+// thresholds), and a dramaticTurn zone-cluster candidate is blocked by the pre-existing
+// DRAMATIC_TURN_TEMPORAL_CLUSTER (Wave 489, the same thirds-based >75% test at minCount 4). Both
+// were skipped as non-distinct. CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift='negative' × structural thirds — distinct from the pre-existing
+// EMOTIONAL_ZONE_CLUSTER (Wave 475), which clusters on non-neutral scenes of EITHER valence
+// combined; this isolates the negative valence specifically, a narrower signal never tested),
+// CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift='negative' absence —
+// distinct from the pre-existing EMOTIONAL_NEUTRAL_RUN (Wave 324), which fires on a run of
+// ALL-neutral scenes; this fires on a run absent of negative charge specifically, which a run
+// mixing neutral and positive scenes would satisfy but EMOTIONAL_NEUTRAL_RUN would not).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4628,6 +4645,75 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r783c.maxZoneCount / r783c.count) * 100)}% of the story's character-moment scenes cluster in the ${r783c.zoneNames[r783c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the causal chain has no pause for the protagonist's inner life anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r783c.zoneNames[r783c.maxZoneIdx]} third as a character moment so the causal chain keeps room for interior reflection more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 797: CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN, CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER,
+  //              CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes with no character-moment purpose
+  // reaches 6. Wave 783 applied the zone-cluster mode to this purpose value; the drought-run mode
+  // has never been applied to it, completing the trio for this categorical field (peak mode
+  // conventionally skipped).
+  {
+    const r797a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r797a.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r797a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r797a.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r797a.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with no room for the protagonist's inner life leaves the causal chain running on pure plot mechanics for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r797a.longestRun}-scene stretch as a character moment so the causal chain keeps room for interior reflection throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift='negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from the pre-existing EMOTIONAL_ZONE_CLUSTER (Wave 475), which clusters on
+  // non-neutral scenes of EITHER valence combined — this isolates the negative valence
+  // specifically, a narrower signal that has never been tested on its own.
+  {
+    const r797b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r797b.fires) {
+      issues.push({
+        location: `${r797b.zoneNames[r797b.maxZoneIdx]} third — ${r797b.maxZoneCount} of ${r797b.count} negative-emotion scenes`,
+        rule: 'CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r797b.maxZoneCount / r797b.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r797b.zoneNames[r797b.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the causal chain carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r797b.zoneNames[r797b.maxZoneIdx]} third so the causal chain's emotional cost registers more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift='negative' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes overall,
+  // fires when the longest consecutive run of scenes with no negative charge reaches 6. Distinct
+  // from the pre-existing EMOTIONAL_NEUTRAL_RUN (Wave 324), which fires on a run of ALL-neutral
+  // scenes — this fires on a run absent of negative charge specifically, which a run mixing
+  // neutral and positive scenes would satisfy but EMOTIONAL_NEUTRAL_RUN would not.
+  {
+    const r797c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r797c.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r797c.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r797c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r797c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the causal chain with nothing testing its stakes under emotional cost for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r797c.longestRun}-scene stretch a negative emotional charge so the causal chain keeps testing its stakes against cost throughout that stretch.`,
       });
     }
   }

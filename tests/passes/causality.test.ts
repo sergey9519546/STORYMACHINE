@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 797 — causalityPass: causality character moment drought run, causality negative emotion zone cluster, causality negative emotion drought run', async () => {
+    const runCA797 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment purpose at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs797a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runCA797(recs797a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN'), 'CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs797an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runCA797(recs797an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN'), 'CAUSALITY_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs797b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runCA797(recs797b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs797bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runCA797(recs797bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'CAUSALITY_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs797c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runCA797(recs797c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN'), 'CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs797cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runCA797(recs797cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN'), 'CAUSALITY_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 783 — causalityPass: causality revelation drought run, causality curiosity drought run, causality character moment zone cluster', async () => {
     const runCA783 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
