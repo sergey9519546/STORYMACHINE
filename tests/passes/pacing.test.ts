@@ -934,6 +934,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 719 — pacingPass: pacing open thread zone cluster, pacing payoff drought run, pacing highlight peak uncaused', async () => {
+    const runP719 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('PACING_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs719a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs719a[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs719a[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs719a[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      const res = await runP719(recs719a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_ZONE_CLUSTER'), 'PACING_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs719an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs719an[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs719an[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs719an[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      const res = await runP719(recs719an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_ZONE_CLUSTER'), 'PACING_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PACING_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs719b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs719b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs719b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs719b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs719b[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runP719(recs719b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_DROUGHT_RUN'), 'PACING_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // PACING_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PACING_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs719bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs719bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs719bn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs719bn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runP719(recs719bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_DROUGHT_RUN'), 'PACING_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PACING_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs719c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs719c[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs719c[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP719(recs719c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_PEAK_UNCAUSED'), 'PACING_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // PACING_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PACING_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs719cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs719cn[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs719cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs719cn[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP719(recs719cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_PEAK_UNCAUSED'), 'PACING_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 705 — pacingPass: pacing seed zone cluster, pacing open thread peak uncaused, pacing payoff peak uncaused', async () => {
     const runP705 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
