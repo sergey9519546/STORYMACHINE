@@ -322,6 +322,20 @@
 // been applied to it), CAUSALITY_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave
 // 699 applied the backward-cause peak mode to suspenseDelta; the drought-run mode has never been
 // applied to it).
+// Wave 769 additions (closes the thirteenth rotation cycle, 756-769): CAUSALITY_TURN_DROUGHT_RUN
+// (run-based × dramaticTurn !== 'nothing' absence — dramaticTurn as a primary signal has only ever
+// anchored a fixed-3-scene-window cluster [DRAMATIC_TURN_CLUSTER], an all-turns backward-cause
+// audit [DRAMATIC_TURN_WITHOUT_CAUSE], aftermath, and co-occurrence-decoupling checks in this
+// pass; the shared-library longest-consecutive-absence-run mode has never been applied to it),
+// CAUSALITY_REVELATION_ZONE_CLUSTER (distribution/timing × revelation × structural thirds —
+// existing revelation checks are global-density [REVELATION_CASCADE], zone-scoped-to-first-half
+// [REVELATION_FRONT_LOADING], and fixed-window clustering [REVELATION_CLUSTERING]; the
+// shared-library thirds-based >75% cluster mode has never been applied to it),
+// CAUSALITY_REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude × 2-scene lookback
+// — revelation has only ever served as a hasCause predicate for other signals' peak-uncaused
+// checks in this pass; none of the three shared-library trio modes has ever been applied to
+// revelation itself as the primary signal. hasCause here deliberately references only
+// dramaticTurn, never revelation, to avoid a circular/self-referential audit).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4463,6 +4477,76 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r755c.longestRun} consecutive scenes with no rise in tension at all, even though ${r755c.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the causal chain without mounting pressure driving events forward for an extended run.`,
         suggestedFix: `Raise suspense somewhere within the ${r755c.longestRun}-scene stretch so the causal chain keeps mounting pressure acting on events throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 769: CAUSALITY_TURN_DROUGHT_RUN, CAUSALITY_REVELATION_ZONE_CLUSTER,
+  //              CAUSALITY_REVELATION_PEAK_UNCAUSED ─────────────────────────────────────
+
+  // CAUSALITY_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn as a primary
+  // signal has only ever anchored a fixed-3-scene-window cluster, an all-turns backward-cause
+  // audit, aftermath, and co-occurrence-decoupling checks in this pass; the shared-library
+  // longest-consecutive-absence-run mode has never been applied to it.
+  {
+    const r769a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r769a.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r769a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r769a.longestRun} consecutive scenes with no dramatic turn at all, even though ${r769a.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the causal chain with no pivot to redirect events for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r769a.longestRun}-scene stretch so the causal chain keeps a pivot redirecting events throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Existing revelation checks in
+  // this pass are global-density, zone-scoped-to-first-half, and fixed-window clustering; the
+  // shared-library thirds-based cluster mode has never been applied to it.
+  {
+    const r769b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r769b.fires) {
+      issues.push({
+        location: `${r769b.zoneNames[r769b.maxZoneIdx]} third — ${r769b.maxZoneCount} of ${r769b.count} revelation scenes`,
+        rule: 'CAUSALITY_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r769b.maxZoneCount / r769b.count) * 100)}% of the story's revelation scenes cluster in the ${r769b.zoneNames[r769b.maxZoneIdx]} third. When every disclosure lands in the same structural window, the causal chain has no fresh truth reshaping events anywhere else in the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r769b.zoneNames[r769b.maxZoneIdx]} third so the causal chain keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the peak (earliest, on magnitude ties) revelation scene has no dramatic
+  // turn in the 2 scenes preceding it. revelation has only ever served as a hasCause predicate for
+  // other signals' peak-uncaused checks in this pass; none of the three shared-library trio modes
+  // has ever been applied to revelation itself as the primary signal. hasCause deliberately
+  // references only dramaticTurn, never revelation, to avoid a circular/self-referential audit.
+  {
+    const r769c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r769c.fires) {
+      issues.push({
+        location: `scene ${r769c.peakIdx + 1} — the story's peak revelation scene`,
+        rule: 'CAUSALITY_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r769c.peakIdx + 1} is the earliest of ${r769c.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the causal chain slack right before the reveal.`,
+        suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r769c.peakIdx + 1} so the causal chain builds pressure into the revelation instead of arriving flat.`,
       });
     }
   }

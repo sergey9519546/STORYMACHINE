@@ -1247,6 +1247,70 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 769 — causalityPass: causality turn drought run, causality revelation zone cluster, causality revelation peak uncaused', async () => {
+    const runCA769 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_TURN_DROUGHT_RUN fire:
+    // n=10; dramaticTurn present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_TURN_DROUGHT_RUN fires when a long run has no dramatic turn', async () => {
+      const recs769a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runCA769(recs769a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_DROUGHT_RUN'), 'CAUSALITY_TURN_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_TURN_DROUGHT_RUN does not fire when dramatic turns are evenly spread', async () => {
+      const recs769an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 6, 9].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runCA769(recs769an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_DROUGHT_RUN'), 'CAUSALITY_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs769b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runCA769(recs769b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_ZONE_CLUSTER'), 'CAUSALITY_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs769bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runCA769(recs769bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_ZONE_CLUSTER'), 'CAUSALITY_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 (peak, earliest) and 5; no dramaticTurn at 0 or 1 (2-scene
+    // lookback of the peak at index 2).
+    it('CAUSALITY_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs769c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs769c[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs769c[5] = makeSharedRecord(5, { revelation: 'second truth revealed' });
+      const res = await runCA769(recs769c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PEAK_UNCAUSED'), 'CAUSALITY_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('CAUSALITY_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation', async () => {
+      const recs769cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs769cn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs769cn[5] = makeSharedRecord(5, { revelation: 'second truth revealed' });
+      recs769cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runCA769(recs769cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PEAK_UNCAUSED'), 'CAUSALITY_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 755 — causalityPass: causality payoff zone cluster, causality clock drought run, causality suspense drought run', async () => {
     const runCA755 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
