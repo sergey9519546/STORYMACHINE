@@ -934,6 +934,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 649 — pacingPass: pacing staging peak uncaused, pacing open thread drought run, pacing highlight zone cluster', async () => {
+    const runP649 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; staging at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('PACING_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs649a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs649a[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs649a[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP649(recs649a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAGING_PEAK_UNCAUSED'), 'PACING_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // PACING_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PACING_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs649an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs649an[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs649an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs649an[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP649(recs649an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAGING_PEAK_UNCAUSED'), 'PACING_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // PACING_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; debt at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PACING_OPEN_THREAD_DROUGHT_RUN fires when the longest no-debt run is ≥6', async () => {
+      const recs649b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs649b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs649b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs649b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      recs649b[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runP649(recs649b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_DROUGHT_RUN'), 'PACING_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // PACING_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // debt at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PACING_OPEN_THREAD_DROUGHT_RUN does not fire when debt is distributed without a long drought', async () => {
+      const recs649bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs649bn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs649bn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs649bn[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runP649(recs649bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_DROUGHT_RUN'), 'PACING_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('PACING_HIGHLIGHT_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs649c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs649c[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs649c[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs649c[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runP649(recs649c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_ZONE_CLUSTER'), 'PACING_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_HIGHLIGHT_ZONE_CLUSTER does not fire when highlighted-dialogue scenes are distributed across thirds', async () => {
+      const recs649cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs649cn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs649cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs649cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runP649(recs649cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_ZONE_CLUSTER'), 'PACING_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 635 — pacingPass: pacing open thread staging decoupled, pacing seed staging aftermath void, pacing open thread zone imbalance', async () => {
     const runP635 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

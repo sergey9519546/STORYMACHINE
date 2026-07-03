@@ -224,11 +224,26 @@
 // absence — first pairing of these two fields), PACING_OPEN_THREAD_ZONE_IMBALANCE
 // (underweight/bloat × unresolvedClues × four structural zones — unresolvedClues had only ever
 // been used as an aftermath trigger [Wave 607's 7th-row extension], never zone-audited).
+// Wave 649 additions (built on the shared checks library, audit M2.2): this 112-rule pass already
+// hand-rolls the peak/drought/cluster analytical concepts extensively (four PEAK_UNCAUSED checks
+// on suspense/emotion/curiosity/payoff, four flatline/run checks on curiosity/emotion/clock/
+// suspense, one zone-cluster on clock) — but never via the shared checkPeakUncaused/
+// checkDroughtRun/checkZoneCluster helpers, and never on the visualBeats/unresolvedClues/
+// dialogueHighlights channels. PACING_STAGING_PEAK_UNCAUSED (single-peak isolation/backward-
+// cause × visualBeats magnitude — the scene with the densest physical staging has no dramatic
+// turn or revelation in itself or the two scenes before it; distinct from the existing
+// SUSPENSE/EMOTIONAL/CURIOSITY/PAYOFF_PEAK_UNCAUSED family, none of which audit the staging
+// channel), PACING_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence — a 6+
+// consecutive-scene stretch with zero outstanding clue-debt while such scenes occur ≥3 times
+// elsewhere; the drought/flatline-run template applied to a fifth channel after curiosity/
+// emotion/clock/suspense), PACING_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights
+// × structural thirds — >75% of highlighted-dialogue scenes concentrate in one third; the
+// zone-cluster template applied to a second channel after clock).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /**
  * Compute weighted line counts per scene.
@@ -3670,6 +3685,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r635c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName635c} contains ${r635c.counts[r635c.bloatZoneIdx]} of them (${Math.round((r635c.counts[r635c.bloatZoneIdx] / r635c.totalCount) * 100)}%) while ${emptyNames635c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's pacing of active mystery an uneven structural rhythm.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames635c} — so every structural quarter carries some sense of active, unanswered mystery.`,
+      });
+    }
+  }
+
+  // ── Wave 649: PACING_STAGING_PEAK_UNCAUSED, PACING_OPEN_THREAD_DROUGHT_RUN,
+  //              PACING_HIGHLIGHT_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // PACING_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // First checkPeakUncaused use in this pass via the shared library — distinct from the existing
+  // SUSPENSE/EMOTIONAL/CURIOSITY/PAYOFF_PEAK_UNCAUSED family, none of which audit the staging
+  // channel.
+  {
+    const r649a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r649a.fires) {
+      issues.push({
+        location: `scene ${r649a.peakIdx + 1} — peak physical-staging density (${r649a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r649a.peakIdx + 1}, with ${r649a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most staged beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r649a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6. This
+  // pass already hand-rolls flatline/run logic for curiosity, emotion, clock, and suspense, but
+  // never via the shared helper and never on the unresolvedClues channel — a long unbroken
+  // stretch where every mystery is settled leaves the pacing engine with no open question to
+  // modulate against.
+  {
+    const r649b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r649b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r649b.longestRun} consecutive scenes`,
+        rule: 'PACING_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r649b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r649b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the pacing has no open question to modulate its rhythm against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r649b.longestRun}-scene stretch so the pacing keeps some outstanding mystery to work against throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-dialogue
+  // scenes, fires when >75% of them fall in a single structural third. This pass already applies
+  // the zone-cluster template to clock (CLOCK_ZONE_CLUSTER); this is the second channel — a scene
+  // where a line of dialogue is flagged as memorable concentrates almost exclusively in one
+  // third rather than surfacing throughout the story's pacing.
+  {
+    const r649c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r649c.fires) {
+      const zoneName649c = r649c.zoneNames[r649c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName649c} third — ${r649c.maxZoneCount}/${r649c.count} highlighted-dialogue scenes`,
+        rule: 'PACING_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r649c.maxZoneCount} of the story's ${r649c.count} scenes carrying a standout line of dialogue (${Math.round((r649c.maxZoneCount / r649c.count) * 100)}%) cluster in the ${zoneName649c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds paced without a verbal high point to punctuate them.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName649c} third a standout line of dialogue — spreading memorable dialogue across the story lets each structural third carry its own verbal punctuation.`,
       });
     }
   }
