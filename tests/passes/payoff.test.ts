@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1361,6 +1364,84 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 594 — payoffPass: seed purpose monotone, payoff purpose monotone, clue seed zone imbalance', async () => {
+    const runPY594 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('SEED_PURPOSE_MONOTONE fires when >70% of seed scenes share the same purpose', async () => {
+      // 8 scenes; seeds at 0,1,2,4 (4 total) — 3 of them ('complicate') = 75% > 70%
+      const recs594a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs594a[0] = makeSharedRecord(0, { purpose: 'complicate', seededClueIds: ['a'] });
+      recs594a[1] = makeSharedRecord(1, { purpose: 'complicate', seededClueIds: ['b'] });
+      recs594a[2] = makeSharedRecord(2, { purpose: 'complicate', seededClueIds: ['c'] });
+      recs594a[4] = makeSharedRecord(4, { purpose: 'raise_stakes', seededClueIds: ['d'] });
+      const res = await runPY594(recs594a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_PURPOSE_MONOTONE'), 'SEED_PURPOSE_MONOTONE should fire');
+    });
+
+    it('SEED_PURPOSE_MONOTONE does not fire when seed scenes are spread across purposes', async () => {
+      // 4 seeds, each with a distinct purpose — dominant share = 25% < 70%
+      const recs594a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs594a[0] = makeSharedRecord(0, { purpose: 'complicate', seededClueIds: ['a'] });
+      recs594a[1] = makeSharedRecord(1, { purpose: 'raise_stakes', seededClueIds: ['b'] });
+      recs594a[2] = makeSharedRecord(2, { purpose: 'establish_world', seededClueIds: ['c'] });
+      recs594a[4] = makeSharedRecord(4, { purpose: 'character_moment', seededClueIds: ['d'] });
+      const res = await runPY594(recs594a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_PURPOSE_MONOTONE'), 'SEED_PURPOSE_MONOTONE should not fire');
+    });
+
+    it('PAYOFF_PURPOSE_MONOTONE fires when >70% of payoff scenes share the same purpose', async () => {
+      const recs594b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs594b[0] = makeSharedRecord(0, { purpose: 'resolution', payoffSetupIds: ['a'] });
+      recs594b[1] = makeSharedRecord(1, { purpose: 'resolution', payoffSetupIds: ['b'] });
+      recs594b[2] = makeSharedRecord(2, { purpose: 'resolution', payoffSetupIds: ['c'] });
+      recs594b[4] = makeSharedRecord(4, { purpose: 'climax', payoffSetupIds: ['d'] });
+      const res = await runPY594(recs594b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PURPOSE_MONOTONE'), 'PAYOFF_PURPOSE_MONOTONE should fire');
+    });
+
+    it('PAYOFF_PURPOSE_MONOTONE does not fire when payoff scenes are spread across purposes', async () => {
+      const recs594b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs594b[0] = makeSharedRecord(0, { purpose: 'resolution', payoffSetupIds: ['a'] });
+      recs594b[1] = makeSharedRecord(1, { purpose: 'climax', payoffSetupIds: ['b'] });
+      recs594b[2] = makeSharedRecord(2, { purpose: 'character_moment', payoffSetupIds: ['c'] });
+      recs594b[4] = makeSharedRecord(4, { purpose: 'turning_point', payoffSetupIds: ['d'] });
+      const res = await runPY594(recs594b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PURPOSE_MONOTONE'), 'PAYOFF_PURPOSE_MONOTONE should not fire');
+    });
+
+    it('CLUE_SEED_ZONE_IMBALANCE fires when one zone has zero seeds and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3 each: seeds at 6,7,8 (zone 2 = Act 2b, 3/4=75%) plus one more at 9
+      // (zone 3) to meet minCount=4 — zones 0,1 remain empty, zone 2 still holds ≥50% of the total
+      const recs594c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs594c[6] = makeSharedRecord(6, { seededClueIds: ['a'] });
+      recs594c[7] = makeSharedRecord(7, { seededClueIds: ['b'] });
+      recs594c[8] = makeSharedRecord(8, { seededClueIds: ['c'] });
+      recs594c[9] = makeSharedRecord(9, { seededClueIds: ['d'] });
+      const res = await runPY594(recs594c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLUE_SEED_ZONE_IMBALANCE'), 'CLUE_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('CLUE_SEED_ZONE_IMBALANCE does not fire when seeds are spread across all zones', async () => {
+      // one seed per zone (12 scenes, zones of 3): 1,4,7,10 → no empty zone
+      const recs594c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs594c[1] = makeSharedRecord(1, { seededClueIds: ['a'] });
+      recs594c[4] = makeSharedRecord(4, { seededClueIds: ['b'] });
+      recs594c[7] = makeSharedRecord(7, { seededClueIds: ['c'] });
+      recs594c[10] = makeSharedRecord(10, { seededClueIds: ['d'] });
+      const res = await runPY594(recs594c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLUE_SEED_ZONE_IMBALANCE'), 'CLUE_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 580 — payoffPass: seed opening zone absent, payoff seed decoupled, payoff consecutive valence run', async () => {
     const makeRec580 = (idx: number, overrides: any = {}): any => ({

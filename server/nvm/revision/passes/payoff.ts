@@ -187,9 +187,25 @@
 // scenes exist; thread resolutions never move bonds in their wake; first relational-channel entry
 // in the payoff-aftermath family, distinct from PAYOFF_REVELATION_AFTERMATH_ABSENT, PAYOFF_SEED_
 // AFTERMATH_ABSENT, and PAYOFF_CLOCK_AFTERMATH_ABSENT which use different aftermath channels).
+// Wave 594 additions: seed purpose monotone (average/aggregate × seed × scene-purpose — n≥8,
+// ≥4 seed scenes, >70% share the identical `purpose` value; clue-planting is confined to one
+// narrative function rather than woven across varied structural beats; the `purpose` field —
+// a fixed ScenePurpose enum — is used only once elsewhere in this entire file [an incidental OR-
+// condition], making this the first dedicated purpose-distribution check here), payoff purpose
+// monotone (the payoff-channel mirror of the above — >70% of payoff scenes share one purpose;
+// distinct from SEED_PURPOSE_MONOTONE by channel, following this file's existing convention of
+// mirrored seed/payoff pairs like SEED_DROUGHT_RUN/PAYOFF_DROUGHT_RUN and SEED_EMOTIONAL_VALENCE_
+// UNIFORM/PAYOFF_EMOTIONAL_VALENCE_UNIFORM), clue seed zone imbalance (underweight/bloat × seed ×
+// four structural zones, built on checkZoneImbalance from the shared checks library — audit M2.2 —
+// n≥10, ≥4 seed scenes; fires only when one zone has ZERO seeds while another holds ≥50% of the
+// total; distinct from SETUP_CLUSTERING [a pure >70%-concentration ratio with no zero-zone
+// requirement — a story could have seeds in every zone and still trip that check] and CLUE_SEED_
+// TEMPORAL_CLUSTER [uses thirds, not quarters, and likewise has no void-zone requirement]; first
+// check in this pass requiring the co-presence of a void AND a bloat rather than either alone).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function payoffPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -3159,6 +3175,95 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 594: SEED_PURPOSE_MONOTONE, PAYOFF_PURPOSE_MONOTONE,
+  //              CLUE_SEED_ZONE_IMBALANCE ────────────────────────────────────────────────────
+
+  // SEED_PURPOSE_MONOTONE — Average/aggregate × seed × scene-purpose.
+  // n≥8, ≥4 seed scenes (seededClueIds non-empty). More than 70% of seed scenes share the
+  // identical `purpose` value → fire. Clue-planting is confined to one narrative function —
+  // e.g. every seed lands during a 'complicate' beat and never during 'establish_world' or
+  // 'raise_stakes' — rather than being woven across the story's varied structural functions.
+  // Foreshadowing that only ever arrives through one kind of scene reads as a device tied to a
+  // single beat-type rather than a technique available anywhere in the story's structure.
+  // Distinct from: every other seed check in this pass, which audits seed scenes against a
+  // signal-delta channel (curiosity/suspense/emotion/relationship) or a structural position
+  // (zone/run), never against the scene's own declared purpose. First — and only — dedicated
+  // purpose-distribution check in this file; `purpose` otherwise appears just once, as an
+  // incidental OR-condition inside an unrelated check.
+  if (records.length >= 8) {
+    const seedRecs594a = records.filter(r => (r.seededClueIds ?? []).length > 0);
+    if (seedRecs594a.length >= 4) {
+      const purposeCounts594a = new Map<string, number>();
+      for (const r of seedRecs594a) purposeCounts594a.set(r.purpose, (purposeCounts594a.get(r.purpose) ?? 0) + 1);
+      const [domPurpose594a, domCount594a] = [...purposeCounts594a.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (domCount594a / seedRecs594a.length > 0.70) {
+        issues.push({
+          location: `${domCount594a} of ${seedRecs594a.length} seed scene(s) share purpose "${domPurpose594a}"`,
+          rule: 'SEED_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `${Math.round((domCount594a / seedRecs594a.length) * 100)}% of the story's ${seedRecs594a.length} clue-planting scenes (${domCount594a} of them) share the single scene purpose "${domPurpose594a}". Foreshadowing is confined to one narrative function rather than woven across the story's varied structural beats — the audience learns, even if only subconsciously, which kind of scene tends to carry a planted thread, and clue-planting outside that beat-type starts to feel less likely. The most versatile foreshadowing arrives through many different kinds of scenes: a quiet character moment, a raised-stakes confrontation, a piece of exposition.`,
+          suggestedFix: `Plant at least one clue in a scene serving a different structural purpose than "${domPurpose594a}" — a seed dropped during a raise_stakes confrontation reads very differently than one delivered during quiet exposition. Spreading seeds across purposes keeps foreshadowing feeling available anywhere in the story rather than tied to a single recurring beat-type.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_PURPOSE_MONOTONE — Average/aggregate × payoff × scene-purpose.
+  // The payoff-channel mirror of SEED_PURPOSE_MONOTONE: n≥8, ≥4 payoff scenes (payoffSetupIds
+  // non-empty), >70% sharing the identical purpose value → fire. Thread-resolutions are confined
+  // to one narrative function — e.g. every payoff lands during 'climax' beats and never during a
+  // quieter character moment — rather than resolving across the story's full structural range.
+  // Distinct from SEED_PURPOSE_MONOTONE by channel (payoff, not seed); follows this file's existing
+  // convention of mirrored seed/payoff pairs (SEED_DROUGHT_RUN/PAYOFF_DROUGHT_RUN, SEED_EMOTIONAL_
+  // VALENCE_UNIFORM/PAYOFF_EMOTIONAL_VALENCE_UNIFORM). Distinct from PAYOFF_EMOTIONAL_VALENCE_
+  // UNIFORM (categorical emotional sign, not scene purpose) and from RESOLUTION_CRAMMED_AT_END
+  // (temporal position, not purpose distribution).
+  if (records.length >= 8) {
+    const payoffRecs594b = records.filter(r => (r.payoffSetupIds ?? []).length > 0);
+    if (payoffRecs594b.length >= 4) {
+      const purposeCounts594b = new Map<string, number>();
+      for (const r of payoffRecs594b) purposeCounts594b.set(r.purpose, (purposeCounts594b.get(r.purpose) ?? 0) + 1);
+      const [domPurpose594b, domCount594b] = [...purposeCounts594b.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (domCount594b / payoffRecs594b.length > 0.70) {
+        issues.push({
+          location: `${domCount594b} of ${payoffRecs594b.length} payoff scene(s) share purpose "${domPurpose594b}"`,
+          rule: 'PAYOFF_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `${Math.round((domCount594b / payoffRecs594b.length) * 100)}% of the story's ${payoffRecs594b.length} payoff scenes (${domCount594b} of them) share the single scene purpose "${domPurpose594b}". Thread-resolution is confined to one narrative function rather than distributed across the story's structural range — every callback lands the same way, in the same kind of beat, rather than resolving through the story's varied structural functions.`,
+          suggestedFix: `Resolve at least one setup in a scene serving a different structural purpose than "${domPurpose594b}" — a payoff delivered mid-conversation in a character moment reads differently than one delivered at the climax. Distributing payoffs across purposes keeps resolutions from feeling procedurally identical.`,
+        });
+      }
+    }
+  }
+
+  // CLUE_SEED_ZONE_IMBALANCE — Underweight/bloat × seed × four structural zones.
+  // Built on checkZoneImbalance from the shared check-template library (server/nvm/revision/
+  // passes/lib/checks.ts, audit M2.2). n≥10, ≥4 seed scenes total, divided across four equal
+  // structural zones (Act 1/2a/2b/3). Fires only when at least one zone has ZERO seeds while
+  // another holds ≥50% of the total — the co-presence of a void AND a bloat, not concentration
+  // alone. Distinct from SETUP_CLUSTERING (a pure >70%-concentration ratio with no requirement
+  // that any zone be literally empty — a story with seeds spread [1,1,1,7] would trip that check
+  // without ever having a void zone) and CLUE_SEED_TEMPORAL_CLUSTER (uses thirds, not quarters,
+  // and likewise has no zero-zone requirement). First check in this pass requiring simultaneous
+  // void-and-bloat rather than concentration alone.
+  {
+    const r594c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r594c.fires) {
+      const emptyNames594c = r594c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName594c = FOUR_ZONE_NAMES[r594c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames594c} empty; ${bloatName594c} has ${r594c.counts[r594c.bloatZoneIdx]}/${r594c.totalCount} seeds`,
+        rule: 'CLUE_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r594c.totalCount} seeded clues are unevenly distributed across its four structural zones: ${bloatName594c} contains ${r594c.counts[r594c.bloatZoneIdx]} of them (${Math.round((r594c.counts[r594c.bloatZoneIdx] / r594c.totalCount) * 100)}%) while ${emptyNames594c} contains none. Clue-planting simultaneously bloats in one zone and vanishes from another: the audience receives a concentrated burst of new threads in one structural quarter while another quarter offers nothing new to wonder about.`,
+        suggestedFix: `Redistribute seeds: move at least one clue-plant from ${bloatName594c} into the empty zone(s) — ${emptyNames594c} — so every structural quarter carries some foreshadowing. The goal is not perfect uniformity, but that no zone is completely seed-free while another carries more than half the total load.`,
+      });
     }
   }
 
