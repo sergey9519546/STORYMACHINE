@@ -1376,6 +1376,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 777 — relationshipArcPass: relational suspense peak uncaused, relational curiosity zone cluster, relational revelation drought run', async () => {
+    const runRA777 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('RELATIONAL_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs777a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs777a[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs777a[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      const res = await runRA777(recs777a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED'), 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('RELATIONAL_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs777an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs777an[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs777an[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      recs777an[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runRA777(recs777an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED'), 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs777b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA777(recs777b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_ZONE_CLUSTER'), 'RELATIONAL_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs777bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA777(recs777bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_ZONE_CLUSTER'), 'RELATIONAL_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs777c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runRA777(recs777c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_DROUGHT_RUN'), 'RELATIONAL_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs777cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runRA777(recs777cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_DROUGHT_RUN'), 'RELATIONAL_REVELATION_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 763 — relationshipArcPass: relational suspense zone cluster, relational curiosity drought run, relational revelation zone cluster', async () => {
     const runRA763 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

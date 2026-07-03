@@ -317,6 +317,17 @@
 // the relationship channel's own state [RELATIONSHIP_PEAK_REVELATION_ABSENT] and served as a
 // hasCause predicate elsewhere; none of the three shared-library trio modes has ever been applied
 // to revelation itself as the primary signal).
+// Wave 777 additions: RELATIONAL_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-
+// magnitude × 2-scene lookback — Wave 763 applied the zone-cluster mode to suspenseDelta; the
+// existing RELATIONSHIP_SUSPENSE_PEAK_ABSENT audits whether a relationship shift co-occurs AT the
+// peak suspense scene, not a preparing cause before it — the backward-cause peak mode has never
+// been applied to suspenseDelta itself), RELATIONAL_CURIOSITY_ZONE_CLUSTER (distribution/timing ×
+// curiosityDelta>0 presence × structural thirds — Wave 763 applied the run-based drought mode to
+// curiosityDelta; the zone-cluster mode has never been applied to it), RELATIONAL_REVELATION_
+// DROUGHT_RUN (run-based × revelation absence — Wave 763 applied the zone-cluster mode to
+// revelation; the existing RELATIONSHIP_REVELATION_SILENT audits co-occurrence with a
+// relationship shift, not run-length absence of revelation itself — the drought-run mode has
+// never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4483,6 +4494,76 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${Math.round((r763c.maxZoneCount / r763c.count) * 100)}% of the story's revelation scenes cluster in the ${r763c.zoneNames[r763c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the relationship has no fresh truth reshaping it anywhere else in the story.`,
         suggestedFix: `Let a revelation land in at least one scene outside the ${r763c.zoneNames[r763c.maxZoneIdx]} third so the relationship keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 777: RELATIONAL_SUSPENSE_PEAK_UNCAUSED, RELATIONAL_CURIOSITY_ZONE_CLUSTER,
+  //              RELATIONAL_REVELATION_DROUGHT_RUN ──────────────────────────────────────
+
+  // RELATIONAL_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Wave 763 applied the zone-cluster mode to suspenseDelta; the existing
+  // RELATIONSHIP_SUSPENSE_PEAK_ABSENT audits whether a relationship shift co-occurs AT the peak
+  // suspense scene, not a preparing cause before it — the backward-cause peak mode has never been
+  // applied to suspenseDelta itself.
+  {
+    const r777a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r777a.fires) {
+      issues.push({
+        location: `scene ${r777a.peakIdx} (peak suspenseDelta ${r777a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'RELATIONAL_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r777a.peakIdx}, suspenseDelta ${r777a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r777a.qualifyingCount} scenes elsewhere carry tension. The moment the relationship is under the most external pressure lands out of nowhere — nothing has built toward the danger testing the bond.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r777a.peakIdx} so the relationship's peak moment of pressure reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // curiosity-positive scenes, fires when more than 75% of those scenes cluster in a single
+  // third. Wave 763 applied the run-based drought mode to curiosityDelta; the zone-cluster mode
+  // has never been applied to it.
+  {
+    const r777b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r777b.fires) {
+      issues.push({
+        location: `${r777b.zoneNames[r777b.maxZoneIdx]} third — ${r777b.maxZoneCount} of ${r777b.count} curiosity-positive scenes`,
+        rule: 'RELATIONAL_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r777b.maxZoneCount / r777b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r777b.zoneNames[r777b.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the relationship has no fresh question keeping it alive anywhere else in the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r777b.zoneNames[r777b.maxZoneIdx]} third so the relationship keeps generating fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation scenes overall, fires
+  // when the longest consecutive run of scenes with no revelation reaches 6. Wave 763 applied the
+  // zone-cluster mode to revelation; the existing RELATIONSHIP_REVELATION_SILENT audits
+  // co-occurrence with a relationship shift, not run-length absence of revelation itself — the
+  // drought-run mode has never been applied to it.
+  {
+    const r777c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r777c.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r777c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r777c.longestRun} consecutive scenes with no revelation at all, even though ${r777c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the relationship with no fresh disclosure reshaping it for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r777c.longestRun}-scene stretch so the relationship keeps being reshaped by new disclosures throughout that stretch.`,
       });
     }
   }
