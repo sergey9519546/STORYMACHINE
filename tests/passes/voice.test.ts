@@ -1438,6 +1438,71 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 851 — voicePass: voice stakes drought run, voice positive emotion zone cluster, voice establish world zone cluster', async () => {
+    const runV851 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_STAKES_DROUGHT_RUN fire:
+    // n=10; raise_stakes at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_STAKES_DROUGHT_RUN fires when a long run has no stakes-raising purpose', async () => {
+      const recs851a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runV851(recs851a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAKES_DROUGHT_RUN'), 'VOICE_STAKES_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are evenly spread', async () => {
+      const recs851an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runV851(recs851an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAKES_DROUGHT_RUN'), 'VOICE_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('VOICE_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs851b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runV851(recs851b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_POSITIVE_EMOTION_ZONE_CLUSTER'), 'VOICE_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes spread across thirds', async () => {
+      const recs851bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runV851(recs851bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_POSITIVE_EMOTION_ZONE_CLUSTER'), 'VOICE_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('VOICE_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs851c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runV851(recs851c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_ESTABLISH_WORLD_ZONE_CLUSTER'), 'VOICE_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs851cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runV851(recs851cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_ESTABLISH_WORLD_ZONE_CLUSTER'), 'VOICE_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 837 — voicePass: voice turning point drought run, voice introduce conflict drought run, voice stakes zone cluster', async () => {
     const runV837 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

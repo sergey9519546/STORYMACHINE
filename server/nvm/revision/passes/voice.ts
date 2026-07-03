@@ -350,6 +350,15 @@
 // conventionally skipped for this categorical field), VOICE_STAKES_ZONE_CLUSTER (distribution/
 // timing × purpose === 'raise_stakes' × structural thirds — this purpose value has never been
 // referenced anywhere in this file; a virgin field).
+//
+// Wave 851 additions: VOICE_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 837; peak mode conventionally skipped for this categorical field), VOICE_POSITIVE_EMOTION_ZONE_
+// CLUSTER (distribution/timing × emotionalShift === 'positive' × structural thirds — mirrors the
+// completed negative-valence trio; the positive valence has never been isolated by any of the
+// three shared-library trio modes in this file), VOICE_ESTABLISH_WORLD_ZONE_CLUSTER
+// (distribution/timing × purpose === 'establish_world' × structural thirds — this purpose value
+// has never been referenced anywhere in this file; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5116,6 +5125,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r837c.maxZoneCount / r837c.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r837c.zoneNames[r837c.maxZoneIdx]} third. When every escalation lands in the same structural window, the story's voice has no mounting pressure to speak through anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r837c.zoneNames[r837c.maxZoneIdx]} third to raise stakes so the story's voice keeps mounting pressure to speak through more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 851: VOICE_STAKES_DROUGHT_RUN, VOICE_POSITIVE_EMOTION_ZONE_CLUSTER,
+  //              VOICE_ESTABLISH_WORLD_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 837 (peak mode conventionally skipped for this categorical field).
+  {
+    const r851a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r851a.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising: ${r851a.longestRun} consecutive scenes`,
+        rule: 'VOICE_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r851a.longestRun} consecutive scenes with no stakes-raising purpose at all, even though ${r851a.presentCount} scenes elsewhere escalate. A long unbroken stretch with no mounting pressure leaves the story's voice with nothing new to speak through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r851a.longestRun}-scene stretch to raise stakes so the story's voice keeps mounting pressure to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed negative-valence trio; the positive valence has never been isolated by
+  // any of the three shared-library trio modes in this file.
+  {
+    const r851b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r851b.fires) {
+      issues.push({
+        location: `${r851b.zoneNames[r851b.maxZoneIdx]} third — ${r851b.maxZoneCount} of ${r851b.count} positive-emotion scenes`,
+        rule: 'VOICE_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r851b.maxZoneCount / r851b.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r851b.zoneNames[r851b.maxZoneIdx]} third. When all the relief concentrates in one structural window, the story's voice carries its emotional reward in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r851b.zoneNames[r851b.maxZoneIdx]} third so the story's voice registers its emotional reward more evenly across the story.`,
+      });
+    }
+  }
+
+  // VOICE_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this file — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r851c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r851c.fires) {
+      issues.push({
+        location: `${r851c.zoneNames[r851c.maxZoneIdx]} third — ${r851c.maxZoneCount} of ${r851c.count} world-establishing scenes`,
+        rule: 'VOICE_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r851c.maxZoneCount / r851c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r851c.zoneNames[r851c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the story's voice has no fresh ground to speak through anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r851c.zoneNames[r851c.maxZoneIdx]} third to establish the world so the story's voice keeps fresh ground to speak through more evenly across the story.`,
       });
     }
   }
