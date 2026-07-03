@@ -1204,6 +1204,95 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 754 — beliefPass: belief relationship peak uncaused, belief turn drought run, belief suspense zone cluster', async () => {
+    const runBF754 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; relationship shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('BELIEF_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs754a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs754a[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs754a[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runBF754(recs754a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_PEAK_UNCAUSED'), 'BELIEF_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs754an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs754an[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs754an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs754an[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runBF754(recs754an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_PEAK_UNCAUSED'), 'BELIEF_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_TURN_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a dramatic turn (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('BELIEF_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run reaches 6', async () => {
+      const recs754b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs754b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs754b[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs754b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runBF754(recs754b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURN_DROUGHT_RUN'), 'BELIEF_TURN_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_TURN_DROUGHT_RUN no-fire:
+    // dramatic-turn scenes spread out so no gap reaches 6 consecutive scenes
+    it('BELIEF_TURN_DROUGHT_RUN does not fire when dramatic turns are spread through the story', async () => {
+      const recs754bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs754bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs754bn[3] = makeSharedRecord(3, { dramaticTurn: 'reversal' });
+      recs754bn[6] = makeSharedRecord(6, { dramaticTurn: 'reversal' });
+      recs754bn[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runBF754(recs754bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURN_DROUGHT_RUN'), 'BELIEF_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('BELIEF_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs754c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs754c[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs754c[1] = makeSharedRecord(1, { suspenseDelta: 1 });
+      recs754c[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      const res = await runBF754(recs754c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_ZONE_CLUSTER'), 'BELIEF_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_SUSPENSE_ZONE_CLUSTER no-fire:
+    // suspense-positive scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes are distributed across thirds', async () => {
+      const recs754cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs754cn[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs754cn[4] = makeSharedRecord(4, { suspenseDelta: 1 });
+      recs754cn[7] = makeSharedRecord(7, { suspenseDelta: 1 });
+      const res = await runBF754(recs754cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_ZONE_CLUSTER'), 'BELIEF_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 740 — beliefPass: belief clock delta drought run, belief open thread peak uncaused, belief staging drought run', async () => {
     const runBF740 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

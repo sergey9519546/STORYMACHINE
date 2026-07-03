@@ -298,6 +298,14 @@
 // never been applied to it, completing the trio), BELIEF_STAGING_DROUGHT_RUN (run-based ×
 // visualBeats absence — Waves 642/726 applied the zone-cluster and backward-cause peak modes to
 // visualBeats; the drought-run mode has never been applied to it, completing the trio).
+// Wave 754 additions: BELIEF_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// relationshipShifts magnitude — Wave 670 applied the run-based drought mode to
+// relationshipShifts; the backward-cause peak mode has never been applied to it),
+// BELIEF_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — Wave 670 applied the
+// zone-cluster mode to this signal; the drought-run mode has never been applied to it),
+// BELIEF_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 presence × structural
+// thirds — Wave 684 applied the backward-cause peak mode to suspenseDelta; the zone-cluster mode
+// has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4153,6 +4161,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r740c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r740c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves the belief-tracking layer with no concrete image to anchor a character's conviction to for an extended run.`,
         suggestedFix: `Add a physical staging beat somewhere within the ${r740c.longestRun}-scene stretch so the belief-tracking layer keeps a concrete image to anchor conviction to throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 754: BELIEF_RELATIONSHIP_PEAK_UNCAUSED, BELIEF_TURN_DROUGHT_RUN,
+  //              BELIEF_SUSPENSE_ZONE_CLUSTER ─────────────────────────────────────────────
+
+  // BELIEF_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 670 applied the run-based drought mode to
+  // relationshipShifts; the backward-cause peak mode has never been applied to it.
+  {
+    const r754a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r754a.fires) {
+      issues.push({
+        location: `scene ${r754a.peakIdx + 1} — peak relationship-shift density (${r754a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r754a.peakIdx + 1}, with ${r754a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — the belief-tracking layer has no causal ground for the moment characters' convictions about each other shift hardest.`,
+        suggestedFix: `Give scene ${r754a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. Wave 670 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r754b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r754b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r754b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r754b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r754b.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the belief-tracking layer with no structural pivot to test characters' convictions against for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r754b.longestRun}-scene stretch so the belief-tracking layer keeps a structural pivot testing convictions throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 684 applied
+  // the backward-cause peak mode to suspenseDelta; the zone-cluster mode has never been applied
+  // to it.
+  {
+    const r754c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r754c.fires) {
+      issues.push({
+        location: `${r754c.zoneNames[r754c.maxZoneIdx]} third — ${r754c.maxZoneCount} of ${r754c.count} suspense-positive scenes`,
+        rule: 'BELIEF_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r754c.maxZoneCount / r754c.count) * 100)}% of the scenes where tension rises cluster in the ${r754c.zoneNames[r754c.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the belief-tracking layer has no rising danger testing characters' convictions anywhere else in the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r754c.zoneNames[r754c.maxZoneIdx]} third so the belief-tracking layer keeps tension testing convictions more evenly across the story.`,
       });
     }
   }
