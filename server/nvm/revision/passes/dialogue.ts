@@ -225,6 +225,14 @@
 // appearance was the word "purpose" inside a suggestedFix prose string (Wave 504), never an
 // accessed field — despite `purpose` being a real ScenePurpose enum this pass never once
 // consulted, even as nearly every other record field was covered across Waves 434-602.
+// Wave 630 additions (built on the shared checks library, audit M2.2): DIALOGUE_PAYOFF_STAGING_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — payoffSetupIds had only
+// ever been paired with the raw fountain-derived dialogue signal, never with another record
+// field), DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID (sequence/aftermath × relationshipShifts trigger
+// → visualBeats absence — first pairing of these two fields in this 117-rule pass),
+// DIALOGUE_PAYOFF_ZONE_IMBALANCE (underweight/bloat × payoffSetupIds × four structural zones —
+// Waves 602/616 applied this template to visualBeats and purpose; payoffSetupIds itself has
+// never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3747,6 +3755,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r616c.triggerCount} scenes whose purpose is to raise the stakes is followed by two scenes with no highlighted dialogue, even though ${r616c.aftermathCount} such scenes exist elsewhere in the script. Escalating what's at risk should give a character something worth saying about the new cost soon after; when that aftermath is always verbally unremarkable, the raised stakes register structurally but no voice confirms what they mean.`,
         suggestedFix: `After at least one stakes-raising scene, let one of the following two scenes carry a line worth remembering — a character naming what the higher cost means to them, or voicing what they now stand to lose. Give the escalation a voice, not just a structural marker.`,
+      });
+    }
+  }
+
+  // ── Wave 630: DIALOGUE_PAYOFF_STAGING_DECOUPLED, DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID,
+  //              DIALOGUE_PAYOFF_ZONE_IMBALANCE ─────────────────────────────────────────────
+
+  // DIALOGUE_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. payoffSetupIds had only
+  // ever been paired with the raw fountain-derived dialogue-presence signal in this pass, never
+  // with another record field. A resolution and a scene rich in physical staging never happen
+  // together — every payoff lands through spoken dialogue alone.
+  {
+    const r630a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r630a.fires) {
+      issues.push({
+        location: `${r630a.aCount} payoff scene(s), ${r630a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'DIALOGUE_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r630a.aCount} scenes where a planted thread resolves never coincide with the ${r630a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more force when a character's physical action embodies what the resolution means, rather than the moment being carried entirely through spoken dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or object a character handles that embodies what just resolved, alongside whatever voice carries the scene.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID — Sequence/aftermath × relationshipShifts trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying shift scenes (|amount|≥0.3, pos<n-2), ≥3 scenes anywhere with substantial physical
+  // staging, a 2-scene lookahead window. Fires when every shift's two-scene aftermath contains no
+  // visually dense scene, while such scenes do occur elsewhere. First pairing of relationshipShifts
+  // with visualBeats in this pass — a bond that has just shifted often plays out physically in
+  // what follows, and when that aftermath consistently stays unstaged, the shift's consequences
+  // are only ever discussed.
+  {
+    const r630b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r630b.fires) {
+      issues.push({
+        location: `${r630b.triggerCount} relationship-shift scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r630b.triggerCount} relationship-shift scenes is followed by two scenes with no substantial physical staging, even though ${r630b.aftermathCount} such scenes exist elsewhere in the script. A bond that has just shifted often plays out physically in the following beats — closer proximity, avoided contact, a changed way of moving around each other — and when that aftermath consistently stays unstaged, the shift's consequences are only ever spoken about.`,
+        suggestedFix: `After at least one relationship shift, let one of the following two scenes carry substantial physical staging — the new dynamic made visible through action or blocking, not only through what characters say to each other.`,
+      });
+    }
+  }
+
+  // DIALOGUE_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero payoffs while
+  // another holds ≥50% of the total. Waves 602 and 616 applied this template to visualBeats and
+  // purpose respectively; payoffSetupIds itself has never been zone-audited in this file, despite
+  // being the trigger for two existing hand-rolled aftermath checks.
+  {
+    const r630c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r630c.fires) {
+      const emptyNames630c = r630c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName630c = FOUR_ZONE_NAMES[r630c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames630c} empty; ${bloatName630c} has ${r630c.counts[r630c.bloatZoneIdx]}/${r630c.totalCount} payoff scenes`,
+        rule: 'DIALOGUE_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r630c.totalCount} thread-resolution scenes are unevenly distributed across its four structural zones: ${bloatName630c} contains ${r630c.counts[r630c.bloatZoneIdx]} of them (${Math.round((r630c.counts[r630c.bloatZoneIdx] / r630c.totalCount) * 100)}%) while ${emptyNames630c} contains none. Resolution bloats in one structural quarter and vanishes from another, giving the story's verbal rhythm of answers arriving an uneven structural pulse.`,
+        suggestedFix: `Redistribute resolutions: let at least one thread pay off in the empty zone(s) — ${emptyNames630c} — so every structural quarter carries some verbal sense of a question finally being answered.`,
       });
     }
   }

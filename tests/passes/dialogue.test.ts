@@ -1598,6 +1598,98 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 630 — dialoguePass: dialogue payoff staging decoupled, dialogue shift staging aftermath void, dialogue payoff zone imbalance', async () => {
+    const makeRec630 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: 'complicate', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD630 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes630 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('DIALOGUE_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs630a = Array.from({ length: 6 }, (_, i) => makeRec630(i,
+        i === 0 || i === 1 ? { payoffSetupIds: ['thread-a'] }
+        : i === 4 || i === 5 ? { visualBeats: ['closes the case', 'sets it down'] }
+        : {}
+      ));
+      const res = await runD630(buildScenes630(6), recs630a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_STAGING_DECOUPLED'), 'DIALOGUE_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // DIALOGUE_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('DIALOGUE_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs630an = Array.from({ length: 6 }, (_, i) => makeRec630(i,
+        i === 0 ? { payoffSetupIds: ['thread-a'], visualBeats: ['closes the case', 'sets it down'] }
+        : i === 1 ? { payoffSetupIds: ['thread-b'] }
+        : i === 5 ? { visualBeats: ['closes the case', 'sets it down'] }
+        : {}
+      ));
+      const res = await runD630(buildScenes630(6), recs630an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_STAGING_DECOUPLED'), 'DIALOGUE_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; shift triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID fires when no shift is followed by a visually dense scene within 2 scenes', async () => {
+      const recs630b = Array.from({ length: 8 }, (_, i) => makeRec630(i,
+        i === 0 || i === 1 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] }
+        : i === 5 || i === 6 || i === 7 ? { visualBeats: ['closes the case', 'sets it down'] }
+        : {}
+      ));
+      const res = await runD630(buildScenes630(8), recs630b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs630bn = Array.from({ length: 8 }, (_, i) => makeRec630(i,
+        i === 0 || i === 1 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] }
+        : i === 3 || i === 5 || i === 6 || i === 7 ? { visualBeats: ['closes the case', 'sets it down'] }
+        : {}
+      ));
+      const res = await runD630(buildScenes630(8), recs630bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // DIALOGUE_PAYOFF_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); payoffs at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('DIALOGUE_PAYOFF_ZONE_IMBALANCE fires when one zone is empty of payoffs while another is bloated', async () => {
+      const recs630c = Array.from({ length: 12 }, (_, i) => makeRec630(i, {
+        payoffSetupIds: (i === 6 || i === 7 || i === 8 || i === 9) ? ['thread'] : [],
+      }));
+      const res = await runD630(buildScenes630(12), recs630c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_ZONE_IMBALANCE'), 'DIALOGUE_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    // DIALOGUE_PAYOFF_ZONE_IMBALANCE no-fire:
+    // one payoff per zone (1,4,7,10) → no zone is empty
+    it('DIALOGUE_PAYOFF_ZONE_IMBALANCE does not fire when payoffs are spread across all zones', async () => {
+      const recs630cn = Array.from({ length: 12 }, (_, i) => makeRec630(i, {
+        payoffSetupIds: (i === 1 || i === 4 || i === 7 || i === 10) ? ['thread'] : [],
+      }));
+      const res = await runD630(buildScenes630(12), recs630cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_ZONE_IMBALANCE'), 'DIALOGUE_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 616 — dialoguePass: purpose dialogue highlight decoupled, character moment zone imbalance, raise stakes dialogue highlight aftermath void', async () => {
     const makeRec616 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
