@@ -1365,6 +1365,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 916 — payoffPass: payoff revelation purpose zone cluster, payoff revelation purpose drought run, payoff character moment zone imbalance', async () => {
+    const runPY916 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs916a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY916(recs916a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER'), 'PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs916an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY916(recs916an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER'), 'PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs916b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY916(recs916b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN'), 'PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs916bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY916(recs916bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN'), 'PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // character_moment at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of character-moment scenes', async () => {
+      const recs916c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runPY916(recs916c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const recs916cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runPY916(recs916cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 902 — payoffPass: payoff turning point zone imbalance, payoff complicate zone imbalance, payoff introduce conflict zone imbalance', async () => {
     const runPY902 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

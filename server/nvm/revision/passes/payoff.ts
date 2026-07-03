@@ -414,6 +414,14 @@
 // by it: PAYOFF_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
 // PAYOFF_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate'), and
 // PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
+//
+// Wave 916 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing PAYOFF_REVELATION_ZONE_CLUSTER/DROUGHT_RUN and related rules audit the separate
+// revelation string|null field, not this purpose enum value) -- a genuinely virgin field. This
+// wave adds PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER and PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN (peak
+// mode conventionally skipped for this categorical field), plus PAYOFF_CHARACTER_MOMENT_ZONE_
+// IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
+// a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5011,6 +5019,74 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r902c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName902c} contains ${r902c.counts[r902c.bloatZoneIdx]} of them (${Math.round((r902c.counts[r902c.bloatZoneIdx] / r902c.totalCount) * 100)}%) while ${emptyNames902c} contains none. New conflicts bloat in one structural quarter and vanish from another, giving the payoff engine's fresh setups an uneven structural rhythm.`,
         suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames902c} — so the payoff engine keeps seeding fresh setups more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from PAYOFF_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r916a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r916a.fires) {
+      issues.push({
+        location: `${r916a.zoneNames[r916a.maxZoneIdx]} third — ${r916a.maxZoneCount} of ${r916a.count} revelation-purposed scenes`,
+        rule: 'PAYOFF_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r916a.maxZoneCount / r916a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r916a.zoneNames[r916a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the payoff engine gets no fresh information to cash in setups anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r916a.zoneNames[r916a.maxZoneIdx]} third as a revelation so the payoff engine keeps discharging setups more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r916b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r916b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r916b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r916b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r916b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the payoff engine with no fresh disclosure to discharge setups against for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r916b.longestRun}-scene stretch as a revelation so the payoff engine keeps discharging setups throughout that stretch.`,
+      });
+    }
+  }
+
+  // PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 888. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone PAYOFF_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based PAYOFF_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r916c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r916c.fires) {
+      const emptyNames916c = r916c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName916c = FOUR_ZONE_NAMES[r916c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames916c} empty; ${bloatName916c} has ${r916c.counts[r916c.bloatZoneIdx]}/${r916c.totalCount} character-moment scenes`,
+        rule: 'PAYOFF_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r916c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName916c} contains ${r916c.counts[r916c.bloatZoneIdx]} of them (${Math.round((r916c.counts[r916c.bloatZoneIdx] / r916c.totalCount) * 100)}%) while ${emptyNames916c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the payoff engine's emotional pauses an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames916c} — so the payoff engine's emotional pauses land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
