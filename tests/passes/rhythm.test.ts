@@ -1136,6 +1136,83 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 708 — rhythmPass: dialogue signal zone cluster, seed signal peak uncaused, payoff signal drought run', async () => {
+    const runR708 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // DIALOGUE_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_SIGNAL_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs708a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs708a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs708a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs708a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runR708(recs708a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_ZONE_CLUSTER'), 'DIALOGUE_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_SIGNAL_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_SIGNAL_ZONE_CLUSTER does not fire when highlighted-dialogue scenes are distributed across thirds', async () => {
+      const recs708an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs708an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs708an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs708an[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runR708(recs708an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_ZONE_CLUSTER'), 'DIALOGUE_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+
+    // SEED_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('SEED_SIGNAL_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs708b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs708b[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs708b[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR708(recs708b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_PEAK_UNCAUSED'), 'SEED_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // SEED_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('SEED_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs708bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs708bn[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs708bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs708bn[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR708(recs708bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_PEAK_UNCAUSED'), 'SEED_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PAYOFF_SIGNAL_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs708c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs708c[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs708c[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs708c[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs708c[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runR708(recs708c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_DROUGHT_RUN'), 'PAYOFF_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_SIGNAL_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PAYOFF_SIGNAL_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs708cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs708cn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs708cn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs708cn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runR708(recs708cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_DROUGHT_RUN'), 'PAYOFF_SIGNAL_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 694 — rhythmPass: relational signal peak uncaused, seed signal zone cluster, dialogue signal drought run', async () => {
     const runR694 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
