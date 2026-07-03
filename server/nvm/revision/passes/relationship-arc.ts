@@ -299,6 +299,14 @@
 // — Wave 651 applied the run-based drought mode to unresolvedClues; the existing
 // RELATIONAL_OPEN_THREAD_ZONE_IMBALANCE checks a different mode [four-zone bloat/empty]; the
 // thirds-ratio zone-cluster mode has never been applied to it).
+// Wave 749 additions: RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause
+// × unresolvedClues magnitude — Waves 651/735 applied the run-based drought and zone-cluster
+// modes to unresolvedClues; the backward-cause peak mode has never been applied to it, completing
+// the trio), RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0 presence ×
+// structural thirds — Waves 679/735 applied the backward-cause peak and run-based drought modes
+// to clockDelta; the zone-cluster mode has never been applied to it, completing the trio),
+// RELATIONAL_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — Wave 679 applied
+// the zone-cluster mode to this signal; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4329,6 +4337,74 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${Math.round((r735c.maxZoneCount / r735c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the ${r735c.zoneNames[r735c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the relational arc has no unresolved mystery pressing on the bond anywhere else in the story.`,
         suggestedFix: `Seed or carry forward at least one open thread outside the ${r735c.zoneNames[r735c.maxZoneIdx]} third so unresolved mystery keeps pressing on the relationship throughout the story.`,
+      });
+    }
+  }
+
+  // ── Wave 749: RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED, RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER,
+  //              RELATIONAL_TURN_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 651/735 applied the run-based drought and zone-cluster
+  // modes to unresolvedClues; the backward-cause peak mode has never been applied to it,
+  // completing the trio.
+  {
+    const r749a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r749a.fires) {
+      issues.push({
+        location: `scene ${r749a.peakIdx + 1} — peak open-thread density (${r749a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r749a.peakIdx + 1}, with ${r749a.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the relational arc has no unresolved mystery peak carrying causal weight.`,
+        suggestedFix: `Give scene ${r749a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the bond rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-shifting scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Waves 679/735 applied the backward-cause peak and run-based drought modes to clockDelta; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r749b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r749b.fires) {
+      issues.push({
+        location: `${r749b.zoneNames[r749b.maxZoneIdx]} third — ${r749b.maxZoneCount} of ${r749b.count} clock-shifting scenes`,
+        rule: 'RELATIONAL_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r749b.maxZoneCount / r749b.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r749b.zoneNames[r749b.maxZoneIdx]} third. When every clock movement lands in the same structural window, the relationship's development loses any sense of mounting external pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r749b.zoneNames[r749b.maxZoneIdx]} third so external pressure keeps testing the relationship more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. Wave 679 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r749c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r749c.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r749c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r749c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r749c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the relationship coasting without a structural pivot to react to for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r749c.longestRun}-scene stretch so the relationship keeps something to react to and evolve from throughout that stretch.`,
       });
     }
   }
