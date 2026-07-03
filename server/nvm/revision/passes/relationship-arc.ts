@@ -256,6 +256,16 @@
 // RELATIONSHIP_WARMTH_CLUSTER and RUPTURE_THIRDS_CLUSTER track the warmth and rupture channels;
 // Wave 651 applied the shared zone-cluster helper to visualBeats; clockRaised itself has never
 // been cluster-audited).
+// Wave 679 additions (built on the shared checks library, audit M2.2): RELATIONAL_CLOCK_DELTA_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — clockDelta has
+// only ever appeared as an OR-condition alongside clockRaised inside an aftermath trigger; the
+// backward-cause peak mode applied to it standalone for the first time), RELATIONAL_STAKES_
+// DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — `purpose` anchors
+// RELATIONSHIP_SHIFT_PURPOSE_MONOTONE [a hand-rolled consecutive-run check on a different
+// signal] and a co-occurrence isB condition, but has never been drought-audited as its own
+// presence signal), RELATIONAL_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn presence ×
+// structural thirds — dramaticTurn anchors extensive decoupled/aftermath-void/peak-absent
+// coverage here, but has never been cluster-audited).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3946,6 +3956,77 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${r665c.maxZoneCount} of the story's ${r665c.count} clock-raised scenes (${Math.round((r665c.maxZoneCount / r665c.count) * 100)}%) cluster in the ${zoneName665c} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no urgency bearing on the relationship.`,
         suggestedFix: `Raise a clock in at least one scene outside the ${zoneName665c} third — spreading time pressure across the story lets every structural third carry some urgency bearing on the relationship, not only one.`,
+      });
+    }
+  }
+
+  // ── Wave 679: RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED, RELATIONAL_STAKES_DROUGHT_RUN,
+  //              RELATIONAL_TURN_ZONE_CLUSTER ─────────────────────────────────────────────────
+
+  // RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. clockDelta has only ever appeared as an OR-condition alongside clockRaised
+  // inside an aftermath trigger; the backward-cause peak mode applied to it standalone for the
+  // first time.
+  {
+    const r679a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r679a.fires) {
+      issues.push({
+        location: `scene ${r679a.peakIdx + 1} — peak clockDelta (${r679a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r679a.peakIdx + 1}, at ${r679a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r679a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the relationship's sharpest deadline compression is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // `purpose` anchors RELATIONSHIP_SHIFT_PURPOSE_MONOTONE (a hand-rolled consecutive-run check on
+  // a different signal) and a co-occurrence isB condition, but has never been drought-audited as
+  // its own presence signal.
+  {
+    const r679b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r679b.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising scene: ${r679b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r679b.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r679b.presentCount} scenes elsewhere do escalate the stakes. A long unbroken stretch with nothing pushing the stakes higher leaves the relationship's arc without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r679b.longestRun}-scene stretch to raise stakes — even a small escalation keeps the relationship's arc under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 dramatic-turn
+  // scenes, fires when >75% of them fall in a single structural third. dramaticTurn anchors
+  // extensive decoupled/aftermath-void/peak-absent coverage here, but has never been
+  // cluster-audited.
+  {
+    const r679c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r679c.fires) {
+      const zoneName679c = r679c.zoneNames[r679c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName679c} third — ${r679c.maxZoneCount}/${r679c.count} dramatic-turn scenes`,
+        rule: 'RELATIONAL_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r679c.maxZoneCount} of the story's ${r679c.count} dramatic-turn scenes (${Math.round((r679c.maxZoneCount / r679c.count) * 100)}%) cluster in the ${zoneName679c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no reversal testing the relationship.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName679c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry a reversal that tests the relationship.`,
       });
     }
   }

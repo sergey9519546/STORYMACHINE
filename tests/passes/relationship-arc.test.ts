@@ -1376,6 +1376,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 679 — relationshipArcPass: relational clock delta peak uncaused, relational stakes drought run, relational turn zone cluster', async () => {
+    const runRA679 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs679a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs679a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs679a[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runRA679(recs679a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED'), 'RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs679an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs679an[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs679an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs679an[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runRA679(recs679an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED'), 'RELATIONAL_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_STAKES_DROUGHT_RUN fire:
+    // 10 scenes; stakes-raising at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_STAKES_DROUGHT_RUN fires when the longest no-stakes-raising run is ≥6', async () => {
+      const recs679b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs679b[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs679b[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs679b[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      recs679b[9] = makeSharedRecord(9, { purpose: 'raise_stakes' });
+      const res = await runRA679(recs679b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_DROUGHT_RUN'), 'RELATIONAL_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are distributed without a long drought', async () => {
+      const recs679bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs679bn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs679bn[4] = makeSharedRecord(4, { purpose: 'raise_stakes' });
+      recs679bn[9] = makeSharedRecord(9, { purpose: 'raise_stakes' });
+      const res = await runRA679(recs679bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_DROUGHT_RUN'), 'RELATIONAL_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs679c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs679c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs679c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs679c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runRA679(recs679c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_TURN_ZONE_CLUSTER'), 'RELATIONAL_TURN_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_TURN_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs679cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs679cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs679cn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs679cn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runRA679(recs679cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_TURN_ZONE_CLUSTER'), 'RELATIONAL_TURN_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 665 — relationshipArcPass: relational payoff peak uncaused, relational seed drought run, relational clock zone cluster', async () => {
     const runRA665 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
