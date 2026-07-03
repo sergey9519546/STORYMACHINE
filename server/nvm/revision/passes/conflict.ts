@@ -223,6 +223,13 @@
 // applied this template to visualBeats only), CONFLICT_TURN_STAGING_AFTERMATH_VOID
 // (sequence/aftermath × dramaticTurn trigger → visualBeats absence — first pairing of these two
 // fields).
+// Wave 632 additions (built on the shared checks library, audit M2.2): CONFLICT_HIGHLIGHT_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first
+// pairing of these two fields in this 111-rule pass), CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × heavy unresolvedClues debt trigger → visualBeats absence — first pairing
+// of these two fields), CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat ×
+// dialogueHighlights × four structural zones — Wave 604/618 applied this template to visualBeats
+// and payoffSetupIds; dialogueHighlights itself has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3701,6 +3708,80 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r618c.triggerCount} dramatic-turn scenes is followed by two scenes with no substantial physical staging, even though ${r618c.aftermathCount} such scenes exist elsewhere in the script. A pivot's consequences often play out physically — a character acting differently in the world because of what just changed — and when that aftermath consistently stays unstaged, the turn's impact is only ever discussed, never shown.`,
         suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry substantial physical staging — a character's changed behavior made visible through action rather than only through what they say.`,
+      });
+    }
+  }
+
+  // ── Wave 632: CONFLICT_HIGHLIGHT_OPEN_THREAD_DECOUPLED, CONFLICT_OPEN_THREAD_STAGING_
+  //              AFTERMATH_VOID, CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE ───────────────────
+
+  // CONFLICT_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 scenes carrying outstanding clue-debt. Zero overlap
+  // → fire. First pairing of these two fields in this 111-rule pass. A line the story flags as
+  // memorable never lands while a mystery sits open — the conflict's most quotable moments and
+  // its live tensions run on separate tracks.
+  {
+    const r632a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r632a.fires) {
+      issues.push({
+        location: `${r632a.aCount} dialogue-highlight scene(s), ${r632a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'CONFLICT_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r632a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r632a.bCount} scenes carrying outstanding clue-debt — the story's most memorable dialogue and its open conflicts never intersect. A line worth remembering often lands hardest when a character is actively pressing on an unresolved tension.`,
+        suggestedFix: `Let at least one standout line of dialogue land in a scene that is also carrying open clue-debt — a character voicing suspicion or naming what's still unresolved, tying the conflict's most memorable moment to its live tension.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥3 scenes anywhere
+  // with substantial physical staging, a 2-scene lookahead window. Fires when every heavy-debt
+  // scene's two-scene aftermath contains no visually dense scene, while such scenes do occur
+  // elsewhere. First pairing of unresolvedClues with visualBeats in this pass — the heaviest
+  // concentrations of open conflict never register physically in the story's world nearby.
+  {
+    const r632b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r632b.fires) {
+      issues.push({
+        location: `${r632b.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r632b.triggerCount} instances) is followed by two full scenes with no substantial physical staging, even though ${r632b.aftermathCount} such scenes occur elsewhere in the story. The heaviest concentrations of open conflict never show up physically nearby — no restless action, no tense staging reflecting the unresolved pressure.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let physical staging carry some of the tension — a character pacing, handling an object tied to the unresolved conflict, or otherwise showing the pressure rather than only discussing it.`,
+      });
+    }
+  }
+
+  // CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a dialogue highlight, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Waves 604 and 618
+  // applied this template to visualBeats and payoffSetupIds respectively; dialogueHighlights
+  // itself has never been zone-audited in this file.
+  {
+    const r632c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r632c.fires) {
+      const emptyNames632c = r632c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName632c = FOUR_ZONE_NAMES[r632c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames632c} empty; ${bloatName632c} has ${r632c.counts[r632c.bloatZoneIdx]}/${r632c.totalCount} dialogue-highlight scenes`,
+        rule: 'CONFLICT_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r632c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName632c} contains ${r632c.counts[r632c.bloatZoneIdx]} of them (${Math.round((r632c.counts[r632c.bloatZoneIdx] / r632c.totalCount) * 100)}%) while ${emptyNames632c} contains none. Memorable conflict dialogue bloats in one structural quarter and vanishes from another, giving the story's verbal-conflict rhythm an uneven pulse.`,
+        suggestedFix: `Redistribute standout dialogue: bring at least one memorable conflict line into ${emptyNames632c}, so every structural quarter carries some verbal high point for the conflict, not only the quarter currently carrying most of them.`,
       });
     }
   }
