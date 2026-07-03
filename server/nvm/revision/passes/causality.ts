@@ -280,6 +280,15 @@
 // seededClueIds × structural thirds — seededClueIds anchors extensive hand-rolled aggregate/
 // front-loading logic [Waves 335, 461b, 489b] but has never been zone-cluster-audited via the
 // shared library).
+// Wave 699 additions (closes the eighth rotation cycle, 686-699): CAUSALITY_CLOCK_ZONE_CLUSTER
+// (distribution/timing × clockRaised × structural thirds — clockRaised anchors extensive
+// hand-rolled aggregate/threshold logic throughout this pass but has never been zone-cluster-
+// audited via the shared library), CAUSALITY_RELATIONSHIP_DROUGHT_RUN (run-based ×
+// relationshipShifts absence — relationshipShifts anchors extensive hand-rolled aggregate/
+// threshold logic but has never been drought-audited via the shared library),
+// CAUSALITY_SUSPENSE_PEAK_UNCAUSED (single-peak isolation/backward-cause × suspenseDelta
+// magnitude — suspenseDelta anchors extensive hand-rolled aggregate/threshold logic but has never
+// been backward-cause peak-audited via the shared library).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4082,6 +4091,75 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r685c.maxZoneCount} of the story's ${r685c.count} clue-planting scenes (${Math.round((r685c.maxZoneCount / r685c.count) * 100)}%) cluster in the ${zoneName685c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the causal chain of setups an uneven structural rhythm.`,
         suggestedFix: `Plant at least one clue outside the ${zoneName685c} third — spreading foreshadowing across the story lets the causal chain of setups build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 699: CAUSALITY_CLOCK_ZONE_CLUSTER, CAUSALITY_RELATIONSHIP_DROUGHT_RUN,
+  //              CAUSALITY_SUSPENSE_PEAK_UNCAUSED ─────────────────────────────────────────────
+
+  // CAUSALITY_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-raised scenes, fires when
+  // >75% of them fall in a single structural third. clockRaised anchors extensive hand-rolled
+  // aggregate/threshold logic throughout this pass but has never been zone-cluster-audited via
+  // the shared library.
+  {
+    const r699a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r699a.fires) {
+      const zoneName699a = r699a.zoneNames[r699a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName699a} third — ${r699a.maxZoneCount}/${r699a.count} clock-raised scenes`,
+        rule: 'CAUSALITY_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r699a.maxZoneCount} of the story's ${r699a.count} clock-raised scenes (${Math.round((r699a.maxZoneCount / r699a.count) * 100)}%) cluster in the ${zoneName699a} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the causal chain of urgency an uneven structural rhythm.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${zoneName699a} third — spreading time pressure across the story lets every structural third carry some causal urgency.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6.
+  // relationshipShifts anchors extensive hand-rolled aggregate/threshold logic but has never been
+  // drought-audited via the shared library.
+  {
+    const r699b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r699b.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r699b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r699b.longestRun} consecutive scenes with no relationship shift at all, even though ${r699b.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the causal chain of interpersonal consequence dormant for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r699b.longestRun}-scene stretch — even a small movement keeps the causal chain tied to changing interpersonal stakes throughout.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SUSPENSE_PEAK_UNCAUSED — Single-peak isolation/backward-cause × suspenseDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a
+  // positive suspense delta, a 2-scene lookback. Finds the single scene where suspense spikes
+  // hardest; fires when neither that scene nor either of the two before it contains a dramatic
+  // turn or revelation. suspenseDelta anchors extensive hand-rolled aggregate/threshold logic but
+  // has never been backward-cause peak-audited via the shared library.
+  {
+    const r699c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r699c.fires) {
+      issues.push({
+        location: `scene ${r699c.peakIdx + 1} — peak suspense spike (${r699c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single sharpest suspense spike (scene ${r699c.peakIdx + 1}, delta ${r699c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where tension rises most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
+        suggestedFix: `Give scene ${r699c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest rise in tension is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
       });
     }
   }
