@@ -1247,6 +1247,78 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 741 — causalityPass: causality clock delta zone cluster, causality relationship zone cluster, causality payoff peak uncaused', async () => {
+    const runCA741 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs741a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs741a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs741a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs741a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runCA741(recs741a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER'), 'CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-shifting scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock movement is distributed across thirds', async () => {
+      const recs741an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs741an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs741an[4] = makeSharedRecord(4, { clockDelta: -1 });
+      recs741an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runCA741(recs741an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER'), 'CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_RELATIONSHIP_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; relationship-shift scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_RELATIONSHIP_ZONE_CLUSTER fires when >75% of relationship-shift scenes cluster in one third', async () => {
+      const recs741b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs741b[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs741b[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs741b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runCA741(recs741b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_ZONE_CLUSTER'), 'CAUSALITY_RELATIONSHIP_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSALITY_RELATIONSHIP_ZONE_CLUSTER no-fire:
+    // relationship-shift scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSALITY_RELATIONSHIP_ZONE_CLUSTER does not fire when relationship-shift scenes are distributed across thirds', async () => {
+      const recs741bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs741bn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs741bn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs741bn[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      const res = await runCA741(recs741bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RELATIONSHIP_ZONE_CLUSTER'), 'CAUSALITY_RELATIONSHIP_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_PAYOFF_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('CAUSALITY_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs741c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs741c[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs741c[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA741(recs741c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_PEAK_UNCAUSED'), 'CAUSALITY_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // CAUSALITY_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CAUSALITY_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs741cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs741cn[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs741cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs741cn[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA741(recs741cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_PEAK_UNCAUSED'), 'CAUSALITY_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 727 — causalityPass: causality clock delta drought run, causality relationship peak uncaused, causality seed drought run', async () => {
     const runCA727 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

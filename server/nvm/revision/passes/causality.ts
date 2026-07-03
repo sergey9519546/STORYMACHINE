@@ -305,6 +305,15 @@
 // it), CAUSALITY_SEED_DROUGHT_RUN (run-based × seededClueIds absence — Waves 685/713 applied the
 // zone-cluster and backward-cause peak modes to seededClueIds; the drought-run mode has never been
 // applied to it, completing the trio).
+// Wave 741 additions (closes the eleventh rotation cycle, 728-741): CAUSALITY_CLOCK_DELTA_ZONE_
+// CLUSTER (distribution/timing × clockDelta≠0 presence × structural thirds — Waves 685/727
+// applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+// mode has never been applied to it, completing the trio), CAUSALITY_RELATIONSHIP_ZONE_CLUSTER
+// (distribution/timing × relationshipShifts × structural thirds — Waves 699/727 applied the
+// run-based drought and backward-cause peak modes to relationshipShifts; the zone-cluster mode has
+// never been applied to it, completing the trio), CAUSALITY_PAYOFF_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × payoffSetupIds magnitude — Wave 685 applied the run-based drought
+// mode to payoffSetupIds; the backward-cause peak mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4313,6 +4322,74 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r727c.longestRun} consecutive scenes with no new clues planted at all, even though ${r727c.presentCount} scenes elsewhere do seed foreshadowing. A long unbroken stretch with nothing new laid down leaves the causal chain running on old setups for an extended run.`,
         suggestedFix: `Plant at least one new clue within the ${r727c.longestRun}-scene stretch so the causal chain keeps feeding fresh foreshadowing throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 741: CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER, CAUSALITY_RELATIONSHIP_ZONE_CLUSTER,
+  //              CAUSALITY_PAYOFF_PEAK_UNCAUSED ────────────────────────────────────────────
+
+  // CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-shifting scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Waves 685/727 applied the backward-cause peak and run-based drought modes to clockDelta; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r741a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r741a.fires) {
+      issues.push({
+        location: `${r741a.zoneNames[r741a.maxZoneIdx]} third — ${r741a.maxZoneCount} of ${r741a.count} clock-shifting scenes`,
+        rule: 'CAUSALITY_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r741a.maxZoneCount / r741a.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r741a.zoneNames[r741a.maxZoneIdx]} third. When every clock movement lands in the same structural window, the causal chain loses any sense of mounting pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r741a.zoneNames[r741a.maxZoneIdx]} third so the pressure on the causal chain tightens or eases more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 699/727
+  // applied the run-based drought and backward-cause peak modes to relationshipShifts; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r741b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r741b.fires) {
+      issues.push({
+        location: `${r741b.zoneNames[r741b.maxZoneIdx]} third — ${r741b.maxZoneCount} of ${r741b.count} relationship-shift scenes`,
+        rule: 'CAUSALITY_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r741b.maxZoneCount / r741b.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r741b.zoneNames[r741b.maxZoneIdx]} third. When every bond change lands in the same structural window, the causal chain has no relational movement to draw on anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r741b.zoneNames[r741b.maxZoneIdx]} third so the causal chain keeps relational movement available more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous thread resolutions;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Wave 685 applied the run-based drought mode to payoffSetupIds; the
+  // backward-cause peak mode has never been applied to it.
+  {
+    const r741c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r741c.fires) {
+      issues.push({
+        location: `scene ${r741c.peakIdx + 1} — peak payoff density (${r741c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r741c.peakIdx + 1}, with ${r741c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
+        suggestedFix: `Give scene ${r741c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
       });
     }
   }
