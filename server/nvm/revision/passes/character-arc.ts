@@ -360,6 +360,23 @@
 // thirds — the existing ARC_NEGATIVE_EMOTION_RUN audits consecutive-presence [run-based], a
 // distinct claim from where negative beats concentrate structurally; the general thirds-ratio
 // zone-cluster mode has never been applied to this specific valence).
+// Wave 799 additions: ARC_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative'
+// absence — completes the trio for this valence alongside the zone-cluster mode added in Wave
+// 785; distinct from ARC_NEGATIVE_EMOTION_RUN, which audits consecutive PRESENCE of negative
+// scenes — an absence run of 6+ scenes with no negative beat is the mirror-image claim, and a
+// story satisfying one does not automatically satisfy the other). Reconnaissance for this wave
+// also confirmed that ARC_SUSPENSE_DROUGHT_RUN (Wave 561, hand-rolled), ARC_CLOCK_DROUGHT_RUN
+// (Wave 575, hand-rolled), ARC_CURIOSITY_DROUGHT_RUN (Wave 519, hand-rolled) and ARC_CURIOSITY_
+// ZONE_CLUSTER (Wave 575, hand-rolled) and ARC_TURN_ZONE_CLUSTER (Wave 477, hand-rolled) and
+// ARC_PEAK_RELATIONAL_UNCAUSED (Wave 435, hand-rolled) already complete their respective trios,
+// so suspenseDelta, clockRaised, curiosityDelta, dramaticTurn, and relationshipShifts were
+// correctly skipped as non-distinct candidates. ARC_TURNING_POINT_ZONE_CLUSTER
+// (distribution/timing × purpose === 'turning_point' × structural thirds — this specific purpose
+// value has only ever appeared inside a five-value composite set [line ~404]; it has never been
+// audited as its own standalone signal by any of the three shared-library trio modes),
+// ARC_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence — completing 2
+// of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave; peak
+// mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4486,6 +4503,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r785c.maxZoneCount / r785c.count) * 100)}% of the story's negative emotional shifts cluster in the ${r785c.zoneNames[r785c.maxZoneIdx]} third. When every setback lands in the same structural window, the character's arc has no low point testing them anywhere else in the story.`,
         suggestedFix: `Give the character a setback in at least one scene outside the ${r785c.zoneNames[r785c.maxZoneIdx]} third so the arc keeps testing them with adversity more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 799: ARC_NEGATIVE_EMOTION_DROUGHT_RUN, ARC_TURNING_POINT_ZONE_CLUSTER,
+  //              ARC_TURNING_POINT_DROUGHT_RUN ──────────────────────────────────────
+
+  // ARC_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no negative charge reaches 6. Completes
+  // the trio for this valence alongside the zone-cluster mode added in Wave 785. Distinct from
+  // ARC_NEGATIVE_EMOTION_RUN, which audits consecutive PRESENCE of negative scenes — an absence
+  // run of 6+ scenes with no negative beat is the mirror-image claim, and a story satisfying one
+  // does not automatically satisfy the other.
+  {
+    const r799a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r799a.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r799a.longestRun} consecutive scenes`,
+        rule: 'ARC_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r799a.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r799a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the character's arc without any adversity testing them for an extended run.`,
+        suggestedFix: `Give the character a setback within the ${r799a.longestRun}-scene stretch so the arc keeps testing them with adversity throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This specific purpose value has only ever appeared inside a five-value composite set (used
+  // elsewhere in this pass); it has never been audited as its own standalone signal by any of the
+  // three shared-library trio modes.
+  {
+    const r799b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r799b.fires) {
+      issues.push({
+        location: `${r799b.zoneNames[r799b.maxZoneIdx]} third — ${r799b.maxZoneCount} of ${r799b.count} turning-point scenes`,
+        rule: 'ARC_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r799b.maxZoneCount / r799b.count) * 100)}% of the story's turning-point scenes cluster in the ${r799b.zoneNames[r799b.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the character's arc has no redirection anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r799b.zoneNames[r799b.maxZoneIdx]} third as a turning point so the arc keeps redirecting the character more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall, fires
+  // when the longest consecutive run of scenes with no turning-point purpose reaches 6. Completes
+  // 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave
+  // (peak mode conventionally skipped for this categorical field).
+  {
+    const r799c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r799c.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r799c.longestRun} consecutive scenes`,
+        rule: 'ARC_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r799c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r799c.presentCount} scenes elsewhere redirect the character. A long unbroken stretch with no redirection leaves the character's arc coasting without a pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r799c.longestRun}-scene stretch as a turning point so the arc keeps redirecting the character throughout that stretch.`,
       });
     }
   }

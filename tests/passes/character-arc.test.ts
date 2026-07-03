@@ -1080,6 +1080,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 799 — characterArcPass: arc negative emotion drought run, arc turning point zone cluster, arc turning point drought run', async () => {
+    const makeRec799 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc799 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ARC_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs799a = Array.from({ length: 10 }, (_, i) =>
+        makeRec799(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runArc799(recs799a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_DROUGHT_RUN'), 'ARC_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs799an = Array.from({ length: 10 }, (_, i) =>
+        makeRec799(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runArc799(recs799an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_DROUGHT_RUN'), 'ARC_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('ARC_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs799b = Array.from({ length: 9 }, (_, i) =>
+        makeRec799(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc799(recs799b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_ZONE_CLUSTER'), 'ARC_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs799bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec799(i, { purpose: [0, 4, 8].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc799(recs799bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_ZONE_CLUSTER'), 'ARC_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_TURNING_POINT_DROUGHT_RUN fire:
+    // n=10; turning_point at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ARC_TURNING_POINT_DROUGHT_RUN fires when a long run has no turning point', async () => {
+      const recs799c = Array.from({ length: 10 }, (_, i) =>
+        makeRec799(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc799(recs799c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_DROUGHT_RUN'), 'ARC_TURNING_POINT_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_TURNING_POINT_DROUGHT_RUN does not fire when turning points are evenly spread', async () => {
+      const recs799cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec799(i, { purpose: [0, 3, 6, 9].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runArc799(recs799cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURNING_POINT_DROUGHT_RUN'), 'ARC_TURNING_POINT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 785 — characterArcPass: arc revelation drought run, arc revelation peak uncaused, arc negative emotion zone cluster', async () => {
     const makeRec785 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
