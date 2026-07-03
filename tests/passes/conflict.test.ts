@@ -1535,6 +1535,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 926 — conflictPass: conflict stakes zone imbalance, conflict revelation purpose zone imbalance, conflict negative emotion zone imbalance', async () => {
+    const makeRec926 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF926 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CONFLICT_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs926a = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runCF926(recs926a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_ZONE_IMBALANCE'), 'CONFLICT_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs926an = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runCF926(recs926an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_ZONE_IMBALANCE'), 'CONFLICT_STAKES_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs926b = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCF926(recs926b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs926bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCF926(recs926bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'CONFLICT_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs926c = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runCF926(recs926c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs926cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec926(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runCF926(recs926cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'CONFLICT_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 912 — conflictPass: conflict complicate zone imbalance, conflict introduce conflict zone imbalance, conflict character moment zone imbalance', async () => {
     const makeRec912 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
