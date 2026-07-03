@@ -406,6 +406,14 @@
 // mode to two more purpose values with complete 3-zone/run-based trios: BELIEF_TURNING_POINT_
 // ZONE_IMBALANCE (purpose === 'turning_point') and BELIEF_INTRODUCE_CONFLICT_ZONE_IMBALANCE
 // (purpose === 'introduce_conflict').
+//
+// Wave 908 additions: purpose === 'revelation' has never been isolated as its own standalone
+// signal in this pass (only the separate revelation-as-magnitude field is audited, by BELIEF_
+// REVELATION_PEAK_UNCAUSED) -- a genuinely virgin purpose value. This wave adds BELIEF_REVELATION_
+// PURPOSE_ZONE_CLUSTER and BELIEF_REVELATION_PURPOSE_DROUGHT_RUN (peak mode conventionally skipped
+// for this categorical field), plus BELIEF_COMPLICATE_ZONE_IMBALANCE, continuing the
+// checkZoneImbalance rollout: purpose === 'complicate' already has a complete 3-zone/run-based
+// trio but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5022,6 +5030,74 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r894c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName894c} contains ${r894c.counts[r894c.bloatZoneIdx]} of them (${Math.round((r894c.counts[r894c.bloatZoneIdx] / r894c.totalCount) * 100)}%) while ${emptyNames894c} contains none. New fronts of conflict bloat in one structural quarter and vanish from another, giving the belief-tracking layer's tests an uneven structural rhythm.`,
         suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames894c} — so the belief-tracking layer faces fresh friction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from BELIEF_REVELATION_PEAK_UNCAUSED, which audits the separate revelation-
+  // as-magnitude field, not this purpose enum value — purpose === 'revelation' has never been
+  // isolated as its own standalone signal in this pass; a virgin field.
+  {
+    const r908a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r908a.fires) {
+      issues.push({
+        location: `${r908a.zoneNames[r908a.maxZoneIdx]} third — ${r908a.maxZoneCount} of ${r908a.count} revelation-purposed scenes`,
+        rule: 'BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r908a.maxZoneCount / r908a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r908a.zoneNames[r908a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the belief-tracking layer gets no fresh information revising its beliefs anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r908a.zoneNames[r908a.maxZoneIdx]} third as a revelation so the belief-tracking layer keeps revising its beliefs more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r908b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r908b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r908b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r908b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r908b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the belief-tracking layer with no fresh information revising its beliefs for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r908b.longestRun}-scene stretch as a revelation so the belief-tracking layer keeps revising its beliefs throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 880. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone BELIEF_COMPLICATE_ZONE_CLUSTER and run-based
+  // BELIEF_COMPLICATE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r908c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r908c.fires) {
+      const emptyNames908c = r908c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName908c = FOUR_ZONE_NAMES[r908c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames908c} empty; ${bloatName908c} has ${r908c.counts[r908c.bloatZoneIdx]}/${r908c.totalCount} complicating scenes`,
+        rule: 'BELIEF_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r908c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName908c} contains ${r908c.counts[r908c.bloatZoneIdx]} of them (${Math.round((r908c.counts[r908c.bloatZoneIdx] / r908c.totalCount) * 100)}%) while ${emptyNames908c} contains none. Complications bloat in one structural quarter and vanish from another, giving the belief-tracking layer's fresh pressure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames908c} — so the belief-tracking layer meets fresh pressure more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

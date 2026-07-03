@@ -1204,6 +1204,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 908 — beliefPass: belief revelation purpose zone cluster, belief revelation purpose drought run, belief complicate zone imbalance', async () => {
+    const runBF908 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%.
+    it('BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs908a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER'), 'BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs908an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER'), 'BELIEF_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3 satisfied), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('BELIEF_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs908b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PURPOSE_DROUGHT_RUN'), 'BELIEF_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs908bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_PURPOSE_DROUGHT_RUN'), 'BELIEF_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_COMPLICATE_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // complicate at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('BELIEF_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs908c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_ZONE_IMBALANCE'), 'BELIEF_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs908cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runBF908(recs908cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_COMPLICATE_ZONE_IMBALANCE'), 'BELIEF_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 894 — beliefPass: belief complicate drought run, belief turning point zone imbalance, belief introduce conflict zone imbalance', async () => {
     const runBF894 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
