@@ -1438,6 +1438,100 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 725 — voicePass: voice highlight drought run, voice relationship peak uncaused, voice open thread drought run', async () => {
+    const runV725 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_HIGHLIGHT_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry highlighted dialogue (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('VOICE_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run reaches 6', async () => {
+      const recs725a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs725a[0] = makeSharedRecord(0, { dialogueHighlights: ['line a'] });
+      recs725a[1] = makeSharedRecord(1, { dialogueHighlights: ['line b'] });
+      recs725a[2] = makeSharedRecord(2, { dialogueHighlights: ['line c'] });
+      const res = await runV725(recs725a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_DROUGHT_RUN'), 'VOICE_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlighted-dialogue scenes spread out so no gap reaches 6 consecutive scenes
+    it('VOICE_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is spread through the story', async () => {
+      const recs725an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs725an[0] = makeSharedRecord(0, { dialogueHighlights: ['line a'] });
+      recs725an[3] = makeSharedRecord(3, { dialogueHighlights: ['line b'] });
+      recs725an[6] = makeSharedRecord(6, { dialogueHighlights: ['line c'] });
+      recs725an[9] = makeSharedRecord(9, { dialogueHighlights: ['line d'] });
+      const res = await runV725(recs725an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_DROUGHT_RUN'), 'VOICE_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; relationship shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('VOICE_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs725b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs725b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs725b[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runV725(recs725b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_PEAK_UNCAUSED'), 'VOICE_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // VOICE_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VOICE_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs725bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs725bn[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+      recs725bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs725bn[6] = makeSharedRecord(6, {
+        relationshipShifts: [
+          { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+          { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+        ],
+      });
+      const res = await runV725(recs725bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_PEAK_UNCAUSED'), 'VOICE_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_OPEN_THREAD_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry unresolved clues (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('VOICE_OPEN_THREAD_DROUGHT_RUN fires when the longest no-outstanding-clue run reaches 6', async () => {
+      const recs725c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs725c[0] = makeSharedRecord(0, { unresolvedClues: ['clue a'] });
+      recs725c[1] = makeSharedRecord(1, { unresolvedClues: ['clue b'] });
+      recs725c[2] = makeSharedRecord(2, { unresolvedClues: ['clue c'] });
+      const res = await runV725(recs725c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_DROUGHT_RUN'), 'VOICE_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // unresolved-clue scenes spread out so no gap reaches 6 consecutive scenes
+    it('VOICE_OPEN_THREAD_DROUGHT_RUN does not fire when open threads are spread through the story', async () => {
+      const recs725cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs725cn[0] = makeSharedRecord(0, { unresolvedClues: ['clue a'] });
+      recs725cn[3] = makeSharedRecord(3, { unresolvedClues: ['clue b'] });
+      recs725cn[6] = makeSharedRecord(6, { unresolvedClues: ['clue c'] });
+      recs725cn[9] = makeSharedRecord(9, { unresolvedClues: ['clue d'] });
+      const res = await runV725(recs725cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_DROUGHT_RUN'), 'VOICE_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 711 — voicePass: voice staging zone cluster, voice seed peak uncaused, voice payoff zone cluster', async () => {
     const runV711 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

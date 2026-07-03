@@ -270,6 +270,13 @@
 // timing × payoffSetupIds × structural thirds — Waves 669/697 applied the drought-run and
 // backward-cause peak modes to payoffSetupIds; the zone-cluster mode has never been applied to
 // it, completing the trio).
+// Wave 725 additions: VOICE_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence — Wave
+// 669 applied the backward-cause peak mode to dialogueHighlights; the drought-run mode has never
+// been applied to it), VOICE_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// relationshipShifts magnitude — Wave 669 applied the zone-cluster mode to relationshipShifts;
+// the backward-cause peak mode has never been applied to it), VOICE_OPEN_THREAD_DROUGHT_RUN
+// (run-based × unresolvedClues absence — Wave 683 applied the backward-cause peak mode to
+// unresolvedClues; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4434,6 +4441,74 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r711c.maxZoneCount} of the story's ${r711c.count} thread-resolution scenes (${Math.round((r711c.maxZoneCount / r711c.count) * 100)}%) cluster in the ${zoneName711c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the voice's resolutions paying off.`,
         suggestedFix: `Let at least one thread resolve outside the ${zoneName711c} third — spreading resolutions across the story lets the story's voice pay off gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 725: VOICE_HIGHLIGHT_DROUGHT_RUN, VOICE_RELATIONSHIP_PEAK_UNCAUSED,
+  //              VOICE_OPEN_THREAD_DROUGHT_RUN ────────────────────────────────────────────────
+
+  // VOICE_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Wave 669 applied the backward-cause peak mode to dialogueHighlights; the drought-run mode has
+  // never been applied to it.
+  {
+    const r725a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r725a.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r725a.longestRun} consecutive scenes`,
+        rule: 'VOICE_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r725a.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r725a.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the story's voice running on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r725a.longestRun}-scene stretch a standout line of dialogue — keeping the story's voice alive throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 669 applied the zone-cluster mode to relationshipShifts;
+  // the backward-cause peak mode has never been applied to it.
+  {
+    const r725b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r725b.fires) {
+      issues.push({
+        location: `scene ${r725b.peakIdx + 1} — peak relationship-shift density (${r725b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r725b.peakIdx + 1}, with ${r725b.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the story's voice is causally connected.`,
+        suggestedFix: `Give scene ${r725b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires when the longest
+  // consecutive run of scenes with zero outstanding clue-debt reaches 6. Wave 683 applied the
+  // backward-cause peak mode to unresolvedClues; the drought-run mode has never been applied to
+  // it.
+  {
+    const r725c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r725c.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r725c.longestRun} consecutive scenes`,
+        rule: 'VOICE_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r725c.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r725c.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved leaves the story's voice without any unanswered question to press against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r725c.longestRun}-scene stretch so the story's voice keeps some outstanding mystery to work against throughout that stretch.`,
       });
     }
   }
