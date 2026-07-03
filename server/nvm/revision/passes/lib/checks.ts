@@ -69,7 +69,11 @@ export function checkAftermathVoid(opts: AftermathVoidOptions): AftermathVoidRes
   if (n < minRecords) return { fires: false, triggerCount: 0, aftermathCount: 0 };
 
   const aftermathCount = records.filter((r, i) => isAftermath(r, i, records)).length;
-  const triggers = records.filter((r, i) => i < n - 1 && isTrigger(r, i, records));
+  // Only scenes with a FULL lookahead window remaining qualify as triggers — matches the
+  // established `pos < n - window` convention used throughout the hand-rolled aftermath
+  // checks this library replaces, so every qualifying trigger is checked against the same
+  // full window rather than a truncated one near the end of the story.
+  const triggers = records.filter((r, i) => i < n - window && isTrigger(r, i, records));
 
   if (triggers.length < minTriggerCount || aftermathCount < minAftermathCount) {
     return { fires: false, triggerCount: triggers.length, aftermathCount };

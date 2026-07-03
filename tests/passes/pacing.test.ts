@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (line ~522, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -930,6 +933,92 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 593 — pacingPass: stakes aftermath suspense flat, stakes aftermath curiosity flat, stakes aftermath emotion flat', async () => {
+    // Uses the shared tests/passes/helpers.ts factories (audit M2.2) instead of a local
+    // makeRecNNN clone — makeSharedRecord() defaults purpose to the real 'complicate'
+    // ScenePurpose enum value, and 'raise_stakes' below is a real member of that enum too.
+    const runP593 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('STAKES_AFTERMATH_SUSPENSE_FLAT fires when no stakes-raise is followed by a suspense rise', async () => {
+      // 9 scenes; stakes-raises at 0,1,2 (windows reach at most scene 4); suspense rises at 7,8
+      // (well outside every trigger's 2-scene window)
+      const recs593a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593a[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs593a[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593a[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      recs593a[7] = makeSharedRecord(7, { suspenseDelta: 1 });
+      recs593a[8] = makeSharedRecord(8, { suspenseDelta: 1 });
+      const res = await runP593(recs593a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_SUSPENSE_FLAT'), 'STAKES_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    it('STAKES_AFTERMATH_SUSPENSE_FLAT does not fire when a stakes-raise is followed by a suspense rise within 2 scenes', async () => {
+      const recs593a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593a[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593a[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      recs593a[3] = makeSharedRecord(3, { purpose: 'raise_stakes' });
+      recs593a[5] = makeSharedRecord(5, { purpose: 'raise_stakes' });
+      recs593a[7] = makeSharedRecord(7, { suspenseDelta: 1 });
+      const res = await runP593(recs593a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_SUSPENSE_FLAT'), 'STAKES_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+
+    it('STAKES_AFTERMATH_CURIOSITY_FLAT fires when no stakes-raise is followed by a curiosity rise', async () => {
+      // 9 scenes; stakes-raises at 0,1,2 (windows reach at most scene 4); curiosity rises at 7,8
+      const recs593b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593b[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs593b[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593b[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      recs593b[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      recs593b[8] = makeSharedRecord(8, { curiosityDelta: 1 });
+      const res = await runP593(recs593b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_CURIOSITY_FLAT'), 'STAKES_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    it('STAKES_AFTERMATH_CURIOSITY_FLAT does not fire when a stakes-raise is followed by a curiosity rise within 2 scenes', async () => {
+      const recs593b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593b[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593b[2] = makeSharedRecord(2, { curiosityDelta: 1 });
+      recs593b[3] = makeSharedRecord(3, { purpose: 'raise_stakes' });
+      recs593b[5] = makeSharedRecord(5, { purpose: 'raise_stakes' });
+      recs593b[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      const res = await runP593(recs593b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_CURIOSITY_FLAT'), 'STAKES_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+
+    it('STAKES_AFTERMATH_EMOTION_FLAT fires when no stakes-raise is followed by a non-neutral emotional shift', async () => {
+      // 9 scenes; stakes-raises at 0,1,2 (windows reach at most scene 4); emotional shifts at 7,8
+      const recs593c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs593c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      recs593c[7] = makeSharedRecord(7, { emotionalShift: 'negative' });
+      recs593c[8] = makeSharedRecord(8, { emotionalShift: 'positive' });
+      const res = await runP593(recs593c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_EMOTION_FLAT'), 'STAKES_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    it('STAKES_AFTERMATH_EMOTION_FLAT does not fire when a stakes-raise is followed by a non-neutral emotional shift within 2 scenes', async () => {
+      const recs593c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs593c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs593c[2] = makeSharedRecord(2, { emotionalShift: 'negative' });
+      recs593c[3] = makeSharedRecord(3, { purpose: 'raise_stakes' });
+      recs593c[5] = makeSharedRecord(5, { purpose: 'raise_stakes' });
+      recs593c[7] = makeSharedRecord(7, { emotionalShift: 'positive' });
+      const res = await runP593(recs593c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAKES_AFTERMATH_EMOTION_FLAT'), 'STAKES_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+  });
 
   describe('Wave 579 — pacingPass: payoff peak uncaused, suspense closing zone absent, clock zone cluster', async () => {
     const makeRec579 = (idx: number, overrides: any = {}): any => ({

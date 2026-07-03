@@ -195,9 +195,24 @@
 // payoff→curiosity; distinct from PAYOFF_SUSPENSE_DECOUPLED which is co-occurrence in the same
 // scene and from CLOCK_AFTERMATH_SUSPENSE_FLAT / REVELATION_SUSPENSE_AFTERMATH_FLAT which use
 // different triggers).
+// Wave 593 additions: stakes aftermath suspense flat, stakes aftermath curiosity flat, stakes
+// aftermath emotion flat (sequence/aftermath × suspense/curiosity/emotion × stakes-raise trigger —
+// n≥8, ≥3 raise_stakes scenes [pos<n-2]; every stakes-raise is followed by 2 scenes with no rise in
+// the respective channel; the escalation-aftermath family already covers revelation, clock, payoff,
+// dramatic-turn, and seed triggers [Waves 467/481/495/509/523/537/551/565] but never the stakes-raise
+// trigger itself — the moment a story explicitly raises what's at risk is exactly where the audience
+// expects tension/wonder/feeling to follow, and this was the one missing row in a 6-trigger x
+// 3-channel matrix. First checks in this pass built on the shared checkAftermathVoid template
+// (server/nvm/revision/passes/lib/checks.ts, audit M2.2) rather than a hand-rolled loop; the
+// template additionally requires the aftermath signal to occur >=2 times elsewhere in the story
+// [minAftermathCount], a slightly stronger guard than the existing seed/clock/payoff/turn/revelation
+// aftermath checks use — it protects against firing when the channel is trivially absent everywhere,
+// not just decoupled from the stakes-raise trigger specifically).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
+import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkAftermathVoid } from './lib/checks.ts';
 
 /**
  * Compute weighted line counts per scene.
@@ -3313,6 +3328,94 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `Redistribute clock-raising moments across all three structural thirds so that urgency escalates rather than spikes. The opening third should introduce a first deadline; the middle should tighten or add to it; the closing third should make the clock impossible to ignore. If the ${dominantZone579c} third genuinely belongs as the urgency zone for this story, at minimum ensure at least one other third carries at least one clock raise — even a single seed of urgency in an otherwise loose zone gives the temporal pressure a lineage across the whole story rather than a single-act burst.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 593: STAKES_AFTERMATH_SUSPENSE_FLAT, STAKES_AFTERMATH_CURIOSITY_FLAT,
+  //              STAKES_AFTERMATH_EMOTION_FLAT ───────────────────────────────────────────────
+  // The stakes-raise trigger is the one missing row in this pass's 6-trigger aftermath matrix:
+  // the suspense/curiosity/emotion aftermath families already cover revelation, clock, payoff,
+  // dramatic-turn, and seed (Waves 467/481/495/509/523/537/551/565) but never the moment a scene's
+  // purpose is explicitly to raise the stakes (purpose === 'raise_stakes', the same predicate
+  // STAKES_SCENE_BLOAT/UNDERWEIGHT already use for scene length). Built on checkAftermathVoid from
+  // the shared check-template library (audit M2.2) rather than a hand-rolled loop — the first checks
+  // in this pass to do so.
+
+  {
+    const isStakesRaise593 = (r: ScreenplaySceneRecord) => r.purpose === 'raise_stakes';
+
+    // STAKES_AFTERMATH_SUSPENSE_FLAT — sequence/aftermath × suspense × stakes-raise trigger.
+    // n≥8, ≥3 qualifying stakes-raise scenes (pos<n-2), ≥2 suspense-rise scenes existing elsewhere.
+    // Every stakes-raise is followed by 2 scenes with no suspenseDelta>0 → fire. Explicitly raising
+    // the stakes should tighten what follows — the audience has just been told more is at risk, and
+    // the next beats should feel that risk pressing on the story. When every stakes-raise is followed
+    // by flat or falling tension, the escalation is announced but not felt downstream.
+    // Distinct from: SEED_AFTERMATH_SUSPENSE_FLAT / CLOCK_AFTERMATH_SUSPENSE_FLAT / PAYOFF_AFTERMATH_
+    // SUSPENSE_FLAT / TURN_AFTERMATH_SUSPENSE_FLAT / REVELATION_SUSPENSE_AFTERMATH_FLAT (different
+    // triggers), STAKES_SCENE_UNDERWEIGHT/BLOAT (scene-length signal, not aftermath). First aftermath
+    // × suspense check on the stakes-raise trigger — the stakes row of the suspense-aftermath family.
+    {
+      const r593a = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+        isTrigger: isStakesRaise593, isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+      });
+      if (r593a.fires) {
+        issues.push({
+          location: `${r593a.triggerCount} stakes-raise scene(s) — no suspense rise within 2 scenes of any`,
+          rule: 'STAKES_AFTERMATH_SUSPENSE_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r593a.triggerCount} stakes-raising scenes is followed by two scenes with no suspense rise, even though ${r593a.aftermathCount} suspense-rise scene(s) exist elsewhere in the script. Raising the stakes is a promise to the audience that more is now at risk — the scenes that follow should feel that promise pressing on the story as rising tension. When every stakes-raise is followed by flat or falling suspense, the escalation is announced in the abstract but never converted into felt pressure in what actually happens next.`,
+          suggestedFix: `After at least one stakes-raising scene, let the following scene or the one after carry a suspense rise — a complication that makes the newly-raised stakes concrete, a countdown that starts ticking, or a threat that becomes immediate. The escalation should be felt in the story's tension, not just stated in its premise.`,
+        });
+      }
+    }
+
+    // STAKES_AFTERMATH_CURIOSITY_FLAT — sequence/aftermath × curiosity × stakes-raise trigger.
+    // Same guards as above; fires when no stakes-raise is followed by a curiosityDelta>0 within 2
+    // scenes. Raising the stakes should also raise questions — what will the higher cost mean, who
+    // will pay it, can it still be avoided — and a stakes-raise that generates no forward wondering
+    // treats the escalation as settled information rather than an open, consequential question.
+    // Distinct from the other four aftermath×curiosity triggers (seed/clock/payoff/turn/revelation)
+    // and from CURIOSITY_FRONTLOAD/CURIOSITY_FLATLINE_RUN (global distribution, not per-trigger
+    // aftermath). Stakes row of the curiosity-aftermath family.
+    {
+      const r593b = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+        isTrigger: isStakesRaise593, isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+      });
+      if (r593b.fires) {
+        issues.push({
+          location: `${r593b.triggerCount} stakes-raise scene(s) — no curiosity rise within 2 scenes of any`,
+          rule: 'STAKES_AFTERMATH_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r593b.triggerCount} stakes-raising scenes is followed by two scenes with no curiosity rise, even though ${r593b.aftermathCount} curiosity-rise scene(s) exist elsewhere in the script. Raising the stakes should open questions along with raising risk: what will the higher cost mean, who ends up paying it, is there still a way out. When every stakes-raise's aftermath is curiosity-flat, the escalation reads as settled information delivered to the audience rather than an unresolved question they are pulled forward to answer.`,
+          suggestedFix: `After at least one stakes-raising scene, let the following scene raise a new question tied to the heightened cost — a character wondering aloud whether it's still worth it, an ambiguous consequence whose shape isn't yet clear, or a choice whose outcome is deliberately left open. The stakes should not just be higher; they should be uncertain.`,
+        });
+      }
+    }
+
+    // STAKES_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × stakes-raise trigger.
+    // Same guards; fires when no stakes-raise is followed by a non-neutral emotionalShift within 2
+    // scenes. A stakes-raise that lands with no felt consequence in its aftermath is escalation as
+    // bookkeeping — the characters register no dread, hope, or resolve in response to the newly-
+    // raised cost, so the audience has no emotional anchor for why the higher stakes should matter.
+    // Distinct from the other four aftermath×emotion triggers and from EMOTIONAL_FLATLINE_RUN
+    // (global consecutive-neutral run, not tied to the stakes-raise trigger specifically). Stakes
+    // row of the emotion-aftermath family — completes the 6-trigger x 3-channel matrix.
+    {
+      const r593c = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+        isTrigger: isStakesRaise593, isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      });
+      if (r593c.fires) {
+        issues.push({
+          location: `${r593c.triggerCount} stakes-raise scene(s) — no emotional shift within 2 scenes of any`,
+          rule: 'STAKES_AFTERMATH_EMOTION_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r593c.triggerCount} stakes-raising scenes is followed by two emotionally neutral scenes, even though ${r593c.aftermathCount} emotionally-charged scene(s) exist elsewhere in the script. Raising the stakes should register on the characters who now stand to lose more — dread, resolve, or hope — and when every stakes-raise's aftermath is affectively flat, the escalation is announced to the audience but not felt by anyone inside the story.`,
+          suggestedFix: `After at least one stakes-raising scene, let the following scene carry a non-neutral emotional beat from a character who now has more to lose — a flicker of fear, a hardened resolve, or a flare of hope that the higher cost is worth it. The audience should feel the weight of the raised stakes through a character's reaction, not just infer it from the premise.`,
+        });
       }
     }
   }
