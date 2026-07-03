@@ -375,6 +375,18 @@
 // own standalone signal), PAYOFF_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax'
 // × structural thirds — likewise only ever touched via an incidental `isClimaticScene`
 // disjunction; a virgin standalone signal).
+//
+// Wave 860 additions: PAYOFF_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 846; peak mode conventionally skipped for this categorical field),
+// PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 'establish_world' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+// Wave 846; peak mode conventionally skipped for this categorical field),
+// PAYOFF_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- this purpose value is only ever touched by RESOLUTION_CRAMMED_AT_END
+// and PAYOFF_POST_CLIMAX_CLUSTER, both of which audit the temporal position of payoffSetupIds
+// resolution, not scenes whose `purpose` field equals 'resolution'; none of the three
+// shared-library trio modes has ever isolated the purpose value itself as a standalone signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4683,6 +4695,74 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r846c.maxZoneCount / r846c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r846c.zoneNames[r846c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the payoff engine delivers its biggest rewards in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r846c.zoneNames[r846c.maxZoneIdx]} third so the payoff engine delivers its rewards more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 860: PAYOFF_CLIMAX_DROUGHT_RUN, PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              PAYOFF_RESOLUTION_ZONE_CLUSTER ──────────────────────────────
+
+  // PAYOFF_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 846 (peak mode conventionally skipped for this categorical field).
+  {
+    const r860a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r860a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r860a.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r860a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r860a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the payoff engine without a structural high point to build its rewards toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r860a.longestRun}-scene stretch as the climax, or restructure so peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 846 (peak mode conventionally skipped for this categorical field).
+  {
+    const r860b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r860b.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r860b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r860b.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r860b.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the payoff engine with no fresh ground to plant setups against for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r860b.longestRun}-scene stretch to establish the world, so setups have fresh ground to plant against throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // PAYOFF_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. Distinct from RESOLUTION_CRAMMED_AT_END and PAYOFF_POST_CLIMAX_CLUSTER, which both
+  // audit the temporal position of payoffSetupIds resolution (when clues get paid off), not
+  // scenes whose `purpose` field itself equals 'resolution'; none of the three shared-library
+  // trio modes has ever isolated this purpose value as its own standalone signal.
+  {
+    const r860c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r860c.fires) {
+      issues.push({
+        location: `${r860c.zoneNames[r860c.maxZoneIdx]} third — ${r860c.maxZoneCount} of ${r860c.count} resolution-purposed scenes`,
+        rule: 'PAYOFF_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r860c.maxZoneCount / r860c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r860c.zoneNames[r860c.maxZoneIdx]} third. When every resolution beat concentrates in one structural window, the payoff engine has no room to let earlier threads settle before the ending absorbs them all at once.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r860c.zoneNames[r860c.maxZoneIdx]} third so closure is distributed across the story rather than concentrated in a single structural window.`,
       });
     }
   }
