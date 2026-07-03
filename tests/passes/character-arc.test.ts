@@ -1080,6 +1080,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 939 — characterArcPass: arc open thread zone imbalance, arc payoff zone imbalance, arc seed zone imbalance', async () => {
+    const makeRec939 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc939 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ARC_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs939a = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 1, 2, 8, 9].includes(i) ? { unresolvedClues: ['c'] } : {}));
+      const res = await runArc939(recs939a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_ZONE_IMBALANCE'), 'ARC_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs939an = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 3, 5, 8].includes(i) ? { unresolvedClues: ['c'] } : {}));
+      const res = await runArc939(recs939an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_ZONE_IMBALANCE'), 'ARC_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs939b = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 1, 2, 8, 9].includes(i) ? { payoffSetupIds: ['s'] } : {}));
+      const res = await runArc939(recs939b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_ZONE_IMBALANCE'), 'ARC_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs939bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 3, 5, 8].includes(i) ? { payoffSetupIds: ['s'] } : {}));
+      const res = await runArc939(recs939bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_ZONE_IMBALANCE'), 'ARC_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seed scenes', async () => {
+      const recs939c = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 1, 2, 8, 9].includes(i) ? { seededClueIds: ['k'] } : {}));
+      const res = await runArc939(recs939c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SEED_ZONE_IMBALANCE'), 'ARC_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_SEED_ZONE_IMBALANCE does not fire when seed scenes touch every zone', async () => {
+      const recs939cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec939(i, [0, 3, 5, 8].includes(i) ? { seededClueIds: ['k'] } : {}));
+      const res = await runArc939(recs939cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SEED_ZONE_IMBALANCE'), 'ARC_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 925 — characterArcPass: arc suspense zone imbalance, arc curiosity zone imbalance, arc clock delta zone imbalance', async () => {
     const makeRec925 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

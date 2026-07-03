@@ -465,6 +465,12 @@
 // has a complete 3-zone/run-based trio (zone-cluster + drought-run) but has never been audited by
 // the 4-zone mode: ARC_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0), ARC_CURIOSITY_ZONE_IMBALANCE
 // (curiosityDelta > 0), and ARC_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta > 0).
+//
+// Wave 939 additions: continuing the checkZoneImbalance rollout, this wave extends the 4-zone mode
+// to the three clue-tracking array-field signals, each of which has a complete 3-zone/run-based
+// trio but has never been audited by the 4-zone mode: ARC_OPEN_THREAD_ZONE_IMBALANCE
+// (unresolvedClues.length > 0), ARC_PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0), and
+// ARC_SEED_ZONE_IMBALANCE (seededClueIds.length > 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5303,6 +5309,79 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r925c.totalCount} clock-advancing scenes are unevenly distributed across its four structural zones: ${bloatName925c} contains ${r925c.counts[r925c.bloatZoneIdx]} of them (${Math.round((r925c.counts[r925c.bloatZoneIdx] / r925c.totalCount) * 100)}%) while ${emptyNames925c} contains none. Ticks of the clock bloat in one structural quarter and vanish from another, giving the arc's sense of time pressure an uneven structural rhythm.`,
         suggestedFix: `Redistribute clock beats: advance the clock in at least one scene inside the empty zone(s) — ${emptyNames925c} — so time pressure builds across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues.length > 0 × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, extending the
+  // 4-zone mode to the unresolvedClues array-field signal. n≥10, ≥4 open-thread scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone ARC_OPEN_THREAD_ZONE_CLUSTER
+  // and run-based ARC_OPEN_THREAD_DROUGHT_RUN — the first application of the 4-zone mode to this
+  // signal.
+  {
+    const r939a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r939a.fires) {
+      const emptyNames939a = r939a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName939a = FOUR_ZONE_NAMES[r939a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames939a} empty; ${bloatName939a} has ${r939a.counts[r939a.bloatZoneIdx]}/${r939a.totalCount} open-thread scenes`,
+        rule: 'ARC_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r939a.totalCount} scenes that leave a thread unresolved are unevenly distributed across its four structural zones: ${bloatName939a} contains ${r939a.counts[r939a.bloatZoneIdx]} of them (${Math.round((r939a.counts[r939a.bloatZoneIdx] / r939a.totalCount) * 100)}%) while ${emptyNames939a} contains none. Open threads bloat in one structural quarter and vanish from another, so the arc's unfinished business piles up in only part of the story.`,
+        suggestedFix: `Redistribute open threads: leave a thread unresolved in at least one scene inside the empty zone(s) — ${emptyNames939a} — so the arc carries unfinished business across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds.length > 0 × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to
+  // the payoffSetupIds array-field signal. n≥10, ≥4 payoff scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of the
+  // total. Distinct from the existing 3-zone ARC_PAYOFF_ZONE_CLUSTER and run-based ARC_PAYOFF_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this signal.
+  {
+    const r939b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r939b.fires) {
+      const emptyNames939b = r939b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName939b = FOUR_ZONE_NAMES[r939b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames939b} empty; ${bloatName939b} has ${r939b.counts[r939b.bloatZoneIdx]}/${r939b.totalCount} payoff scenes`,
+        rule: 'ARC_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r939b.totalCount} scenes that pay off an earlier setup are unevenly distributed across its four structural zones: ${bloatName939b} contains ${r939b.counts[r939b.bloatZoneIdx]} of them (${Math.round((r939b.counts[r939b.bloatZoneIdx] / r939b.totalCount) * 100)}%) while ${emptyNames939b} contains none. Payoffs bloat in one structural quarter and vanish from another, so the arc's earned rewards land in only part of the story.`,
+        suggestedFix: `Redistribute payoffs: cash in an earlier setup in at least one scene inside the empty zone(s) — ${emptyNames939b} — so the arc delivers earned rewards across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_SEED_ZONE_IMBALANCE — Underweight/bloat × seededClueIds.length > 0 × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to the
+  // seededClueIds array-field signal. n≥10, ≥4 seed scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of the
+  // total. Distinct from the existing 3-zone ARC_SEED_ZONE_CLUSTER and run-based ARC_SEED_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to this signal.
+  {
+    const r939c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r939c.fires) {
+      const emptyNames939c = r939c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName939c = FOUR_ZONE_NAMES[r939c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames939c} empty; ${bloatName939c} has ${r939c.counts[r939c.bloatZoneIdx]}/${r939c.totalCount} seed scenes`,
+        rule: 'ARC_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r939c.totalCount} scenes that seed a clue are unevenly distributed across its four structural zones: ${bloatName939c} contains ${r939c.counts[r939c.bloatZoneIdx]} of them (${Math.round((r939c.counts[r939c.bloatZoneIdx] / r939c.totalCount) * 100)}%) while ${emptyNames939c} contains none. Seeds bloat in one structural quarter and vanish from another, so the arc plants its groundwork in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue in at least one scene inside the empty zone(s) — ${emptyNames939c} — so the arc lays groundwork across every structural quarter, not only the quarter currently carrying most of it.`,
       });
     }
   }
