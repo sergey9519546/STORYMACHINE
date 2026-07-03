@@ -423,6 +423,11 @@
 // 'raise_stakes'), STRUCTURE_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose
 // trio was completed in Wave 919), and STRUCTURE_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift
 // === 'negative', a valence signal with a complete 3-zone/run trio).
+// Wave 947 additions: extending the checkZoneImbalance rollout to three more trio-complete signals
+// spanning three distinct signal classes: STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift
+// === 'positive', the positive-valence mirror of Wave 933's negative one), STRUCTURE_SUSPENSE_ZONE_
+// IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE
+// (unresolvedClues.length > 0 — open-thread array field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5231,6 +5236,81 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r933c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName933c} contains ${r933c.counts[r933c.bloatZoneIdx]} of them (${Math.round((r933c.counts[r933c.bloatZoneIdx] / r933c.totalCount) * 100)}%) while ${emptyNames933c} contains none. Downturns bloat in one structural quarter and vanish from another, leaving the story's architecture lopsided around where its emotional low points fall.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames933c} — so the structure's low points fall across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone STRUCTURE_POSITIVE_EMOTION_ZONE_CLUSTER and run-based STRUCTURE_POSITIVE_EMOTION_DROUGHT_
+  // RUN — the first application of the 4-zone bloat+empty-zone mode to this valence signal, and the
+  // positive-valence mirror of the Wave 933 STRUCTURE_NEGATIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r947a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r947a.fires) {
+      const emptyNames947a = r947a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName947a = FOUR_ZONE_NAMES[r947a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames947a} empty; ${bloatName947a} has ${r947a.counts[r947a.bloatZoneIdx]}/${r947a.totalCount} positive-shift scenes`,
+        rule: 'STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r947a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName947a} contains ${r947a.counts[r947a.bloatZoneIdx]} of them (${Math.round((r947a.counts[r947a.bloatZoneIdx] / r947a.totalCount) * 100)}%) while ${emptyNames947a} contains none. Upturns bloat in one structural quarter and vanish from another, leaving the story's architecture lopsided around where its emotional high points fall.`,
+        suggestedFix: `Redistribute upturns: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames947a} — so the structure's high points fall across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone STRUCTURE_
+  // SUSPENSE_ZONE_CLUSTER and run-based STRUCTURE_SUSPENSE_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than categorical purpose or emotional valence.
+  {
+    const r947b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r947b.fires) {
+      const emptyNames947b = r947b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName947b = FOUR_ZONE_NAMES[r947b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames947b} empty; ${bloatName947b} has ${r947b.counts[r947b.bloatZoneIdx]}/${r947b.totalCount} suspense-raising scenes`,
+        rule: 'STRUCTURE_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r947b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName947b} contains ${r947b.counts[r947b.bloatZoneIdx]} of them (${Math.round((r947b.counts[r947b.bloatZoneIdx] / r947b.totalCount) * 100)}%) while ${emptyNames947b} contains none. Tension bloats in one structural quarter and flatlines in another, leaving the story's architecture lopsided around where its suspense is built.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames947b} — so the structure sustains tension across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × (unresolvedClues.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // leaving an open thread total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone STRUCTURE_OPEN_THREAD_ZONE_CLUSTER and run-based STRUCTURE_OPEN_THREAD_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the open-thread array-field signal in
+  // this pass, keying on unresolved-question density rather than purpose, valence, or delta.
+  {
+    const r947c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r947c.fires) {
+      const emptyNames947c = r947c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName947c = FOUR_ZONE_NAMES[r947c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames947c} empty; ${bloatName947c} has ${r947c.counts[r947c.bloatZoneIdx]}/${r947c.totalCount} open-thread scenes`,
+        rule: 'STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r947c.totalCount} scenes leaving an open thread are unevenly distributed across its four structural zones: ${bloatName947c} contains ${r947c.counts[r947c.bloatZoneIdx]} of them (${Math.round((r947c.counts[r947c.bloatZoneIdx] / r947c.totalCount) * 100)}%) while ${emptyNames947c} contains none. Unresolved questions bloat in one structural quarter and never open in another, leaving the story's architecture lopsided around where its loose ends accumulate.`,
+        suggestedFix: `Redistribute open threads: leave an unresolved question (non-empty unresolvedClues) in at least one scene inside the empty zone(s) — ${emptyNames947c} — so the structure keeps forward pull alive across every structural quarter, not only the quarter currently carrying most of it.`,
       });
     }
   }

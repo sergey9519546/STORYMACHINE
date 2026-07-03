@@ -1006,6 +1006,61 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 947 — structurePass: structure positive emotion zone imbalance, structure suspense zone imbalance, structure open thread zone imbalance', async () => {
+    const runST947 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs947a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runST947(recs947a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs947an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runST947(recs947an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'STRUCTURE_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs947b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runST947(recs947b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_ZONE_IMBALANCE'), 'STRUCTURE_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs947bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runST947(recs947bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_ZONE_IMBALANCE'), 'STRUCTURE_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs947c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 1, 2, 8, 9].includes(i) ? ['q1'] : [] }));
+      const res = await runST947(recs947c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE'), 'STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs947cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 3, 5, 8].includes(i) ? ['q1'] : [] }));
+      const res = await runST947(recs947cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE'), 'STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 933 — structurePass: structure stakes zone imbalance, structure revelation purpose zone imbalance, structure negative emotion zone imbalance', async () => {
     const runST933 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
