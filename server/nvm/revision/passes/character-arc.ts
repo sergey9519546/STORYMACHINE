@@ -440,6 +440,17 @@
 // values already has a complete 3-zone/run-based trio via checkZoneCluster/checkDroughtRun; the
 // 4-zone mode is categorically distinct (act-based buckets, fires only on an empty zone plus a
 // >=50%-share bloat zone) and has never been applied to any of them before.
+//
+// Wave 897 additions (opens the twenty-third rotation cycle): purpose === 'revelation' has only
+// ever appeared inside the dramaticPurposes composite set (union with 'turning_point', 'climax',
+// 'raise_stakes', 'complicate') and has never been audited as its own standalone signal. This
+// wave adds ARC_REVELATION_PURPOSE_DROUGHT_RUN (run-based absence) and ARC_REVELATION_PURPOSE_
+// ZONE_CLUSTER (distribution/timing, structural thirds) for this purpose value -- named distinctly
+// from the pre-existing ARC_REVELATION_DROUGHT_RUN/ARC_REVELATION_ZONE_CLUSTER, which audit the
+// separate `revelation` string|null field, not this purpose enum value. It also adds
+// ARC_STAKES_ZONE_IMBALANCE, continuing the checkZoneImbalance rollout begun in Wave 869: purpose
+// === 'raise_stakes' already has a complete 3-zone/run-based trio (ARC_STAKES_ZONE_CLUSTER,
+// ARC_STAKES_DROUGHT_RUN) but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5062,6 +5073,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r883c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName883c} contains ${r883c.counts[r883c.bloatZoneIdx]} of them (${Math.round((r883c.counts[r883c.bloatZoneIdx] / r883c.totalCount) * 100)}%) while ${emptyNames883c} contains none. Turning points bloat in one structural quarter and vanish from another, giving the arc's pivots an uneven structural rhythm.`,
         suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames883c} — so every structural quarter carries some capacity for the arc to pivot, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from ARC_REVELATION_ZONE_CLUSTER, which audits the separate `revelation`
+  // string|null field on every record, not this purpose enum value — purpose === 'revelation' has
+  // only ever appeared inside the dramaticPurposes composite set and has never been audited as its
+  // own standalone signal by any of the three shared-library trio modes.
+  {
+    const r897a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r897a.fires) {
+      issues.push({
+        location: `${r897a.zoneNames[r897a.maxZoneIdx]} third — ${r897a.maxZoneCount} of ${r897a.count} revelation-purposed scenes`,
+        rule: 'ARC_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r897a.maxZoneCount / r897a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r897a.zoneNames[r897a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the character's arc has no fresh truth reshaping it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r897a.zoneNames[r897a.maxZoneIdx]} third as a revelation so the character's arc keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r897b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r897b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r897b.longestRun} consecutive scenes`,
+        rule: 'ARC_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r897b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r897b.presentCount} scenes elsewhere disclose a truth by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the character's arc with no fresh disclosure reshaping it for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r897b.longestRun}-scene stretch as a revelation so the character's arc keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, continuing the rollout
+  // begun in Wave 869. n≥10, ≥4 stakes-raising scenes total, divided across four equal structural
+  // zones. Fires only when one zone has zero such scenes while another holds ≥50% of the total.
+  // Distinct from the existing ARC_STAKES_ZONE_CLUSTER (3-zone >75%-concentration test) and
+  // ARC_STAKES_DROUGHT_RUN (run-based absence) — the first application of the 4-zone bloat+empty-
+  // zone mode to this purpose value.
+  {
+    const r897c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r897c.fires) {
+      const emptyNames897c = r897c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName897c = FOUR_ZONE_NAMES[r897c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames897c} empty; ${bloatName897c} has ${r897c.counts[r897c.bloatZoneIdx]}/${r897c.totalCount} stakes-raising scenes`,
+        rule: 'ARC_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r897c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName897c} contains ${r897c.counts[r897c.bloatZoneIdx]} of them (${Math.round((r897c.counts[r897c.bloatZoneIdx] / r897c.totalCount) * 100)}%) while ${emptyNames897c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the arc's escalation an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames897c} — so every structural quarter carries some escalation for the arc to face, not only the quarter currently carrying most of it.`,
       });
     }
   }

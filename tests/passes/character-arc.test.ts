@@ -1080,6 +1080,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 897 — characterArcPass: arc revelation purpose zone cluster, arc revelation purpose drought run, arc stakes zone imbalance', async () => {
+    const makeRec897 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc897 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (all in opening third) → 3/3 = 100% > 75%.
+    it('ARC_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs897a = Array.from({ length: 9 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runArc897(recs897a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_ZONE_CLUSTER'), 'ARC_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs897an = Array.from({ length: 9 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runArc897(recs897an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_ZONE_CLUSTER'), 'ARC_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3 satisfied), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('ARC_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs897b = Array.from({ length: 10 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runArc897(recs897b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_DROUGHT_RUN'), 'ARC_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs897bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runArc897(recs897bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_DROUGHT_RUN'), 'ARC_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_STAKES_ZONE_IMBALANCE fire: n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9});
+    // raise_stakes at 0,1,2,8,9 → Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('ARC_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs897c = Array.from({ length: 10 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'development' }),
+      );
+      const res = await runArc897(recs897c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_ZONE_IMBALANCE'), 'ARC_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs897cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec897(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'development' }),
+      );
+      const res = await runArc897(recs897cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_ZONE_IMBALANCE'), 'ARC_STAKES_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 883 — characterArcPass: arc complicate zone imbalance, arc introduce conflict zone imbalance, arc turning point zone imbalance', async () => {
     const makeRec883 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
