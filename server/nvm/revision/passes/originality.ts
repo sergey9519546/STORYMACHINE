@@ -312,6 +312,19 @@
 // (distribution/timing × purpose === 'raise_stakes' × structural thirds — purpose has never
 // anchored any of the three shared-library modes in this pass; a predictable, front- or
 // back-loaded distribution of stakes-raising scenes is itself a learnable pattern).
+// Wave 760 additions: ORIGINALITY_REVELATION_PEAK_UNCAUSED (single-peak isolation/backward-cause
+// × revelation magnitude — ORIGINALITY_REVELATION_DROUGHT_RUN and ORIGINALITY_REVELATION_ZONE_
+// CLUSTER applied the run-based drought and zone-cluster modes to revelation != null; the
+// backward-cause peak mode has never been applied to it, completing the trio — this check's
+// hasCause deliberately references only dramaticTurn, not revelation itself, to avoid a circular
+// audit of the revelation channel; an uncaused disclosure is itself a predictable pattern),
+// ORIGINALITY_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — Wave 746
+// applied the zone-cluster mode to this signal; the drought-run mode has never been applied to it
+// — a long unbroken stretch with the stakes never rising is itself a predictable pattern),
+// ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — clockDelta has only
+// ever anchored an average/aggregate variety check [CLOCK_DELTA_FLATLINE]; the run-based drought
+// mode has never been applied to it — a long unbroken stretch with the clock never moving is
+// itself a predictable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4649,6 +4662,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r746c.maxZoneCount} of the story's ${r746c.count} scenes purposed to raise stakes (${Math.round((r746c.maxZoneCount / r746c.count) * 100)}%) cluster in the ${zoneName746c} third. Escalation concentrates almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect the stakes to rise in rather than experiencing genuinely unpredictable pressure.`,
         suggestedFix: `Raise the stakes in at least one scene outside the ${zoneName746c} third — spreading escalation across the story keeps its timing genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ── Wave 760: ORIGINALITY_REVELATION_PEAK_UNCAUSED, ORIGINALITY_STAKES_DROUGHT_RUN,
+  //              ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN ────────────────────────────────────
+
+  // ORIGINALITY_REVELATION_PEAK_UNCAUSED — Single-peak isolation/backward-cause × revelation
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, a 2-scene lookback. Finds the single scene carrying a revelation (magnitude 1 vs 0
+  // elsewhere); fires when neither that scene nor either of the two before it contains a
+  // dramatic turn. ORIGINALITY_REVELATION_DROUGHT_RUN and ORIGINALITY_REVELATION_ZONE_CLUSTER
+  // applied the run-based drought and zone-cluster modes to revelation != null; the
+  // backward-cause peak mode has never been applied to it, completing the trio — this check's
+  // hasCause deliberately references only dramaticTurn, not revelation itself, to avoid a
+  // circular audit of the revelation channel; an uncaused disclosure is itself a predictable
+  // pattern.
+  {
+    const r760a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r760a.fires) {
+      issues.push({
+        location: `scene ${r760a.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'ORIGINALITY_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's revelation at scene ${r760a.peakIdx + 1} arrives with no dramatic turn in itself or the two scenes before it. A disclosure that lands without a structural pivot preparing it is itself a learnable pattern — the audience senses the story's revelations arriving on their own schedule rather than in response to events.`,
+        suggestedFix: `Give scene ${r760a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn, so the revelation is earned by an event rather than arriving as an arbitrary, learnable disclosure.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. Wave 746 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it — a long
+  // unbroken stretch with the stakes never rising is itself a predictable pattern.
+  {
+    const r760b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r760b.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r760b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r760b.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r760b.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher is itself a learnable pattern — the audience can predict that no escalation will arrive for an extended stretch.`,
+        suggestedFix: `Purpose at least one scene within the ${r760b.longestRun}-scene stretch to raise stakes so the audience can't predict a long, pressure-free lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 clock-shifting scenes overall,
+  // fires when the longest consecutive run of scenes with zero clock movement reaches 6.
+  // clockDelta has only ever anchored an average/aggregate variety check
+  // (CLOCK_DELTA_FLATLINE); the run-based drought mode has never been applied to it — a long
+  // unbroken stretch with the clock never moving is itself a predictable pattern.
+  {
+    const r760c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r760c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r760c.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r760c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r760c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline is itself a learnable pattern — the audience can predict that no clock movement will arrive for an extended stretch.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r760c.longestRun}-scene stretch so the audience can't predict a long, deadline-frozen lull.`,
       });
     }
   }

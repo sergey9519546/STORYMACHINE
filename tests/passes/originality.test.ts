@@ -1210,6 +1210,108 @@ He sits at his desk.
   });
 
 
+  describe('Wave 760 — originalityPass: originality revelation peak uncaused, originality stakes drought run, originality clock delta drought run', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746 above —
+    // every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping
+    // unrelated 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_760 = ['establish_world', 'introduce_conflict', 'complicate', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_760 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_760 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor760 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec760 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor760(idx),
+      emotionalShift: EMOTION_POOL_760[idx % EMOTION_POOL_760.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_760[idx % PURPOSE_POOL_760.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain760 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor760(i)}\n\n${SENTENCE_POOL_760[i % SENTENCE_POOL_760.length]}`).join('\n\n');
+    const runO760 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain760(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 and 5 (magnitude ties at 1, peak resolves to the first
+    // occurrence — scene 2); no dramaticTurn at 2, 1, or 0.
+    it('ORIGINALITY_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs760a = Array.from({ length: 8 }, (_, i) => makeRec760(i, {
+        revelation: (i === 2 || i === 5) ? 'a truth surfaces' : null,
+      }));
+      const res = await runO760(recs760a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_PEAK_UNCAUSED'), 'ORIGINALITY_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    // ORIGINALITY_REVELATION_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 1, within the peak's 2-scene lookback (2-1=1)
+    it('ORIGINALITY_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation within the lookback', async () => {
+      const recs760an = Array.from({ length: 8 }, (_, i) => makeRec760(i, {
+        revelation: (i === 2 || i === 5) ? 'a truth surfaces' : null,
+        dramaticTurn: i === 1 ? 'reversal' : 'nothing',
+      }));
+      const res = await runO760(recs760an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_PEAK_UNCAUSED'), 'ORIGINALITY_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // ORIGINALITY_STAKES_DROUGHT_RUN fire:
+    // 10 scenes; stakes-raising at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ORIGINALITY_STAKES_DROUGHT_RUN fires when the longest no-stakes-raise run is ≥6', async () => {
+      const recs760b = Array.from({ length: 10 }, (_, i) => makeRec760(i, {
+        purpose: (i === 0 || i === 1 || i === 2 || i === 9) ? 'raise_stakes' : PURPOSE_POOL_760[i % PURPOSE_POOL_760.length],
+      }));
+      const res = await runO760(recs760b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_DROUGHT_RUN'), 'ORIGINALITY_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // ORIGINALITY_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ORIGINALITY_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are distributed without a long drought', async () => {
+      const recs760bn = Array.from({ length: 10 }, (_, i) => makeRec760(i, {
+        purpose: (i === 0 || i === 4 || i === 9) ? 'raise_stakes' : PURPOSE_POOL_760[i % PURPOSE_POOL_760.length],
+      }));
+      const res = await runO760(recs760bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_DROUGHT_RUN'), 'ORIGINALITY_STAKES_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs760c = Array.from({ length: 10 }, (_, i) => makeRec760(i, {
+        clockDelta: (i === 0 || i === 1 || i === 2) ? 1 : 0,
+      }));
+      const res = await runO760(recs760c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN'), 'ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs760cn = Array.from({ length: 10 }, (_, i) => makeRec760(i, {
+        clockDelta: (i === 0 || i === 3 || i === 6 || i === 9) ? 1 : 0,
+      }));
+      const res = await runO760(recs760cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN'), 'ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 746 — originalityPass: originality open thread zone cluster, originality turn drought run, originality stakes zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732 above — every
     // fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated
