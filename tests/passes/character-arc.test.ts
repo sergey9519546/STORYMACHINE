@@ -1080,6 +1080,88 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 757 — characterArcPass: arc suspense zone cluster, arc emotion zone cluster, arc stakes drought run', async () => {
+    const makeRec757 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc757 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('ARC_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs757a = Array.from({ length: 9 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 1 || i === 2) ? { suspenseDelta: 1 } : {}
+      ));
+      const res = await runArc757(recs757a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_ZONE_CLUSTER'), 'ARC_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_SUSPENSE_ZONE_CLUSTER no-fire:
+    // suspense-positive scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes are distributed across thirds', async () => {
+      const recs757an = Array.from({ length: 9 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 4 || i === 7) ? { suspenseDelta: 1 } : {}
+      ));
+      const res = await runArc757(recs757an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_ZONE_CLUSTER'), 'ARC_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally-charged scenes at 0,1,2 → 100% opening third
+    it('ARC_EMOTION_ZONE_CLUSTER fires when >75% of emotionally-charged scenes cluster in one third', async () => {
+      const recs757b = Array.from({ length: 9 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runArc757(recs757b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_EMOTION_ZONE_CLUSTER'), 'ARC_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_EMOTION_ZONE_CLUSTER no-fire:
+    // emotionally-charged scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_EMOTION_ZONE_CLUSTER does not fire when emotionally-charged scenes are distributed across thirds', async () => {
+      const recs757bn = Array.from({ length: 9 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 4 || i === 7) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runArc757(recs757bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_EMOTION_ZONE_CLUSTER'), 'ARC_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_STAKES_DROUGHT_RUN fire:
+    // 10 scenes; stakes-raising at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_STAKES_DROUGHT_RUN fires when the longest no-stakes-raise run is ≥6', async () => {
+      const recs757c = Array.from({ length: 10 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runArc757(recs757c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_DROUGHT_RUN'), 'ARC_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // ARC_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are distributed without a long drought', async () => {
+      const recs757cn = Array.from({ length: 10 }, (_, i) => makeRec757(i,
+        (i === 0 || i === 4 || i === 9) ? { purpose: 'raise_stakes' } : {}
+      ));
+      const res = await runArc757(recs757cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_DROUGHT_RUN'), 'ARC_STAKES_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 743 — characterArcPass: arc character moment zone cluster, arc turn drought run, arc clock zone cluster', async () => {
     const makeRec743 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

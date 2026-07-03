@@ -328,6 +328,17 @@
 // run-length absence and ARC_CLOCK_OPENING_ZONE_ABSENT audits only the opening third specifically;
 // the general thirds-ratio zone-cluster mode, which can fire on a middle- or closing-third
 // concentration that the opening-only check cannot detect, has never been applied to it).
+// Wave 757 additions: ARC_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 presence ×
+// structural thirds — the existing ARC_SUSPENSE_DROUGHT_RUN [Wave 561] audits run-length absence
+// and ARC_SUSPENSE_OPENING_ZONE_ABSENT audits only the opening third specifically; the general
+// thirds-ratio zone-cluster mode has never been applied to it), ARC_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift !== 'neutral' presence × structural thirds — the existing
+// ARC_EMOTIONAL_DROUGHT_RUN audits run-length absence, ARC_EMOTION_CONCENTRATION audits a
+// contiguous span [≤20% of the story], and ARC_EMOTIONAL_FRONT_LOADED/BACK_LOADED audit a binary
+// half-split; the general thirds-ratio zone-cluster mode — a disjoint-third majority test distinct
+// from all three — has never been applied to it), ARC_STAKES_DROUGHT_RUN (run-based × purpose ===
+// 'raise_stakes' absence — purpose has never anchored any of the three shared-library modes for
+// this specific value; the run-based drought mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4248,6 +4259,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r743c.maxZoneCount / r743c.count) * 100)}% of the story's clockRaised scenes cluster in the ${r743c.zoneNames[r743c.maxZoneIdx]} third. When every ticking-clock beat lands in the same structural window, the character's arc loses any sense of mounting time pressure recurring across the whole story.`,
         suggestedFix: `Raise the clock in at least one scene outside the ${r743c.zoneNames[r743c.maxZoneIdx]} third so time pressure keeps testing the character more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 757: ARC_SUSPENSE_ZONE_CLUSTER, ARC_EMOTION_ZONE_CLUSTER, ARC_STAKES_DROUGHT_RUN ──
+
+  // ARC_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. The existing
+  // ARC_SUSPENSE_DROUGHT_RUN audits run-length absence and ARC_SUSPENSE_OPENING_ZONE_ABSENT
+  // audits only the opening third specifically; the general thirds-ratio zone-cluster mode has
+  // never been applied to it.
+  {
+    const r757a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r757a.fires) {
+      issues.push({
+        location: `${r757a.zoneNames[r757a.maxZoneIdx]} third — ${r757a.maxZoneCount} of ${r757a.count} suspense-positive scenes`,
+        rule: 'ARC_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r757a.maxZoneCount / r757a.count) * 100)}% of the scenes where tension rises cluster in the ${r757a.zoneNames[r757a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the character's arc has no rising danger testing them anywhere else in the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r757a.zoneNames[r757a.maxZoneIdx]} third so tension keeps testing the character more evenly across the arc.`,
+      });
+    }
+  }
+
+  // ARC_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // emotionally-charged scenes, fires when more than 75% of those scenes cluster in a single
+  // third. The existing ARC_EMOTIONAL_DROUGHT_RUN audits run-length absence,
+  // ARC_EMOTION_CONCENTRATION audits a contiguous span (≤20% of the story), and
+  // ARC_EMOTIONAL_FRONT_LOADED/BACK_LOADED audit a binary half-split; the general thirds-ratio
+  // zone-cluster mode — a disjoint-third majority test distinct from all three — has never been
+  // applied to it.
+  {
+    const r757b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift !== 'neutral',
+    });
+    if (r757b.fires) {
+      issues.push({
+        location: `${r757b.zoneNames[r757b.maxZoneIdx]} third — ${r757b.maxZoneCount} of ${r757b.count} emotionally-charged scenes`,
+        rule: 'ARC_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r757b.maxZoneCount / r757b.count) * 100)}% of the protagonist's emotionally-charged scenes cluster in the ${r757b.zoneNames[r757b.maxZoneIdx]} third. When every emotional beat lands in the same structural window, the character's arc goes affectively quiet everywhere else in the story.`,
+        suggestedFix: `Give the protagonist an emotional beat in at least one scene outside the ${r757b.zoneNames[r757b.maxZoneIdx]} third so feeling keeps threading through the arc more evenly.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. purpose has never
+  // anchored any of the three shared-library modes for this specific value; the run-based drought
+  // mode has never been applied to it.
+  {
+    const r757c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r757c.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r757c.longestRun} consecutive scenes`,
+        rule: 'ARC_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r757c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r757c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the character's arc coasting without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r757c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the character's arc under mounting pressure throughout that stretch.`,
       });
     }
   }
