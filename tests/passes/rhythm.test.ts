@@ -1136,6 +1136,71 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 862 — rhythmPass: rhythm establish world zone cluster, rhythm climax zone cluster, rhythm resolution zone cluster', async () => {
+    const runR862 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs862a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runR862(recs862a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER'), 'RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs862an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runR862(recs862an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER'), 'RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs862b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runR862(recs862b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLIMAX_ZONE_CLUSTER'), 'RHYTHM_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs862bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runR862(recs862bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLIMAX_ZONE_CLUSTER'), 'RHYTHM_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_RESOLUTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; resolution scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_RESOLUTION_ZONE_CLUSTER fires when >75% of resolution-purposed scenes cluster in one third', async () => {
+      const recs862c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runR862(recs862c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_RESOLUTION_ZONE_CLUSTER'), 'RHYTHM_RESOLUTION_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_RESOLUTION_ZONE_CLUSTER does not fire when resolution-purposed scenes spread across thirds', async () => {
+      const recs862cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runR862(recs862cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_RESOLUTION_ZONE_CLUSTER'), 'RHYTHM_RESOLUTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 848 — rhythmPass: rhythm stakes drought run, rhythm introduce conflict drought run, rhythm positive emotion drought run', async () => {
     const runR848 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

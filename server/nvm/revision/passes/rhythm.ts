@@ -357,6 +357,13 @@
 // RHYTHM_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'positive' absence —
 // completes 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave 834; peak
 // mode conventionally skipped for this categorical field).
+//
+// Wave 862 additions: RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'establish_world' x structural thirds -- this purpose value has never been referenced anywhere
+// in this pass; a virgin field), RHYTHM_CLIMAX_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'climax' x structural thirds -- likewise a virgin field, never referenced in this pass
+// before), RHYTHM_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- likewise a virgin field, never referenced in this pass before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4302,6 +4309,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r848c.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r848c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the story's rhythm without an emotional payoff for an extended run.`,
         suggestedFix: `Give the story a moment of relief within the ${r848c.longestRun}-scene stretch so the rhythm keeps delivering an emotional payoff throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 862: RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER, RHYTHM_CLIMAX_ZONE_CLUSTER,
+  //              RHYTHM_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r862a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r862a.fires) {
+      issues.push({
+        location: `${r862a.zoneNames[r862a.maxZoneIdx]} third — ${r862a.maxZoneCount} of ${r862a.count} world-establishing scenes`,
+        rule: 'RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r862a.maxZoneCount / r862a.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r862a.zoneNames[r862a.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the story's rhythm has no fresh ground to orient the reader against anywhere else.`,
+        suggestedFix: `Purpose at least one scene outside the ${r862a.zoneNames[r862a.maxZoneIdx]} third to establish the world so the rhythm keeps orienting the reader more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r862b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r862b.fires) {
+      issues.push({
+        location: `${r862b.zoneNames[r862b.maxZoneIdx]} third — ${r862b.maxZoneCount} of ${r862b.count} climax-purposed scenes`,
+        rule: 'RHYTHM_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r862b.maxZoneCount / r862b.count) * 100)}% of the scenes purposed as the climax cluster in the ${r862b.zoneNames[r862b.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the story's rhythm surges in only one part of the story instead of building throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r862b.zoneNames[r862b.maxZoneIdx]} third so the rhythm's biggest surges land more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 resolution-
+  // purposed scenes, fires when more than 75% of them fall in a single structural third. This
+  // purpose value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r862c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r862c.fires) {
+      issues.push({
+        location: `${r862c.zoneNames[r862c.maxZoneIdx]} third — ${r862c.maxZoneCount} of ${r862c.count} resolution-purposed scenes`,
+        rule: 'RHYTHM_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r862c.maxZoneCount / r862c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r862c.zoneNames[r862c.maxZoneIdx]} third. When every settling beat concentrates in one structural window, the story's rhythm has no room to wind down gradually before the ending absorbs it all at once.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r862c.zoneNames[r862c.maxZoneIdx]} third so the rhythm's wind-down is distributed across the story rather than concentrated in a single structural window.`,
       });
     }
   }
