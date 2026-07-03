@@ -340,6 +340,15 @@
 // === 'raise_stakes' × structural thirds — the existing THEME_RAISE_STAKES_SILENT is a
 // co-occurrence check [do stakes-raising scenes carry theme]; none of the three shared-library
 // trio modes has ever been applied to this purpose value).
+//
+// Wave 822 additions: THEME_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 808; peak mode conventionally skipped for this categorical field), THEME_TURNING_POINT_ZONE_
+// CLUSTER (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose
+// value has never appeared anywhere in this file; a virgin field for all three shared-library
+// trio modes), THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — likewise a virgin field, never referenced in this
+// file before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4652,6 +4661,73 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r808c.maxZoneCount / r808c.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r808c.zoneNames[r808c.maxZoneIdx]} third. When every escalation lands in the same structural window, the theme has no mounting pressure testing it anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r808c.zoneNames[r808c.maxZoneIdx]} third to raise stakes so the theme keeps mounting pressure testing it more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 822: THEME_STAKES_DROUGHT_RUN, THEME_TURNING_POINT_ZONE_CLUSTER,
+  //              THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // THEME_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes with no stakes-raising purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 808 (peak mode conventionally skipped for this categorical field).
+  {
+    const r822a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r822a.fires) {
+      issues.push({
+        location: `longest stretch with no stakes-raising: ${r822a.longestRun} consecutive scenes`,
+        rule: 'THEME_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r822a.longestRun} consecutive scenes with no stakes-raising purpose at all, even though ${r822a.presentCount} scenes elsewhere escalate. A long unbroken stretch with no mounting pressure leaves the theme untested for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r822a.longestRun}-scene stretch to raise stakes so the theme keeps facing mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never appeared anywhere in this file before — a virgin field for all
+  // three shared-library trio modes, distinct from THEME_TURN_ZONE_CLUSTER (Wave 682), which
+  // audits the dramaticTurn free-text field, not this purpose enum value.
+  {
+    const r822b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r822b.fires) {
+      issues.push({
+        location: `${r822b.zoneNames[r822b.maxZoneIdx]} third — ${r822b.maxZoneCount} of ${r822b.count} turning-point scenes`,
+        rule: 'THEME_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r822b.maxZoneCount / r822b.count) * 100)}% of the story's turning-point scenes cluster in the ${r822b.zoneNames[r822b.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the theme has no redirection testing it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r822b.zoneNames[r822b.maxZoneIdx]} third as a turning point so the theme keeps facing redirection more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. Also a virgin field — 'introduce_conflict' has never appeared
+  // anywhere in this file before this wave.
+  {
+    const r822c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r822c.fires) {
+      issues.push({
+        location: `${r822c.zoneNames[r822c.maxZoneIdx]} third — ${r822c.maxZoneCount} of ${r822c.count} conflict-introducing scenes`,
+        rule: 'THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r822c.maxZoneCount / r822c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r822c.zoneNames[r822c.maxZoneIdx]} third. When every new conflict lands in the same structural window, the theme has no fresh friction testing it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r822c.zoneNames[r822c.maxZoneIdx]} third to introduce conflict so the theme keeps facing fresh friction more evenly across the story.`,
       });
     }
   }
