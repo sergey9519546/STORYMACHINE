@@ -213,6 +213,12 @@
 // (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere
 // in this pass), CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × clockRaised
 // trigger → dialogueHighlights absence — first use of clockRaised anywhere in this pass).
+// Wave 627 additions (built on the shared checks library, audit M2.2): VOICE_PAYOFF_STAGING_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — first use of payoffSetupIds
+// anywhere in this 107-rule pass), VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+// (sequence/aftermath × seededClueIds trigger → dialogueHighlights absence — first use of
+// seededClueIds in this pass), VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE (underweight/bloat ×
+// relationshipShifts × four structural zones — first use of relationshipShifts in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3888,6 +3894,81 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r613c.triggerCount} clock-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r613c.aftermathCount} such scenes exist elsewhere in the script. Time pressure that mounts without a nearby memorable line means the deadline's weight is tracked mechanically but never voiced — no character's speech registers the tightening clock in a way the story itself flags as worth remembering.`,
         suggestedFix: `After at least one clock-raising scene, let one of the following two scenes carry a line worth remembering — a character naming what the shrinking time means or what it will cost. Give the mounting deadline pressure a voice, not just a structural countdown.`,
+      });
+    }
+  }
+
+  // ── Wave 627: VOICE_PAYOFF_STAGING_DECOUPLED, VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  //              VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE ───────────────────────────────────
+
+  // VOICE_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. First use of the
+  // payoffSetupIds field anywhere in this 107-rule pass. A resolution and a scene rich in physical
+  // staging never happen together — every payoff lands through spoken dialogue alone, with no
+  // physical beat carrying the resolution's weight.
+  {
+    const r627a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r627a.fires) {
+      issues.push({
+        location: `${r627a.aCount} payoff scene(s), ${r627a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'VOICE_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r627a.aCount} scenes where a planted thread resolves never coincide with the ${r627a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more force when a character's physical action embodies what the resolution means, rather than the moment being carried entirely through spoken dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or object a character handles that embodies what just resolved, alongside whatever voice carries the scene.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a 2-scene
+  // lookahead window. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while highlighted dialogue does occur elsewhere. First use of the seededClueIds
+  // field anywhere in this pass — every planted clue passes into an aftermath with no memorable
+  // verbal moment giving the material texture.
+  {
+    const r627b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r627b.fires) {
+      issues.push({
+        location: `${r627b.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r627b.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r627b.aftermathCount} such scenes exist elsewhere in the script. Seeds gain voice when a nearby line gives them verbal texture, but that opportunity consistently passes unremarked in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, giving it verbal presence before its eventual payoff.`,
+      });
+    }
+  }
+
+  // VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE — Underweight/bloat × relationshipShifts × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a relationship shift, divided across four equal structural zones. Fires only when
+  // one zone has zero shifts while another holds ≥50% of the total. First use of the
+  // relationshipShifts field anywhere in this 107-rule pass — every existing check here operates
+  // on lexical/textual dialogue patterns or the clock/turn/revelation/dialogueHighlights record
+  // channels, never the relational-movement signal.
+  {
+    const r627c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r627c.fires) {
+      const emptyNames627c = r627c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName627c = FOUR_ZONE_NAMES[r627c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames627c} empty; ${bloatName627c} has ${r627c.counts[r627c.bloatZoneIdx]}/${r627c.totalCount} relationship-shift scenes`,
+        rule: 'VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r627c.totalCount} relationship-shift scenes are unevenly distributed across its four structural zones: ${bloatName627c} contains ${r627c.counts[r627c.bloatZoneIdx]} of them (${Math.round((r627c.counts[r627c.bloatZoneIdx] / r627c.totalCount) * 100)}%) while ${emptyNames627c} contains none. Relational movement bloats in one structural quarter and vanishes from another, giving the story's verbal-relational rhythm an uneven pulse across its four quarters.`,
+        suggestedFix: `Redistribute relationship shifts: bring at least one bond change into ${emptyNames627c}, so every structural quarter carries some relational movement rather than only the quarter currently carrying most of them.`,
       });
     }
   }

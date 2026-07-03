@@ -1438,6 +1438,94 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 627 — voicePass: voice payoff staging decoupled, voice seed dialogue highlight aftermath void, voice relationship shift zone imbalance', async () => {
+    const runV627 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('VOICE_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs627a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs627a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs627a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs627a[4] = makeSharedRecord(4, { visualBeats: ['pockets the letter', 'locks the drawer'] });
+      recs627a[5] = makeSharedRecord(5, { visualBeats: ['pockets the letter', 'locks the drawer'] });
+      const res = await runV627(recs627a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_STAGING_DECOUPLED'), 'VOICE_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // VOICE_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('VOICE_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs627an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs627an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'], visualBeats: ['pockets the letter', 'locks the drawer'] });
+      recs627an[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs627an[5] = makeSharedRecord(5, { visualBeats: ['pockets the letter', 'locks the drawer'] });
+      const res = await runV627(recs627an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_STAGING_DECOUPLED'), 'VOICE_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no seed is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs627b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs627b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs627b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs627b[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs627b[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs627b[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runV627(recs627b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs627bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs627bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs627bn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs627bn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs627bn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs627bn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs627bn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runV627(recs627bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    // VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); shifts at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE fires when one zone is empty of relationship shifts while another is bloated', async () => {
+      const recs627c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs627c[6] = makeSharedRecord(6, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs627c[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs627c[8] = makeSharedRecord(8, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs627c[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runV627(recs627c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE'), 'VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE should fire');
+    });
+
+    // VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE no-fire:
+    // one shift per zone (1,4,7,10) → no zone is empty
+    it('VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE does not fire when shifts are spread across all zones', async () => {
+      const recs627cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs627cn[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs627cn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs627cn[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs627cn[10] = makeSharedRecord(10, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runV627(recs627cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE'), 'VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 613 — voicePass: dramatic turn dialogue highlight decoupled, voice staging zone imbalance, clock dialogue highlight aftermath void', async () => {
     const runV613 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
