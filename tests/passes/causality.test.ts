@@ -1247,6 +1247,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 671 — causalityPass: causality highlight drought run, causality open thread peak uncaused, causality stakes zone cluster', async () => {
+    const runCA671 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CAUSALITY_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs671a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs671a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs671a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs671a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs671a[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runCA671(recs671a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_HIGHLIGHT_DROUGHT_RUN'), 'CAUSALITY_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CAUSALITY_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs671an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs671an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs671an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs671an[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runCA671(recs671an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_HIGHLIGHT_DROUGHT_RUN'), 'CAUSALITY_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1 clue) and 6 (5 clues, the peak); no dramaticTurn or
+    // revelation at 6, 5, or 4
+    it('CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs671b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs671b[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs671b[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA671(recs671b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED'), 'CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs671bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs671bn[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs671bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs671bn[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA671(recs671bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED'), 'CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // CAUSALITY_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs671c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs671c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs671c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs671c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      const res = await runCA671(recs671c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_STAKES_ZONE_CLUSTER'), 'CAUSALITY_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSALITY_STAKES_ZONE_CLUSTER no-fire:
+    // stakes-raising scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSALITY_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes are distributed across thirds', async () => {
+      const recs671cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs671cn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs671cn[4] = makeSharedRecord(4, { purpose: 'raise_stakes' });
+      recs671cn[7] = makeSharedRecord(7, { purpose: 'raise_stakes' });
+      const res = await runCA671(recs671cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_STAKES_ZONE_CLUSTER'), 'CAUSALITY_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 657 — causalityPass: causality highlight peak uncaused, causality open thread drought run, causal staging zone cluster', async () => {
     const runCA657 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

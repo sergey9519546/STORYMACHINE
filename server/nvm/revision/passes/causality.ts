@@ -260,6 +260,16 @@
 // visualBeats × structural thirds — Wave 643 applied the zone-cluster mode to dialogueHighlights;
 // visualBeats itself has only ever been zone-IMBALANCED [four-zone bloat/empty, Wave 615], never
 // cluster-audited on the thirds granularity).
+// Wave 671 additions (built on the shared checks library, audit M2.2): opens the seventh rotation
+// cycle. CAUSALITY_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence — Waves 643/657
+// applied the peak-uncaused and zone-cluster modes to dialogueHighlights; the drought-run mode
+// has never been applied to this channel), CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × unresolvedClues magnitude — unresolvedClues has been zone-imbalanced,
+// drought-audited, and decoupled, but the scene carrying the most simultaneous open threads has
+// never been backward-cause peak-audited), CAUSALITY_STAKES_ZONE_CLUSTER (distribution/timing ×
+// purpose === 'raise_stakes' × structural thirds — `purpose` has only ever appeared inside
+// incidental threshold conditions [e.g. purpose === 'climax'/'resolution' guards] in this
+// 120-rule pass, never as the standalone subject of its own check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3925,6 +3935,75 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r657c.maxZoneCount} of the story's ${r657c.count} visually dense scenes (${Math.round((r657c.maxZoneCount / r657c.count) * 100)}%) cluster in the ${zoneName657c} third. Physical staging concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no physically staged causal anchor.`,
         suggestedFix: `Give at least one scene outside the ${zoneName657c} third substantial physical staging — spreading staged causal anchors across the story lets each structural third carry its own physical grounding.`,
+      });
+    }
+  }
+
+  // ── Wave 671: CAUSALITY_HIGHLIGHT_DROUGHT_RUN, CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED,
+  //              CAUSALITY_STAKES_ZONE_CLUSTER ──────────────────────────────────────────────
+
+  // CAUSALITY_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Waves 643/657 applied the peak-uncaused and zone-cluster modes to dialogueHighlights; the
+  // drought-run mode has never been applied to this channel.
+  {
+    const r671a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r671a.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r671a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r671a.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r671a.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the causal chain of events without a quotable anchor for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r671a.longestRun}-scene stretch a standout line of dialogue — a character naming the stakes or the consequence of what just happened, keeping the causal chain verbally anchored throughout.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. unresolvedClues has been zone-imbalanced, drought-audited, and
+  // decoupled elsewhere in this pass, but never backward-cause peak-audited.
+  {
+    const r671b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r671b.fires) {
+      issues.push({
+        location: `scene ${r671b.peakIdx + 1} — peak open-thread density (${r671b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r671b.peakIdx + 1}, with ${r671b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r671b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when >75% of them fall in a single structural third. `purpose` has only ever
+  // appeared inside incidental threshold conditions (e.g. purpose === 'climax'/'resolution'
+  // guards) in this pass, never as the standalone subject of its own check.
+  {
+    const r671c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r671c.fires) {
+      const zoneName671c = r671c.zoneNames[r671c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName671c} third — ${r671c.maxZoneCount}/${r671c.count} stakes-raising scenes`,
+        rule: 'CAUSALITY_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r671c.maxZoneCount} of the story's ${r671c.count} scenes purposed to raise stakes (${Math.round((r671c.maxZoneCount / r671c.count) * 100)}%) cluster in the ${zoneName671c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no causal pressure pushing the stakes higher.`,
+        suggestedFix: `Purpose at least one scene outside the ${zoneName671c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting causal pressure.`,
       });
     }
   }
