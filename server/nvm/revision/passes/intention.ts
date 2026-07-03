@@ -423,6 +423,12 @@
 // IMBALANCE (purpose === 'character_moment'), INTENTION_STAKES_ZONE_IMBALANCE (purpose ===
 // 'raise_stakes'), and INTENTION_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation',
 // whose trio was completed in Wave 899).
+// Wave 941 additions: extending the checkZoneImbalance rollout beyond purpose values to three
+// non-purpose signals whose 3-zone/run trios were long complete but had never been 4-zone-audited:
+// INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive' — emotional valence),
+// INTENTION_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and INTENTION_
+// PAYOFF_ZONE_IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field). Three distinct
+// signal classes (valence, delta, array), each keyed independently of authored purpose.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5351,6 +5357,84 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r927c.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName927c} contains ${r927c.counts[r927c.bloatZoneIdx]} of them (${Math.round((r927c.counts[r927c.bloatZoneIdx] / r927c.totalCount) * 100)}%) while ${emptyNames927c} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the character's pursuit of their goal is redirected by new information in only part of the story.`,
         suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames927c} — so the character's intention keeps being redirected by new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone INTENTION_POSITIVE_EMOTION_ZONE_CLUSTER (thirds concentration) and run-based INTENTION_
+  // POSITIVE_EMOTION_DROUGHT_RUN (longest positive-less gap) — this is the first application of the
+  // 4-zone bloat+empty-zone mode to the positive emotional-valence signal in this pass, and unlike
+  // the purpose-value imbalances above it keys on emotional outcome rather than authored intent.
+  {
+    const r941a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r941a.fires) {
+      const emptyNames941a = r941a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName941a = FOUR_ZONE_NAMES[r941a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames941a} empty; ${bloatName941a} has ${r941a.counts[r941a.bloatZoneIdx]}/${r941a.totalCount} positive-shift scenes`,
+        rule: 'INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r941a.totalCount} positive-shift scenes are unevenly distributed across its four structural zones: ${bloatName941a} contains ${r941a.counts[r941a.bloatZoneIdx]} of them (${Math.round((r941a.counts[r941a.bloatZoneIdx] / r941a.totalCount) * 100)}%) while ${emptyNames941a} contains none. Emotional gains bloat in one structural quarter and never arrive in another, so the character's pursuit of their goal only feels rewarding in part of the story.`,
+        suggestedFix: `Redistribute positive turns: move at least one scene whose emotional shift lands positive into the empty zone(s) — ${emptyNames941a} — so the character's intention yields felt progress across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // INTENTION_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone INTENTION_
+  // SUSPENSE_ZONE_CLUSTER (thirds concentration), run-based INTENTION_SUSPENSE_DROUGHT_RUN (longest
+  // suspense-less gap), and single-peak INTENTION_SUSPENSE_PEAK_UNCAUSED (one uncaused spike) — this
+  // is the first application of the 4-zone bloat+empty-zone mode to the suspense-delta magnitude
+  // signal in this pass, keying on tension change rather than categorical purpose or emotion.
+  {
+    const r941b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r941b.fires) {
+      const emptyNames941b = r941b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName941b = FOUR_ZONE_NAMES[r941b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames941b} empty; ${bloatName941b} has ${r941b.counts[r941b.bloatZoneIdx]}/${r941b.totalCount} suspense-raising scenes`,
+        rule: 'INTENTION_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r941b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName941b} contains ${r941b.counts[r941b.bloatZoneIdx]} of them (${Math.round((r941b.counts[r941b.bloatZoneIdx] / r941b.totalCount) * 100)}%) while ${emptyNames941b} contains none. Rising tension bloats in one structural quarter and flatlines in another, so the character's pursuit of their goal only feels threatened in part of the story.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames941b} — so the character's intention stays under pressure across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone INTENTION_
+  // PAYOFF_ZONE_CLUSTER (thirds concentration), run-based INTENTION_PAYOFF_DROUGHT_RUN (longest
+  // payoff-less gap), and single-peak INTENTION_PAYOFF_PEAK_UNCAUSED (one uncaused payoff burst) —
+  // this is the first application of the 4-zone bloat+empty-zone mode to the payoff array-field
+  // signal in this pass, keying on setups-being-paid-off rather than purpose, emotion, or delta.
+  {
+    const r941c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r941c.fires) {
+      const emptyNames941c = r941c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName941c = FOUR_ZONE_NAMES[r941c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames941c} empty; ${bloatName941c} has ${r941c.counts[r941c.bloatZoneIdx]}/${r941c.totalCount} payoff scenes`,
+        rule: 'INTENTION_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r941c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName941c} contains ${r941c.counts[r941c.bloatZoneIdx]} of them (${Math.round((r941c.counts[r941c.bloatZoneIdx] / r941c.totalCount) * 100)}%) while ${emptyNames941c} contains none. Setups get paid off in a bloated cluster in one structural quarter and nowhere in another, so the character's pursuit of their goal only closes prior threads in part of the story.`,
+        suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames941c} — so the character's intention keeps resolving planted threads across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

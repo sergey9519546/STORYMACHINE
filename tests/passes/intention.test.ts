@@ -1352,6 +1352,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 941 — intentionPass: intention positive emotion zone imbalance, intention suspense zone imbalance, intention payoff zone imbalance', async () => {
+    const makeRec941 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN941 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs941a = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runIN941(recs941a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs941an = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runIN941(recs941an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'INTENTION_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs941b = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 1, 2, 8, 9].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runIN941(recs941b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SUSPENSE_ZONE_IMBALANCE'), 'INTENTION_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs941bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 3, 5, 8].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runIN941(recs941bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SUSPENSE_ZONE_IMBALANCE'), 'INTENTION_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs941c = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 1, 2, 8, 9].includes(i) ? { payoffSetupIds: ['s1'] } : {}));
+      const res = await runIN941(recs941c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_ZONE_IMBALANCE'), 'INTENTION_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs941cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec941(i, [0, 3, 5, 8].includes(i) ? { payoffSetupIds: ['s1'] } : {}));
+      const res = await runIN941(recs941cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_ZONE_IMBALANCE'), 'INTENTION_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 927 — intentionPass: intention character moment zone imbalance, intention stakes zone imbalance, intention revelation purpose zone imbalance', async () => {
     const makeRec927 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
