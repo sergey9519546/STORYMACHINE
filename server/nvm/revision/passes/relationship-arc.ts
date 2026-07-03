@@ -307,6 +307,16 @@
 // to clockDelta; the zone-cluster mode has never been applied to it, completing the trio),
 // RELATIONAL_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — Wave 679 applied
 // the zone-cluster mode to this signal; the drought-run mode has never been applied to it).
+// Wave 763 additions: RELATIONAL_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0
+// presence × structural thirds — suspenseDelta has only ever anchored aftermath and valence-
+// uniform checks in this pass; none of the three shared-library trio modes has ever been applied
+// to it), RELATIONAL_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — curiosityDelta
+// has only ever anchored aftermath checks in this pass; none of the three shared-library trio
+// modes has ever been applied to it), RELATIONAL_REVELATION_ZONE_CLUSTER (distribution/timing ×
+// revelation × structural thirds — revelation has only ever anchored hand-rolled peak audits of
+// the relationship channel's own state [RELATIONSHIP_PEAK_REVELATION_ABSENT] and served as a
+// hasCause predicate elsewhere; none of the three shared-library trio modes has ever been applied
+// to revelation itself as the primary signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4405,6 +4415,74 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r749c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r749c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the relationship coasting without a structural pivot to react to for an extended run.`,
         suggestedFix: `Introduce a dramatic turn somewhere within the ${r749c.longestRun}-scene stretch so the relationship keeps something to react to and evolve from throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 763: RELATIONAL_SUSPENSE_ZONE_CLUSTER, RELATIONAL_CURIOSITY_DROUGHT_RUN,
+  //              RELATIONAL_REVELATION_ZONE_CLUSTER ────────────────────────────────────────
+
+  // RELATIONAL_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // suspense-positive scenes, fires when more than 75% of those scenes cluster in a single
+  // third. suspenseDelta has only ever anchored aftermath and valence-uniform checks in this
+  // pass; none of the three shared-library trio modes has ever been applied to it.
+  {
+    const r763a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r763a.fires) {
+      issues.push({
+        location: `${r763a.zoneNames[r763a.maxZoneIdx]} third — ${r763a.maxZoneCount} of ${r763a.count} suspense-positive scenes`,
+        rule: 'RELATIONAL_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r763a.maxZoneCount / r763a.count) * 100)}% of the scenes where tension rises cluster in the ${r763a.zoneNames[r763a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the relationship has no rising danger testing it anywhere else in the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r763a.zoneNames[r763a.maxZoneIdx]} third so tension keeps testing the relationship more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6.
+  // curiosityDelta has only ever anchored aftermath checks in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r763b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r763b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r763b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r763b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r763b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the relationship without a question keeping the audience invested in what happens between these characters for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r763b.longestRun}-scene stretch so the relationship keeps a live question driving audience investment throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of those scenes cluster in a single third. revelation has only ever
+  // anchored hand-rolled peak audits of the relationship channel's own state
+  // (RELATIONSHIP_PEAK_REVELATION_ABSENT) and served as a hasCause predicate elsewhere; none of
+  // the three shared-library trio modes has ever been applied to revelation itself as the
+  // primary signal.
+  {
+    const r763c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r763c.fires) {
+      issues.push({
+        location: `${r763c.zoneNames[r763c.maxZoneIdx]} third — ${r763c.maxZoneCount} of ${r763c.count} revelation scenes`,
+        rule: 'RELATIONAL_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r763c.maxZoneCount / r763c.count) * 100)}% of the story's revelation scenes cluster in the ${r763c.zoneNames[r763c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the relationship has no fresh truth reshaping it anywhere else in the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r763c.zoneNames[r763c.maxZoneIdx]} third so the relationship keeps being reshaped by new disclosures more evenly across the story.`,
       });
     }
   }

@@ -1376,6 +1376,74 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 763 — relationshipArcPass: relational suspense zone cluster, relational curiosity drought run, relational revelation zone cluster', async () => {
+    const runRA763 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_SUSPENSE_ZONE_CLUSTER fire:
+    // 9 scenes; suspenseDelta > 0 at 0, 1, 2 (all in opening third) — 3 of 3 (100%) cluster in opening.
+    it('RELATIONAL_SUSPENSE_ZONE_CLUSTER fires when suspense-positive scenes cluster in one third', async () => {
+      const recs763a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA763(recs763a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_ZONE_CLUSTER'), 'RELATIONAL_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs763an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA763(recs763an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_ZONE_CLUSTER'), 'RELATIONAL_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_CURIOSITY_DROUGHT_RUN fire:
+    // 10 scenes; curiosityDelta > 0 at 0, 1, 2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs763b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA763(recs763b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_DROUGHT_RUN'), 'RELATIONAL_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs763bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA763(recs763bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_DROUGHT_RUN'), 'RELATIONAL_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_REVELATION_ZONE_CLUSTER fire:
+    // 9 scenes; revelation set at 0, 1, 2 (all in opening third) — 3 of 3 (100%) cluster in opening.
+    it('RELATIONAL_REVELATION_ZONE_CLUSTER fires when revelation scenes cluster in one third', async () => {
+      const recs763c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runRA763(recs763c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_ZONE_CLUSTER'), 'RELATIONAL_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs763cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runRA763(recs763cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_ZONE_CLUSTER'), 'RELATIONAL_REVELATION_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 749 — relationshipArcPass: relational open thread peak uncaused, relational clock delta zone cluster, relational turn drought run', async () => {
     const runRA749 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
