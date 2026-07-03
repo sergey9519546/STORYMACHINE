@@ -1598,6 +1598,95 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 602 — dialoguePass: dialogue highlight/open thread decoupled, visual beat zone imbalance, open thread aftermath void', async () => {
+    const makeRec602 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: '', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD602 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes602 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=8; scenes 0,1 carry a dialogue highlight (no debt); scenes 2,3 carry open clue-debt
+    // (no highlight); zero scene has both → fires
+    it('DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when highlight scenes and open-thread scenes never overlap', async () => {
+      const recs602a = Array.from({ length: 8 }, (_, i) => makeRec602(i, {
+        dialogueHighlights: i === 0 || i === 1 ? ['a memorable line'] : [],
+        unresolvedClues: i === 2 || i === 3 ? ['unpaid-clue'] : [],
+      }));
+      const res = await runD602(buildScenes602(8), recs602a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 2 carries BOTH a dialogue highlight and open clue-debt → overlap exists
+    it('DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs602an = Array.from({ length: 8 }, (_, i) => makeRec602(i, {
+        dialogueHighlights: i === 0 || i === 1 || i === 2 ? ['a memorable line'] : [],
+        unresolvedClues: i === 2 || i === 3 ? ['unpaid-clue'] : [],
+      }));
+      const res = await runD602(buildScenes602(8), recs602an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // VISUAL_BEAT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually-dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4=75% ≥ 50% → fires
+    it('VISUAL_BEAT_ZONE_IMBALANCE fires when one zone is empty of visually-dense scenes while another is bloated', async () => {
+      const recs602b = Array.from({ length: 12 }, (_, i) => makeRec602(i, {
+        visualBeats: (i === 6 || i === 9 || i === 10 || i === 11) ? ['examines the room', 'notices the photo'] : [],
+      }));
+      const res = await runD602(buildScenes602(12), recs602b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'VISUAL_BEAT_ZONE_IMBALANCE'), 'VISUAL_BEAT_ZONE_IMBALANCE should fire');
+    });
+
+    // VISUAL_BEAT_ZONE_IMBALANCE no-fire:
+    // one visually-dense scene per zone (1,4,7,10) → no zone is empty
+    it('VISUAL_BEAT_ZONE_IMBALANCE does not fire when every zone has a visually-dense scene', async () => {
+      const recs602bn = Array.from({ length: 12 }, (_, i) => makeRec602(i, {
+        visualBeats: (i === 1 || i === 4 || i === 7 || i === 10) ? ['examines the room', 'notices the photo'] : [],
+      }));
+      const res = await runD602(buildScenes602(12), recs602bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'VISUAL_BEAT_ZONE_IMBALANCE'), 'VISUAL_BEAT_ZONE_IMBALANCE should not fire');
+    });
+
+    // OPEN_THREAD_DIALOGUE_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1 (unresolvedClues≥3); their windows
+    // {1,2} and {2,3} carry no dialogue highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('OPEN_THREAD_DIALOGUE_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by highlighted dialogue', async () => {
+      const recs602c = Array.from({ length: 8 }, (_, i) => makeRec602(i, {
+        unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+        dialogueHighlights: i === 5 || i === 6 || i === 7 ? ['a memorable line'] : [],
+      }));
+      const res = await runD602(buildScenes602(8), recs602c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'OPEN_THREAD_DIALOGUE_AFTERMATH_VOID'), 'OPEN_THREAD_DIALOGUE_AFTERMATH_VOID should fire');
+    });
+
+    // OPEN_THREAD_DIALOGUE_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('OPEN_THREAD_DIALOGUE_AFTERMATH_VOID does not fire when a trigger window contains a highlighted scene', async () => {
+      const recs602cn = Array.from({ length: 8 }, (_, i) => makeRec602(i, {
+        unresolvedClues: i === 0 || i === 1 ? ['c1', 'c2', 'c3'] : [],
+        dialogueHighlights: i === 3 || i === 5 || i === 6 || i === 7 ? ['a memorable line'] : [],
+      }));
+      const res = await runD602(buildScenes602(8), recs602cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'OPEN_THREAD_DIALOGUE_AFTERMATH_VOID'), 'OPEN_THREAD_DIALOGUE_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 588 — dialoguePass: curiosity-spike scene void, closing-zone silent, hedge back-loaded', async () => {
     const makeRec588 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,

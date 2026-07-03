@@ -209,9 +209,20 @@
 // distinct from RELATIONSHIP_SHIFT_SCENE_DIALOGUE_ABSENT [co-occurrence in the shift scene itself]
 // and from all other aftermath triggers in this pass, completing the event-type aftermath family
 // alongside clock/revelation/dramatic-turn/payoff/suspense/seed).
+// Wave 602 additions (built on the shared checks library, audit M2.2): DIALOGUE_HIGHLIGHT_OPEN_
+// THREAD_DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first use
+// of either field as a per-scene RECORD signal in this pass; every prior "dialogue" check in this
+// 111-rule file derives dialogue presence from the raw fountain text via extractDialogue/dlgPerScene,
+// never from the record's own curated dialogueHighlights annotation), VISUAL_BEAT_ZONE_IMBALANCE
+// (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere in
+// this pass), OPEN_THREAD_DIALOGUE_AFTERMATH_VOID (sequence/aftermath × heavy unresolved-clue-debt
+// trigger → dialogueHighlights absence — a two-scene window, distinguishing it mechanically from
+// this pass's other seven aftermath checks which all use a one-scene "next scene" window keyed to
+// event-type triggers rather than accumulated-debt magnitude).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract dialogue lines from fountain text with speaker attribution */
 function extractDialogue(fountain: string): Array<{ speaker: string; line: string; lineNum: number }> {
@@ -3557,6 +3568,98 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Redistribute hedging language into the first half: let setup and rising-action scenes carry at least two or three tentative lines — characters still weighing options, speaking diffidently before the pressure forces decisiveness. Reserve the second half for fewer but more charged hedges; a single moment of genuine doubt in the climax lands hard precisely because it is surrounded by more direct speech. When the setup wavers and the climax commits, the arc from uncertainty to conviction becomes felt through language.`,
         });
       }
+    }
+  }
+
+  // ── Wave 602: DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED, VISUAL_BEAT_ZONE_IMBALANCE,
+  //              OPEN_THREAD_DIALOGUE_AFTERMATH_VOID ─────────────────────────────────────────
+
+  // DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8,
+  // ≥2 scenes carrying a curated dialogue highlight, ≥2 scenes carrying outstanding clue-debt.
+  // Zero overlap → fire. A scene flagged as containing a standout line of dialogue and a scene
+  // carrying open, unpaid narrative debt never coincide — the moments the story itself marks as
+  // verbally memorable never happen while a mystery is actively hanging open, and the moments
+  // of unresolved debt never get a line of dialogue worth remembering. Distinct from every other
+  // check in this 111-rule pass: this is the first check anywhere in the file to read the
+  // record's own dialogueHighlights field (every prior "dialogue absence" check derives presence
+  // from extractDialogue/dlgPerScene against the raw fountain text instead) and the first to read
+  // unresolvedClues at all. Also distinct from SEED_SCENE_DIALOGUE_ABSENT (Wave 518: seededClueIds
+  // — clues planted THIS scene — not unresolvedClues, the carried-forward debt of clues not yet
+  // paid off) and DIALOGUE_SEED_AFTERMATH_SILENT (Wave 560: same seededClueIds distinction, windowed).
+  {
+    const r602a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r602a.fires) {
+      issues.push({
+        location: `${r602a.aCount} highlight scene(s), ${r602a.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'DIALOGUE_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r602a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r602a.bCount} scenes carrying outstanding, unpaid clue-debt — a memorable exchange and an actively open mystery never happen in the same scene. The lines the story itself judged worth highlighting all land while every thread is quiet, and every scene where a mystery hangs open passes without a line of dialogue rising to that same level. The two channels run on entirely separate tracks.`,
+        suggestedFix: `Let at least one standout dialogue moment land in a scene that is also carrying open clue-debt — a character voicing suspicion, pressing a question, or circling what hasn't been explained yet. Tying the story's most memorable lines to its live mysteries gives the audience's curiosity a voice instead of leaving it to visual or structural cues alone.`,
+      });
+    }
+  }
+
+  // VISUAL_BEAT_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones. Built
+  // on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes carrying substantial
+  // visual staging (visualBeats.length≥2) across the story, divided into four equal structural
+  // zones. Fires only when one zone has zero visually-dense scenes while another holds ≥50% of
+  // the total. First use of the visualBeats field anywhere in this pass — every existing check
+  // in this file reads dialogue-side signals (fountain-parsed lines, dialogueHighlights, or record
+  // channels correlated WITH dialogue absence); this is the first to audit the distribution of the
+  // pass's structural opposite — scenes leaning heavily on physical staging rather than speech —
+  // in its own right. A story whose visually dense scenes cluster in one act and vanish from
+  // another shifts abruptly between verbal and physical storytelling modes rather than blending
+  // the two gradually across its structure.
+  {
+    const r602b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r602b.fires) {
+      const emptyNames602b = r602b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName602b = FOUR_ZONE_NAMES[r602b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames602b} empty; ${bloatName602b} has ${r602b.counts[r602b.bloatZoneIdx]}/${r602b.totalCount} visually dense scenes`,
+        rule: 'VISUAL_BEAT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r602b.totalCount} visually dense scenes (substantial physical staging beats) are unevenly distributed across its four structural zones: ${bloatName602b} contains ${r602b.counts[r602b.bloatZoneIdx]} of them (${Math.round((r602b.counts[r602b.bloatZoneIdx] / r602b.totalCount) * 100)}%) while ${emptyNames602b} contains none. The balance between physical staging and spoken scenes shifts abruptly at that structural boundary instead of varying gradually, giving the story's verbal-versus-visual texture an uneven rhythm across its four quarters.`,
+        suggestedFix: `Redistribute physical staging emphasis: bring at least one heavily visual scene into ${emptyNames602b}, or thin out ${bloatName602b}'s concentration by letting one of its visually dense scenes lean more on dialogue instead. A more even spread keeps the story's verbal and physical registers blended throughout rather than segregated by act.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_DIALOGUE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying trigger scenes (unresolvedClues.length≥3 — heavy carried debt, not merely
+  // present), ≥3 scenes anywhere carrying a dialogue highlight, a 2-scene lookahead window. Fires
+  // when EVERY heavy-debt scene's two-scene aftermath contains no highlighted dialogue moment,
+  // while highlighted dialogue does occur elsewhere in the story. Distinct from this pass's seven
+  // other aftermath checks (clock/seed/relationship-shift/revelation/dramatic-turn/payoff/suspense
+  // triggers at Waves 518/532/546/560), all of which use a ONE-scene "next scene only" window keyed
+  // to a single discrete event and measure raw dialogue presence via dlgPerScene; this check uses a
+  // TWO-scene window keyed to an accumulated-magnitude trigger (debt load, not a single event) and
+  // measures the curated dialogueHighlights signal instead. Also distinct from DIALOGUE_HIGHLIGHT_
+  // OPEN_THREAD_DECOUPLED above (same field pair, but that check is same-scene co-occurrence with
+  // no positional/windowed component at all).
+  {
+    const r602c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r602c.fires) {
+      issues.push({
+        location: `${r602c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes after any of them`,
+        rule: 'OPEN_THREAD_DIALOGUE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r602c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no highlighted dialogue moment, even though ${r602c.aftermathCount} scenes elsewhere in the story do contain one. The heaviest concentrations of open mystery pass without any line of dialogue rising to a memorable register in their immediate aftermath — the pressure of stacked unanswered questions never finds verbal release.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line worth remembering — pressing on what's unresolved, voicing frustration at how much is still open, or naming the stakes of not knowing. Let the density of open threads surface as a spoken pressure point rather than passing in silence.`,
+      });
     }
   }
 
