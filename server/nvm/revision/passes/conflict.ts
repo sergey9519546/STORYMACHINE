@@ -292,6 +292,15 @@
 // drought-run mode has never been applied to it), CONFLICT_CLOCK_DELTA_DROUGHT_RUN (run-based ×
 // clockDelta>0 absence — Wave 674 applied the backward-cause peak mode and Wave 702 applied the
 // zone-cluster mode to clockRaised; clockDelta itself has never been drought-audited).
+// Wave 730 additions: CONFLICT_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds ×
+// structural thirds — Waves 660/716 applied the backward-cause peak and run-based drought modes to
+// payoffSetupIds; the zone-cluster mode has never been applied to it, completing the trio),
+// CONFLICT_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/backward-cause × relationshipShifts
+// magnitude — relationshipShifts is this pass's most heavily used field [76+ accesses] and Wave
+// 702 applied the run-based drought mode to it; the backward-cause peak mode has never been
+// applied to it), CONFLICT_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta>0 presence ×
+// structural thirds — Waves 674/716 applied the backward-cause peak and run-based drought modes to
+// clockDelta; the zone-cluster mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4264,6 +4273,75 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r716c.longestRun} consecutive scenes with no clock advance at all, even though ${r716c.presentCount} scenes elsewhere do compress time pressure. A long unbroken stretch with no deadline tightening leaves the conflict without any mounting urgency for an extended run.`,
         suggestedFix: `Advance the clock somewhere within the ${r716c.longestRun}-scene stretch — even a small compression keeps the conflict under some time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 730: CONFLICT_PAYOFF_ZONE_CLUSTER, CONFLICT_RELATIONSHIP_PEAK_UNCAUSED,
+  //              CONFLICT_CLOCK_DELTA_ZONE_CLUSTER ─────────────────────────────────────────
+
+  // CONFLICT_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Waves 660/716 applied the
+  // backward-cause peak and run-based drought modes to payoffSetupIds; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r730a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r730a.fires) {
+      issues.push({
+        location: `${r730a.zoneNames[r730a.maxZoneIdx]} third — ${r730a.maxZoneCount} of ${r730a.count} payoff scenes`,
+        rule: 'CONFLICT_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r730a.maxZoneCount / r730a.count) * 100)}% of the story's thread resolutions cluster in the ${r730a.zoneNames[r730a.maxZoneIdx]} third. When every payoff lands in the same structural window, the conflict engine spends the rest of the story escalating without ever cashing in tension elsewhere.`,
+        suggestedFix: `Move at least one thread resolution outside the ${r730a.zoneNames[r730a.maxZoneIdx]} third so the conflict's payoffs land more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // relationshipShifts magnitude. Built on checkPeakUncaused from the shared checks library. n≥8,
+  // ≥2 scenes carrying a relationship shift, a 2-scene lookback. Finds the single scene with the
+  // most simultaneous bond changes; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. relationshipShifts is this pass's most heavily used
+  // field [76+ accesses] and Wave 702 applied the run-based drought mode to it; the backward-cause
+  // peak mode has never been applied to it.
+  {
+    const r730b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r730b.fires) {
+      issues.push({
+        location: `scene ${r730b.peakIdx + 1} — peak relationship-shift density (${r730b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r730b.peakIdx + 1}, with ${r730b.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the conflict's relational fallout concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the conflict is what's reshaping these bonds.`,
+        suggestedFix: `Give scene ${r730b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by the conflict's escalation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-advancing
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 674/716
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r730c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r730c.fires) {
+      issues.push({
+        location: `${r730c.zoneNames[r730c.maxZoneIdx]} third — ${r730c.maxZoneCount} of ${r730c.count} clock-advancing scenes`,
+        rule: 'CONFLICT_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r730c.maxZoneCount / r730c.count) * 100)}% of the scenes that advance the ticking clock cluster in the ${r730c.zoneNames[r730c.maxZoneIdx]} third. When every clock-tightening beat lands in the same structural window, the conflict loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-advancing beat outside the ${r730c.zoneNames[r730c.maxZoneIdx]} third so time pressure tightens on the conflict more evenly across the story.`,
       });
     }
   }

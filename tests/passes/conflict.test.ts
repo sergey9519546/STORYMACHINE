@@ -1535,6 +1535,104 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 730 — conflictPass: conflict payoff zone cluster, conflict relationship peak uncaused, conflict clock delta zone cluster', async () => {
+    const makeRec730 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF730 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs730a = Array.from({ length: 9 }, (_, i) => makeRec730(i,
+        (i === 0 || i === 1 || i === 2) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runCF730(recs730a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_ZONE_CLUSTER'), 'CONFLICT_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // CONFLICT_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CONFLICT_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs730an = Array.from({ length: 9 }, (_, i) => makeRec730(i,
+        (i === 0 || i === 4 || i === 7) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runCF730(recs730an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_ZONE_CLUSTER'), 'CONFLICT_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; relationship shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('CONFLICT_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs730b = Array.from({ length: 8 }, (_, i) => makeRec730(i,
+        i === 2 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] }
+        : i === 6 ? { relationshipShifts: [
+            { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+          ] }
+        : {}
+      ));
+      const res = await runCF730(recs730b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RELATIONSHIP_PEAK_UNCAUSED'), 'CONFLICT_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // CONFLICT_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CONFLICT_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs730bn = Array.from({ length: 8 }, (_, i) => makeRec730(i,
+        i === 2 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { relationshipShifts: [
+            { pairKey: 'a|b', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|c', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|d', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|e', dimension: 'trust', amount: 1 },
+            { pairKey: 'a|f', dimension: 'trust', amount: 1 },
+          ] }
+        : {}
+      ));
+      const res = await runCF730(recs730bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RELATIONSHIP_PEAK_UNCAUSED'), 'CONFLICT_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // CONFLICT_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-advancing scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-advancing scenes cluster in one third', async () => {
+      const recs730c = Array.from({ length: 9 }, (_, i) => makeRec730(i,
+        (i === 0 || i === 1 || i === 2) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runCF730(recs730c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DELTA_ZONE_CLUSTER'), 'CONFLICT_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // CONFLICT_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-advancing scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CONFLICT_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-advancing scenes are distributed across thirds', async () => {
+      const recs730cn = Array.from({ length: 9 }, (_, i) => makeRec730(i,
+        (i === 0 || i === 4 || i === 7) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runCF730(recs730cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_DELTA_ZONE_CLUSTER'), 'CONFLICT_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 716 — conflictPass: conflict seed peak uncaused, conflict payoff drought run, conflict clock delta drought run', async () => {
     const makeRec716 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
