@@ -194,9 +194,25 @@
 // (sequence/aftermath × curiosity trigger — n≥8, ≥2 curiosity-spike scenes with curiosityDelta>0
 // not at last position, none followed by resonant; the curiosity-channel aftermath complement to
 // THEME_CURIOSITY_SCENES_DECOUPLED; completes the aftermath × {seed, suspense, curiosity} channel family).
+// Wave 598 additions: unresolved clue decoupled (co-occurrence/decoupling × resonance ×
+// unresolvedClues-present — n≥6, ≥2 scenes carrying outstanding clue-debt, zero of them
+// thematically resonant; distinct from THEME_CLUE_DECOUPLED [Wave 265: seededClueIds, the
+// scene where a clue is PLANTED — a single-scene event] since unresolvedClues tracks the STATE
+// of a clue remaining unpaid across every scene it lingers in, not just the planting moment;
+// first use of the unresolvedClues signal in this 99-rule file), unresolved clue zone imbalance
+// (underweight/bloat × unresolvedClues-present × four structural zones, built on checkZoneImbalance
+// from the shared checks library — audit M2.2 — n≥10, ≥4 debt-carrying scenes; fires only when one
+// zone has zero such scenes while another holds ≥50%; audits WHERE narrative debt concentrates
+// structurally, orthogonal to THEME_RESONANCE_THIRDS_CLUSTER which audits resonance distribution,
+// not clue-debt distribution), unresolved clue aftermath silent (sequence/aftermath ×
+// unresolvedClues-present trigger → resonance aftermath, built on checkAftermathVoid — n≥8, ≥3
+// qualifying debt-carrying scenes, none followed by a resonant scene in the next 2; distinct from
+// the same-scene co-occurrence check above by aftermath mode, and from every other THEME_*_AFTERMATH_
+// SILENT check by trigger channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -3383,6 +3399,83 @@ export async function themePass(input: PassInput): Promise<PassResult> {
           });
         }
       }
+    }
+  }
+
+  // ── Wave 598: THEME_UNRESOLVED_CLUE_DECOUPLED, THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE,
+  //              THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT ──────────────────────────────────────
+  // First checks in this pass to use the unresolvedClues signal — every other clue-related
+  // check here (THEME_CLUE_DECOUPLED, THEME_SEED_PEAK_ABSENT, THEME_SEED_AFTERMATH_SILENT) keys
+  // on seededClueIds, the moment a clue is PLANTED. unresolvedClues instead tracks the ongoing
+  // STATE of a clue remaining unpaid — every scene it lingers in, not just its origin.
+  const isResonant598 = (r: any): boolean => sceneHasResonance(sceneTexts.get(r.sceneIdx) ?? '', expandedKeywords);
+  const hasDebt598 = (r: any): boolean => ((r.unresolvedClues ?? []) as unknown[]).length > 0;
+
+  // THEME_UNRESOLVED_CLUE_DECOUPLED — Co-occurrence/decoupling × resonance × unresolvedClues.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 debt-carrying
+  // scenes (unresolvedClues non-empty), ≥2 resonant scenes existing elsewhere. Zero overlap
+  // between the two → fire. The scenes where a mystery sits open never carry the story's central
+  // idea — an open question and the theme it might illuminate never share a moment.
+  {
+    const r598a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: hasDebt598, isB: isResonant598,
+    });
+    if (r598a.fires) {
+      issues.push({
+        location: `${r598a.aCount} scene(s) carrying unresolved clue-debt — zero thematically resonant`,
+        rule: 'THEME_UNRESOLVED_CLUE_DECOUPLED',
+        severity: 'minor',
+        description: `${r598a.aCount} scenes carry outstanding, unresolved clue-debt, but none of them carry thematic language related to "${themeRaw}", even though ${r598a.bCount} resonant scene(s) exist elsewhere. The scenes where a mystery sits open — where the audience is actively holding an unanswered question — never coincide with the story's central idea. An open question is a natural home for thematic reflection: what the unresolved thread implies about the theme, what its persistence costs the characters, or what its eventual answer might mean.`,
+        suggestedFix: `Let at least one scene carrying open clue-debt also voice the theme — a character reflecting on what the unanswered question means to them, phrased in language that connects to "${themeRaw}". Unresolved mysteries and thematic meaning reinforce each other: the open question keeps mattering because it is tied to what the story is about.`,
+      });
+    }
+  }
+
+  // THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total — audits WHERE outstanding narrative debt
+  // concentrates structurally, orthogonal to THEME_RESONANCE_THIRDS_CLUSTER (which audits
+  // resonance distribution, not clue-debt distribution, and uses thirds not quarters).
+  {
+    const r598b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: hasDebt598,
+    });
+    if (r598b.fires) {
+      const emptyNames598b = r598b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName598b = FOUR_ZONE_NAMES[r598b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames598b} empty; ${bloatName598b} has ${r598b.counts[r598b.bloatZoneIdx]}/${r598b.totalCount} debt-carrying scenes`,
+        rule: 'THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r598b.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName598b} contains ${r598b.counts[r598b.bloatZoneIdx]} of them (${Math.round((r598b.counts[r598b.bloatZoneIdx] / r598b.totalCount) * 100)}%) while ${emptyNames598b} contains none. Unresolved mysteries bloat in one structural quarter and vanish from another, giving the story's sense of open questions an uneven structural rhythm.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames598b} — rather than resolving everything before that quarter of the story begins. A story's sense of active mystery should have some presence in every structural quarter.`,
+      });
+    }
+  }
+
+  // THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT — Sequence/aftermath × unresolvedClues-present
+  // trigger → resonance aftermath. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥3 qualifying debt-carrying scenes (pos < n-2), ≥2 resonant scenes existing elsewhere.
+  // None of the qualifying debt scenes are followed by a resonant scene within 2 scenes → fire.
+  // An open question never gets connected to the theme even in its aftermath — distinct from
+  // THEME_UNRESOLVED_CLUE_DECOUPLED above by mode (aftermath window vs. same-scene), and from
+  // every other THEME_*_AFTERMATH_SILENT check in this file by trigger channel.
+  {
+    const r598c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 3, minAftermathCount: 2, window: 2,
+      isTrigger: hasDebt598, isAftermath: isResonant598,
+    });
+    if (r598c.fires) {
+      issues.push({
+        location: `${r598c.triggerCount} unresolved-clue scene(s) — no resonant scene within 2 scenes of any`,
+        rule: 'THEME_UNRESOLVED_CLUE_AFTERMATH_SILENT',
+        severity: 'minor',
+        description: `None of the story's ${r598c.triggerCount} scenes carrying outstanding clue-debt are followed by a thematically resonant scene within the next two, even though ${r598c.aftermathCount} resonant scene(s) exist elsewhere. The aftermath of an open question is a natural window for thematic reflection — a character sitting with an unanswered mystery is exactly the moment to voice what the story is really about — but that window consistently goes thematically silent.`,
+        suggestedFix: `After at least one scene where clue-debt is left outstanding, let the following scene or the one after voice the theme — a beat where a character's response to the lingering question connects to "${themeRaw}". The unresolved thread's aftermath is a natural home for the story's central idea to surface.`,
+      });
     }
   }
 
