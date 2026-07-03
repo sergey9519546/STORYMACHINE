@@ -370,6 +370,17 @@
 // DIALOGUE_EMOTION_ZONE_CLUSTER [Wave 686], which tests combined non-neutral emotionalShift
 // [either valence]; this isolates the negative valence alone, which none of the three
 // shared-library trio modes has ever done on its own).
+//
+// Wave 840 additions (opens the nineteenth rotation cycle): DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_
+// RUN (run-based × purpose === 'introduce_conflict' absence — completes 2 of 3 slots for this
+// purpose value alongside the zone-cluster mode added in Wave 826; peak mode conventionally
+// skipped for this categorical field), DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN (run-based ×
+// emotionalShift === 'negative' absence — completes 2 of 3 slots for this valence alongside the
+// zone-cluster mode added in Wave 826; peak mode conventionally skipped for this categorical
+// field), DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift ===
+// 'positive' × structural thirds — distinct from DIALOGUE_EMOTION_ZONE_CLUSTER [Wave 686], which
+// tests combined non-neutral emotionalShift [either valence]; this isolates the positive valence
+// alone, opening a new trio in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4927,6 +4938,74 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r826c.maxZoneCount / r826c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r826c.zoneNames[r826c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, dialogue carries its emotional cost in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a negative-emotion scene outside the ${r826c.zoneNames[r826c.maxZoneIdx]} third so dialogue registers its emotional cost more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 840: DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN, DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 826 (peak mode conventionally skipped for this
+  // categorical field).
+  {
+    const r840a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r840a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r840a.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r840a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r840a.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves dialogue with nothing new to voice for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r840a.longestRun}-scene stretch to introduce conflict so dialogue keeps fresh friction to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 826 (peak mode conventionally skipped for this categorical field).
+  {
+    const r840b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r840b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r840b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r840b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r840b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves dialogue with no emotional cost to voice for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r840b.longestRun}-scene stretch an emotional setback so dialogue keeps an emotional cost to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from DIALOGUE_EMOTION_ZONE_CLUSTER (Wave 686), which tests combined non-neutral
+  // emotionalShift (either valence); this isolates the positive valence alone, opening a new
+  // trio in this pass.
+  {
+    const r840c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r840c.fires) {
+      issues.push({
+        location: `${r840c.zoneNames[r840c.maxZoneIdx]} third — ${r840c.maxZoneCount} of ${r840c.count} positive-emotion scenes`,
+        rule: 'DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r840c.maxZoneCount / r840c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r840c.zoneNames[r840c.maxZoneIdx]} third. When all the relief concentrates in one structural window, dialogue carries its emotional reward in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r840c.zoneNames[r840c.maxZoneIdx]} third so dialogue registers its emotional reward more evenly across the story.`,
       });
     }
   }

@@ -1598,6 +1598,83 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 840 — dialoguePass: dialogue introduce conflict drought run, dialogue negative emotion drought run, dialogue positive emotion zone cluster', async () => {
+    const makeRec840 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes840 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD840 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs840a = Array.from({ length: 10 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runD840(buildScenes840(10), recs840a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs840an = Array.from({ length: 10 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runD840(buildScenes840(10), recs840an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs840b = Array.from({ length: 10 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runD840(buildScenes840(10), recs840b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs840bn = Array.from({ length: 10 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runD840(buildScenes840(10), recs840bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs840c = Array.from({ length: 9 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runD840(buildScenes840(9), recs840c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER'), 'DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes spread across thirds', async () => {
+      const recs840cn = Array.from({ length: 9 }, (_, i) => makeRec840(i,
+        (i === 0 || i === 4 || i === 8) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runD840(buildScenes840(9), recs840cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER'), 'DIALOGUE_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 826 — dialoguePass: dialogue turning point drought run, dialogue introduce conflict zone cluster, dialogue negative emotion zone cluster', async () => {
     const makeRec826 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
