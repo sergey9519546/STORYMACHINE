@@ -375,6 +375,17 @@
 // (distribution/timing × purpose === 'turning_point' × structural thirds — likewise only ever
 // touched by the generic PURPOSE_CONSECUTIVE_RUN check; none of the three shared-library trio
 // modes has ever been applied to it).
+//
+// Wave 830 additions: ORIGINALITY_TURNING_POINT_DROUGHT_RUN (run-based × purpose ===
+// 'turning_point' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 816; peak mode conventionally skipped for this categorical
+// field), ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; a virgin field), ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'negative' × structural thirds — distinct from
+// ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined non-neutral emotionalShift [either
+// valence]; this isolates the negative valence alone, which none of the three shared-library trio
+// modes has ever done on its own).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5068,6 +5079,72 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r816c.maxZoneCount / r816c.count) * 100)}% of the story's turning-point scenes cluster in the ${r816c.zoneNames[r816c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than pivots distributed unevenly across the whole story.`,
         suggestedFix: `Purpose at least one scene outside the ${r816c.zoneNames[r816c.maxZoneIdx]} third as a turning point so pivots stay unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 830: ORIGINALITY_TURNING_POINT_DROUGHT_RUN, ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes
+  // overall, fires when the longest consecutive run of scenes with no turning-point purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 816 (peak mode conventionally skipped for this categorical field).
+  {
+    const r830a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r830a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r830a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r830a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r830a.presentCount} scenes elsewhere redirect events — a long, predictable stretch of coasting the audience can learn to anticipate.`,
+        suggestedFix: `Purpose at least one scene within the ${r830a.longestRun}-scene stretch as a turning point so redirection stays unpredictable throughout that stretch rather than absent for a learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r830b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r830b.fires) {
+      issues.push({
+        location: `${r830b.zoneNames[r830b.maxZoneIdx]} third — ${r830b.maxZoneCount} of ${r830b.count} conflict-introducing scenes`,
+        rule: 'ORIGINALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r830b.maxZoneCount / r830b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r830b.zoneNames[r830b.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than fresh fronts of conflict opening unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r830b.zoneNames[r830b.maxZoneIdx]} third to introduce conflict so new fronts stay unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift ===
+  // 'negative' × structural thirds. Built on checkZoneCluster from the shared checks library.
+  // n≥9, ≥3 negative-emotion scenes, fires when more than 75% of them fall in a single structural
+  // third. Distinct from ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined non-neutral
+  // emotionalShift (either valence); this isolates the negative valence alone.
+  {
+    const r830c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r830c.fires) {
+      issues.push({
+        location: `${r830c.zoneNames[r830c.maxZoneIdx]} third — ${r830c.maxZoneCount} of ${r830c.count} negative-emotion scenes`,
+        rule: 'ORIGINALITY_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r830c.maxZoneCount / r830c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r830c.zoneNames[r830c.maxZoneIdx]} third — a predictable concentration of darkness the audience can learn to anticipate rather than emotional cost distributed unevenly across the whole story.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r830c.zoneNames[r830c.maxZoneIdx]} third so emotional cost stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }
