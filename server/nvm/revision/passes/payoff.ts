@@ -251,6 +251,15 @@
 // (distribution/timing × visualBeats × structural thirds — Wave 650 applied the zone-cluster mode
 // to unresolvedClues; visualBeats itself has only been backward-cause peak-audited, never
 // cluster-audited on the thirds granularity).
+// Wave 678 additions (built on the shared checks library, audit M2.2): PAYOFF_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — distinct from the
+// existing PAYOFF_CLOCK_PEAK_DECOUPLED [Wave 566], which checks whether the peak-clockDelta scene
+// carries a payoff; this instead asks whether that scene is structurally caused by a dramatic
+// turn or revelation), PAYOFF_TURN_DROUGHT_RUN (run-based × dramaticTurn presence absence —
+// dramaticTurn anchors several decoupled and aftermath-absent checks here, but has never been
+// drought-audited), PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift
+// === 'negative' × structural thirds — emotionalShift anchors PAYOFF_EMOTIONAL_VALENCE_UNIFORM
+// and several decoupled checks, but has never been cluster-audited).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3684,6 +3693,76 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r664c.maxZoneCount} of the story's ${r664c.count} visually dense scenes (${Math.round((r664c.maxZoneCount / r664c.count) * 100)}%) cluster in the ${zoneName664c} third. Physical staging concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no physically embodied resolution.`,
         suggestedFix: `Give at least one scene outside the ${zoneName664c} third substantial physical staging — spreading embodied resolution across the story lets each structural third carry its own physical weight.`,
+      });
+    }
+  }
+
+  // ── Wave 678: PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED, PAYOFF_TURN_DROUGHT_RUN,
+  //              PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Distinct from PAYOFF_CLOCK_PEAK_DECOUPLED (Wave 566), which checks whether the
+  // peak-clockDelta scene carries a payoff; this instead asks whether that scene is structurally
+  // caused by a dramatic turn or revelation.
+  {
+    const r678a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r678a.fires) {
+      issues.push({
+        location: `scene ${r678a.peakIdx + 1} — peak clockDelta (${r678a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r678a.peakIdx + 1}, at ${r678a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r678a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest deadline compression is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_DROUGHT_RUN — Run-based × dramaticTurn presence absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 dramatic-turn scenes overall, fires
+  // when the longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn
+  // anchors several decoupled and aftermath-absent checks here, but has never been
+  // drought-audited.
+  {
+    const r678b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r678b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r678b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r678b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r678b.presentCount} scenes elsewhere do carry a structural pivot. A long stretch with no reversal or twist leaves the story's resolutions arriving without any structural pivot preceding them for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r678b.longestRun}-scene stretch a dramatic turn — even a modest reversal keeps the payoff engine structurally punctuated throughout that stretch.`,
+      });
+    }
+  }
+
+  // PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when >75% of them fall in a single structural third.
+  // emotionalShift anchors PAYOFF_EMOTIONAL_VALENCE_UNIFORM and several decoupled checks, but has
+  // never been cluster-audited.
+  {
+    const r678c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r678c.fires) {
+      const zoneName678c = r678c.zoneNames[r678c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName678c} third — ${r678c.maxZoneCount}/${r678c.count} negative-emotion scenes`,
+        rule: 'PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r678c.maxZoneCount} of the story's ${r678c.count} negative-emotion scenes (${Math.round((r678c.maxZoneCount / r678c.count) * 100)}%) cluster in the ${zoneName678c} third. Emotional pain concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no sense of cost weighing against the resolutions landing there.`,
+        suggestedFix: `Let at least one scene outside the ${zoneName678c} third carry a negative emotional shift — spreading emotional cost across the story keeps every structural third's resolutions honestly weighted.`,
       });
     }
   }

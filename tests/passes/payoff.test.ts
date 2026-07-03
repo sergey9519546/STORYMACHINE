@@ -1365,6 +1365,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 678 — payoffPass: payoff clock delta peak uncaused, payoff turn drought run, payoff negative emotion zone cluster', async () => {
+    const runPY678 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs678a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs678a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs678a[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runPY678(recs678a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED'), 'PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs678an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs678an[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs678an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs678an[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runPY678(recs678an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED'), 'PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_TURN_DROUGHT_RUN fire:
+    // 10 scenes; dramatic turns at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PAYOFF_TURN_DROUGHT_RUN fires when the longest no-turn run is ≥6', async () => {
+      const recs678b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs678b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs678b[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs678b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      recs678b[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runPY678(recs678b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_DROUGHT_RUN'), 'PAYOFF_TURN_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_TURN_DROUGHT_RUN no-fire:
+    // dramatic turns at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PAYOFF_TURN_DROUGHT_RUN does not fire when dramatic turns are distributed without a long drought', async () => {
+      const recs678bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs678bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs678bn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs678bn[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runPY678(recs678bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_DROUGHT_RUN'), 'PAYOFF_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs678c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs678c[0] = makeSharedRecord(0, { emotionalShift: 'negative' });
+      recs678c[1] = makeSharedRecord(1, { emotionalShift: 'negative' });
+      recs678c[2] = makeSharedRecord(2, { emotionalShift: 'negative' });
+      const res = await runPY678(recs678c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER no-fire:
+    // negative-emotion scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes are distributed across thirds', async () => {
+      const recs678cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs678cn[0] = makeSharedRecord(0, { emotionalShift: 'negative' });
+      recs678cn[4] = makeSharedRecord(4, { emotionalShift: 'negative' });
+      recs678cn[7] = makeSharedRecord(7, { emotionalShift: 'negative' });
+      const res = await runPY678(recs678cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 664 — payoffPass: payoff relationship peak uncaused, payoff clock drought run, payoff staging zone cluster', async () => {
     const runPY664 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
