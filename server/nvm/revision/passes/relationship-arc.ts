@@ -208,10 +208,17 @@
 // raise_stakes-purpose scenes, zero overlap; bond-moving never coincides with the scene explicitly
 // raising what's at risk; first co-occurrence check in this pass pairing shift with the purpose
 // signal rather than with a numeric delta channel).
+// Wave 609 additions (built on the shared checks library, audit M2.2): OPEN_THREAD_RELATIONSHIP_
+// SHIFT_DECOUPLED (co-occurrence/decoupling × unresolvedClues × relationshipShifts — first use of
+// unresolvedClues anywhere in this 102-rule pass), PHYSICAL_PRESENCE_ZONE_IMBALANCE
+// (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere in
+// this pass), RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath ×
+// relationship-shift trigger → dialogueHighlights absence — first use of dialogueHighlights
+// anywhere in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 // Minimum co-appearances before a never-shifting pair is considered static.
 const STATIC_COAPPEAR_THRESHOLD = 3;
@@ -3523,6 +3530,90 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story has ${r595c.aCount} meaningful relationship-shift scene(s) and ${r595c.bCount} scene(s) whose purpose is to raise the stakes, but the two never coincide. The moment a story tells the audience more is now at risk is a natural moment for a bond to move — the newly-raised cost could test a relationship, force an alliance, or expose a rift. When stakes-raising and relational movement are fully decoupled, escalation stays abstract: the audience is told more is at risk without feeling it through any relationship actually shifting in response.`,
         suggestedFix: `Let at least one stakes-raising scene also carry a relationship shift — the higher cost forces two characters to choose sides, tests a fragile alliance, or exposes a fault line neither had acknowledged. A stakes-raise that also moves a bond does double dramatic work: the audience feels the escalation through a relationship, not just through exposition.`,
+      });
+    }
+  }
+
+  // ── Wave 609: OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED, PHYSICAL_PRESENCE_ZONE_IMBALANCE,
+  //              RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ────────────────────────
+
+  // OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // relationshipShifts. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8,
+  // ≥2 scenes carrying outstanding clue-debt, ≥2 scenes with a relationship shift. Zero overlap →
+  // fire. Unresolved narrative tension and relational movement never occupy the same scene — a
+  // bond changes only while every mystery is quiet, and a mystery hangs open only while every
+  // relationship holds steady. First use of the unresolvedClues field anywhere in this 102-rule
+  // pass. Distinct from RELATIONSHIP_SHIFT_STAKES_DECOUPLED (Wave 595: pairs shift with the
+  // stakes-raise purpose, not unresolvedClues) and every other co-occurrence check in this file.
+  {
+    const r609a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r609a.fires) {
+      issues.push({
+        location: `${r609a.aCount} open-thread scene(s), ${r609a.bCount} relationship-shift scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r609a.aCount} scenes carrying outstanding, unpaid clue-debt never coincide with the ${r609a.bCount} scenes where a relationship shifts — unresolved narrative tension and relational movement run on entirely separate tracks. A bond is most likely to move under pressure, and an open mystery is one of the story's natural sources of pressure; when the two never combine, each channel's weight is felt in isolation rather than compounding into a relationship visibly straining under what's still unknown.`,
+        suggestedFix: `Let at least one relationship shift happen in a scene that also carries open clue-debt — a bond moving because a character's uncertainty about what's unresolved changes how they treat someone else. Tying the mystery's pressure to the relational channel gives both greater weight than either carries alone.`,
+      });
+    }
+  }
+
+  // PHYSICAL_PRESENCE_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass — every existing check here audits relational
+  // movement through the relationshipShifts/purpose/emotion/revelation channels; this is the
+  // first to audit how physical presence — as opposed to relational or verbal signal — is spread
+  // across the four structural quarters. A story whose physical staging clusters in one act and
+  // vanishes from another shifts abruptly between staged and unstaged storytelling rather than
+  // sustaining physical presence alongside its relational arcs throughout.
+  {
+    const r609b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r609b.fires) {
+      const emptyNames609b = r609b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName609b = FOUR_ZONE_NAMES[r609b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames609b} empty; ${bloatName609b} has ${r609b.counts[r609b.bloatZoneIdx]}/${r609b.totalCount} visually dense scenes`,
+        rule: 'PHYSICAL_PRESENCE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r609b.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName609b} contains ${r609b.counts[r609b.bloatZoneIdx]} of them (${Math.round((r609b.counts[r609b.bloatZoneIdx] / r609b.totalCount) * 100)}%) while ${emptyNames609b} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's balance between staged and unstaged scenes an uneven rhythm relative to its relational arcs.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames609b}, or thin out ${bloatName609b}'s concentration by letting one of its visually dense scenes lean more on dialogue or relational tension instead. A more even spread keeps physical presence active alongside the story's relational movement throughout.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath ×
+  // relationship-shift trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying shift scenes (|amount|≥0.3, pos<n-2), ≥3
+  // scenes anywhere with a dialogue highlight, a 2-scene lookahead window. Fires when every
+  // shift's two-scene aftermath contains no highlighted dialogue, while highlighted dialogue does
+  // occur elsewhere in the story. First use of the dialogueHighlights field anywhere in this
+  // pass. Every bond change passes into an aftermath with no memorable verbal moment giving the
+  // new dynamic a voice. Distinct from RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID
+  // (Wave 511) and RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID (Wave 497), which use different
+  // aftermath channels, and from OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED above (relationship
+  // shift is the same-scene co-occurrence subject there, not the windowed trigger here).
+  {
+    const r609c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r609c.fires) {
+      issues.push({
+        location: `${r609c.triggerCount} relationship-shift scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r609c.triggerCount} relationship-shift scenes is followed by two scenes with no highlighted dialogue, even though ${r609c.aftermathCount} such scenes exist elsewhere in the script. A bond that has just shifted carries into the next beat; when that aftermath never carries a memorable line, the new dynamic goes unvoiced — no character's speech confirms what changed or what it costs.`,
+        suggestedFix: `After at least one relationship shift, let one of the following two scenes carry a line worth remembering — a character naming what changed between them, or a piece of dialogue whose weight comes precisely from the bond having moved. Give the new dynamic a voice, not just a structural record.`,
       });
     }
   }

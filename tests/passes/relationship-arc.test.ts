@@ -1376,6 +1376,98 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 609 — relationshipArcPass: open thread relationship shift decoupled, physical presence zone imbalance, relationship shift dialogue highlight aftermath void', async () => {
+    const runRA609 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED fire:
+    // n=8; open threads at 0,1 (no shift); shifts at 2,3 (no open thread) → zero overlap → fires
+    it('OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED fires when open-thread scenes and shift scenes never overlap', async () => {
+      const recs609a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs609a[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs609a[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs609a[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs609a[3] = makeSharedRecord(3, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      const res = await runRA609(recs609a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED'), 'OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED no-fire:
+    // scene 2 carries BOTH an open thread and a shift → overlap exists
+    it('OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs609an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs609an[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs609an[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs609an[2] = makeSharedRecord(2, { unresolvedClues: ['unpaid-clue'], relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs609an[3] = makeSharedRecord(3, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      const res = await runRA609(recs609an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED'), 'OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED should not fire');
+    });
+
+    // PHYSICAL_PRESENCE_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('PHYSICAL_PRESENCE_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs609b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs609b[6] = makeSharedRecord(6, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609b[9] = makeSharedRecord(9, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609b[10] = makeSharedRecord(10, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609b[11] = makeSharedRecord(11, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      const res = await runRA609(recs609b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PHYSICAL_PRESENCE_ZONE_IMBALANCE'), 'PHYSICAL_PRESENCE_ZONE_IMBALANCE should fire');
+    });
+
+    // PHYSICAL_PRESENCE_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('PHYSICAL_PRESENCE_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs609bn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs609bn[1] = makeSharedRecord(1, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609bn[4] = makeSharedRecord(4, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609bn[7] = makeSharedRecord(7, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      recs609bn[10] = makeSharedRecord(10, { visualBeats: ['grips the letter', 'stares at the photo'] });
+      const res = await runRA609(recs609bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PHYSICAL_PRESENCE_ZONE_IMBALANCE'), 'PHYSICAL_PRESENCE_ZONE_IMBALANCE should not fire');
+    });
+
+    // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; shift triggers (|amount|>=0.3) at 0,1; their windows {1,2} and {2,3} carry
+    // no dialogue highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no shift is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs609c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs609c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs609c[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      recs609c[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs609c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs609c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runRA609(recs609c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs609cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs609cn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs609cn[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      recs609cn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs609cn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs609cn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs609cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runRA609(recs609cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 595 — relationshipArcPass: relationship shift purpose monotone, relationship shift zone imbalance, relationship shift stakes decoupled', async () => {
     const runRA595 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
