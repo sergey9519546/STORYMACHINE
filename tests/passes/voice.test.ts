@@ -1438,6 +1438,85 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 753 — voicePass: voice clock delta drought run, voice character moment drought run, voice curiosity zone cluster', async () => {
+    const runV753 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('VOICE_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs753a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs753a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs753a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs753a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runV753(recs753a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_DROUGHT_RUN'), 'VOICE_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('VOICE_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs753an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs753an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs753an[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs753an[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs753an[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runV753(recs753an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_DELTA_DROUGHT_RUN'), 'VOICE_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 purposed as character moments (>=3 present overall); scenes 3-9 (7 scenes) purposed otherwise
+    it('VOICE_CHARACTER_MOMENT_DROUGHT_RUN fires when the longest no-character-moment run reaches 6', async () => {
+      const recs753b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs753b[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs753b[1] = makeSharedRecord(1, { purpose: 'character_moment' });
+      recs753b[2] = makeSharedRecord(2, { purpose: 'character_moment' });
+      const res = await runV753(recs753b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CHARACTER_MOMENT_DROUGHT_RUN'), 'VOICE_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_CHARACTER_MOMENT_DROUGHT_RUN no-fire:
+    // character-moment scenes spread out so no gap reaches 6 consecutive scenes
+    it('VOICE_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are spread through the story', async () => {
+      const recs753bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs753bn[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs753bn[3] = makeSharedRecord(3, { purpose: 'character_moment' });
+      recs753bn[6] = makeSharedRecord(6, { purpose: 'character_moment' });
+      recs753bn[9] = makeSharedRecord(9, { purpose: 'character_moment' });
+      const res = await runV753(recs753bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CHARACTER_MOMENT_DROUGHT_RUN'), 'VOICE_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('VOICE_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs753c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs753c[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs753c[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs753c[2] = makeSharedRecord(2, { curiosityDelta: 1 });
+      const res = await runV753(recs753c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_ZONE_CLUSTER'), 'VOICE_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_CURIOSITY_ZONE_CLUSTER no-fire:
+    // curiosity-positive scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes are distributed across thirds', async () => {
+      const recs753cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs753cn[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs753cn[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs753cn[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      const res = await runV753(recs753cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CURIOSITY_ZONE_CLUSTER'), 'VOICE_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 739 — voicePass: voice open thread zone cluster, voice highlight zone cluster, voice relationship drought run', async () => {
     const runV739 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

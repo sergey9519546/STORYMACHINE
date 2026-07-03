@@ -286,6 +286,13 @@
 // VOICE_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence — Waves 669/725 applied
 // the zone-cluster and backward-cause peak modes to relationshipShifts; the drought-run mode has
 // never been applied to it, completing the trio).
+// Wave 753 additions: VOICE_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 641
+// applied the backward-cause peak mode to clockDelta; the drought-run mode has never been applied
+// to it), VOICE_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence
+// — Wave 655 applied the zone-cluster mode to this signal; the drought-run mode has never been
+// applied to it), VOICE_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence ×
+// structural thirds — Wave 683 applied the run-based drought mode to curiosityDelta; the
+// zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4584,6 +4591,71 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r739c.longestRun} consecutive scenes with no relationship shift at all, even though ${r739c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters leaves the story's voice with no relational movement to speak through for an extended run.`,
         suggestedFix: `Shift at least one relationship — however slightly — within the ${r739c.longestRun}-scene stretch so the story's voice keeps something relational to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 753: VOICE_CLOCK_DELTA_DROUGHT_RUN, VOICE_CHARACTER_MOMENT_DROUGHT_RUN,
+  //              VOICE_CURIOSITY_ZONE_CLUSTER ──────────────────────────────────────────────
+
+  // VOICE_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Wave 641 applied the
+  // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it.
+  {
+    const r753a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r753a.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r753a.longestRun} consecutive scenes`,
+        rule: 'VOICE_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r753a.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r753a.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the story's voice without any mechanical pressure to speak against for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r753a.longestRun}-scene stretch so the story's voice keeps a mechanical pressure to speak against throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes purposed otherwise reaches 6. Wave
+  // 655 applied the zone-cluster mode to this signal; the drought-run mode has never been applied
+  // to it.
+  {
+    const r753b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r753b.fires) {
+      issues.push({
+        location: `longest stretch with no character-moment scene: ${r753b.longestRun} consecutive scenes`,
+        rule: 'VOICE_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r753b.longestRun} consecutive scenes purposed otherwise than a character moment, even though ${r753b.presentCount} scenes elsewhere are dedicated to the protagonist's inner life. A long unbroken stretch with nothing but plot-forward scenes leaves the story's voice with no interior beat to speak through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r753b.longestRun}-scene stretch as a character moment so the story's voice keeps a beat of interior reflection to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 683 applied
+  // the run-based drought mode to curiosityDelta; the zone-cluster mode has never been applied to
+  // it.
+  {
+    const r753c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r753c.fires) {
+      issues.push({
+        location: `${r753c.zoneNames[r753c.maxZoneIdx]} third — ${r753c.maxZoneCount} of ${r753c.count} curiosity-positive scenes`,
+        rule: 'VOICE_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r753c.maxZoneCount / r753c.count) * 100)}% of the scenes where curiosity rises cluster in the ${r753c.zoneNames[r753c.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the story's voice goes quiet on fresh questions for the rest of the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r753c.zoneNames[r753c.maxZoneIdx]} third so the story's voice keeps generating fresh questions more evenly across the story.`,
       });
     }
   }
