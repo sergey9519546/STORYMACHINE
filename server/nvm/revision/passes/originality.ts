@@ -289,6 +289,17 @@
 // thirds — Wave 648 applied the backward-cause peak mode to relationshipShifts; the zone-cluster
 // mode has never been applied to it — a predictable, front- or back-loaded distribution of
 // relational movement is itself a learnable pattern).
+// Wave 732 additions: ORIGINALITY_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts
+// absence — Waves 648/718 applied the backward-cause peak and zone-cluster modes to
+// relationshipShifts; the drought-run mode has never been applied to it, completing the trio — a
+// long unbroken stretch where bonds never move is itself a predictable, learnable pattern),
+// ORIGINALITY_REVELATION_ZONE_CLUSTER (distribution/timing × revelation × structural thirds —
+// Wave 648 applied the run-based drought mode to revelation != null; the zone-cluster mode has
+// never been applied to it — a predictable, front- or back-loaded distribution of disclosures is
+// itself a learnable pattern), ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × unresolvedClues magnitude — Wave 676 applied the run-based drought
+// mode to unresolvedClues; the backward-cause peak mode has never been applied to it — an
+// uncaused spike in accumulated open-thread debt is itself a predictable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4482,6 +4493,78 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r718c.maxZoneCount} of the story's ${r718c.count} relationship-shift scenes (${Math.round((r718c.maxZoneCount / r718c.count) * 100)}%) cluster in the ${zoneName718c} third. Bond changes concentrate almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect relational movement in rather than experiencing a genuinely unpredictable rhythm.`,
         suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName718c} third — spreading relational movement across the story keeps its timing genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ── Wave 732: ORIGINALITY_RELATIONSHIP_DROUGHT_RUN, ORIGINALITY_REVELATION_ZONE_CLUSTER,
+  //              ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED ──────────────────────────────────────
+
+  // ORIGINALITY_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no bond change reaches 6. Waves 648/718
+  // applied the backward-cause peak and zone-cluster modes to relationshipShifts; the drought-run
+  // mode has never been applied to it, completing the trio — a long unbroken stretch where bonds
+  // never move is itself a predictable, learnable pattern.
+  {
+    const r732a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r732a.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r732a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r732a.longestRun} consecutive scenes with no relationship shift at all, even though ${r732a.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters is itself a learnable pattern — the audience can predict that no relational movement will arrive for an extended stretch.`,
+        suggestedFix: `Shift at least one relationship — however slightly — within the ${r732a.longestRun}-scene stretch so the audience can't predict a long, relationally inert lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of them fall in a single structural third. Wave 648 applied the run-based
+  // drought mode to revelation != null; the zone-cluster mode has never been applied to it — a
+  // predictable, front- or back-loaded distribution of disclosures is itself a learnable pattern.
+  {
+    const r732b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r732b.fires) {
+      const zoneName732b = r732b.zoneNames[r732b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName732b} third — ${r732b.maxZoneCount}/${r732b.count} revelation scenes`,
+        rule: 'ORIGINALITY_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r732b.maxZoneCount} of the story's ${r732b.count} revelation scenes (${Math.round((r732b.maxZoneCount / r732b.count) * 100)}%) cluster in the ${zoneName732b} third. Disclosures concentrate almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect a revelation in rather than experiencing genuinely unpredictable timing.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${zoneName732b} third — spreading disclosures across the story keeps their timing genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // unresolvedClues magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2
+  // scenes carrying outstanding clue-debt, a 2-scene lookback. Finds the single scene with the
+  // most simultaneous open threads; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. Wave 676 applied the run-based drought mode to
+  // unresolvedClues; the backward-cause peak mode has never been applied to it — an uncaused
+  // spike in accumulated open-thread debt is itself a predictable pattern, since the audience
+  // learns that the story's mystery load peaks arbitrarily rather than in response to events.
+  {
+    const r732c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r732c.fires) {
+      issues.push({
+        location: `scene ${r732c.peakIdx + 1} — peak open-thread density (${r732c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r732c.peakIdx + 1}, with ${r732c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. An unmotivated spike in accumulated mystery is itself a learnable pattern — the audience senses the story's open-thread load rising and falling on its own schedule rather than in response to what happens.`,
+        suggestedFix: `Give scene ${r732c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's peak of accumulated mystery is earned by an event rather than arriving as an arbitrary, learnable spike.`,
       });
     }
   }
