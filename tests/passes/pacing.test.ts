@@ -934,6 +934,70 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 901 — pacingPass: pacing resolution zone imbalance, pacing turning point zone imbalance, pacing complicate zone imbalance', async () => {
+    const runP901 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone
+    // touched → no-fire. Filler is 'establish_world' (not one of the tested purpose values).
+    it('PACING_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs901a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runP901(recs901a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_RESOLUTION_ZONE_IMBALANCE'), 'PACING_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs901an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runP901(recs901an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_RESOLUTION_ZONE_IMBALANCE'), 'PACING_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs901b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runP901(recs901b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_TURNING_POINT_ZONE_IMBALANCE'), 'PACING_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs901bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runP901(recs901bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_TURNING_POINT_ZONE_IMBALANCE'), 'PACING_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs901c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runP901(recs901c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_COMPLICATE_ZONE_IMBALANCE'), 'PACING_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs901cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runP901(recs901cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_COMPLICATE_ZONE_IMBALANCE'), 'PACING_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 887 — pacingPass: pacing complicate drought run, pacing climax zone imbalance, pacing establish world zone imbalance', async () => {
     const runP887 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

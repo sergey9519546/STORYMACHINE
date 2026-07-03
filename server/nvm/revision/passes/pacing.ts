@@ -392,6 +392,13 @@
 // pass (only dialogueHighlights and unresolvedClues had); this wave applies it to two purpose
 // values with complete 3-zone/run-based trios: PACING_CLIMAX_ZONE_IMBALANCE (purpose ===
 // 'climax') and PACING_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world').
+//
+// Wave 901 additions: continuing the checkZoneImbalance rollout begun in Wave 887, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: PACING_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
+// PACING_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'), and
+// PACING_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5060,6 +5067,81 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r887c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName887c} contains ${r887c.counts[r887c.bloatZoneIdx]} of them (${Math.round((r887c.counts[r887c.bloatZoneIdx] / r887c.totalCount) * 100)}%) while ${emptyNames887c} contains none. World-building bloats in one structural quarter and vanishes from another, giving pacing's grounding an uneven structural rhythm.`,
         suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames887c} — so pacing keeps fresh ground to build from more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 887. n≥10, ≥4 resolution-purposed scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds
+  // ≥50% of the total. Distinct from the existing 3-zone PACING_RESOLUTION_ZONE_CLUSTER and
+  // run-based PACING_RESOLUTION_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to this purpose value.
+  {
+    const r901a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r901a.fires) {
+      const emptyNames901a = r901a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName901a = FOUR_ZONE_NAMES[r901a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames901a} empty; ${bloatName901a} has ${r901a.counts[r901a.bloatZoneIdx]}/${r901a.totalCount} resolution-purposed scenes`,
+        rule: 'PACING_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r901a.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName901a} contains ${r901a.counts[r901a.bloatZoneIdx]} of them (${Math.round((r901a.counts[r901a.bloatZoneIdx] / r901a.totalCount) * 100)}%) while ${emptyNames901a} contains none. Settling beats bloat in one structural quarter and vanish from another, giving pacing's release an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames901a} — so pacing releases tension more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 887. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone PACING_TURNING_POINT_ZONE_CLUSTER and run-based
+  // PACING_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r901b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r901b.fires) {
+      const emptyNames901b = r901b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName901b = FOUR_ZONE_NAMES[r901b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames901b} empty; ${bloatName901b} has ${r901b.counts[r901b.bloatZoneIdx]}/${r901b.totalCount} turning-point scenes`,
+        rule: 'PACING_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r901b.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName901b} contains ${r901b.counts[r901b.bloatZoneIdx]} of them (${Math.round((r901b.counts[r901b.bloatZoneIdx] / r901b.totalCount) * 100)}%) while ${emptyNames901b} contains none. Pivots bloat in one structural quarter and vanish from another, giving pacing's direction changes an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames901b} — so pacing changes direction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 887. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone PACING_COMPLICATE_ZONE_CLUSTER and run-based
+  // PACING_COMPLICATE_DROUGHT_RUN (both added earlier) — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r901c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r901c.fires) {
+      const emptyNames901c = r901c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName901c = FOUR_ZONE_NAMES[r901c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames901c} empty; ${bloatName901c} has ${r901c.counts[r901c.bloatZoneIdx]}/${r901c.totalCount} complicating scenes`,
+        rule: 'PACING_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r901c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName901c} contains ${r901c.counts[r901c.bloatZoneIdx]} of them (${Math.round((r901c.counts[r901c.bloatZoneIdx] / r901c.totalCount) * 100)}%) while ${emptyNames901c} contains none. Complications bloat in one structural quarter and vanish from another, giving pacing's escalation an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames901c} — so pacing keeps deepening its trouble more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
