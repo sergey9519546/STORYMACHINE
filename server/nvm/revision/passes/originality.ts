@@ -405,6 +405,16 @@
 // structural thirds — this purpose value has never been referenced anywhere in this pass; a
 // virgin field), ORIGINALITY_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
 // structural thirds — likewise a virgin field, never referenced in this pass before).
+//
+// Wave 872 additions: ORIGINALITY_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 858; peak mode conventionally skipped for this categorical field),
+// ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 'establish_world' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 858; peak mode conventionally skipped for this categorical field),
+// ORIGINALITY_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- this purpose value has never been referenced anywhere in this pass; a
+// virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5298,6 +5308,72 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r858c.maxZoneCount / r858c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r858c.zoneNames[r858c.maxZoneIdx]} third — the same predictable window every time, rather than the story's biggest moments landing unevenly across its whole shape.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r858c.zoneNames[r858c.maxZoneIdx]} third so the story's peak moments stay less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ── Wave 872: ORIGINALITY_CLIMAX_DROUGHT_RUN, ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              ORIGINALITY_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 858 (peak mode conventionally skipped for this categorical field).
+  {
+    const r872a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r872a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r872a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r872a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r872a.presentCount} scenes elsewhere are — a long, predictable stretch without a peak moment the audience can learn to anticipate.`,
+        suggestedFix: `Purpose a scene within the ${r872a.longestRun}-scene stretch as the climax, or restructure so peak moments recur unpredictably rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes
+  // overall, fires when the longest consecutive run of scenes with no world-establishing purpose
+  // reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 858 (peak mode conventionally skipped for this categorical field).
+  {
+    const r872b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r872b.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r872b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r872b.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r872b.presentCount} scenes elsewhere are — a long, predictable stretch without new world-building the audience can learn to anticipate.`,
+        suggestedFix: `Purpose a scene within the ${r872b.longestRun}-scene stretch to establish the world, so world-building stays unpredictable throughout the story rather than confined to one isolated pocket.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r872c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r872c.fires) {
+      issues.push({
+        location: `${r872c.zoneNames[r872c.maxZoneIdx]} third — ${r872c.maxZoneCount} of ${r872c.count} resolution-purposed scenes`,
+        rule: 'ORIGINALITY_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r872c.maxZoneCount / r872c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r872c.zoneNames[r872c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than closure distributed unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r872c.zoneNames[r872c.maxZoneIdx]} third so closure stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }
