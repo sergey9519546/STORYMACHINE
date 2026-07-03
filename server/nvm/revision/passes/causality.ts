@@ -420,6 +420,21 @@
 // -- completes 2 of 3 slots for this signal alongside the run-based drought mode added in Wave
 // 783; the shared-library backward-cause peak mode has never been applied to curiosityDelta
 // magnitude in this pass and remains open for a future wave).
+//
+// Correction: reconnaissance for Wave 881 found that the Wave 867 note above (peak mode "remains
+// open") was itself in error -- the pre-existing Wave 783 header already documents that the
+// hand-rolled CURIOSITY_SPIKE_WITHOUT_CAUSE covers the backward-cause peak mode for
+// curiosityDelta. No new peak-uncaused check was added for this signal in Wave 881 as a result.
+//
+// Wave 881 additions: CAUSALITY_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 867; peak mode conventionally skipped for this categorical field),
+// CAUSALITY_CLIMAX_ZONE_IMBALANCE (underweight/bloat x purpose === 'climax' x four structural
+// zones -- distinct from the existing 3-zone CAUSALITY_CLIMAX_ZONE_CLUSTER and run-based
+// CAUSALITY_CLIMAX_DROUGHT_RUN; the first application of the 4-zone bloat+empty-zone mode to
+// this purpose value), CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE (underweight/bloat x purpose
+// === 'establish_world' x four structural zones -- likewise the first application of the 4-zone
+// mode to this purpose value, distinct from its existing 3-zone and run-based counterparts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5104,6 +5119,79 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r867c.maxZoneCount / r867c.count) * 100)}% of the story's curiosity-raising scenes cluster in the ${r867c.zoneNames[r867c.maxZoneIdx]} third. When every spike of wonder concentrates in one structural window, the causal chain's engine for open questions runs dry everywhere else in the story.`,
         suggestedFix: `Introduce a curiosity-raising beat outside the ${r867c.zoneNames[r867c.maxZoneIdx]} third so the causal chain keeps generating open questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 881: CAUSALITY_COMPLICATE_DROUGHT_RUN, CAUSALITY_CLIMAX_ZONE_IMBALANCE,
+  //              CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // CAUSALITY_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 867 (peak mode conventionally skipped for this categorical field).
+  {
+    const r881a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r881a.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r881a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r881a.longestRun} consecutive scenes with no complicating purpose at all, even though ${r881a.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the causal chain stalled for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r881a.longestRun}-scene stretch to complicate the story so the causal chain keeps deepening its cause-and-effect throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // climax-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone CAUSALITY_CLIMAX_ZONE_CLUSTER and run-based CAUSALITY_CLIMAX_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r881b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r881b.fires) {
+      const emptyNames881b = r881b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName881b = FOUR_ZONE_NAMES[r881b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames881b} empty; ${bloatName881b} has ${r881b.counts[r881b.bloatZoneIdx]}/${r881b.totalCount} climax-purposed scenes`,
+        rule: 'CAUSALITY_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r881b.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName881b} contains ${r881b.counts[r881b.bloatZoneIdx]} of them (${Math.round((r881b.counts[r881b.bloatZoneIdx] / r881b.totalCount) * 100)}%) while ${emptyNames881b} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the causal chain's payoff an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames881b} — so every structural quarter carries some capacity for the causal chain's payoff, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'establish_world' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library. n≥10, ≥4 world-establishing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER and
+  // run-based CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r881c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r881c.fires) {
+      const emptyNames881c = r881c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName881c = FOUR_ZONE_NAMES[r881c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames881c} empty; ${bloatName881c} has ${r881c.counts[r881c.bloatZoneIdx]}/${r881c.totalCount} world-establishing scenes`,
+        rule: 'CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r881c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName881c} contains ${r881c.counts[r881c.bloatZoneIdx]} of them (${Math.round((r881c.counts[r881c.bloatZoneIdx] / r881c.totalCount) * 100)}%) while ${emptyNames881c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the causal chain's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames881c} — so every structural quarter carries some fresh ground for the causal chain to build from, not only the quarter currently carrying most of them.`,
       });
     }
   }

@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 881 — causalityPass: causality complicate drought run, causality climax zone imbalance, causality establish world zone imbalance', async () => {
+    const runCA881 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs881a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA881(recs881a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_DROUGHT_RUN'), 'CAUSALITY_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs881an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA881(recs881an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_DROUGHT_RUN'), 'CAUSALITY_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('CAUSALITY_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs881b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA881(recs881b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_ZONE_IMBALANCE'), 'CAUSALITY_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs881bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA881(recs881bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_ZONE_IMBALANCE'), 'CAUSALITY_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs881c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA881(recs881c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs881cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA881(recs881cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 867 — causalityPass: causality complicate zone cluster, causality turn zone cluster, causality curiosity zone cluster', async () => {
     const runCA867 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
