@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
+import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
 
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
@@ -117,6 +118,127 @@ export const OutlineBodySchema = z.object({
 
 export const CollabTokenBodySchema = z.object({
   room: roomIdField,
+});
+
+// ── NVM route schemas (audit M2.3) ───────────────────────────────────────────
+// These routes previously relied on ad-hoc inline `typeof`/`Array.isArray`
+// checks scattered through server/routes/nvm.ts. Schemas here match what each
+// handler already assumed — deliberately loose (`.passthrough()` / `z.unknown()`)
+// on complex domain objects (NarrativeTransitionIR, RevealPlan, FixedPoint,
+// SceneTarget, StoryOp) that the handlers themselves only shallow-validate;
+// modeling those fully in zod would duplicate TypeScript's own type system for
+// no additional safety the handler doesn't already provide.
+
+export const GhostBranchBodySchema = z.object({
+  sessionId: sessionIdField,
+  ghostId: z.string().min(1).max(128),
+});
+
+export const RedteamBodySchema = z.object({
+  sessionId: sessionIdField,
+  plan: z.object({ revealId: z.string().min(1) }).passthrough(),
+});
+
+export const QualityBodySchema = z.object({
+  sessionId: sessionIdField,
+  ir: z.object({ ops: z.array(z.unknown()) }).passthrough(),
+});
+
+export const TwinDoBodySchema = z.object({
+  sessionId: sessionIdField,
+  opId: z.string().min(1),
+  replacement: z.unknown().optional(),
+});
+
+export const FixedPointsBodySchema = z.object({
+  sessionId: sessionIdField,
+  fixedPoints: z.array(z.unknown()).min(1),
+  currentScene: z.number().optional(),
+});
+
+export const BackchainBodySchema = z.object({
+  sessionId: sessionIdField,
+  fixedPoint: z.object({ atScene: z.number() }).passthrough(),
+  currentScene: z.number().optional(),
+});
+
+const StoryOpItemSchema = z
+  .object({ op: z.string().refine(k => k in STORY_OP_KINDS, { message: 'unknown StoryOp kind' }) })
+  .passthrough();
+
+export const InjectOpsBodySchema = z.object({
+  sessionId: sessionIdField,
+  ops: z.array(StoryOpItemSchema).min(1),
+  sceneIdx: z.number().optional(),
+  label: z.string().max(256).optional(),
+});
+
+export const ConvergeBodySchema = z.object({
+  sessionId: sessionIdField,
+  target: z.object({ sceneIdx: z.number() }).passthrough(),
+  seed: z.number().optional(),
+  budget: z.object({
+    maxIterations: z.number().optional(),
+    candidatesPerIteration: z.number().optional(),
+  }).passthrough().optional(),
+});
+
+export const ConvergeArcBodySchema = z.object({
+  sessionId: sessionIdField,
+  scenes: z.array(z.unknown()).min(1).max(8),
+});
+
+export const SelfplayBodySchema = z.object({
+  sessionId: sessionIdField,
+  scenarios: z.array(z.unknown()).min(1).max(5),
+  maxSimulations: z.number().positive().optional(),
+  maxScenesPerScenario: z.number().positive().optional(),
+  budget: z.object({
+    maxIterations: z.number().optional(),
+    candidatesPerIteration: z.number().optional(),
+    maxLLMCalls: z.number().optional(),
+  }).passthrough().optional(),
+});
+
+export const GenomeDiffBodySchema = z.object({
+  sessionId: sessionIdField,
+  runIdA: z.string().min(1),
+  runIdB: z.string().min(1),
+});
+
+export const GenomeBreedBodySchema = z.object({
+  sessionId: sessionIdField,
+  runIdA: z.string().min(1),
+  runIdB: z.string().min(1),
+  newId: z.string().min(1).optional(),
+});
+
+export const RepairBodySchema = z.object({
+  sessionId: sessionIdField,
+  ir: z.object({ ops: z.array(z.unknown()) }).passthrough(),
+});
+
+export const LiveMoveBodySchema = z.object({
+  sessionId: sessionIdField,
+  text: z.string().min(1).max(2000),
+  sceneIdx: z.number().optional(),
+});
+
+export const LiveAdvanceBodySchema = z.object({
+  sessionId: sessionIdField,
+  beats: z.number().optional(),
+  locationId: z.string().max(128).optional(),
+});
+
+export const CompileBodySchema = z.object({
+  sessionId: sessionIdField,
+  title: z.string().max(256).optional(),
+});
+
+export const ReviseBodySchema = z.object({
+  sessionId: sessionIdField,
+  approvedSpans: z.array(z.unknown()).optional(),
+  title: z.string().max(256).optional(),
 });
 
 // ── Middleware factory ───────────────────────────────────────────────────────

@@ -3,9 +3,15 @@ import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { buildEnrichedState } from '../nvm/state/enrichedState.ts';
 import {
-  asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
+  asyncHandler, safeJsonParse, sessionId, getOrCreateSession,
   gameLimiter, aiLimiter,
 } from '../lib/session-store.ts';
+import {
+  validate, GhostBranchBodySchema, RedteamBodySchema, QualityBodySchema, TwinDoBodySchema,
+  FixedPointsBodySchema, BackchainBodySchema, InjectOpsBodySchema, ConvergeBodySchema,
+  ConvergeArcBodySchema, SelfplayBodySchema, GenomeDiffBodySchema, GenomeBreedBodySchema,
+  RepairBodySchema, LiveMoveBodySchema, LiveAdvanceBodySchema, CompileBodySchema, ReviseBodySchema,
+} from '../lib/validation.ts';
 
 const router = express.Router();
 export default router;
@@ -32,9 +38,9 @@ router.get('/api/nvm/ghost-commits', gameLimiter, asyncHandler(async (req, res) 
 }));
 
 // POST /api/nvm/ghost-commits/branch — promote a ghost to a What-If candidate
-router.post('/api/nvm/ghost-commits/branch', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/ghost-commits/branch', gameLimiter, validate(GhostBranchBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const ghostId = requireString(req.body?.ghostId, 'ghostId', 128);
+  const { ghostId } = req.body as { ghostId: string };
   const ghost = stage.ghostLedgerFind(ghostId);
   if (!ghost) { res.status(404).json({ error: 'ghost not found' }); return; }
   res.json({ ghostId, branchedOps: ghost.ir.ops, sceneIdx: ghost.sceneIdx });
@@ -102,13 +108,10 @@ router.get('/api/nvm/topology', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/redteam — red-team a RevealPlan against current audience state
-router.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/redteam', gameLimiter, validate(RedteamBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { redTeamVerdict } = await import('../nvm/valuation/audience-redteam.ts');
-  const plan = req.body?.plan;
-  if (!plan || typeof plan.revealId !== 'string') {
-    res.status(400).json({ error: 'body.plan must be a RevealPlan' }); return;
-  }
+  const { plan } = req.body as { plan: import('../nvm/reveal/RevealPlan.ts').RevealPlan };
   const state = buildEnrichedState(stage);
   res.json(redTeamVerdict(plan, state));
 }));
@@ -116,13 +119,10 @@ router.post('/api/nvm/redteam', gameLimiter, asyncHandler(async (req, res) => {
 // ── Godmode API routes ─────────────────────────────────────────────────────
 
 // POST /api/nvm/quality — run quality engine on a candidate IR
-router.post('/api/nvm/quality', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/quality', gameLimiter, validate(QualityBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runQualityEngine } = await import('../nvm/quality/index.ts');
-  const ir = req.body?.ir;
-  if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
-    res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR' }); return;
-  }
+  const { ir } = req.body as { ir: import('../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR };
   const state = buildEnrichedState(stage);
   res.json(runQualityEngine(ir, state));
 }));
@@ -161,29 +161,25 @@ router.get('/api/nvm/twin/scm', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/twin/do — Pearl's do() causal intervention
-router.post('/api/nvm/twin/do', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/twin/do', gameLimiter, validate(TwinDoBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { buildSCM } = await import('../nvm/twin/scm.ts');
   const { doIntervention } = await import('../nvm/twin/counterfactual.ts');
-  const opId = req.body?.opId;
-  if (typeof opId !== 'string' || !opId) {
-    res.status(400).json({ error: 'body.opId (string) is required' }); return;
-  }
+  type StoryOpT = import('../nvm/ops/StoryOp.ts').StoryOp;
+  const { opId, replacement } = req.body as { opId: string; replacement?: StoryOpT | null };
   const scm = buildSCM(stage);
-  const intervention = { opId, replacement: req.body?.replacement ?? null };
+  const intervention = { opId, replacement: replacement ?? null };
   res.json(doIntervention(scm, intervention));
 }));
 
 // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor
-router.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/author/fixed-points', gameLimiter, validate(FixedPointsBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { planToward } = await import('../nvm/author/fixed-points.ts');
-  const fps = req.body?.fixedPoints;
-  if (!Array.isArray(fps) || fps.length === 0) {
-    res.status(400).json({ error: 'body.fixedPoints must be a non-empty array' }); return;
-  }
+  type FixedPointT = import('../nvm/author/fixed-points.ts').FixedPoint;
+  const { fixedPoints: fps, currentScene: bodyCurrentScene } = req.body as { fixedPoints: FixedPointT[]; currentScene?: number };
   const state = buildEnrichedState(stage);
-  const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+  const currentScene = typeof bodyCurrentScene === 'number' ? bodyCurrentScene : state.turn;
   const planResult = planToward(state, fps, currentScene);
 
   // Convert each GoalBias to DramaticPressure and inject into the Stage.
@@ -226,15 +222,13 @@ router.post('/api/nvm/author/fixed-points', gameLimiter, asyncHandler(async (req
 }));
 
 // POST /api/nvm/author/backchain — backward-chain a single FixedPoint to a schedule.
-router.post('/api/nvm/author/backchain', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/author/backchain', gameLimiter, validate(BackchainBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { backchain, scheduleToGoalBiases } = await import('../nvm/author/backchain.ts');
-  const fp = req.body?.fixedPoint;
-  if (!fp || typeof fp.atScene !== 'number') {
-    res.status(400).json({ error: 'body.fixedPoint with atScene (number) is required' }); return;
-  }
+  type FixedPointT = import('../nvm/author/fixed-points.ts').FixedPoint;
+  const { fixedPoint: fp, currentScene: bodyCurrentScene } = req.body as { fixedPoint: FixedPointT; currentScene?: number };
   const state = buildEnrichedState(stage);
-  const currentScene = typeof req.body?.currentScene === 'number' ? req.body.currentScene : state.turn;
+  const currentScene = typeof bodyCurrentScene === 'number' ? bodyCurrentScene : state.turn;
   const result = backchain(fp, state, currentScene);
   const { sanitizeForPrompt } = await import('../lib/prompt-utils.ts');
   const biases = scheduleToGoalBiases(result, sanitizeForPrompt(fp.description ?? `fixed point @ scene ${fp.atScene}`, 1000));
@@ -250,29 +244,20 @@ router.get('/api/nvm/momentum', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/inject-ops — Director's Cut: inject custom StoryOps into the canon.
-router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/inject-ops', gameLimiter, validate(InjectOpsBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
   const { stateHash } = await import('../nvm/state/NarrativeState.ts');
   const { summarizeOps } = await import('../nvm/state/StoryCommit.ts');
   const { randomUUID } = await import('node:crypto');
-  const { STORY_OP_KINDS } = await import('../nvm/ops/StoryOp.ts');
 
-  const ops = req.body?.ops;
-  if (!Array.isArray(ops) || ops.length === 0) {
-    res.status(400).json({ error: 'body.ops must be a non-empty StoryOp array' }); return;
-  }
-  // Validate each op has a known op kind
-  for (const op of ops) {
-    if (typeof op?.op !== 'string' || !(op.op in STORY_OP_KINDS)) {
-      res.status(400).json({ error: `Unknown op kind: "${op?.op ?? '?'}"` }); return;
-    }
-  }
+  type StoryOpT = import('../nvm/ops/StoryOp.ts').StoryOp;
+  const { ops, sceneIdx: bodySceneIdx, label } = req.body as { ops: StoryOpT[]; sceneIdx?: number; label?: string };
 
   const state = buildEnrichedState(stage);
   const commits = stage.getCommits().filter(c => !c.reverted);
   const parentId = commits[commits.length - 1]?.commitId ?? null;
-  const sceneIdx = typeof req.body?.sceneIdx === 'number' ? req.body.sceneIdx : state.turn;
+  const sceneIdx = typeof bodySceneIdx === 'number' ? bodySceneIdx : state.turn;
 
   const newState = applyStoryOps(state, ops);
   const commitId = randomUUID();
@@ -291,23 +276,21 @@ router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) =>
     sceneIdx,
     ops: ops.length,
     newStateHash: stateHash(newState),
-    label: req.body?.label ?? 'director_cut',
+    label: label ?? 'director_cut',
   });
 }));
 
 // POST /api/nvm/converge — run the G1 convergence loop on a scene target.
 // aiLimiter (not gameLimiter): each converge call fans out to multiple LLM candidate
 // generations — the loose 120/min game limit would allow a cost/quota-exhaustion DoS.
-router.post('/api/nvm/converge', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
-  const target = req.body?.target;
-  if (!target || typeof target !== 'object' || typeof target.sceneIdx !== 'number') {
-    res.status(400).json({ error: 'body.target must be a SceneTarget with sceneIdx' }); return;
-  }
+  type SceneTargetT = import('../nvm/generate/proof-spec.ts').SceneTarget;
+  const { target, seed: bodySeed } = req.body as { target: SceneTargetT; seed?: number };
   const state = buildEnrichedState(stage);
-  const seed = typeof req.body?.seed === 'number' ? req.body.seed : Date.now();
+  const seed = typeof bodySeed === 'number' ? bodySeed : Date.now();
   const generate = makeLLMCandidateGenerator();
 
   // G13→G1: if corpus has runs, mine the Director Policy and pass it to the budget.
@@ -530,18 +513,13 @@ router.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
 
 // POST /api/nvm/selfplay — run N headless sims and persist corpus results.
 // aiLimiter: self-play runs up to 50 simulations × LLM candidate generations per request.
-router.post('/api/nvm/selfplay', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/selfplay', aiLimiter, validate(SelfplayBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runSelfPlay } = await import('../nvm/selfplay/corpus.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
   const { extractGenome } = await import('../nvm/selfplay/genome.ts');
-  const scenarios = req.body?.scenarios;
-  if (!Array.isArray(scenarios) || scenarios.length === 0) {
-    res.status(400).json({ error: 'body.scenarios must be a non-empty array' }); return;
-  }
-  if (scenarios.length > 5) {
-    res.status(400).json({ error: 'Maximum 5 scenarios per HTTP self-play request' }); return;
-  }
+  type SimScenarioT = import('../nvm/selfplay/corpus.ts').SimScenario;
+  const { scenarios } = req.body as { scenarios: SimScenarioT[] };
   const rawMax = req.body?.maxSimulations;
   const maxSimulations = typeof rawMax === 'number' && rawMax > 0 ? Math.min(rawMax, 50) : undefined;
   const rawMaxScenes = req.body?.maxScenesPerScenario;
@@ -597,13 +575,10 @@ router.get('/api/nvm/genome/current', gameLimiter, asyncHandler(async (req, res)
 }));
 
 // POST /api/nvm/genome/diff — diff two corpus run genomes.
-router.post('/api/nvm/genome/diff', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/genome/diff', gameLimiter, validate(GenomeDiffBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { diffGenomes } = await import('../nvm/selfplay/genome.ts');
-  const { runIdA, runIdB } = req.body ?? {};
-  if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
-    res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
-  }
+  const { runIdA, runIdB } = req.body as { runIdA: string; runIdB: string };
   const runs = stage.getCorpusRuns(200);
   const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
   const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
@@ -620,13 +595,10 @@ router.post('/api/nvm/genome/diff', gameLimiter, asyncHandler(async (req, res) =
 }));
 
 // POST /api/nvm/genome/breed — breed two corpus run genomes into a seed genome.
-router.post('/api/nvm/genome/breed', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/genome/breed', gameLimiter, validate(GenomeBreedBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { breedGenomes } = await import('../nvm/selfplay/genome.ts');
-  const { runIdA, runIdB, newId } = req.body ?? {};
-  if (typeof runIdA !== 'string' || typeof runIdB !== 'string') {
-    res.status(400).json({ error: 'body.runIdA and body.runIdB (strings) are required' }); return;
-  }
+  const { runIdA, runIdB, newId } = req.body as { runIdA: string; runIdB: string; newId?: string };
   const runs = stage.getCorpusRuns(200);
   const runA = runs.find((r: { run_id: string }) => r.run_id === runIdA);
   const runB = runs.find((r: { run_id: string }) => r.run_id === runIdB);
@@ -704,15 +676,12 @@ router.get('/api/nvm/proof/:commitId', gameLimiter, asyncHandler(async (req, res
 }));
 
 // POST /api/nvm/repair — run all proof tiers on an IR, return repair patches.
-router.post('/api/nvm/repair', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/repair', gameLimiter, validate(RepairBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runTier1, runTier2, runTier4 } = await import('../nvm/proof/kernel.ts');
   const { repair } = await import('../nvm/proof/repair.ts');
   const { lint } = await import('../nvm/proof/lint.ts');
-  const ir = req.body?.ir;
-  if (!ir || typeof ir !== 'object' || !Array.isArray(ir.ops)) {
-    res.status(400).json({ error: 'body.ir must be a NarrativeTransitionIR with ops[]' }); return;
-  }
+  const { ir } = req.body as { ir: import('../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR };
   const state = buildEnrichedState(stage);
   const t1 = runTier1(ir, state);
   const t2 = runTier2(ir, state);
@@ -782,7 +751,7 @@ router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) =
 
 // POST /api/nvm/converge-arc — multi-scene arc compiler.
 // aiLimiter: arc convergence runs the LLM converge loop for up to 8 scenes per request.
-router.post('/api/nvm/converge-arc', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
@@ -790,13 +759,8 @@ router.post('/api/nvm/converge-arc', aiLimiter, asyncHandler(async (req, res) =>
   const { mineCorpus } = await import('../nvm/selfplay/mine.ts');
   const { appendGhost } = await import('../nvm/repro/ghost-ledger.ts');
 
-  const sceneTargets = req.body?.scenes;
-  if (!Array.isArray(sceneTargets) || sceneTargets.length === 0) {
-    res.status(400).json({ error: 'body.scenes must be a non-empty array of SceneTarget' }); return;
-  }
-  if (sceneTargets.length > 8) {
-    res.status(400).json({ error: 'Maximum 8 scenes per arc compilation' }); return;
-  }
+  type SceneTargetT = import('../nvm/generate/proof-spec.ts').SceneTarget;
+  const { scenes: sceneTargets } = req.body as { scenes: SceneTargetT[] };
 
   // Mine Director Policy from corpus if available
   let directorPolicy: import('../nvm/selfplay/mine.ts').DirectorPolicy | undefined;
@@ -1382,10 +1346,10 @@ router.get('/api/nvm/voice-dna', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/live/move — Author-Presence Move Bus.
-router.post('/api/nvm/live/move', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/live/move', gameLimiter, validate(LiveMoveBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { text, sceneIdx: bodySceneIdx } = req.body as { text?: string; sceneIdx?: number };
-  if (!text || typeof text !== 'string' || text.trim().length === 0) {
+  const { text, sceneIdx: bodySceneIdx } = req.body as { text: string; sceneIdx?: number };
+  if (text.trim().length === 0) {
     res.status(400).json({ error: 'text is required' });
     return;
   }
@@ -1496,7 +1460,7 @@ router.get('/api/nvm/live/feed', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/live/advance — Reactive Turn Cycle.
-router.post('/api/nvm/live/advance', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/live/advance', gameLimiter, validate(LiveAdvanceBodySchema), asyncHandler(async (req, res) => {
   const { stage, orchestrator } = getOrCreateSession(sessionId(req));
   const { beats = 1, locationId } = req.body as { beats?: number; locationId?: string };
   const safeBeats = Math.max(1, Math.min(5, typeof beats === 'number' ? beats : 1));
@@ -1587,7 +1551,7 @@ router.get('/api/nvm/screenplay/memory', gameLimiter, asyncHandler(async (req, r
 }));
 
 // POST /api/nvm/compile — End-Condition Detector + Screenplay Compiler.
-router.post('/api/nvm/compile', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/compile', gameLimiter, validate(CompileBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { title = 'UNTITLED' } = req.body as { title?: string };
 
@@ -1616,7 +1580,7 @@ router.post('/api/nvm/compile', gameLimiter, asyncHandler(async (req, res) => {
 
 // POST /api/nvm/revise — 12-pass revision pipeline.
 // aiLimiter: one revise call runs the 14-pass pipeline — up to 14 sequential LLM rewrites.
-router.post('/api/nvm/revise', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
 
