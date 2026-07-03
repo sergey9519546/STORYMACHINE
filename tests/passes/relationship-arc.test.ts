@@ -1376,6 +1376,84 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 707 — relationshipArcPass: relational staging peak uncaused, relational seed peak uncaused, relational highlight drought run', async () => {
+    const runRA707 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; visual beats at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('RELATIONAL_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs707a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs707a[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs707a[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA707(recs707a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_PEAK_UNCAUSED'), 'RELATIONAL_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONAL_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('RELATIONAL_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs707an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs707an[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs707an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs707an[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA707(recs707an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_PEAK_UNCAUSED'), 'RELATIONAL_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('RELATIONAL_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs707b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs707b[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs707b[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA707(recs707b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_PEAK_UNCAUSED'), 'RELATIONAL_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // RELATIONAL_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('RELATIONAL_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs707bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs707bn[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs707bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs707bn[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runRA707(recs707bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_PEAK_UNCAUSED'), 'RELATIONAL_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs707c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs707c[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs707c[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs707c[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs707c[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runRA707(recs707c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_DROUGHT_RUN'), 'RELATIONAL_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs707cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs707cn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs707cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs707cn[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runRA707(recs707cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_DROUGHT_RUN'), 'RELATIONAL_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 693 — relationshipArcPass: relational staging drought run, relational seed zone cluster, relational clock drought run', async () => {
     const runRA693 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

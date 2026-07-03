@@ -273,6 +273,15 @@
 // mode to seededClueIds; the zone-cluster mode has never been applied to this channel),
 // RELATIONAL_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — Wave 665 applied the
 // zone-cluster mode to clockRaised; the drought-run mode has never been applied to this channel).
+// Wave 707 additions (built on the shared checks library): RELATIONAL_STAGING_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × visualBeats magnitude — Waves 651/693 applied the
+// zone-cluster and drought-run modes to visualBeats; the backward-cause peak mode has never been
+// applied to it, completing the trio), RELATIONAL_SEED_PEAK_UNCAUSED (single-peak isolation/
+// backward-cause × seededClueIds magnitude — Waves 665/693 applied the drought-run and zone-
+// cluster modes to seededClueIds; the backward-cause peak mode has never been applied to it,
+// completing the trio), RELATIONAL_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence
+// — Wave 651 applied the backward-cause peak mode to dialogueHighlights; the drought-run mode has
+// never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4098,6 +4107,76 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r693c.longestRun} consecutive scenes with no clock raised at all, even though ${r693c.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the relationship without any urgency bearing on it for an extended run.`,
         suggestedFix: `Raise a clock somewhere within the ${r693c.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the relationship stays under some time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 707: RELATIONAL_STAGING_PEAK_UNCAUSED, RELATIONAL_SEED_PEAK_UNCAUSED,
+  //              RELATIONAL_HIGHLIGHT_DROUGHT_RUN ────────────────────────────────────────────
+
+  // RELATIONAL_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged
+  // scenes, a 2-scene lookback. Finds the single scene with the densest physical staging; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Waves 651/693 applied the zone-cluster and drought-run modes to visualBeats; the
+  // backward-cause peak mode has never been applied to it, completing the trio.
+  {
+    const r707a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r707a.fires) {
+      issues.push({
+        location: `scene ${r707a.peakIdx + 1} — peak physical-staging density (${r707a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r707a.peakIdx + 1}, with ${r707a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r707a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the relationship rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a
+  // 2-scene lookback. Finds the single scene with the most simultaneous clues planted; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Waves 665/693 applied the drought-run and zone-cluster modes to seededClueIds; the backward-
+  // cause peak mode has never been applied to it, completing the trio.
+  {
+    const r707b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r707b.fires) {
+      issues.push({
+        location: `scene ${r707b.peakIdx + 1} — peak seed density (${r707b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'RELATIONAL_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r707b.peakIdx + 1}, with ${r707b.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the relationship's arc drives what gets planted.`,
+        suggestedFix: `Give scene ${r707b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // RELATIONAL_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Wave 651 applied the backward-cause peak mode to dialogueHighlights; the drought-run mode has
+  // never been applied to this channel.
+  {
+    const r707c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r707c.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r707c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r707c.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r707c.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the relationship running on unremarkable dialogue for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r707c.longestRun}-scene stretch a standout line of dialogue — a character voicing something close to the relationship's arc memorably, keeping the verbal register alive throughout.`,
       });
     }
   }
