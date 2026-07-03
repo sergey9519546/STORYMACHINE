@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1002,6 +1005,75 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 597 — structurePass: unresolved clue debt escalation absent, dialogue highlight drought run, dialogue highlight zone imbalance', async () => {
+    const runST597 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT fires when second-half debt is not lower than first-half debt', async () => {
+      // 10 scenes; first half debt [0,0,1,0,1]=2 (avg .4), second half [1,1,1,1,1]=5 (avg 1.0) — debt rises
+      const debts597a = [0, 0, 1, 0, 1, 1, 1, 1, 1, 1];
+      const recs597a = debts597a.map((d, i) => makeSharedRecord(i, { unresolvedClues: Array.from({ length: d }, (_, k) => `clue${k}`) }));
+      const res = await runST597(recs597a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT'), 'UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT should fire');
+    });
+
+    it('UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT does not fire when second-half debt is lower than first-half debt', async () => {
+      // first half [2,2,2,2,2]=10 (avg 2.0), second half [0,0,0,0,0]=0 (avg 0) — debt pays down
+      const debts597anr = [2, 2, 2, 2, 2, 0, 0, 0, 0, 0];
+      const recs597anr = debts597anr.map((d, i) => makeSharedRecord(i, { unresolvedClues: Array.from({ length: d }, (_, k) => `clue${k}`) }));
+      const res = await runST597(recs597anr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT'), 'UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT should not fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_DROUGHT_RUN fires when ≥6 consecutive scenes have no dialogue highlights', async () => {
+      // 10 scenes; highlights at 0,1,2 (3 total); scenes 3-9 (7 in a row) have none
+      const recs597b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs597b[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'] });
+      recs597b[1] = makeSharedRecord(1, { dialogueHighlights: ['bob: believes Y'] });
+      recs597b[2] = makeSharedRecord(2, { dialogueHighlights: ['alice: believes Z'] });
+      const res = await runST597(recs597b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_DROUGHT_RUN'), 'DIALOGUE_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_DROUGHT_RUN does not fire when highlights are spread with no long gap', async () => {
+      // highlights at 0,3,6,9 — max gap = 2 scenes, well under the 6-scene threshold
+      const recs597bnr = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs597bnr[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'] });
+      recs597bnr[3] = makeSharedRecord(3, { dialogueHighlights: ['bob: believes Y'] });
+      recs597bnr[6] = makeSharedRecord(6, { dialogueHighlights: ['alice: believes Z'] });
+      recs597bnr[9] = makeSharedRecord(9, { dialogueHighlights: ['bob: believes W'] });
+      const res = await runST597(recs597bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_DROUGHT_RUN'), 'DIALOGUE_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone has zero highlights and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: highlights at 6,7,8 (zone 2) plus 9 (zone 3) to meet minCount=4
+      const recs597c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs597c[6] = makeSharedRecord(6, { dialogueHighlights: ['a: x'] });
+      recs597c[7] = makeSharedRecord(7, { dialogueHighlights: ['b: y'] });
+      recs597c[8] = makeSharedRecord(8, { dialogueHighlights: ['a: z'] });
+      recs597c[9] = makeSharedRecord(9, { dialogueHighlights: ['b: w'] });
+      const res = await runST597(recs597c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlights are spread across all zones', async () => {
+      const recs597cnr = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs597cnr[1] = makeSharedRecord(1, { dialogueHighlights: ['a: x'] });
+      recs597cnr[4] = makeSharedRecord(4, { dialogueHighlights: ['b: y'] });
+      recs597cnr[7] = makeSharedRecord(7, { dialogueHighlights: ['a: z'] });
+      recs597cnr[10] = makeSharedRecord(10, { dialogueHighlights: ['b: w'] });
+      const res = await runST597(recs597cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 583 — structurePass: turn suspense decoupled, clock aftermath emotion void, peak suspense curiosity void', async () => {
     const makeRec583 = (idx: number, overrides: any = {}): any => ({

@@ -183,9 +183,22 @@
 // co-occurrence), suspense run (run-based × suspense channel — longest consecutive run of scenes
 // with suspenseDelta > 0 ≥ 5; the tension dial stuck at high across an unbroken sequence, the
 // first run-based check on the suspense channel, distinct from the emotional-valence run checks).
+// Wave 597 additions: unresolved clue debt escalation absent (distribution/timing × unresolvedClues
+// trend — first half's average unresolved-clue count is not exceeded by the second half's average;
+// narrative debt never pays down as the story approaches resolution; first check in this pass to
+// use the unresolvedClues signal at all — the file's macro-structure lens has never before audited
+// clue-debt trajectory, only revelation/clock/suspense/curiosity trends), dialogue highlight drought
+// run (run-based × dialogueHighlights absence, built on checkDroughtRun from the shared checks
+// library — audit M2.2, the library's first use of this specific template this session — ≥6
+// consecutive scenes with no dialogueHighlights while ≥3 highlight-bearing scenes exist elsewhere;
+// an extended stretch where no character states a belief worth tracking), dialogue highlight zone
+// imbalance (underweight/bloat × dialogueHighlights × four structural zones, built on
+// checkZoneImbalance — one zone silent while another holds ≥50% of all highlights; the zone-based
+// sibling of the drought-run check above, both first uses of dialogueHighlights in this file).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkDroughtRun, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
@@ -3220,6 +3233,91 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Rewrite ───────────────────────────────────────────────────────────────
+  // ── Wave 597: UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT, DIALOGUE_HIGHLIGHT_DROUGHT_RUN,
+  //              DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE ──────────────────────────────────────────
+
+  // UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT — Distribution/timing × unresolvedClues trend.
+  // n≥10. Requires at least 5 total unresolvedClues entries across the story (otherwise there's
+  // no meaningful debt to track). Splits the story in half; if the second half's average
+  // unresolved-clue count per scene is NOT lower than the first half's → fire. Narrative debt —
+  // clues planted but not yet paid off — should generally pay down as the story approaches its
+  // resolution; a story where the back half carries as much or more open debt than the front half
+  // is accumulating unanswered threads rather than resolving them.
+  // Distinct from: REVELATION_DROUGHT (run-based × revelation absence — a different signal:
+  // whether disclosures happen at all, not how much OPEN debt is outstanding), SETUP_RESOLUTION_
+  // IMBALANCE (compares scene-count budget for setup vs. resolution, not the unresolvedClues
+  // field directly). First check in this pass to use the unresolvedClues signal at all — this
+  // file's macro-structure lens has audited revelation/clock/suspense/curiosity trends, but never
+  // the trajectory of unpaid narrative debt.
+  if (records.length >= 10) {
+    const debtCounts597a = (records as any[]).map(r => ((r.unresolvedClues ?? []) as unknown[]).length);
+    const totalDebt597a = debtCounts597a.reduce((s, v) => s + v, 0);
+    if (totalDebt597a >= 5) {
+      const half597a = Math.floor(debtCounts597a.length / 2);
+      const firstAvg597a = debtCounts597a.slice(0, half597a).reduce((s, v) => s + v, 0) / half597a;
+      const secondAvg597a = debtCounts597a.slice(half597a).reduce((s, v) => s + v, 0) / (debtCounts597a.length - half597a);
+      if (secondAvg597a >= firstAvg597a) {
+        issues.push({
+          location: `first-half avg unresolved clues ${firstAvg597a.toFixed(1)} vs. second-half avg ${secondAvg597a.toFixed(1)}`,
+          rule: 'UNRESOLVED_CLUE_DEBT_ESCALATION_ABSENT',
+          severity: 'minor',
+          description: `The story's outstanding narrative debt does not pay down in the back half: the first-half average of unresolved planted clues per scene (${firstAvg597a.toFixed(1)}) is not exceeded by the second-half average (${secondAvg597a.toFixed(1)}) — in fact the second half carries as much or more open debt. A well-structured mystery or thriller accumulates questions in its first half and spends its second half answering them; when open threads never meaningfully decrease, the audience's sense of the story closing in on its answers never arrives, even if individual payoffs do occur.`,
+          suggestedFix: `Resolve more of the clues planted in the first half before introducing new ones in the second — let the back half's balance of new-seeds-to-payoffs tilt toward payoffs. The audience should feel the story's list of open questions shrinking as it approaches the climax, not holding steady or growing.`,
+        });
+      }
+    }
+  }
+
+  // DIALOGUE_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence.
+  // Built on checkDroughtRun from the shared check-template library (audit M2.2). n≥10, ≥3
+  // scenes with dialogueHighlights present elsewhere, longest consecutive run of highlight-free
+  // scenes ≥6 → fire. An extended stretch where no character states a belief or claim worth
+  // tracking — the story's spoken-conviction engine goes dark for six or more scenes running.
+  // Distinct from: every other run-based check in this pass (CLOCK_RUN, CURIOSITY_RUN, SUSPENSE_
+  // RUN, POSITIVE/NEGATIVE_SCENE_RUN, PURPOSE_MONOTONE_RUN), none of which touch dialogueHighlights
+  // — a signal this file had never used before this wave.
+  {
+    const r597b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r597b.fires) {
+      issues.push({
+        location: `longest dialogue-highlight drought: ${r597b.longestRun} consecutive scenes without a tracked belief statement`,
+        rule: 'DIALOGUE_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r597b.longestRun} consecutive scenes with no dialogueHighlights — no character states a belief or claim worth tracking — even though ${r597b.presentCount} such scenes exist elsewhere. An extended stretch where nobody says anything the story bothers to track suggests the dialogue has gone structurally quiet: characters may be talking, but nothing they say advances what the audience knows about anyone's convictions.`,
+        suggestedFix: `Break the drought by giving at least one character a stated belief, claim, or conviction somewhere within the ${r597b.longestRun}-scene stretch — even a brief, pointed line that reveals what a character thinks is true keeps the story's belief-tracking engine alive through a long scene run.`,
+      });
+    }
+  }
+
+  // DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 highlight-bearing scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero
+  // highlight-bearing scenes while another holds ≥50% of the total — the zone-based sibling of
+  // DIALOGUE_HIGHLIGHT_DROUGHT_RUN above; both are the first checks in this file to use the
+  // dialogueHighlights signal, differentiated by mode (run-based vs. four-zone void+bloat) exactly
+  // as this file's existing channel families (clock, curiosity, suspense) are each audited by
+  // multiple distinct modes.
+  {
+    const r597c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r597c.fires) {
+      const emptyNames597c = r597c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName597c = FOUR_ZONE_NAMES[r597c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames597c} empty; ${bloatName597c} has ${r597c.counts[r597c.bloatZoneIdx]}/${r597c.totalCount} dialogue-highlight scenes`,
+        rule: 'DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r597c.totalCount} dialogue-highlight scenes (scenes where a character states a tracked belief) are unevenly distributed across its four structural zones: ${bloatName597c} contains ${r597c.counts[r597c.bloatZoneIdx]} of them (${Math.round((r597c.counts[r597c.bloatZoneIdx] / r597c.totalCount) * 100)}%) while ${emptyNames597c} contains none. The story's spoken-conviction engine bloats in one zone and vanishes from another: one structural quarter carries a burst of characters stating what they believe, while another passes with no one's convictions on record.`,
+        suggestedFix: `Redistribute tracked belief-statements: move at least one dialogue highlight from ${bloatName597c} into the empty zone(s) — ${emptyNames597c} — so every structural quarter carries some evidence of characters stating what they think is true.`,
+      });
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
