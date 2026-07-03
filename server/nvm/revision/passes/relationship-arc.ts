@@ -353,6 +353,15 @@
 // MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment' × structural thirds
 // — this purpose value has never been referenced anywhere in this pass; none of the three
 // shared-library trio modes has ever been applied to it).
+// Wave 819 additions: RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose ===
+// 'character_moment' absence — completing 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 805; peak mode conventionally skipped for this categorical
+// field), RELATIONAL_TURNING_POINT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'turning_point' × structural thirds — this purpose value has never been referenced anywhere
+// in this pass; none of the three shared-library trio modes has ever been applied to it),
+// RELATIONAL_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
+// completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+// same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4731,6 +4740,72 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${Math.round((r805c.maxZoneCount / r805c.count) * 100)}% of the story's character-moment scenes cluster in the ${r805c.zoneNames[r805c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the relationship has no room to let a bond register on the character anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r805c.zoneNames[r805c.maxZoneIdx]} third as a character moment so the relationship keeps room for interior reflection more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 819: RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN, RELATIONAL_TURNING_POINT_ZONE_CLUSTER,
+  //              RELATIONAL_TURNING_POINT_DROUGHT_RUN ──────────────────────────────────────
+
+  // RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment
+  // scenes overall, fires when the longest consecutive run of scenes with no character-moment
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 805 (peak mode conventionally skipped for this categorical field).
+  {
+    const r819a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r819a.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r819a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r819a.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r819a.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with nothing but plot momentum leaves the relationship without a beat to let a bond register on the character for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r819a.longestRun}-scene stretch as a character moment so the relationship keeps room for a bond to register throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r819b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r819b.fires) {
+      issues.push({
+        location: `${r819b.zoneNames[r819b.maxZoneIdx]} third — ${r819b.maxZoneCount} of ${r819b.count} turning-point scenes`,
+        rule: 'RELATIONAL_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r819b.maxZoneCount / r819b.count) * 100)}% of the story's turning-point scenes cluster in the ${r819b.zoneNames[r819b.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the relationship has no pivot redirecting the bond anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r819b.zoneNames[r819b.maxZoneIdx]} third as a turning point so the relationship keeps a pivot redirecting the bond more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes
+  // overall, fires when the longest consecutive run of scenes with no turning-point purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r819c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r819c.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r819c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r819c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r819c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the relationship without a pivot to redirect the bond for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r819c.longestRun}-scene stretch as a turning point so the relationship keeps a pivot redirecting the bond throughout that stretch.`,
       });
     }
   }
