@@ -284,6 +284,14 @@
 // the shared library), CONFLICT_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence
 // — relationshipShifts is this pass's most heavily used field [76 accesses] but has never been
 // drought-audited via the shared library).
+// Wave 716 additions (built on the shared checks library): CONFLICT_SEED_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × seededClueIds magnitude — Waves 660/688 applied the
+// drought-run and zone-cluster modes to seededClueIds; the backward-cause peak mode has never
+// been applied to it, completing the trio), CONFLICT_PAYOFF_DROUGHT_RUN (run-based ×
+// payoffSetupIds absence — Wave 660 applied the backward-cause peak mode to payoffSetupIds; the
+// drought-run mode has never been applied to it), CONFLICT_CLOCK_DELTA_DROUGHT_RUN (run-based ×
+// clockDelta>0 absence — Wave 674 applied the backward-cause peak mode and Wave 702 applied the
+// zone-cluster mode to clockRaised; clockDelta itself has never been drought-audited).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4189,6 +4197,73 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r702c.longestRun} consecutive scenes with no relationship shift at all, even though ${r702c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the conflict's interpersonal dimension dormant for an extended run.`,
         suggestedFix: `Let a bond shift somewhere within the ${r702c.longestRun}-scene stretch — even a small movement keeps the conflict tied to changing interpersonal stakes throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 716: CONFLICT_SEED_PEAK_UNCAUSED, CONFLICT_PAYOFF_DROUGHT_RUN,
+  //              CONFLICT_CLOCK_DELTA_DROUGHT_RUN ──────────────────────────────────────────────
+
+  // CONFLICT_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Waves
+  // 660/688 applied the drought-run and zone-cluster modes to seededClueIds; the backward-cause
+  // peak mode has never been applied to it, completing the trio.
+  {
+    const r716a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r716a.fires) {
+      issues.push({
+        location: `scene ${r716a.peakIdx + 1} — peak seed density (${r716a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r716a.peakIdx + 1}, with ${r716a.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the conflict's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r716a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in the conflict rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. Wave 660 applied the
+  // backward-cause peak mode to payoffSetupIds; the drought-run mode has never been applied to it.
+  {
+    const r716b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r716b.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r716b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r716b.longestRun} consecutive scenes with no thread resolving at all, even though ${r716b.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the conflict's engine of cause-and-effect dormant for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r716b.longestRun}-scene stretch so the conflict's sense of accumulating consequence keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 scenes with a positive clock delta, fires when the
+  // longest consecutive run of scenes with no clock advance reaches 6. Wave 674 applied the
+  // backward-cause peak mode and Wave 702 applied the zone-cluster mode to clockRaised; clockDelta
+  // itself has never been drought-audited.
+  {
+    const r716c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r716c.fires) {
+      issues.push({
+        location: `longest stretch with no clock advance: ${r716c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r716c.longestRun} consecutive scenes with no clock advance at all, even though ${r716c.presentCount} scenes elsewhere do compress time pressure. A long unbroken stretch with no deadline tightening leaves the conflict without any mounting urgency for an extended run.`,
+        suggestedFix: `Advance the clock somewhere within the ${r716c.longestRun}-scene stretch — even a small compression keeps the conflict under some time pressure throughout that stretch.`,
       });
     }
   }

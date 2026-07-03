@@ -1535,6 +1535,92 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 716 — conflictPass: conflict seed peak uncaused, conflict payoff drought run, conflict clock delta drought run', async () => {
+    const makeRec716 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF716 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('CONFLICT_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs716a = Array.from({ length: 8 }, (_, i) => makeRec716(i,
+        i === 2 ? { seededClueIds: ['clue-a'] }
+        : i === 6 ? { seededClueIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF716(recs716a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_SEED_PEAK_UNCAUSED'), 'CONFLICT_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // CONFLICT_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CONFLICT_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs716an = Array.from({ length: 8 }, (_, i) => makeRec716(i,
+        i === 2 ? { seededClueIds: ['clue-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { seededClueIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF716(recs716an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_SEED_PEAK_UNCAUSED'), 'CONFLICT_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // CONFLICT_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CONFLICT_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs716b = Array.from({ length: 10 }, (_, i) => makeRec716(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runCF716(recs716b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_PAYOFF_DROUGHT_RUN'), 'CONFLICT_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CONFLICT_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs716bn = Array.from({ length: 10 }, (_, i) => makeRec716(i,
+        (i === 0 || i === 4 || i === 9) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runCF716(recs716bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_PAYOFF_DROUGHT_RUN'), 'CONFLICT_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_CLOCK_DELTA_DROUGHT_RUN fire:
+    // 10 scenes; clock advances at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CONFLICT_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-advance run is ≥6', async () => {
+      const recs716c = Array.from({ length: 10 }, (_, i) => makeRec716(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runCF716(recs716c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'CONFLICT_CLOCK_DELTA_DROUGHT_RUN'), 'CONFLICT_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock advances at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CONFLICT_CLOCK_DELTA_DROUGHT_RUN does not fire when clock advances are distributed without a long drought', async () => {
+      const recs716cn = Array.from({ length: 10 }, (_, i) => makeRec716(i,
+        (i === 0 || i === 4 || i === 9) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runCF716(recs716cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'CONFLICT_CLOCK_DELTA_DROUGHT_RUN'), 'CONFLICT_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 702 — conflictPass: conflict open thread peak uncaused, conflict clock zone cluster, conflict relationship drought run', async () => {
     const makeRec702 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
