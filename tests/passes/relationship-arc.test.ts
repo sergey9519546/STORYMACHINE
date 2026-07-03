@@ -1376,6 +1376,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 833 — relationshipArcPass: relational introduce conflict zone cluster, relational introduce conflict drought run, relational positive emotion zone cluster', async () => {
+    const runRA833 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; introduce_conflict scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER fires when >75% of conflict-introducing scenes cluster in one third', async () => {
+      const recs833a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runRA833(recs833a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER does not fire when conflict-introducing scenes spread across thirds', async () => {
+      const recs833an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runRA833(recs833an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs833b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runRA833(recs833b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs833bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runRA833(recs833bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs833c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runRA833(recs833c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER'), 'RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes spread across thirds', async () => {
+      const recs833cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runRA833(recs833cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER'), 'RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 819 — relationshipArcPass: relational character moment drought run, relational turning point zone cluster, relational turning point drought run', async () => {
     const runRA819 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

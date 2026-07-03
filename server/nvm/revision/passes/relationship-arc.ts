@@ -362,6 +362,16 @@
 // RELATIONAL_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
 // completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
 // same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 833 additions: RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose
+// === 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; a virgin field), RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based ×
+// purpose === 'introduce_conflict' absence — completing 2 of 3 slots for this purpose value
+// alongside the zone-cluster mode added in this same wave; peak mode conventionally skipped for
+// this categorical field), RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'positive' × structural thirds — mirrors the completed negative-valence
+// trio; the positive valence has never been isolated by any of the three shared-library trio
+// modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4806,6 +4816,73 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r819c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r819c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the relationship without a pivot to redirect the bond for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r819c.longestRun}-scene stretch as a turning point so the relationship keeps a pivot redirecting the bond throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 833: RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER, RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r833a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r833a.fires) {
+      issues.push({
+        location: `${r833a.zoneNames[r833a.maxZoneIdx]} third — ${r833a.maxZoneCount} of ${r833a.count} conflict-introducing scenes`,
+        rule: 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r833a.maxZoneCount / r833a.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r833a.zoneNames[r833a.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the relationship faces fresh friction in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Purpose at least one scene outside the ${r833a.zoneNames[r833a.maxZoneIdx]} third to introduce conflict so the relationship keeps facing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in this same wave (peak mode conventionally skipped
+  // for this categorical field).
+  {
+    const r833b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r833b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r833b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r833b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r833b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the relationship untested for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r833b.longestRun}-scene stretch to introduce conflict so the relationship keeps facing fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift ===
+  // 'positive' × structural thirds. Built on checkZoneCluster from the shared checks library.
+  // n≥9, ≥3 positive-emotion scenes, fires when more than 75% of them fall in a single structural
+  // third. Mirrors the completed negative-valence trio; the positive valence has never been
+  // isolated by any of the three shared-library trio modes in this pass.
+  {
+    const r833c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r833c.fires) {
+      issues.push({
+        location: `${r833c.zoneNames[r833c.maxZoneIdx]} third — ${r833c.maxZoneCount} of ${r833c.count} positive-emotion scenes`,
+        rule: 'RELATIONAL_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r833c.maxZoneCount / r833c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r833c.zoneNames[r833c.maxZoneIdx]} third. When all the warmth concentrates in one structural window, the relationship carries its emotional reward in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r833c.zoneNames[r833c.maxZoneIdx]} third so the relationship registers its emotional reward more evenly across the story.`,
       });
     }
   }
