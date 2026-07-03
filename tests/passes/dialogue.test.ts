@@ -1598,6 +1598,85 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 798 — dialoguePass: dialogue revelation drought run, dialogue revelation peak uncaused, dialogue character moment zone cluster', async () => {
+    const makeRec798 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes798 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD798 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs798a = Array.from({ length: 10 }, (_, i) => makeRec798(i,
+        (i === 0 || i === 1 || i === 2) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD798(buildScenes798(10), recs798a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_DROUGHT_RUN'), 'DIALOGUE_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs798an = Array.from({ length: 10 }, (_, i) => makeRec798(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD798(buildScenes798(10), recs798an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_DROUGHT_RUN'), 'DIALOGUE_REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('DIALOGUE_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs798b = Array.from({ length: 8 }, (_, i) => makeRec798(i,
+        (i === 2 || i === 5) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD798(buildScenes798(8), recs798b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_PEAK_UNCAUSED'), 'DIALOGUE_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('DIALOGUE_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs798bn = Array.from({ length: 8 }, (_, i) => makeRec798(i,
+        i === 1 ? { dramaticTurn: 'reversal' } :
+        (i === 2 || i === 5) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD798(buildScenes798(8), recs798bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_PEAK_UNCAUSED'), 'DIALOGUE_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs798c = Array.from({ length: 9 }, (_, i) => makeRec798(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runD798(buildScenes798(9), recs798c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs798cn = Array.from({ length: 9 }, (_, i) => makeRec798(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runD798(buildScenes798(9), recs798cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 784 — dialoguePass: dialogue revelation zone cluster, dialogue clock raised zone cluster, dialogue emotion drought run', async () => {
     const makeRec784 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

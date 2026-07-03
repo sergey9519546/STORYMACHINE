@@ -337,6 +337,17 @@
 // it), DIALOGUE_EMOTION_DROUGHT_RUN (run-based × emotionalShift !== 'neutral' absence —
 // DIALOGUE_EMOTION_ZONE_CLUSTER already applied the zone-cluster mode to this signal; the
 // drought-run mode has never been applied to it).
+// Wave 798 additions (opens the sixteenth rotation cycle): DIALOGUE_REVELATION_DROUGHT_RUN
+// (run-based × revelation absence — Wave 784 applied the zone-cluster mode to revelation;
+// completing 2 of 3 trio slots), DIALOGUE_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude [0/1] × 2-scene lookback, anchored on the FIRST revelation scene —
+// completes the trio for revelation; hasCause deliberately omits revelation to avoid
+// circularity), DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — the existing CHARACTER_MOMENT_ZONE_IMBALANCE uses
+// checkZoneImbalance, a different shared-library helper testing deficit-vs-surplus across the
+// four named acts, not the general thirds-based >75%-concentration test; completing the trio for
+// this categorical field alongside the pre-existing drought-run mode, peak conventionally
+// skipped).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4691,6 +4702,75 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r784c.longestRun} consecutive scenes with no emotional charge at all, even though ${r784c.presentCount} scenes elsewhere carry one. A long unbroken stretch with nothing felt leaves dialogue with no emotional register to voice for an extended run.`,
         suggestedFix: `Give at least one scene within the ${r784c.longestRun}-scene stretch an emotional charge so dialogue keeps a felt register to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 798: DIALOGUE_REVELATION_DROUGHT_RUN, DIALOGUE_REVELATION_PEAK_UNCAUSED,
+  //              DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // DIALOGUE_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Wave 784 applied the zone-cluster
+  // mode to revelation; completing 2 of 3 trio slots.
+  {
+    const r798a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r798a.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r798a.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r798a.longestRun} consecutive scenes with no revelation at all, even though ${r798a.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves dialogue with no fresh disclosure to voice reactions to for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r798a.longestRun}-scene stretch so dialogue keeps a fresh disclosure to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Completes the trio for revelation. hasCause deliberately omits
+  // revelation to avoid circularity.
+  {
+    const r798b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r798b.fires) {
+      issues.push({
+        location: `scene ${r798b.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'DIALOGUE_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r798b.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r798b.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot gives the dialogue nothing to voice reaction against — the disclosure reads as a coincidence rather than a consequence of the story's own turns.`,
+        suggestedFix: `Add a dramatic turn in scene ${r798b.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points, giving dialogue something concrete to react to.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. Distinct from the existing CHARACTER_MOMENT_ZONE_IMBALANCE, which uses
+  // checkZoneImbalance — a different shared-library helper testing deficit-vs-surplus across the
+  // four named acts, not the general thirds-based >75%-concentration test. Completes the trio for
+  // this categorical field alongside the pre-existing drought-run mode (peak conventionally
+  // skipped).
+  {
+    const r798c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r798c.fires) {
+      issues.push({
+        location: `${r798c.zoneNames[r798c.maxZoneIdx]} third — ${r798c.maxZoneCount} of ${r798c.count} character-moment scenes`,
+        rule: 'DIALOGUE_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r798c.maxZoneCount / r798c.count) * 100)}% of the story's character-moment scenes cluster in the ${r798c.zoneNames[r798c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, dialogue has no room to voice the protagonist's inner life anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r798c.zoneNames[r798c.maxZoneIdx]} third as a character moment so dialogue keeps room to voice interior reflection more evenly across the story.`,
       });
     }
   }
