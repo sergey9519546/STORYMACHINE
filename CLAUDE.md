@@ -51,9 +51,15 @@ Each wave:
 2. Every new check carries full guard conditions and a comment block explaining
    the rule and an explicit **distinctness rationale** vs. related rules.
 3. Update the file's header comment with a "Wave N additions:" summary line.
-4. Add **6 tests** (fire + no-fire per check) in `test.ts`, inserted BEFORE the
-   most recent prior wave's `describe` block (newest-first order).
-5. Run `node --experimental-strip-types test.ts` — require **0 failures**.
+4. Add **6 tests** (fire + no-fire per check) in `tests/passes/<pass>.test.ts`
+   (e.g. `tests/passes/conflict.test.ts`), inserted BEFORE the most recent
+   prior wave's `describe` block in that file (newest-first order). The
+   monolithic root `test.ts` no longer exists — it was split one file per
+   pass (audit M2.1) specifically so each wave only touches a single ~3–5k
+   line file instead of a 64k-line one.
+5. Run `node --experimental-strip-types tests/passes/<pass>.test.ts` for the
+   file you touched — require **0 failures**. Run the full suite
+   (`npm test`) before pushing to confirm nothing else regressed.
 6. Commit and push to the working branch (`claude/review-merge-prs-IJKUO`).
 
 Analytical modes to draw distinct checks from: average/aggregate, single-peak
@@ -63,7 +69,8 @@ underweight/bloat, sequence/aftermath, backward-cause, run-based, valence.
 ### Test runner
 
 ```
-node --experimental-strip-types test.ts
+node --experimental-strip-types tests/passes/<pass>.test.ts   # the file you touched
+npm test                                                       # full suite before pushing
 ```
 
 ### Commit message trailer

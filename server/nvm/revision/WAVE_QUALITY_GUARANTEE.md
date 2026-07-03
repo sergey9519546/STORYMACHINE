@@ -1,15 +1,16 @@
 # NVM Revision-Wave Quality Guarantee
 
 **Scope:** the narrative-quality-check "wave" workflow that incrementally extends the
-revision passes in `server/nvm/revision/passes/` (and their tests in `test.ts`).
+revision passes in `server/nvm/revision/passes/` (and their tests, one file per pass,
+in `tests/passes/*.test.ts` — split from a single monolithic `test.ts` in audit M2.1).
 
 **Status at last update:** through **Wave 590** — 14 passes, **1307** distinct rule names,
-**3841** tests, suite green (`node --experimental-strip-types test.ts` ⇒ 0 failures).
+**3841** tests across `tests/passes/*.test.ts`, suite green (`npm test` ⇒ 0 failures).
 
 > This count drifts every wave. Rather than hand-updating it each time, verify the live
 > numbers with:
 > `grep -h "rule: '" server/nvm/revision/passes/*.ts | grep -oP "rule: '[A-Z_]+'" | sort -u | wc -l`
-> and the `# tests` / `# pass` lines from `node --experimental-strip-types test.ts`.
+> and the `# tests` / `# pass` lines from `npm test`.
 
 ---
 
@@ -135,7 +136,7 @@ has met it; each future wave will.
    records/fountain directly and never depend on network or model calls.
 
 7. **Security surface untouched.** The wave workflow is confined to
-   `server/nvm/revision/passes/*.ts` and `test.ts`. It adds **no** routes, **no** frontend
+   `server/nvm/revision/passes/*.ts` and `tests/passes/*.test.ts`. It adds **no** routes, **no** frontend
    code, **no** `apiKey` references, and **no** new `console.*` in `server/**`. The
    project's standing security invariants are therefore preserved by construction:
    - API keys live only in `.env` (gitignored), never in tracked files;
