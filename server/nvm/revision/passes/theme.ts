@@ -310,6 +310,15 @@
 // peak for a structural cause [dramatic turn or revelation] in the 2 preceding scenes, a wholly
 // different analytical claim, so the shared-library backward-cause mode has never been applied to
 // suspenseDelta).
+// Wave 780 additions: THEME_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 766
+// applied the zone-cluster and backward-cause peak modes to suspenseDelta; the run-based drought
+// mode has never been applied to it, completing the trio), THEME_CURIOSITY_DROUGHT_RUN (run-based
+// × curiosityDelta>0 absence — Wave 766 applied the zone-cluster mode to curiosityDelta; the
+// run-based drought mode has never been applied to it), THEME_CURIOSITY_PEAK_UNCAUSED
+// (backward-cause × curiosityDelta-as-magnitude × 2-scene lookback — THEME_CURIOSITY_PEAK_ABSENT
+// audits whether the peak scene ITSELF carries thematic resonance; this looks backward from the
+// peak for a structural cause, a wholly different analytical claim, so the shared-library
+// backward-cause mode has never been applied to curiosityDelta, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4418,6 +4427,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single highest-suspense scene (Scene ${r766c.peakIdx}, suspenseDelta ${r766c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r766c.qualifyingCount} scenes elsewhere carry tension. The moment the audience is most gripped lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
         suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r766c.peakIdx} so the theme earns its peak suspense instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // ── Wave 780: THEME_SUSPENSE_DROUGHT_RUN, THEME_CURIOSITY_DROUGHT_RUN,
+  //              THEME_CURIOSITY_PEAK_UNCAUSED ──────────────────────────────────────
+
+  // THEME_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no rising tension reaches 6. Wave 766 applied the
+  // zone-cluster and backward-cause peak modes to suspenseDelta; the run-based drought mode has
+  // never been applied to it, completing the trio.
+  {
+    const r780a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r780a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r780a.longestRun} consecutive scenes`,
+        rule: 'THEME_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r780a.longestRun} consecutive scenes with no rise in suspense at all, even though ${r780a.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the theme with no rising tension pressing on it for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r780a.longestRun}-scene stretch so the theme keeps rising tension pressing on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no curiosity rise reaches 6. Wave 766 applied the
+  // zone-cluster mode to curiosityDelta; the run-based drought mode has never been applied to it.
+  {
+    const r780b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r780b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r780b.longestRun} consecutive scenes`,
+        rule: 'THEME_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r780b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r780b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the theme with no fresh question keeping it alive for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r780b.longestRun}-scene stretch so the theme keeps a live question pulling the audience through that stretch.`,
+      });
+    }
+  }
+
+  // THEME_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in
+  // the 2 scenes preceding it. THEME_CURIOSITY_PEAK_ABSENT audits whether the peak scene ITSELF
+  // carries thematic resonance; this looks backward from the peak for a structural cause, a
+  // wholly different analytical claim, so the shared-library backward-cause mode has never been
+  // applied to curiosityDelta, completing the trio.
+  {
+    const r780c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.curiosityDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r780c.fires) {
+      issues.push({
+        location: `scene ${r780c.peakIdx} (peak curiosityDelta ${r780c.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'THEME_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r780c.peakIdx}, curiosityDelta ${r780c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r780c.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r780c.peakIdx} so the theme earns its peak curiosity instead of springing it without preparation.`,
       });
     }
   }

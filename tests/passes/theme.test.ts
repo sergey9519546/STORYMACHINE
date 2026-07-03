@@ -931,6 +931,74 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 780 — themePass: theme suspense drought run, theme curiosity drought run, theme curiosity peak uncaused', async () => {
+    const runT780 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs780a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT780(recs780a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_DROUGHT_RUN'), 'THEME_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs780an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT780(recs780an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_DROUGHT_RUN'), 'THEME_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs780b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT780(recs780b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_DROUGHT_RUN'), 'THEME_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs780bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT780(recs780bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_DROUGHT_RUN'), 'THEME_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('THEME_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs780c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs780c[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs780c[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runT780(recs780c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_PEAK_UNCAUSED'), 'THEME_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('THEME_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs780cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs780cn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs780cn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs780cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runT780(recs780cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_PEAK_UNCAUSED'), 'THEME_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 766 — themePass: theme suspense zone cluster, theme curiosity zone cluster, theme suspense peak uncaused', async () => {
     const runT766 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
