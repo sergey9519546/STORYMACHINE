@@ -339,6 +339,17 @@
 // secondary "isB" in co-occurrence-decoupling checks in this pass; none of the three
 // shared-library trio modes has ever been applied to it as a primary signal — every suspense
 // spike concentrated in one structural third is itself a predictable pattern).
+// Wave 788 additions: ORIGINALITY_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave
+// 774 applied the zone-cluster mode to suspenseDelta; the run-based drought mode has never been
+// applied to it — a long unbroken stretch of flatlined tension is itself a predictable pattern),
+// ORIGINALITY_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence ×
+// structural thirds — curiosityDelta has only ever anchored aftermath/decoupling checks in this
+// pass; none of the three shared-library trio modes has ever been applied to it — every curiosity
+// spike concentrated in one structural third is itself a predictable pattern),
+// ORIGINALITY_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift !== 'neutral' presence ×
+// structural thirds — emotionalShift has only ever anchored an average/aggregate tonal check in
+// this pass; none of the three shared-library trio modes has ever been applied to it — every
+// emotional beat concentrated in one structural third is itself a predictable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4822,6 +4833,74 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r774c.maxZoneCount / r774c.count) * 100)}% of the scenes where tension rises cluster in the ${r774c.zoneNames[r774c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than tension that keeps testing the story unevenly across its full length.`,
         suggestedFix: `Raise suspense in at least one scene outside the ${r774c.zoneNames[r774c.maxZoneIdx]} third so tension stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 788: ORIGINALITY_SUSPENSE_DROUGHT_RUN, ORIGINALITY_CURIOSITY_ZONE_CLUSTER,
+  //              ORIGINALITY_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 suspense-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no rising tension reaches 6. Wave 774
+  // applied the zone-cluster mode to suspenseDelta; the run-based drought mode has never been
+  // applied to it — a long unbroken stretch of flatlined tension is itself a predictable pattern.
+  {
+    const r788a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r788a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r788a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r788a.longestRun} consecutive scenes with no rise in suspense at all, even though ${r788a.presentCount} scenes elsewhere do spike — a predictable stretch of flatlined tension the audience can learn to expect rather than a story that keeps testing them unevenly throughout.`,
+        suggestedFix: `Raise suspense somewhere within the ${r788a.longestRun}-scene stretch so tension stays unpredictable rather than settling into a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // curiosity-positive scenes, fires when more than 75% of those scenes cluster in a single
+  // third. curiosityDelta has only ever anchored aftermath/decoupling checks in this pass; none
+  // of the three shared-library trio modes has ever been applied to it — every curiosity spike
+  // concentrated in one structural third is itself a predictable pattern.
+  {
+    const r788b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r788b.fires) {
+      issues.push({
+        location: `${r788b.zoneNames[r788b.maxZoneIdx]} third — ${r788b.maxZoneCount} of ${r788b.count} curiosity-positive scenes`,
+        rule: 'ORIGINALITY_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r788b.maxZoneCount / r788b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r788b.zoneNames[r788b.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than fresh questions distributed unevenly across the whole story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r788b.zoneNames[r788b.maxZoneIdx]} third so wonder stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral'
+  // presence × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9,
+  // ≥3 emotionally charged scenes, fires when more than 75% of those scenes cluster in a single
+  // third. emotionalShift has only ever anchored an average/aggregate tonal check in this pass;
+  // none of the three shared-library trio modes has ever been applied to it — every emotional
+  // beat concentrated in one structural third is itself a predictable pattern.
+  {
+    const r788c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r788c.fires) {
+      issues.push({
+        location: `${r788c.zoneNames[r788c.maxZoneIdx]} third — ${r788c.maxZoneCount} of ${r788c.count} emotionally charged scenes`,
+        rule: 'ORIGINALITY_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r788c.maxZoneCount / r788c.count) * 100)}% of the story's emotionally charged scenes cluster in the ${r788c.zoneNames[r788c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than felt experience distributed unevenly across the whole story.`,
+        suggestedFix: `Give at least one scene outside the ${r788c.zoneNames[r788c.maxZoneIdx]} third an emotional charge so felt experience stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }

@@ -1210,6 +1210,101 @@ He sits at his desk.
   });
 
 
+  describe('Wave 788 — originalityPass: originality suspense drought run, originality curiosity zone cluster, originality emotion zone cluster', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_788 = ['establish_world', 'introduce_conflict', 'complicate', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_788 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_788 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor788 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec788 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor788(idx),
+      emotionalShift: EMOTION_POOL_788[idx % EMOTION_POOL_788.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_788[idx % PURPOSE_POOL_788.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain788 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor788(i)}\n\n${SENTENCE_POOL_788[i % SENTENCE_POOL_788.length]}`).join('\n\n');
+    const runO788 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain788(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ORIGINALITY_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs788a = Array.from({ length: 10 }, (_, i) => makeRec788(i, {
+        suspenseDelta: (i === 0 || i === 1 || i === 2) ? 2 : 0,
+      }));
+      const res = await runO788(recs788a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_DROUGHT_RUN'), 'ORIGINALITY_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs788an = Array.from({ length: 10 }, (_, i) => makeRec788(i, {
+        suspenseDelta: (i === 0 || i === 3 || i === 6 || i === 9) ? 2 : 0,
+      }));
+      const res = await runO788(recs788an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_DROUGHT_RUN'), 'ORIGINALITY_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs788b = Array.from({ length: 9 }, (_, i) => makeRec788(i, {
+        curiosityDelta: (i === 0 || i === 1 || i === 2) ? 2 : 0,
+      }));
+      const res = await runO788(recs788b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CURIOSITY_ZONE_CLUSTER'), 'ORIGINALITY_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs788bn = Array.from({ length: 9 }, (_, i) => makeRec788(i, {
+        curiosityDelta: (i === 0 || i === 4 || i === 8) ? 2 : 0,
+      }));
+      const res = await runO788(recs788bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CURIOSITY_ZONE_CLUSTER'), 'ORIGINALITY_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally charged scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_EMOTION_ZONE_CLUSTER fires when >75% of emotionally charged scenes cluster in one third', async () => {
+      const recs788c = Array.from({ length: 9 }, (_, i) => makeRec788(i, {
+        emotionalShift: (i === 0 || i === 1 || i === 2) ? 'negative' : 'neutral',
+      }));
+      const res = await runO788(recs788c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_EMOTION_ZONE_CLUSTER'), 'ORIGINALITY_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_EMOTION_ZONE_CLUSTER does not fire when emotionally charged scenes spread across thirds', async () => {
+      const recs788cn = Array.from({ length: 9 }, (_, i) => makeRec788(i, {
+        emotionalShift: (i === 0 || i === 4 || i === 8) ? 'negative' : 'neutral',
+      }));
+      const res = await runO788(recs788cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_EMOTION_ZONE_CLUSTER'), 'ORIGINALITY_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 774 — originalityPass: originality clock delta peak uncaused, originality clock delta zone cluster, originality suspense zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760 above —
     // every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping
