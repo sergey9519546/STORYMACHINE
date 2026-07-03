@@ -1204,6 +1204,77 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 614 — beliefPass: belief staging zone imbalance, clock signal flatline, visual beat belief decoupled', async () => {
+    const runBF614 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_STAGING_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('BELIEF_STAGING_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs614a = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs614a[6] = makeSharedRecord(6, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614a[9] = makeSharedRecord(9, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614a[10] = makeSharedRecord(10, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614a[11] = makeSharedRecord(11, { visualBeats: ['pockets the note', 'hides the key'] });
+      const res = await runBF614(recs614a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_ZONE_IMBALANCE'), 'BELIEF_STAGING_ZONE_IMBALANCE should fire');
+    });
+
+    // BELIEF_STAGING_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('BELIEF_STAGING_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs614an = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs614an[1] = makeSharedRecord(1, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614an[4] = makeSharedRecord(4, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614an[7] = makeSharedRecord(7, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614an[10] = makeSharedRecord(10, { visualBeats: ['pockets the note', 'hides the key'] });
+      const res = await runBF614(recs614an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_ZONE_IMBALANCE'), 'BELIEF_STAGING_ZONE_IMBALANCE should not fire');
+    });
+
+    // CLOCK_SIGNAL_FLATLINE fire:
+    // 8 scenes, every clockDelta identical (1.0) — zero deviation from the average
+    it('CLOCK_SIGNAL_FLATLINE fires when clockDelta barely varies across scenes', async () => {
+      const recs614b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { clockDelta: 1.0 }));
+      const res = await runBF614(recs614b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_FLATLINE'), 'CLOCK_SIGNAL_FLATLINE should fire');
+    });
+
+    // CLOCK_SIGNAL_FLATLINE no-fire:
+    // alternating 0.2/2.5 — wide deviation from the average
+    it('CLOCK_SIGNAL_FLATLINE does not fire when clockDelta varies widely across scenes', async () => {
+      const recs614bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i, { clockDelta: i % 2 === 0 ? 0.2 : 2.5 }));
+      const res = await runBF614(recs614bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_FLATLINE'), 'CLOCK_SIGNAL_FLATLINE should not fire');
+    });
+
+    // VISUAL_BEAT_BELIEF_DECOUPLED fire:
+    // n=6; staged at 0,1 (no belief assertion); assertions at 4,5 (no staging) → zero overlap → fires
+    it('VISUAL_BEAT_BELIEF_DECOUPLED fires when visually-staged scenes and belief-assertion scenes never overlap', async () => {
+      const recs614c = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs614c[0] = makeSharedRecord(0, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614c[1] = makeSharedRecord(1, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614c[4] = makeSharedRecord(4, { dialogueHighlights: ['alice: believes X'] });
+      recs614c[5] = makeSharedRecord(5, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runBF614(recs614c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_BELIEF_DECOUPLED'), 'VISUAL_BEAT_BELIEF_DECOUPLED should fire');
+    });
+
+    // VISUAL_BEAT_BELIEF_DECOUPLED no-fire:
+    // scene 0 carries BOTH staging and a belief assertion → overlap exists
+    it('VISUAL_BEAT_BELIEF_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs614cn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs614cn[0] = makeSharedRecord(0, { visualBeats: ['pockets the note', 'hides the key'], dialogueHighlights: ['alice: believes X'] });
+      recs614cn[1] = makeSharedRecord(1, { visualBeats: ['pockets the note', 'hides the key'] });
+      recs614cn[4] = makeSharedRecord(4, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runBF614(recs614cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_BELIEF_DECOUPLED'), 'VISUAL_BEAT_BELIEF_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 600 — beliefPass: clue debt belief decoupled, clue debt clock aftermath void, clue debt zone imbalance', async () => {
     const runBF600 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

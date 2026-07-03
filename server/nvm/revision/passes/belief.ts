@@ -218,6 +218,12 @@
 // session's THEME_UNRESOLVED_CLUE_* or bare UNRESOLVED_CLUE_* rule strings from other passes, to
 // keep rule names distinct across the whole system even though each pass's issues are independently
 // scoped).
+// Wave 614 additions (built on the shared checks library, audit M2.2): BELIEF_STAGING_ZONE_
+// IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of visualBeats
+// anywhere in this 105-rule pass), CLOCK_SIGNAL_FLATLINE (average/aggregate × clockDelta variety
+// — first use of clockDelta anywhere in this pass), VISUAL_BEAT_BELIEF_DECOUPLED
+// (co-occurrence/decoupling × visualBeats × dialogueHighlights-present belief-assertion — pairs
+// this wave's other new field with the file's existing belief-assertion proxy).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3373,6 +3379,87 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r600c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName600c} contains ${r600c.counts[r600c.bloatZoneIdx]} of them (${Math.round((r600c.counts[r600c.bloatZoneIdx] / r600c.totalCount) * 100)}%) while ${emptyNames600c} contains none. The story's sense of active mystery bloats in one structural quarter and vanishes from another.`,
         suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames600c} — rather than resolving everything before that quarter begins.`,
+      });
+    }
+  }
+
+  // ── Wave 614: BELIEF_STAGING_ZONE_IMBALANCE, CLOCK_SIGNAL_FLATLINE,
+  //              VISUAL_BEAT_BELIEF_DECOUPLED ──────────────────────────────────────────────
+
+  // BELIEF_STAGING_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this 105-rule pass — every existing check here audits
+  // belief/deception through dialogueHighlights-derived assertions or the revelation/clue/clock/
+  // relational channels; this is the first to audit how physical staging is spread across the
+  // four structural quarters.
+  {
+    const r614a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r614a.fires) {
+      const emptyNames614a = r614a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName614a = FOUR_ZONE_NAMES[r614a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames614a} empty; ${bloatName614a} has ${r614a.counts[r614a.bloatZoneIdx]}/${r614a.totalCount} visually dense scenes`,
+        rule: 'BELIEF_STAGING_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r614a.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName614a} contains ${r614a.counts[r614a.bloatZoneIdx]} of them (${Math.round((r614a.counts[r614a.bloatZoneIdx] / r614a.totalCount) * 100)}%) while ${emptyNames614a} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's opportunities to show (rather than state) a character's true belief an uneven structural rhythm.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames614a}, so every structural quarter carries some opportunity for belief or deception to surface through action rather than only through what characters say.`,
+      });
+    }
+  }
+
+  // CLOCK_SIGNAL_FLATLINE — Average/aggregate × clockDelta variety. n≥8. Fewer than 20% of
+  // scenes deviate from the average clockDelta by more than 30% of that average → fire. First use
+  // of the clockDelta field anywhere in this pass. A story's deadline pressure should have its own
+  // rhythm — sharp compressions when time runs short, brief reprieves, a final tightening before
+  // the climax; when clockDelta sits close to its own average almost everywhere, the story's sense
+  // of mounting urgency flattens into a steady hum rather than a felt escalation, exactly when the
+  // belief/deception layer this pass tracks most needs the pressure of a ticking clock to force
+  // characters into revealing or maintaining a lie.
+  {
+    if (records.length >= 8) {
+      const clockVals614b = records.map(r => r.clockDelta ?? 0);
+      const avgClock614b = clockVals614b.reduce((s, v) => s + v, 0) / clockVals614b.length;
+      if (Math.abs(avgClock614b) > 1e-9) {
+        const variedClock614b = clockVals614b.filter(v => Math.abs(v - avgClock614b) > Math.abs(avgClock614b) * 0.3).length;
+        if (variedClock614b < clockVals614b.length * 0.2) {
+          issues.push({
+            location: 'clockDelta throughout',
+            rule: 'CLOCK_SIGNAL_FLATLINE',
+            severity: 'minor',
+            description: `Fewer than 20% of the story's ${records.length} scenes deviate from the average clockDelta (${avgClock614b.toFixed(2)}) by more than 30% — the deadline-pressure signal barely moves from scene to scene. A story's ticking clock should have its own rhythm: sharp compressions when time runs short, brief reprieves, a final tightening before the climax. When clockDelta sits close to its own average almost everywhere, the mounting urgency reads as a flat hum rather than a shaped escalation — precisely the pressure this pass's belief/deception tracking most benefits from, since a tightening deadline is what forces characters to reveal or maintain a lie under strain.`,
+            suggestedFix: `Introduce at least a few scenes with a clockDelta clearly above or below the story's average — a sudden compression that forces a decision, or a deliberate lull that lets the pressure recede before it returns harder. The clock's rhythm should have peaks and valleys the audience can feel.`,
+          });
+        }
+      }
+    }
+  }
+
+  // VISUAL_BEAT_BELIEF_DECOUPLED — Co-occurrence/decoupling × visualBeats × dialogueHighlights
+  // (belief-assertion proxy). Built on checkCoOccurrenceDecoupled from the shared checks library.
+  // n≥6, ≥2 visually-staged scenes, ≥2 belief-assertion scenes. Zero overlap → fire. The scenes
+  // richest in physical staging never coincide with a scene where a character asserts a belief —
+  // action and stated conviction run on separate tracks, so the audience never gets to compare
+  // what a character does against what they claim to believe in the same moment. Distinct from
+  // CLUE_DEBT_BELIEF_DECOUPLED (Wave 600: pairs belief-assertion with unresolvedClues, not
+  // visualBeats).
+  {
+    const r614c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.visualBeats ?? []).length >= 2,
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r614c.fires) {
+      issues.push({
+        location: `${r614c.aCount} visually-staged scene(s) and ${r614c.bCount} belief-assertion scene(s) — zero overlap`,
+        rule: 'VISUAL_BEAT_BELIEF_DECOUPLED',
+        severity: 'minor',
+        description: `The script has ${r614c.aCount} scene(s) leaning heavily on physical staging and ${r614c.bCount} scene(s) where a character asserts a belief, but the two never coincide. A scene rich in physical action is a natural place to test a stated belief against what a character actually does — the gap between claim and action is where deception most visibly lives. When the two layers never share a scene, belief is only ever tracked through words, never checked against behavior.`,
+        suggestedFix: `Let at least one heavily staged scene also include a character stating a belief — then let their physical action either confirm or quietly contradict it. Showing the gap (or alignment) between what a character claims and what they do gives the belief-tracking layer a behavioral anchor.`,
       });
     }
   }
