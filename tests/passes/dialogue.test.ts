@@ -1598,6 +1598,73 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 966 — dialoguePass: dialogue curiosity zone imbalance, dialogue revelation zone imbalance, dialogue relationship zone imbalance', async () => {
+    const makeRec966 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes966 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD966 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const records966a = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 1, 2, 8, 9].includes(i) ? { curiosityDelta: 1 } : {}));
+      const res = await runD966(buildScenes966(10), records966a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CURIOSITY_ZONE_IMBALANCE'), 'DIALOGUE_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const records966an = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 3, 5, 8].includes(i) ? { curiosityDelta: 1 } : {}));
+      const res = await runD966(buildScenes966(10), records966an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CURIOSITY_ZONE_IMBALANCE'), 'DIALOGUE_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const records966b = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 1, 2, 8, 9].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runD966(buildScenes966(10), records966b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_ZONE_IMBALANCE'), 'DIALOGUE_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const records966bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 3, 5, 8].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runD966(buildScenes966(10), records966bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_ZONE_IMBALANCE'), 'DIALOGUE_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const records966c = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 1, 2, 8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runD966(buildScenes966(10), records966c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE'), 'DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const records966cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec966(i, [0, 3, 5, 8].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runD966(buildScenes966(10), records966cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE'), 'DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 952 — dialoguePass: dialogue revelation_purpose zone imbalance, dialogue suspense zone imbalance, dialogue open_thread zone imbalance', async () => {
     const makeRec952 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
