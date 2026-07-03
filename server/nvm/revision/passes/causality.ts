@@ -435,6 +435,12 @@
 // this purpose value), CAUSALITY_ESTABLISH_WORLD_ZONE_IMBALANCE (underweight/bloat x purpose
 // === 'establish_world' x four structural zones -- likewise the first application of the 4-zone
 // mode to this purpose value, distinct from its existing 3-zone and run-based counterparts).
+//
+// Wave 895 additions (closes the twenty-second rotation cycle, 882-895): continuing the
+// checkZoneImbalance rollout from Wave 881, this wave applies the 4-zone bloat+empty-zone mode
+// to three more purpose values with complete 3-zone/run-based trios: CAUSALITY_RESOLUTION_
+// ZONE_IMBALANCE (purpose === 'resolution'), CAUSALITY_COMPLICATE_ZONE_IMBALANCE (purpose ===
+// 'complicate'), and CAUSALITY_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5192,6 +5198,83 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r881c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName881c} contains ${r881c.counts[r881c.bloatZoneIdx]} of them (${Math.round((r881c.counts[r881c.bloatZoneIdx] / r881c.totalCount) * 100)}%) while ${emptyNames881c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the causal chain's grounding an uneven structural rhythm.`,
         suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames881c} — so every structural quarter carries some fresh ground for the causal chain to build from, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 895: CAUSALITY_RESOLUTION_ZONE_IMBALANCE, CAUSALITY_COMPLICATE_ZONE_IMBALANCE,
+  //              CAUSALITY_TURNING_POINT_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // CAUSALITY_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone CAUSALITY_RESOLUTION_ZONE_CLUSTER and run-based CAUSALITY_RESOLUTION_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r895a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r895a.fires) {
+      const emptyNames895a = r895a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName895a = FOUR_ZONE_NAMES[r895a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames895a} empty; ${bloatName895a} has ${r895a.counts[r895a.bloatZoneIdx]}/${r895a.totalCount} resolution-purposed scenes`,
+        rule: 'CAUSALITY_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r895a.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName895a} contains ${r895a.counts[r895a.bloatZoneIdx]} of them (${Math.round((r895a.counts[r895a.bloatZoneIdx] / r895a.totalCount) * 100)}%) while ${emptyNames895a} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the causal chain's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames895a} — so the causal chain's threads settle more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // complicating scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone CAUSALITY_COMPLICATE_ZONE_CLUSTER and run-based CAUSALITY_COMPLICATE_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r895b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r895b.fires) {
+      const emptyNames895b = r895b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName895b = FOUR_ZONE_NAMES[r895b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames895b} empty; ${bloatName895b} has ${r895b.counts[r895b.bloatZoneIdx]}/${r895b.totalCount} complicating scenes`,
+        rule: 'CAUSALITY_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r895b.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName895b} contains ${r895b.counts[r895b.bloatZoneIdx]} of them (${Math.round((r895b.counts[r895b.bloatZoneIdx] / r895b.totalCount) * 100)}%) while ${emptyNames895b} contains none. Complications bloat in one structural quarter and vanish from another, giving the causal chain's escalating trouble an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames895b} — so the causal chain keeps deepening its cause-and-effect more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // turning-point scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone CAUSALITY_TURNING_POINT_ZONE_CLUSTER and run-based CAUSALITY_TURNING_POINT_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r895c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r895c.fires) {
+      const emptyNames895c = r895c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName895c = FOUR_ZONE_NAMES[r895c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames895c} empty; ${bloatName895c} has ${r895c.counts[r895c.bloatZoneIdx]}/${r895c.totalCount} turning-point scenes`,
+        rule: 'CAUSALITY_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r895c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName895c} contains ${r895c.counts[r895c.bloatZoneIdx]} of them (${Math.round((r895c.counts[r895c.bloatZoneIdx] / r895c.totalCount) * 100)}%) while ${emptyNames895c} contains none. Turning points bloat in one structural quarter and vanish from another, giving the causal chain's pivots an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames895c} — so the causal chain's pivots land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

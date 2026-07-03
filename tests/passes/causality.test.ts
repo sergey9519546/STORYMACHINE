@@ -1247,6 +1247,66 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 895 — causalityPass: causality resolution zone imbalance, causality complicate zone imbalance, causality turning point zone imbalance', async () => {
+    const runCA895 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_RESOLUTION_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); resolution at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('CAUSALITY_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs895a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_ZONE_IMBALANCE'), 'CAUSALITY_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs895an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_ZONE_IMBALANCE'), 'CAUSALITY_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+
+    // CAUSALITY_COMPLICATE_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('CAUSALITY_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs895b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_ZONE_IMBALANCE'), 'CAUSALITY_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs895bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_ZONE_IMBALANCE'), 'CAUSALITY_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    // CAUSALITY_TURNING_POINT_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('CAUSALITY_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs895c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_ZONE_IMBALANCE'), 'CAUSALITY_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs895cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runCA895(recs895cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_ZONE_IMBALANCE'), 'CAUSALITY_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 881 — causalityPass: causality complicate drought run, causality climax zone imbalance, causality establish world zone imbalance', async () => {
     const runCA881 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
