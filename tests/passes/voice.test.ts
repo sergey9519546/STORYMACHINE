@@ -1438,6 +1438,71 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 837 — voicePass: voice turning point drought run, voice introduce conflict drought run, voice stakes zone cluster', async () => {
+    const runV837 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_TURNING_POINT_DROUGHT_RUN fire:
+    // n=10; turning_point at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_TURNING_POINT_DROUGHT_RUN fires when a long run has no turning point', async () => {
+      const recs837a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runV837(recs837a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURNING_POINT_DROUGHT_RUN'), 'VOICE_TURNING_POINT_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_TURNING_POINT_DROUGHT_RUN does not fire when turning points are evenly spread', async () => {
+      const recs837an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runV837(recs837an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURNING_POINT_DROUGHT_RUN'), 'VOICE_TURNING_POINT_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs837b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runV837(recs837b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs837bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runV837(recs837bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; raise_stakes scenes at 0,1,2 → 100% opening third
+    it('VOICE_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs837c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runV837(recs837c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAKES_ZONE_CLUSTER'), 'VOICE_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes spread across thirds', async () => {
+      const recs837cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'raise_stakes' : 'complicate' }),
+      );
+      const res = await runV837(recs837cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAKES_ZONE_CLUSTER'), 'VOICE_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 823 — voicePass: voice negative emotion drought run, voice turning point zone cluster, voice introduce conflict zone cluster', async () => {
     const runV823 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

@@ -341,6 +341,15 @@
 // which audits the dramaticTurn free-text field, not this purpose enum value), VOICE_INTRODUCE_
 // CONFLICT_ZONE_CLUSTER (distribution/timing × purpose === 'introduce_conflict' × structural
 // thirds — likewise a virgin field, never referenced in this file before).
+//
+// Wave 837 additions: VOICE_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 823; peak mode conventionally skipped for this categorical field), VOICE_INTRODUCE_
+// CONFLICT_DROUGHT_RUN (run-based × purpose === 'introduce_conflict' absence — completes 2 of 3
+// slots for this purpose value alongside the zone-cluster mode added in Wave 823; peak mode
+// conventionally skipped for this categorical field), VOICE_STAKES_ZONE_CLUSTER (distribution/
+// timing × purpose === 'raise_stakes' × structural thirds — this purpose value has never been
+// referenced anywhere in this file; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5041,6 +5050,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r823c.maxZoneCount / r823c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r823c.zoneNames[r823c.maxZoneIdx]} third. When every new conflict lands in the same structural window, the story's voice has no fresh friction to speak through anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r823c.zoneNames[r823c.maxZoneIdx]} third to introduce conflict so the story's voice keeps fresh friction to speak through more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 837: VOICE_TURNING_POINT_DROUGHT_RUN, VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              VOICE_STAKES_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall, fires
+  // when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 823 (peak mode conventionally skipped for this categorical field).
+  {
+    const r837a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r837a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r837a.longestRun} consecutive scenes`,
+        rule: 'VOICE_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r837a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r837a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the story's voice with no pivot to speak through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r837a.longestRun}-scene stretch as a turning point so the story's voice keeps a pivot to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-introducing scenes
+  // overall, fires when the longest consecutive run of scenes with no conflict-introducing
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 823 (peak mode conventionally skipped for this categorical field).
+  {
+    const r837b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r837b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r837b.longestRun} consecutive scenes`,
+        rule: 'VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r837b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r837b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the story's voice with nothing new to speak through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r837b.longestRun}-scene stretch to introduce conflict so the story's voice keeps fresh friction to speak through throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this file — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r837c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r837c.fires) {
+      issues.push({
+        location: `${r837c.zoneNames[r837c.maxZoneIdx]} third — ${r837c.maxZoneCount} of ${r837c.count} stakes-raising scenes`,
+        rule: 'VOICE_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r837c.maxZoneCount / r837c.count) * 100)}% of the scenes purposed to raise stakes cluster in the ${r837c.zoneNames[r837c.maxZoneIdx]} third. When every escalation lands in the same structural window, the story's voice has no mounting pressure to speak through anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r837c.zoneNames[r837c.maxZoneIdx]} third to raise stakes so the story's voice keeps mounting pressure to speak through more evenly across the story.`,
       });
     }
   }
