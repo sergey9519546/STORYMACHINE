@@ -330,6 +330,18 @@
 // composite absence of revelation OR seededClueIds OR relationshipShifts together at a 4-scene
 // threshold; a pure single-field run-based absence check on revelation alone, at the
 // shared-library's 6-scene threshold, has never been applied).
+// Wave 807 additions: STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'negative' absence — Wave 793 applied the zone-cluster mode to this valence; the drought-run
+// mode has never been applied to it, completing 2 of 3 slots for this categorical field, peak
+// conventionally skipped), STRUCTURE_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude [0/1] × 2-scene lookback, anchored on the FIRST revelation scene —
+// completes the trio for revelation; distinct from the existing REVELATION_CAUSELESS, which
+// requires ALL revelations in the story to be causeless with a broader 3-signal/3-scene lookback,
+// not a single-peak backward-cause test with a 2-scene lookback), STRUCTURE_CHARACTER_
+// MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment' × structural thirds
+// — this purpose value has only ever appeared inside the SETUP_RESOLUTION_IMBALANCE composite set
+// [union with 'establish_world']; it has never been audited as its own standalone signal by any
+// of the three shared-library trio modes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4435,6 +4447,77 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r793c.longestRun} consecutive scenes with no revelation at all, even though ${r793c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the story's architecture without a disclosure punctuating it for an extended run — even if clues or relationship shifts keep the composite REVELATION_DROUGHT check satisfied elsewhere.`,
         suggestedFix: `Let a truth surface somewhere within the ${r793c.longestRun}-scene stretch so the structure keeps a disclosure punctuating it throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 807: STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN, STRUCTURE_REVELATION_PEAK_UNCAUSED,
+  //              STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative charge reaches 6.
+  // Wave 793 applied the zone-cluster mode to this valence; the drought-run mode has never been
+  // applied to it, completing 2 of 3 slots for this categorical field (peak conventionally
+  // skipped).
+  {
+    const r807a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r807a.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r807a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r807a.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r807a.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the story's architecture without any adversity testing it for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r807a.longestRun}-scene stretch so the structure keeps testing it with adversity throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) ×
+  // 2-scene lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2
+  // revelation scenes, fires when the (first) revelation scene has no dramatic turn in itself or
+  // the 2 scenes preceding it. Completes the trio for revelation. Distinct from the existing
+  // REVELATION_CAUSELESS, which requires ALL revelations in the story to be causeless with a
+  // broader 3-signal/3-scene lookback, not a single-peak backward-cause test with a 2-scene
+  // lookback. hasCause deliberately omits revelation to avoid circularity.
+  {
+    const r807b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r807b.fires) {
+      issues.push({
+        location: `scene ${r807b.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'STRUCTURE_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r807b.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r807b.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the structure's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r807b.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has only ever appeared inside the SETUP_RESOLUTION_
+  // IMBALANCE composite set (union with 'establish_world'); it has never been audited as its own
+  // standalone signal by any of the three shared-library trio modes.
+  {
+    const r807c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r807c.fires) {
+      issues.push({
+        location: `${r807c.zoneNames[r807c.maxZoneIdx]} third — ${r807c.maxZoneCount} of ${r807c.count} character-moment scenes`,
+        rule: 'STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r807c.maxZoneCount / r807c.count) * 100)}% of the story's character-moment scenes cluster in the ${r807c.zoneNames[r807c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the story's architecture has no room for the protagonist's inner life anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r807c.zoneNames[r807c.maxZoneIdx]} third as a character moment so the structure keeps room for interior reflection more evenly across the story.`,
       });
     }
   }

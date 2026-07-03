@@ -1006,6 +1006,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 807 — structurePass: structure negative emotion drought run, structure revelation peak uncaused, structure character moment zone cluster', async () => {
+    const runST807 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs807a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runST807(recs807a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN'), 'STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs807an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runST807(recs807an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN'), 'STRUCTURE_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('STRUCTURE_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs807b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs807b[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs807b[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      const res = await runST807(recs807b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PEAK_UNCAUSED'), 'STRUCTURE_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('STRUCTURE_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs807bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs807bn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs807bn[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      recs807bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runST807(recs807bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_PEAK_UNCAUSED'), 'STRUCTURE_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs807c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runST807(recs807c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs807cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runST807(recs807cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'STRUCTURE_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 793 — structurePass: structure negative emotion zone cluster, structure revelation zone cluster, structure revelation drought run', async () => {
     const runST793 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
