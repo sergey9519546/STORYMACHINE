@@ -1376,6 +1376,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 623 — relationshipArcPass: relational payoff staging decoupled, relational seed staging aftermath void, relational dialogue highlight zone imbalance', async () => {
+    const runRA623 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_PAYOFF_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('RELATIONAL_PAYOFF_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs623a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs623a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs623a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs623a[4] = makeSharedRecord(4, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623a[5] = makeSharedRecord(5, { visualBeats: ['clasps her hand', 'looks away'] });
+      const res = await runRA623(recs623a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_STAGING_DECOUPLED'), 'RELATIONAL_PAYOFF_STAGING_DECOUPLED should fire');
+    });
+
+    // RELATIONAL_PAYOFF_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('RELATIONAL_PAYOFF_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs623an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs623an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'], visualBeats: ['clasps her hand', 'looks away'] });
+      recs623an[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs623an[5] = makeSharedRecord(5, { visualBeats: ['clasps her hand', 'looks away'] });
+      const res = await runRA623(recs623an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_STAGING_DECOUPLED'), 'RELATIONAL_PAYOFF_STAGING_DECOUPLED should not fire');
+    });
+
+    // RELATIONAL_SEED_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no visually dense
+    // scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('RELATIONAL_SEED_STAGING_AFTERMATH_VOID fires when no seed is followed by a visually dense scene within 2 scenes', async () => {
+      const recs623b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs623b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs623b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs623b[5] = makeSharedRecord(5, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623b[6] = makeSharedRecord(6, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623b[7] = makeSharedRecord(7, { visualBeats: ['clasps her hand', 'looks away'] });
+      const res = await runRA623(recs623b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_STAGING_AFTERMATH_VOID'), 'RELATIONAL_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // RELATIONAL_SEED_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('RELATIONAL_SEED_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs623bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs623bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs623bn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs623bn[3] = makeSharedRecord(3, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623bn[5] = makeSharedRecord(5, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623bn[6] = makeSharedRecord(6, { visualBeats: ['clasps her hand', 'looks away'] });
+      recs623bn[7] = makeSharedRecord(7, { visualBeats: ['clasps her hand', 'looks away'] });
+      const res = await runRA623(recs623bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_STAGING_AFTERMATH_VOID'), 'RELATIONAL_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); highlights at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty of dialogue highlights while another is bloated', async () => {
+      const recs623c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs623c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-a'] });
+      recs623c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-b'] });
+      recs623c[8] = makeSharedRecord(8, { dialogueHighlights: ['line-c'] });
+      recs623c[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runRA623(recs623c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    // RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE no-fire:
+    // one highlight per zone (1,4,7,10) → no zone is empty
+    it('RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlights are spread across all zones', async () => {
+      const recs623cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs623cn[1] = makeSharedRecord(1, { dialogueHighlights: ['line-a'] });
+      recs623cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs623cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      recs623cn[10] = makeSharedRecord(10, { dialogueHighlights: ['line-d'] });
+      const res = await runRA623(recs623cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE'), 'RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 609 — relationshipArcPass: open thread relationship shift decoupled, physical presence zone imbalance, relationship shift dialogue highlight aftermath void', async () => {
     const runRA609 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

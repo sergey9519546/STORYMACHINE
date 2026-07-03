@@ -215,6 +215,13 @@
 // this pass), RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath ×
 // relationship-shift trigger → dialogueHighlights absence — first use of dialogueHighlights
 // anywhere in this pass).
+// Wave 623 additions (built on the shared checks library, audit M2.2): RELATIONAL_PAYOFF_
+// STAGING_DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — first pairing of
+// these two fields in this 105-rule pass), RELATIONAL_SEED_STAGING_AFTERMATH_VOID
+// (sequence/aftermath × seededClueIds trigger → visualBeats absence — first pairing of these two
+// fields), RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (underweight/bloat × dialogueHighlights ×
+// four structural zones — Waves 595/609 applied this template to relationshipShifts and
+// visualBeats; dialogueHighlights itself has never been zone-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3614,6 +3621,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r609c.triggerCount} relationship-shift scenes is followed by two scenes with no highlighted dialogue, even though ${r609c.aftermathCount} such scenes exist elsewhere in the script. A bond that has just shifted carries into the next beat; when that aftermath never carries a memorable line, the new dynamic goes unvoiced — no character's speech confirms what changed or what it costs.`,
         suggestedFix: `After at least one relationship shift, let one of the following two scenes carry a line worth remembering — a character naming what changed between them, or a piece of dialogue whose weight comes precisely from the bond having moved. Give the new dynamic a voice, not just a structural record.`,
+      });
+    }
+  }
+
+  // ── Wave 623: RELATIONAL_PAYOFF_STAGING_DECOUPLED, RELATIONAL_SEED_STAGING_AFTERMATH_VOID,
+  //              RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE ──────────────────────────────
+
+  // RELATIONAL_PAYOFF_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds ×
+  // visualBeats. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // payoff scenes, ≥2 visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. First
+  // pairing of these two fields in this 105-rule pass. A resolved setup and a scene rich in
+  // physical staging never happen together — every payoff lands through dialogue or relational
+  // beats alone, with no physical action carrying the resolution's weight.
+  {
+    const r623a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r623a.fires) {
+      issues.push({
+        location: `${r623a.aCount} payoff scene(s), ${r623a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'RELATIONAL_PAYOFF_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r623a.aCount} scenes where a planted thread resolves never coincide with the ${r623a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more weight when a character's physical action embodies what the resolution means for a relationship, rather than the moment being carried entirely through dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or gesture between characters that embodies what just resolved, giving the payoff a physical anchor alongside whatever is said.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a
+  // 2-scene lookahead window. Fires when every seed's two-scene aftermath contains no visually
+  // dense scene, while such scenes do occur elsewhere. First pairing of seededClueIds with
+  // visualBeats in this pass — every planted clue passes into an aftermath with no physical
+  // presence giving the planted material texture in the world.
+  {
+    const r623b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r623b.fires) {
+      issues.push({
+        location: `${r623b.triggerCount} seed scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'RELATIONAL_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r623b.triggerCount} clue-planting scenes is followed by two scenes with no substantial physical staging, even though ${r623b.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when the world around them briefly holds physical attention, but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry substantial physical staging — the planted material or its surroundings given some visible presence before the relationship arc moves on.`,
+      });
+    }
+  }
+
+  // RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // carrying a curated dialogue highlight, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Waves 595 and 609
+  // applied this template to relationshipShifts and visualBeats respectively; dialogueHighlights
+  // itself — a signal already used for the Wave 609 aftermath check — has never been audited for
+  // its own structural distribution here.
+  {
+    const r623c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r623c.fires) {
+      const emptyNames623c = r623c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName623c = FOUR_ZONE_NAMES[r623c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames623c} empty; ${bloatName623c} has ${r623c.counts[r623c.bloatZoneIdx]}/${r623c.totalCount} dialogue-highlight scenes`,
+        rule: 'RELATIONAL_DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r623c.totalCount} dialogue-highlight scenes are unevenly distributed across its four structural zones: ${bloatName623c} contains ${r623c.counts[r623c.bloatZoneIdx]} of them (${Math.round((r623c.counts[r623c.bloatZoneIdx] / r623c.totalCount) * 100)}%) while ${emptyNames623c} contains none. Memorable dialogue bloats in one structural quarter and vanishes from another, giving the arc's verbal high points an uneven structural rhythm.`,
+        suggestedFix: `Redistribute standout dialogue: bring at least one memorable line into ${emptyNames623c}, so every structural quarter carries some verbal high point for the relational arc, not only the quarter currently carrying most of them.`,
       });
     }
   }
