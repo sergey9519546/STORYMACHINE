@@ -1376,6 +1376,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 805 — relationshipArcPass: relational negative emotion zone cluster, relational negative emotion drought run, relational character moment zone cluster', async () => {
+    const runRA805 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs805a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runRA805(recs805a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs805an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runRA805(recs805an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs805b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runRA805(recs805b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN'), 'RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs805bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runRA805(recs805bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN'), 'RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs805c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runRA805(recs805c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER'), 'RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs805cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runRA805(recs805cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER'), 'RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 791 — relationshipArcPass: relational suspense drought run, relational curiosity peak uncaused, relational revelation peak uncaused', async () => {
     const runRA791 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

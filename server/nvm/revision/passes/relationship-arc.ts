@@ -341,6 +341,18 @@
 // drought; the existing RELATIONSHIP_PEAK_REVELATION_ABSENT anchors on the peak relationship-
 // shift scene checking for revelation, the reverse direction — the backward-cause peak mode has
 // never been applied to revelation itself).
+// Wave 805 additions: RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'negative' × structural thirds — existing negative-emotion checks in this
+// pass are pair-majority-ratio [NEGATIVE_ONLY_PAIR_MAJORITY], co-occurrence
+// [RELATIONSHIP_RUPTURE_EMOTION_FLAT, RELATIONSHIP_PEAK_EMOTION_FLAT, PAIR_EMOTION_FLAT], and
+// aftermath [RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID]; none of the three shared-library trio
+// modes has ever been applied to emotionalShift as a standalone global signal),
+// RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative' absence —
+// completing 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+// wave; peak mode conventionally skipped for this categorical field), RELATIONAL_CHARACTER_
+// MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment' × structural thirds
+// — this purpose value has never been referenced anywhere in this pass; none of the three
+// shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4652,6 +4664,73 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Scene ${r791c.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r791c.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the relationship's own turns forced into the open.`,
         suggestedFix: `Add a dramatic turn in scene ${r791c.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the relationship's own turning points.`,
+      });
+    }
+  }
+
+  // ── Wave 805: RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER, RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift ===
+  // 'negative' × structural thirds. Built on checkZoneCluster from the shared checks library.
+  // n≥9, ≥3 negative-emotion scenes, fires when more than 75% of them fall in a single
+  // structural third. Existing negative-emotion checks in this pass are pair-majority-ratio,
+  // co-occurrence, and aftermath modes; none of the three shared-library trio modes has ever
+  // been applied to emotionalShift as a standalone global signal.
+  {
+    const r805a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r805a.fires) {
+      issues.push({
+        location: `${r805a.zoneNames[r805a.maxZoneIdx]} third — ${r805a.maxZoneCount} of ${r805a.count} negative-emotion scenes`,
+        rule: 'RELATIONAL_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r805a.maxZoneCount / r805a.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r805a.zoneNames[r805a.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the relationship carries its emotional cost in only one part of the story instead of being tested throughout.`,
+        suggestedFix: `Give the relationship a setback outside the ${r805a.zoneNames[r805a.maxZoneIdx]} third so its emotional cost tests the bond more evenly across the story.`,
+      });
+    }
+  }
+
+  // RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative charge reaches 6.
+  // Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+  // wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r805b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r805b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r805b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r805b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r805b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the relationship without any adversity testing the bond for an extended run.`,
+        suggestedFix: `Give the relationship a setback within the ${r805b.longestRun}-scene stretch so it keeps testing the bond with adversity throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has never been referenced anywhere in this pass; none
+  // of the three shared-library trio modes has ever been applied to it.
+  {
+    const r805c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r805c.fires) {
+      issues.push({
+        location: `${r805c.zoneNames[r805c.maxZoneIdx]} third — ${r805c.maxZoneCount} of ${r805c.count} character-moment scenes`,
+        rule: 'RELATIONAL_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r805c.maxZoneCount / r805c.count) * 100)}% of the story's character-moment scenes cluster in the ${r805c.zoneNames[r805c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the relationship has no room to let a bond register on the character anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r805c.zoneNames[r805c.maxZoneIdx]} third as a character moment so the relationship keeps room for interior reflection more evenly across the story.`,
       });
     }
   }
