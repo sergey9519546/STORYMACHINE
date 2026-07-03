@@ -931,6 +931,61 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 948 — themePass: theme positive emotion zone imbalance, theme suspense zone imbalance, theme seed zone imbalance', async () => {
+    const runT948 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('THEME_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs948a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runT948(recs948a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'THEME_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs948an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runT948(recs948an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'THEME_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs948b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runT948(recs948b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_ZONE_IMBALANCE'), 'THEME_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs948bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runT948(recs948bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_ZONE_IMBALANCE'), 'THEME_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs948c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runT948(recs948c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_ZONE_IMBALANCE'), 'THEME_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs948cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runT948(recs948cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_ZONE_IMBALANCE'), 'THEME_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 934 — themePass: theme stakes zone imbalance, theme revelation purpose zone imbalance, theme negative emotion zone imbalance', async () => {
     const runT934 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

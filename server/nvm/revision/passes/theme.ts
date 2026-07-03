@@ -423,6 +423,12 @@
 // THEME_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in
 // Wave 920), and THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence
 // signal with a complete 3-zone/run trio).
+// Wave 948 additions: extending the checkZoneImbalance rollout to three more trio-complete signals
+// spanning three distinct signal classes: THEME_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift ===
+// 'positive', the positive-valence mirror of Wave 934's negative one), THEME_SUSPENSE_ZONE_IMBALANCE
+// (suspenseDelta > 0 — tension-delta magnitude), and THEME_SEED_ZONE_IMBALANCE (seededClueIds.length
+// > 0 — a seededClueIds array field distinct from the already-audited unresolvedClues/visualBeats/
+// payoffSetupIds imbalances).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5367,6 +5373,82 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r934c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName934c} contains ${r934c.counts[r934c.bloatZoneIdx]} of them (${Math.round((r934c.counts[r934c.bloatZoneIdx] / r934c.totalCount) * 100)}%) while ${emptyNames934c} contains none. Downturns bloat in one structural quarter and vanish from another, so the theme's cost is felt in only part of the story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames934c} — so the theme's cost is felt across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // positive-shift scenes total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone THEME_POSITIVE_EMOTION_ZONE_CLUSTER and run-based THEME_POSITIVE_EMOTION_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this valence signal, and the
+  // positive-valence mirror of the Wave 934 THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE.
+  {
+    const r948a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r948a.fires) {
+      const emptyNames948a = r948a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName948a = FOUR_ZONE_NAMES[r948a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames948a} empty; ${bloatName948a} has ${r948a.counts[r948a.bloatZoneIdx]}/${r948a.totalCount} positive-shift scenes`,
+        rule: 'THEME_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r948a.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName948a} contains ${r948a.counts[r948a.bloatZoneIdx]} of them (${Math.round((r948a.counts[r948a.bloatZoneIdx] / r948a.totalCount) * 100)}%) while ${emptyNames948a} contains none. Affirming beats bloat in one structural quarter and vanish from another, so the theme's reward is felt in only part of the story.`,
+        suggestedFix: `Redistribute affirmations: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames948a} — so the theme's reward is felt across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone THEME_
+  // SUSPENSE_ZONE_CLUSTER and run-based THEME_SUSPENSE_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than categorical purpose or emotional valence.
+  {
+    const r948b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r948b.fires) {
+      const emptyNames948b = r948b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName948b = FOUR_ZONE_NAMES[r948b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames948b} empty; ${bloatName948b} has ${r948b.counts[r948b.bloatZoneIdx]}/${r948b.totalCount} suspense-raising scenes`,
+        rule: 'THEME_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r948b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName948b} contains ${r948b.counts[r948b.bloatZoneIdx]} of them (${Math.round((r948b.counts[r948b.bloatZoneIdx] / r948b.totalCount) * 100)}%) while ${emptyNames948b} contains none. Tension bloats in one structural quarter and flatlines in another, so the pressure that tests the theme is confined to part of the story.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames948b} — so the theme stays under pressure across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // THEME_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone THEME_SEED_
+  // ZONE_CLUSTER and run-based THEME_SEED_DROUGHT_RUN, and distinct from the other array-field
+  // imbalances in this pass — THEME_UNRESOLVED_CLUE_ZONE_IMBALANCE (unresolvedClues), THEME_VISUAL_
+  // BEAT_ZONE_IMBALANCE (visualBeats), and THEME_PAYOFF_ZONE_IMBALANCE (payoffSetupIds) — as it keys
+  // on the seededClueIds field, a genuinely different array from all three.
+  {
+    const r948c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r948c.fires) {
+      const emptyNames948c = r948c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName948c = FOUR_ZONE_NAMES[r948c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames948c} empty; ${bloatName948c} has ${r948c.counts[r948c.bloatZoneIdx]}/${r948c.totalCount} seeding scenes`,
+        rule: 'THEME_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r948c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName948c} contains ${r948c.counts[r948c.bloatZoneIdx]} of them (${Math.round((r948c.counts[r948c.bloatZoneIdx] / r948c.totalCount) * 100)}%) while ${emptyNames948c} contains none. Thematic setups bloat in one structural quarter and never get planted in another, so the motifs the theme later reprises are seeded in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames948c} — so the theme's motifs are seeded across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
