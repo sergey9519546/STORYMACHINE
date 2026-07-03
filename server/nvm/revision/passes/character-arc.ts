@@ -252,6 +252,17 @@
 // scenes carrying open clue-debt and scenes where curiosity is actively rising; unresolvedClues
 // has only ever been paired with dialogueHighlights [Wave 603] and used as an aftermath-void
 // trigger [Waves 603, 631] in this file, never cross-checked against the curiosity channel).
+// Wave 659 additions (built on the shared checks library, audit M2.2): ARC_STAGING_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × visualBeats magnitude — the scene with the densest
+// physical staging has no dramatic turn or revelation in itself or the two scenes before it;
+// visualBeats has only ever been zone-imbalanced [four-zone bloat/empty] here, never backward-
+// cause peak-audited), ARC_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence — this
+// pass already hand-rolls drought-run logic for relational/payoff/curiosity/suspense/clock/
+// emotional channels and Wave 645 added seededClueIds via the shared helper; unresolvedClues
+// itself has only been used in co-occurrence and aftermath-void contexts, never drought-audited),
+// ARC_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds — this pass
+// already applies the zone-cluster mode to dramaticTurn, relationshipShifts, and curiosityDelta;
+// payoffSetupIds itself has never been cluster-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3686,6 +3697,75 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The ${r645c.aCount} scenes carrying outstanding clue-debt never coincide with the ${r645c.bCount} scenes where curiosity is actively rising — the arc's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.`,
         suggestedFix: `Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, giving the arc's open threads a causal tie to its rising intrigue.`,
+      });
+    }
+  }
+
+  // ── Wave 659: ARC_STAGING_PEAK_UNCAUSED, ARC_OPEN_THREAD_DROUGHT_RUN, ARC_PAYOFF_ZONE_CLUSTER ──
+
+  // ARC_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // visualBeats has only ever been zone-imbalanced (four-zone bloat/empty) in this file, never
+  // backward-cause peak-audited.
+  {
+    const r659a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r659a.fires) {
+      issues.push({
+        location: `scene ${r659a.peakIdx + 1} — peak physical-staging density (${r659a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for physical staging (scene ${r659a.peakIdx + 1}, with ${r659a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r659a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most physically active moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires when the longest
+  // consecutive run of scenes with zero outstanding clue-debt reaches 6. This pass already
+  // hand-rolls drought-run logic for relational/payoff/curiosity/suspense/clock/emotional channels
+  // and Wave 645 added seededClueIds via the shared helper; unresolvedClues itself has only been
+  // used in co-occurrence and aftermath-void contexts, never drought-audited.
+  {
+    const r659b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r659b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r659b.longestRun} consecutive scenes`,
+        rule: 'ARC_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r659b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r659b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the character's arc has no unanswered question to press against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r659b.longestRun}-scene stretch so the arc maintains some outstanding mystery throughout, keeping the character's arc of open questions alive.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when >75% of
+  // them fall in a single structural third. This pass already applies the zone-cluster mode to
+  // dramaticTurn, relationshipShifts, and curiosityDelta; payoffSetupIds itself has never been
+  // cluster-audited here.
+  {
+    const r659c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r659c.fires) {
+      const zoneName659c = r659c.zoneNames[r659c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName659c} third — ${r659c.maxZoneCount}/${r659c.count} payoff scenes`,
+        rule: 'ARC_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r659c.maxZoneCount} of the arc's ${r659c.count} thread-resolution scenes (${Math.round((r659c.maxZoneCount / r659c.count) * 100)}%) cluster in the ${zoneName659c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the character's arc paying off.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName659c} third — spreading resolutions across the story lets the character's arc pay off gradually instead of arriving all at once.`,
       });
     }
   }

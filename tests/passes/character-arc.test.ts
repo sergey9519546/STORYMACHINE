@@ -1080,6 +1080,94 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 659 — characterArcPass: arc staging peak uncaused, arc open thread drought run, arc payoff zone cluster', async () => {
+    const makeRec659 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc659 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; staging at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('ARC_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs659a = Array.from({ length: 8 }, (_, i) =>
+        makeRec659(i, {
+          visualBeats: i === 2 ? ['glances at the clock'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+        })
+      );
+      const res = await runArc659(recs659a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_STAGING_PEAK_UNCAUSED'), 'ARC_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // ARC_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ARC_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs659an = Array.from({ length: 8 }, (_, i) =>
+        makeRec659(i, {
+          visualBeats: i === 2 ? ['glances at the clock'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+          dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runArc659(recs659an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_STAGING_PEAK_UNCAUSED'), 'ARC_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // ARC_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; debt at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_OPEN_THREAD_DROUGHT_RUN fires when the longest no-debt run is ≥6', async () => {
+      const recs659b = Array.from({ length: 10 }, (_, i) =>
+        makeRec659(i, { unresolvedClues: (i === 0 || i === 1 || i === 2 || i === 9) ? ['a'] : [] })
+      );
+      const res = await runArc659(recs659b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_DROUGHT_RUN'), 'ARC_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // ARC_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // debt at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_OPEN_THREAD_DROUGHT_RUN does not fire when debt is distributed without a long drought', async () => {
+      const recs659bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec659(i, { unresolvedClues: (i === 0 || i === 4 || i === 9) ? ['a'] : [] })
+      );
+      const res = await runArc659(recs659bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_DROUGHT_RUN'), 'ARC_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('ARC_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs659c = Array.from({ length: 9 }, (_, i) =>
+        makeRec659(i, { payoffSetupIds: (i === 0 || i === 1 || i === 2) ? ['thread-a'] : [] })
+      );
+      const res = await runArc659(recs659c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_PAYOFF_ZONE_CLUSTER'), 'ARC_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs659cn = Array.from({ length: 9 }, (_, i) =>
+        makeRec659(i, { payoffSetupIds: (i === 0 || i === 4 || i === 7) ? ['thread-a'] : [] })
+      );
+      const res = await runArc659(recs659cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_PAYOFF_ZONE_CLUSTER'), 'ARC_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 645 — characterArcPass: arc highlight peak uncaused, arc seed drought run, arc open thread curiosity decoupled', async () => {
     const makeRec645 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
