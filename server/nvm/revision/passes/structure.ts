@@ -374,6 +374,18 @@
 // (distribution/timing × purpose === 'climax' × structural thirds — this purpose value has only
 // ever appeared inside the payoffPurposes composite set [union with 'resolution',
 // 'turning_point'] or the presence-only PURPOSE_CLIMAX_ABSENT check; a virgin standalone signal).
+//
+// Wave 863 additions: STRUCTURE_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 849; peak mode conventionally skipped for this categorical field),
+// STRUCTURE_ESTABLISH_WORLD_DROUGHT_RUN (run-based x purpose === 'establish_world' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 849; peak mode conventionally skipped for this categorical field),
+// STRUCTURE_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
+// structural thirds -- this purpose value has only ever appeared inside the payoffPurposes
+// composite set [union with 'climax', 'turning_point'] and two incidental last-record
+// disjunctions (`purpose !== 'resolution'`); it has never been audited as its own standalone
+// signal by any of the three shared-library trio modes).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4753,6 +4765,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r849c.maxZoneCount / r849c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r849c.zoneNames[r849c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the story's architecture builds toward its payoff in only one part of the story instead of throughout its full shape.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r849c.zoneNames[r849c.maxZoneIdx]} third so the structure builds toward its payoff more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // ── Wave 863: STRUCTURE_CLIMAX_DROUGHT_RUN, STRUCTURE_ESTABLISH_WORLD_DROUGHT_RUN,
+  //              STRUCTURE_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // STRUCTURE_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 849 (peak mode conventionally skipped for this categorical field).
+  {
+    const r863a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r863a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r863a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r863a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r863a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the story's architecture without a structural high point to build toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r863a.longestRun}-scene stretch as the climax, or restructure so the story's peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // STRUCTURE_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing
+  // scenes overall, fires when the longest consecutive run of scenes with no world-establishing
+  // purpose reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 849 (peak mode conventionally skipped for this categorical field).
+  {
+    const r863b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r863b.fires) {
+      issues.push({
+        location: `longest stretch with no world-establishing scene: ${r863b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r863b.longestRun} consecutive scenes with no scene purposed to establish the world, even though ${r863b.presentCount} scenes elsewhere are. A long unbroken stretch without new world-building leaves the story's architecture with no fresh ground to build from for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r863b.longestRun}-scene stretch to establish the world, so the structure has fresh ground to build from throughout the story rather than in one isolated pocket.`,
+      });
+    }
+  }
+
+  // STRUCTURE_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has only ever appeared inside the payoffPurposes composite set
+  // (union with 'climax', 'turning_point') and two incidental last-record disjunctions
+  // (`purpose !== 'resolution'`); it has never been audited as its own standalone signal by
+  // any of the three shared-library trio modes.
+  {
+    const r863c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r863c.fires) {
+      issues.push({
+        location: `${r863c.zoneNames[r863c.maxZoneIdx]} third — ${r863c.maxZoneCount} of ${r863c.count} resolution-purposed scenes`,
+        rule: 'STRUCTURE_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r863c.maxZoneCount / r863c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r863c.zoneNames[r863c.maxZoneIdx]} third. When every resolution beat concentrates in one structural window, the story's architecture has no room to let threads settle gradually before the ending absorbs them all at once.`,
+        suggestedFix: `Purpose at least one resolution scene outside the ${r863c.zoneNames[r863c.maxZoneIdx]} third so the structure's closure is distributed across the story rather than concentrated in a single structural window.`,
       });
     }
   }
