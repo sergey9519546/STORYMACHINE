@@ -294,6 +294,17 @@
 // cause × seededClueIds magnitude — seededClueIds has been drought-audited [Wave 645] and
 // zone-clustered [Wave 673], but never backward-cause peak-audited, completing the trio of
 // shared-library modes on this channel).
+// Wave 715 additions (built on the shared checks library): ARC_RESOLUTION_DROUGHT_RUN (run-based
+// × payoffSetupIds absence — Waves 659/687 applied the zone-cluster and backward-cause peak modes
+// to payoffSetupIds; the drought-run mode has never been applied to it via the shared library,
+// completing the trio; named distinctly from the existing hand-rolled ARC_PAYOFF_DROUGHT_RUN
+// [Wave 505] to avoid a rule-name collision), ARC_CLOCK_DELTA_DROUGHT_RUN (run-based ×
+// clockDelta>0 absence — Waves 673/701 applied the backward-cause peak and zone-cluster modes to
+// clockDelta; the drought-run mode has never been applied to it, completing the trio; distinct
+// from the existing hand-rolled ARC_CLOCK_DROUGHT_RUN [clockRaised boolean, Wave 575]),
+// ARC_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause × unresolvedClues magnitude
+// — unresolvedClues has only ever anchored a co-occurrence/decoupling check [Wave 645]; the
+// backward-cause peak mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4003,6 +4014,76 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The arc's single densest scene for planting new clues (scene ${r701c.peakIdx + 1}, with ${r701c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the character's arc drives what gets planted.`,
         suggestedFix: `Give scene ${r701c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most seed-dense moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 715: ARC_RESOLUTION_DROUGHT_RUN, ARC_CLOCK_DELTA_DROUGHT_RUN,
+  //              ARC_OPEN_THREAD_PEAK_UNCAUSED ─────────────────────────────────────────────────
+
+  // ARC_RESOLUTION_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest consecutive
+  // run of scenes with zero thread resolution reaches 6. Waves 659/687 applied the zone-cluster
+  // and backward-cause peak modes to payoffSetupIds; the drought-run mode has never been applied
+  // to it via the shared library, completing the trio. Named distinctly from the existing
+  // hand-rolled ARC_PAYOFF_DROUGHT_RUN (Wave 505) to avoid a rule-name collision.
+  {
+    const r715a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r715a.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r715a.longestRun} consecutive scenes`,
+        rule: 'ARC_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r715a.longestRun} consecutive scenes with no thread resolving at all, even though ${r715a.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the character's arc without a sense of accumulating clarity for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r715a.longestRun}-scene stretch so the character's arc keeps building toward resolution throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta>0 absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 scenes with a positive clock delta, fires when the longest
+  // consecutive run of scenes with no clock advance reaches 6. Waves 673/701 applied the
+  // backward-cause peak and zone-cluster modes to clockDelta; the drought-run mode has never been
+  // applied to it, completing the trio. Distinct from the existing hand-rolled ARC_CLOCK_
+  // DROUGHT_RUN (clockRaised boolean, Wave 575).
+  {
+    const r715b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r715b.fires) {
+      issues.push({
+        location: `longest stretch with no clock advance: ${r715b.longestRun} consecutive scenes`,
+        rule: 'ARC_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The arc contains a run of ${r715b.longestRun} consecutive scenes with no clock advance at all, even though ${r715b.presentCount} scenes elsewhere do compress time pressure. A long unbroken stretch with no deadline tightening leaves the character's arc without any urgency for an extended run.`,
+        suggestedFix: `Advance the clock somewhere within the ${r715b.longestRun}-scene stretch — even a small compression keeps the character's arc under some time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. unresolvedClues has only ever anchored a co-occurrence/decoupling
+  // check (Wave 645); the backward-cause peak mode has never been applied to it.
+  {
+    const r715c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r715c.fires) {
+      issues.push({
+        location: `scene ${r715c.peakIdx + 1} — peak open-thread density (${r715c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for outstanding clue-debt (scene ${r715c.peakIdx + 1}, with ${r715c.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r715c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most mystery-dense moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
       });
     }
   }

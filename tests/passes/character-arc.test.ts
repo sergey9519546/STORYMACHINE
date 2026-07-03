@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 715 — characterArcPass: arc resolution drought run, arc clock delta drought run, arc open thread peak uncaused', async () => {
+    const makeRec715 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc715 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_RESOLUTION_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_RESOLUTION_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs715a = Array.from({ length: 10 }, (_, i) =>
+        makeRec715(i, { payoffSetupIds: (i === 0 || i === 1 || i === 2 || i === 9) ? ['thread-a'] : [] })
+      );
+      const res = await runArc715(recs715a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_RESOLUTION_DROUGHT_RUN'), 'ARC_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    // ARC_RESOLUTION_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_RESOLUTION_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs715an = Array.from({ length: 10 }, (_, i) =>
+        makeRec715(i, { payoffSetupIds: (i === 0 || i === 4 || i === 9) ? ['thread-a'] : [] })
+      );
+      const res = await runArc715(recs715an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_RESOLUTION_DROUGHT_RUN'), 'ARC_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_CLOCK_DELTA_DROUGHT_RUN fire:
+    // 10 scenes; clock advances at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-advance run is ≥6', async () => {
+      const recs715b = Array.from({ length: 10 }, (_, i) =>
+        makeRec715(i, { clockDelta: (i === 0 || i === 1 || i === 2 || i === 9) ? 1 : 0 })
+      );
+      const res = await runArc715(recs715b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_CLOCK_DELTA_DROUGHT_RUN'), 'ARC_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // ARC_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock advances at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_CLOCK_DELTA_DROUGHT_RUN does not fire when clock advances are distributed without a long drought', async () => {
+      const recs715bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec715(i, { clockDelta: (i === 0 || i === 4 || i === 9) ? 1 : 0 })
+      );
+      const res = await runArc715(recs715bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_CLOCK_DELTA_DROUGHT_RUN'), 'ARC_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('ARC_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs715c = Array.from({ length: 8 }, (_, i) =>
+        makeRec715(i, { unresolvedClues: i === 2 ? ['a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [] })
+      );
+      const res = await runArc715(recs715c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_PEAK_UNCAUSED'), 'ARC_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // ARC_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ARC_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs715cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec715(i, {
+          unresolvedClues: i === 2 ? ['a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+          dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runArc715(recs715cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_OPEN_THREAD_PEAK_UNCAUSED'), 'ARC_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 701 — characterArcPass: arc staging zone cluster, arc clock delta zone cluster, arc seed peak uncaused', async () => {
     const makeRec701 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
