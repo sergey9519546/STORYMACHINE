@@ -205,10 +205,16 @@
 // Continues the Wave 596 "narrative signal rhythm" extension with three modes not yet used on
 // records here (run-based, backward-cause, sequence/aftermath, vs. Wave 596's average/aggregate
 // and underweight/bloat).
+// Wave 624 additions: VERBAL_STAGING_SIGNAL_DECOUPLED (co-occurrence/decoupling ×
+// dialogueHighlights × visualBeats — first use of either field in this 104-rule pass, and the
+// first co-occurrence/decoupling mode applied to records here), SEED_SIGNAL_ZONE_IMBALANCE
+// (underweight/bloat × seededClueIds × four structural zones — first use of seededClueIds in
+// this pass), CLOCK_SIGNAL_DROUGHT_RUN (run-based × clockRaised absence — first use of
+// clockRaised in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action lines (non-dialogue, non-slug, non-transition) from fountain */
 function extractActionLines(fountain: string): Array<{ text: string; lineNum: number }> {
@@ -2982,6 +2988,84 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r610c.triggerCount} revelation scenes is followed by two emotionally neutral scenes, even though ${r610c.aftermathCount} emotionally-charged scene(s) exist elsewhere in the script. A disclosed truth should land on someone — shock, relief, dread, or resolve — and when every revelation's aftermath is affectively flat, the story's rhythm of disclosure-then-felt-consequence goes silent right when it should be most audible.`,
         suggestedFix: `After at least one revelation, let the following scene or the one after carry a non-neutral emotional beat from a character absorbing what was just disclosed — visible shock, quiet relief, or a hardening resolve. The truth should be felt by someone nearby, not just registered as a plot event.`,
+      });
+    }
+  }
+
+  // ── Wave 624: VERBAL_STAGING_SIGNAL_DECOUPLED, SEED_SIGNAL_ZONE_IMBALANCE,
+  //              CLOCK_SIGNAL_DROUGHT_RUN ────────────────────────────────────────────────────
+  // Continues the Wave 596/610 "narrative signal rhythm" extension. Three more analytical modes
+  // this pass had never applied to records: co-occurrence/decoupling, a second underweight/bloat
+  // application (Wave 596 used purpose only), and a second run-based application (Wave 610 used
+  // relationshipShifts only).
+
+  // VERBAL_STAGING_SIGNAL_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 scenes carrying a
+  // dialogue highlight, ≥2 visually-staged scenes (visualBeats.length≥2). Zero overlap → fire.
+  // First use of either field in this pass, and the first co-occurrence/decoupling check applied
+  // to records here. A story's verbal high points and its most physically staged moments never
+  // sharing a scene means the two registers — what's said and what's physically shown — never
+  // reinforce each other in the same beat, each developing on an entirely separate rhythm.
+  {
+    const r624a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r624a.fires) {
+      issues.push({
+        location: `${r624a.aCount} dialogue-highlight scene(s), ${r624a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'VERBAL_STAGING_SIGNAL_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r624a.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r624a.bCount} scenes leaning heavily on physical staging — the story's verbal and physical registers run on separate rhythmic tracks. When a memorable line and dense physical staging never share a scene, each register develops in isolation rather than the two reinforcing each other in the same beat.`,
+        suggestedFix: `Let at least one heavily staged scene also carry a line worth remembering — pairing physical presence with verbal weight in the same beat so the story's two registers occasionally converge rather than always alternating.`,
+      });
+    }
+  }
+
+  // SEED_SIGNAL_ZONE_IMBALANCE — Underweight/bloat × seededClueIds × four structural zones. Built
+  // on checkZoneImbalance from the shared checks library. n≥10, ≥4 seed scenes total, divided
+  // across four equal structural zones. Fires only when one zone has zero seeds while another
+  // holds ≥50% of the total. First use of the seededClueIds field anywhere in this pass — Wave 596
+  // applied this template to the purpose channel only. A story's clue-planting rhythm should have
+  // some presence in every structural quarter; when it bloats in one and vanishes from another,
+  // the foreshadowing engine has its own uneven pulse.
+  {
+    const r624b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r624b.fires) {
+      const emptyNames624b = r624b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName624b = FOUR_ZONE_NAMES[r624b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames624b} empty; ${bloatName624b} has ${r624b.counts[r624b.bloatZoneIdx]}/${r624b.totalCount} seed scenes`,
+        rule: 'SEED_SIGNAL_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r624b.totalCount} clue-planting scenes are unevenly distributed across its four structural zones: ${bloatName624b} contains ${r624b.counts[r624b.bloatZoneIdx]} of them (${Math.round((r624b.counts[r624b.bloatZoneIdx] / r624b.totalCount) * 100)}%) while ${emptyNames624b} contains none. Foreshadowing bloats in one structural quarter and vanishes from another, giving the story's rhythm of planted promises an uneven pulse.`,
+        suggestedFix: `Redistribute clue-planting: move at least one seed from ${bloatName624b} into the empty zone(s) — ${emptyNames624b} — so every structural quarter carries some foreshadowing rhythm rather than concentrating it in one.`,
+      });
+    }
+  }
+
+  // CLOCK_SIGNAL_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 clockRaised scenes elsewhere, longest consecutive run of
+  // scenes with no clock raised ≥6 → fire. First use of the clockRaised field anywhere in this
+  // pass — Wave 610 applied the run-based template to relationshipShifts only. An extended
+  // stretch where deadline pressure never registers at all is a run-based flatline in the clock
+  // channel, even though the story does raise it elsewhere.
+  {
+    const r624c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r624c.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r624c.longestRun} consecutive scenes`,
+        rule: 'CLOCK_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r624c.longestRun} consecutive scenes with no clock raised at all, even though ${r624c.presentCount} scenes elsewhere do raise deadline pressure. A long stretch where time pressure never registers means the story's clock-rhythm goes flat for an extended run — the audience feels no ticking urgency at all during that stretch, even if the plot itself keeps moving.`,
+        suggestedFix: `Raise the clock somewhere within the ${r624c.longestRun}-scene stretch — even a small reminder of the deadline keeps the time-pressure channel alive rather than letting it sit dormant for an extended run.`,
       });
     }
   }

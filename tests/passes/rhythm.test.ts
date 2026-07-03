@@ -1136,6 +1136,87 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 624 — rhythmPass: verbal staging signal decoupled, seed signal zone imbalance, clock signal drought run', async () => {
+    const runR624 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VERBAL_STAGING_SIGNAL_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no staging); staged at 4,5 (no highlight) → zero overlap → fires
+    it('VERBAL_STAGING_SIGNAL_DECOUPLED fires when dialogue highlights and visually-staged scenes never overlap', async () => {
+      const recs624a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs624a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs624a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs624a[4] = makeSharedRecord(4, { visualBeats: ['slams the door', 'kicks the chair'] });
+      recs624a[5] = makeSharedRecord(5, { visualBeats: ['slams the door', 'kicks the chair'] });
+      const res = await runR624(recs624a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VERBAL_STAGING_SIGNAL_DECOUPLED'), 'VERBAL_STAGING_SIGNAL_DECOUPLED should fire');
+    });
+
+    // VERBAL_STAGING_SIGNAL_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and visual staging → overlap exists
+    it('VERBAL_STAGING_SIGNAL_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs624an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs624an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'], visualBeats: ['slams the door', 'kicks the chair'] });
+      recs624an[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs624an[5] = makeSharedRecord(5, { visualBeats: ['slams the door', 'kicks the chair'] });
+      const res = await runR624(recs624an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VERBAL_STAGING_SIGNAL_DECOUPLED'), 'VERBAL_STAGING_SIGNAL_DECOUPLED should not fire');
+    });
+
+    // SEED_SIGNAL_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); seeds at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('SEED_SIGNAL_ZONE_IMBALANCE fires when one zone is empty of seed scenes while another is bloated', async () => {
+      const recs624b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs624b[6] = makeSharedRecord(6, { seededClueIds: ['a'] });
+      recs624b[7] = makeSharedRecord(7, { seededClueIds: ['b'] });
+      recs624b[8] = makeSharedRecord(8, { seededClueIds: ['c'] });
+      recs624b[9] = makeSharedRecord(9, { seededClueIds: ['d'] });
+      const res = await runR624(recs624b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_ZONE_IMBALANCE'), 'SEED_SIGNAL_ZONE_IMBALANCE should fire');
+    });
+
+    // SEED_SIGNAL_ZONE_IMBALANCE no-fire:
+    // one seed per zone (1,4,7,10) → no zone is empty
+    it('SEED_SIGNAL_ZONE_IMBALANCE does not fire when seeds are spread across all zones', async () => {
+      const recs624bn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs624bn[1] = makeSharedRecord(1, { seededClueIds: ['a'] });
+      recs624bn[4] = makeSharedRecord(4, { seededClueIds: ['b'] });
+      recs624bn[7] = makeSharedRecord(7, { seededClueIds: ['c'] });
+      recs624bn[10] = makeSharedRecord(10, { seededClueIds: ['d'] });
+      const res = await runR624(recs624bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_ZONE_IMBALANCE'), 'SEED_SIGNAL_ZONE_IMBALANCE should not fire');
+    });
+
+    // CLOCK_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; clockRaised at 0,8,9; drought run 1-7 = 7 consecutive scenes ≥ 6
+    it('CLOCK_SIGNAL_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs624c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs624c[0] = makeSharedRecord(0, { clockRaised: true });
+      recs624c[8] = makeSharedRecord(8, { clockRaised: true });
+      recs624c[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runR624(recs624c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_DROUGHT_RUN'), 'CLOCK_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // CLOCK_SIGNAL_DROUGHT_RUN no-fire:
+    // clockRaised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CLOCK_SIGNAL_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs624cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs624cn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs624cn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs624cn[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runR624(recs624cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_DROUGHT_RUN'), 'CLOCK_SIGNAL_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 610 — rhythmPass: relational signal drought run, clock signal peak uncaused, revelation signal aftermath flat', async () => {
     const runR610 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
