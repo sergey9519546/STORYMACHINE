@@ -283,6 +283,17 @@
 // dialogueHighlights × structural thirds — dialogueHighlights has been backward-cause
 // peak-audited [Wave 645] and drought-audited [Wave 673], but never cluster-audited, completing
 // the trio of shared-library modes on this channel).
+// Wave 701 additions (built on the shared checks library): ARC_STAGING_ZONE_CLUSTER
+// (distribution/timing × visualBeats × structural thirds — visualBeats has been backward-cause
+// peak-audited [Wave 659], drought-audited [Wave 687], and four-zone imbalance-audited, but never
+// cluster-audited on the thirds granularity, completing the trio of shared-library modes on this
+// channel), ARC_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta>0 × structural thirds —
+// distinct from the existing hand-rolled ARC_CLOCK_DROUGHT_RUN [clockRaised boolean] and Wave
+// 673's ARC_CLOCK_DELTA_PEAK_UNCAUSED [backward-cause peak]; the zone-cluster mode has never been
+// applied to the raw clockDelta signal), ARC_SEED_PEAK_UNCAUSED (single-peak isolation/backward-
+// cause × seededClueIds magnitude — seededClueIds has been drought-audited [Wave 645] and
+// zone-clustered [Wave 673], but never backward-cause peak-audited, completing the trio of
+// shared-library modes on this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3922,6 +3933,76 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r687c.maxZoneCount} of the arc's ${r687c.count} scenes carrying a standout line of dialogue (${Math.round((r687c.maxZoneCount / r687c.count) * 100)}%) cluster in the ${zoneName687c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the character's arc.`,
         suggestedFix: `Give at least one scene outside the ${zoneName687c} third a standout line of dialogue — spreading memorable dialogue across the story lets the character's arc carry its own verbal high point in every structural third, not just one.`,
+      });
+    }
+  }
+
+  // ── Wave 701: ARC_STAGING_ZONE_CLUSTER, ARC_CLOCK_DELTA_ZONE_CLUSTER, ARC_SEED_PEAK_UNCAUSED ──
+
+  // ARC_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes, fires when
+  // >75% of them fall in a single structural third. visualBeats has been backward-cause
+  // peak-audited (Wave 659), drought-audited (Wave 687), and four-zone imbalance-audited, but
+  // never cluster-audited on the thirds granularity.
+  {
+    const r701a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r701a.fires) {
+      const zoneName701a = r701a.zoneNames[r701a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName701a} third — ${r701a.maxZoneCount}/${r701a.count} visually dense scenes`,
+        rule: 'ARC_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r701a.maxZoneCount} of the arc's ${r701a.count} visually dense scenes (${Math.round((r701a.maxZoneCount / r701a.count) * 100)}%) cluster in the ${zoneName701a} third. Physical staging concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no physically embodied moment for the character's arc.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName701a} third substantial physical staging — spreading embodied presence across the story lets each structural third carry some physical sense of the character's arc.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta>0 × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes with a positive clock
+  // delta, fires when >75% of them fall in a single structural third. Distinct from the existing
+  // hand-rolled ARC_CLOCK_DROUGHT_RUN (clockRaised boolean) and Wave 673's ARC_CLOCK_DELTA_PEAK_
+  // UNCAUSED (backward-cause peak); the zone-cluster mode has never been applied to the raw
+  // clockDelta signal.
+  {
+    const r701b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r701b.fires) {
+      const zoneName701b = r701b.zoneNames[r701b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName701b} third — ${r701b.maxZoneCount}/${r701b.count} clock-advancing scenes`,
+        rule: 'ARC_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r701b.maxZoneCount} of the arc's ${r701b.count} scenes where the clock advances (${Math.round((r701b.maxZoneCount / r701b.count) * 100)}%) cluster in the ${zoneName701b} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no urgency bearing on the character's arc.`,
+        suggestedFix: `Advance the clock in at least one scene outside the ${zoneName701b} third — spreading time pressure across the story lets every structural third carry some urgency on the character's arc.`,
+      });
+    }
+  }
+
+  // ARC_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude. Built
+  // on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene lookback.
+  // Finds the single scene with the most simultaneous clues planted; fires when neither that scene
+  // nor either of the two before it contains a dramatic turn or revelation. seededClueIds has been
+  // drought-audited (Wave 645) and zone-clustered (Wave 673), but never backward-cause peak-
+  // audited.
+  {
+    const r701c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r701c.fires) {
+      issues.push({
+        location: `scene ${r701c.peakIdx + 1} — peak seed density (${r701c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ARC_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The arc's single densest scene for planting new clues (scene ${r701c.peakIdx + 1}, with ${r701c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the character's arc drives what gets planted.`,
+        suggestedFix: `Give scene ${r701c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's most seed-dense moment is earned by a shift in the character's situation rather than arriving in a causal vacuum.`,
       });
     }
   }

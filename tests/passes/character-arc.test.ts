@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 701 — characterArcPass: arc staging zone cluster, arc clock delta zone cluster, arc seed peak uncaused', async () => {
+    const makeRec701 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc701 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('ARC_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs701a = Array.from({ length: 9 }, (_, i) =>
+        makeRec701(i, { visualBeats: (i === 0 || i === 1 || i === 2) ? ['a', 'b'] : [] })
+      );
+      const res = await runArc701(recs701a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_STAGING_ZONE_CLUSTER'), 'ARC_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs701an = Array.from({ length: 9 }, (_, i) =>
+        makeRec701(i, { visualBeats: (i === 0 || i === 4 || i === 7) ? ['a', 'b'] : [] })
+      );
+      const res = await runArc701(recs701an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_STAGING_ZONE_CLUSTER'), 'ARC_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-advancing scenes at 0,1,2 → 100% opening third
+    it('ARC_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-advancing scenes cluster in one third', async () => {
+      const recs701b = Array.from({ length: 9 }, (_, i) =>
+        makeRec701(i, { clockDelta: (i === 0 || i === 1 || i === 2) ? 1 : 0 })
+      );
+      const res = await runArc701(recs701b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_CLOCK_DELTA_ZONE_CLUSTER'), 'ARC_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-advancing scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-advancing scenes are distributed across thirds', async () => {
+      const recs701bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec701(i, { clockDelta: (i === 0 || i === 4 || i === 7) ? 1 : 0 })
+      );
+      const res = await runArc701(recs701bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_CLOCK_DELTA_ZONE_CLUSTER'), 'ARC_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('ARC_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs701c = Array.from({ length: 8 }, (_, i) =>
+        makeRec701(i, { seededClueIds: i === 2 ? ['clue-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [] })
+      );
+      const res = await runArc701(recs701c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_SEED_PEAK_UNCAUSED'), 'ARC_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // ARC_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ARC_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs701cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec701(i, {
+          seededClueIds: i === 2 ? ['clue-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+          dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+        })
+      );
+      const res = await runArc701(recs701cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_SEED_PEAK_UNCAUSED'), 'ARC_SEED_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 687 — characterArcPass: arc payoff peak uncaused, arc staging drought run, arc highlight zone cluster', async () => {
     const makeRec687 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
