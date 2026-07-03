@@ -931,6 +931,68 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 906 — themePass: theme turning point zone imbalance, theme introduce conflict zone imbalance, theme complicate zone imbalance', async () => {
+    const runT906 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Filler is 'establish_world' (not one of the tested purpose values).
+    it('THEME_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs906a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runT906(recs906a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURNING_POINT_ZONE_IMBALANCE'), 'THEME_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs906an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runT906(recs906an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURNING_POINT_ZONE_IMBALANCE'), 'THEME_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs906b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runT906(recs906b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs906bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runT906(recs906bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs906c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runT906(recs906c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_COMPLICATE_ZONE_IMBALANCE'), 'THEME_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs906cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runT906(recs906cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_COMPLICATE_ZONE_IMBALANCE'), 'THEME_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 892 — themePass: theme climax zone imbalance, theme establish world zone imbalance, theme resolution zone imbalance', async () => {
     const runT892 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
