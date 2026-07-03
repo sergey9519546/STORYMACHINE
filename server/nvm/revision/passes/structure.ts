@@ -228,6 +228,18 @@
 // × seededClueIds × structural thirds — Wave 639's STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER
 // applied the zone-cluster mode to dialogueHighlights; seededClueIds itself has never been
 // cluster-audited here).
+// Wave 667 additions (built on the shared checks library, audit M2.2): STRUCTURE_PAYOFF_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds magnitude — the scene with the
+// most simultaneous thread resolutions has no dramatic turn or revelation in itself or the two
+// scenes before it; Wave 625/653 applied the peak-uncaused mode to visualBeats and
+// dialogueHighlights; payoffSetupIds itself has never been backward-cause peak-audited),
+// STRUCTURE_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence — the drought-run
+// mode has covered emotion/suspense/curiosity/clock/purpose channels via hand-rolled logic and
+// unresolvedClues via the shared helper [Wave 653]; relationshipShifts itself has never been
+// drought-audited despite being used extensively elsewhere), STRUCTURE_CLOCK_ZONE_CLUSTER
+// (distribution/timing × clockRaised × structural thirds — Wave 639 applied the zone-cluster mode
+// to dialogueHighlights; clockRaised itself has never been cluster-audited despite anchoring an
+// entire hand-rolled run-based check family).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3648,6 +3660,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r653c.maxZoneCount} of the story's ${r653c.count} clue-planting scenes (${Math.round((r653c.maxZoneCount / r653c.count) * 100)}%) cluster in the ${zoneName653c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no new seed being planted.`,
         suggestedFix: `Plant at least one clue outside the ${zoneName653c} third — spreading foreshadowing across the story lets each structural third carry its own share of setup for later payoffs.`,
+      });
+    }
+  }
+
+  // ── Wave 667: STRUCTURE_PAYOFF_PEAK_UNCAUSED, STRUCTURE_RELATIONSHIP_DROUGHT_RUN,
+  //              STRUCTURE_CLOCK_ZONE_CLUSTER ────────────────────────────────────────────────
+
+  // STRUCTURE_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous thread resolutions;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Waves 625/653 applied the peak-uncaused mode to visualBeats and dialogueHighlights;
+  // payoffSetupIds itself has never been backward-cause peak-audited.
+  {
+    const r667a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r667a.fires) {
+      issues.push({
+        location: `scene ${r667a.peakIdx + 1} — peak payoff density (${r667a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STRUCTURE_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r667a.peakIdx + 1}, with ${r667a.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r667a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STRUCTURE_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with zero bond changes reaches 6. The
+  // drought-run mode has covered emotion/suspense/curiosity/clock/purpose channels via hand-rolled
+  // logic and unresolvedClues via the shared helper (Wave 653); relationshipShifts itself has
+  // never been drought-audited despite being used extensively elsewhere.
+  {
+    const r667b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r667b.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r667b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r667b.longestRun} consecutive scenes with no relationship shift at all, even though ${r667b.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where no relationship moves leaves the story's structural rhythm running on plot mechanics alone for an extended run.`,
+        suggestedFix: `Let a bond shift somewhere within the ${r667b.longestRun}-scene stretch — even a small movement keeps the story's structural rhythm tied to its characters' relationships throughout.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-raised scenes, fires when
+  // >75% of them fall in a single structural third. Wave 639 applied the zone-cluster mode to
+  // dialogueHighlights; clockRaised itself has never been cluster-audited despite anchoring an
+  // entire hand-rolled run-based check family (CLOCK_RUN).
+  {
+    const r667c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r667c.fires) {
+      const zoneName667c = r667c.zoneNames[r667c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName667c} third — ${r667c.maxZoneCount}/${r667c.count} clock-raised scenes`,
+        rule: 'STRUCTURE_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r667c.maxZoneCount} of the story's ${r667c.count} clock-raised scenes (${Math.round((r667c.maxZoneCount / r667c.count) * 100)}%) cluster in the ${zoneName667c} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no urgency bearing on the plot.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${zoneName667c} third — spreading time pressure across the story lets every structural third carry some urgency.`,
       });
     }
   }

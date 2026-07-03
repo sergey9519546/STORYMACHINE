@@ -1006,6 +1006,84 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 667 — structurePass: structure payoff peak uncaused, structure relationship drought run, structure clock zone cluster', async () => {
+    const runST667 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_PAYOFF_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1 thread) and 6 (5 threads, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('STRUCTURE_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs667a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs667a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs667a[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST667(recs667a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_PEAK_UNCAUSED'), 'STRUCTURE_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // STRUCTURE_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STRUCTURE_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs667an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs667an[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs667an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs667an[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runST667(recs667an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_PEAK_UNCAUSED'), 'STRUCTURE_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+
+    // STRUCTURE_RELATIONSHIP_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('STRUCTURE_RELATIONSHIP_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs667b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs667b[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs667b[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs667b[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs667b[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runST667(recs667b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_DROUGHT_RUN'), 'STRUCTURE_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_RELATIONSHIP_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('STRUCTURE_RELATIONSHIP_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs667bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs667bn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs667bn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs667bn[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runST667(recs667bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_DROUGHT_RUN'), 'STRUCTURE_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-raised scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_CLOCK_ZONE_CLUSTER fires when >75% of clock-raised scenes cluster in one third', async () => {
+      const recs667c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs667c[0] = makeSharedRecord(0, { clockRaised: true });
+      recs667c[1] = makeSharedRecord(1, { clockRaised: true });
+      recs667c[2] = makeSharedRecord(2, { clockRaised: true });
+      const res = await runST667(recs667c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_ZONE_CLUSTER'), 'STRUCTURE_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // STRUCTURE_CLOCK_ZONE_CLUSTER no-fire:
+    // clock-raised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('STRUCTURE_CLOCK_ZONE_CLUSTER does not fire when clock-raised scenes are distributed across thirds', async () => {
+      const recs667cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs667cn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs667cn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs667cn[7] = makeSharedRecord(7, { clockRaised: true });
+      const res = await runST667(recs667cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_ZONE_CLUSTER'), 'STRUCTURE_CLOCK_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 653 — structurePass: structure highlight peak uncaused, structure open thread drought run, structure seed zone cluster', async () => {
     const runST653 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
