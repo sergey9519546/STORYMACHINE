@@ -1598,6 +1598,71 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 896 — dialoguePass: dialogue climax zone imbalance, dialogue establish_world zone imbalance, dialogue resolution zone imbalance', async () => {
+    const makeRec896 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes896 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD896 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    it('DIALOGUE_CLIMAX_ZONE_IMBALANCE fires when climax scenes cluster in two zones and two are empty', async () => {
+      const records896a = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'climax' } : {}));
+      const res = await runD896(buildScenes896(10), records896a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLIMAX_ZONE_IMBALANCE'), 'DIALOGUE_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_CLIMAX_ZONE_IMBALANCE does not fire when climax scenes are spread across all four zones', async () => {
+      const records896an = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 3, 5, 8].includes(i) ? { purpose: 'climax' } : {}));
+      const res = await runD896(buildScenes896(10), records896an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLIMAX_ZONE_IMBALANCE'), 'DIALOGUE_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE fires when establish_world scenes cluster in two zones and two are empty', async () => {
+      const records896b = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'establish_world' } : {}));
+      const res = await runD896(buildScenes896(10), records896b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when establish_world scenes are spread across all four zones', async () => {
+      const records896bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 3, 5, 8].includes(i) ? { purpose: 'establish_world' } : {}));
+      const res = await runD896(buildScenes896(10), records896bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_RESOLUTION_ZONE_IMBALANCE fires when resolution scenes cluster in two zones and two are empty', async () => {
+      const records896c = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'resolution' } : {}));
+      const res = await runD896(buildScenes896(10), records896c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_RESOLUTION_ZONE_IMBALANCE'), 'DIALOGUE_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_RESOLUTION_ZONE_IMBALANCE does not fire when resolution scenes are spread across all four zones', async () => {
+      const records896cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec896(i, [0, 3, 5, 8].includes(i) ? { purpose: 'resolution' } : {}));
+      const res = await runD896(buildScenes896(10), records896cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_RESOLUTION_ZONE_IMBALANCE'), 'DIALOGUE_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 882 — dialoguePass: dialogue resolution drought run, dialogue complicate zone cluster, dialogue complicate drought run', async () => {
     const makeRec882 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -411,6 +411,13 @@
 // 'complicate' absence -- completes 2 of 3 slots for this purpose value alongside the
 // zone-cluster mode added in this same wave; peak mode conventionally skipped for this
 // categorical field).
+//
+// Wave 896 additions (opens the twenty-third rotation cycle): no purpose value had ever been
+// audited by the distinct 4-zone checkZoneImbalance mode in this pass (only visualBeats,
+// character_moment, and payoffSetupIds had). This wave applies it to three purpose values with
+// complete 3-zone/run-based trios: DIALOGUE_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
+// DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and DIALOGUE_
+// RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5234,6 +5241,77 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r882c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r882c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves dialogue with no fresh trouble to react to for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r882c.longestRun}-scene stretch to complicate the story so dialogue keeps reacting to fresh trouble throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLIMAX_ZONE_IMBALANCE -- Zone-presence/absence (bloat+empty) x purpose === 'climax'
+  // x four-zone act-based structure. Built on checkZoneImbalance from the shared checks library.
+  // n>=10, >=4 climax-purposed scenes, fires only when at least one of the four act-based zones
+  // is completely empty of climax-purposed scenes AND the busiest zone holds >=50% of them.
+  // Distinct from DIALOGUE_CLIMAX's existing drought-run (run-based absence) and zone-cluster
+  // (3-zone >75% concentration) checks: this is the first application of the 4-zone bloat+empty-
+  // zone mode to this purpose value in this pass.
+  {
+    const r896a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r896a.fires) {
+      const emptyNames896a = r896a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName896a = FOUR_ZONE_NAMES[r896a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames896a} empty; ${bloatName896a} has ${r896a.counts[r896a.bloatZoneIdx]}/${r896a.totalCount} climax-purposed scenes`,
+        rule: 'DIALOGUE_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r896a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName896a} contains ${r896a.counts[r896a.bloatZoneIdx]} of them (${Math.round((r896a.counts[r896a.bloatZoneIdx] / r896a.totalCount) * 100)}%) while ${emptyNames896a} contains none. Dialogue built to peak at the climax has no zone elsewhere in the story to build toward it from.`,
+        suggestedFix: `Redistribute climactic beats: move at least one climax-purposed scene into the empty zone(s) -- ${emptyNames896a} -- so dialogue has intensity to build across the whole story, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE -- Zone-presence/absence (bloat+empty) x
+  // purpose === 'establish_world' x four-zone act-based structure. Built on checkZoneImbalance.
+  // n>=10, >=4 world-establishing scenes, fires only when a zone is completely empty of them AND
+  // the busiest zone holds >=50%. Distinct from DIALOGUE_ESTABLISH_WORLD's existing drought-run
+  // and zone-cluster checks: first application of the 4-zone bloat+empty-zone mode to this value.
+  {
+    const r896b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r896b.fires) {
+      const emptyNames896b = r896b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName896b = FOUR_ZONE_NAMES[r896b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames896b} empty; ${bloatName896b} has ${r896b.counts[r896b.bloatZoneIdx]}/${r896b.totalCount} world-establishing scenes`,
+        rule: 'DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r896b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName896b} contains ${r896b.counts[r896b.bloatZoneIdx]} of them (${Math.round((r896b.counts[r896b.bloatZoneIdx] / r896b.totalCount) * 100)}%) while ${emptyNames896b} contains none. Dialogue is left to re-explain the world piecemeal wherever establishing beats are absent.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) -- ${emptyNames896b} -- so dialogue can lean on established context throughout the story, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_RESOLUTION_ZONE_IMBALANCE -- Zone-presence/absence (bloat+empty) x
+  // purpose === 'resolution' x four-zone act-based structure. Built on checkZoneImbalance.
+  // n>=10, >=4 resolution-purposed scenes, fires only when a zone is completely empty of them AND
+  // the busiest zone holds >=50%. Distinct from DIALOGUE_RESOLUTION's existing drought-run and
+  // zone-cluster checks: first application of the 4-zone bloat+empty-zone mode to this value.
+  {
+    const r896c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r896c.fires) {
+      const emptyNames896c = r896c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName896c = FOUR_ZONE_NAMES[r896c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames896c} empty; ${bloatName896c} has ${r896c.counts[r896c.bloatZoneIdx]}/${r896c.totalCount} resolution-purposed scenes`,
+        rule: 'DIALOGUE_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r896c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName896c} contains ${r896c.counts[r896c.bloatZoneIdx]} of them (${Math.round((r896c.counts[r896c.bloatZoneIdx] / r896c.totalCount) * 100)}%) while ${emptyNames896c} contains none. Dialogue has nothing to settle in the empty zone(s), leaving loose threads dangling until resolution is crammed elsewhere.`,
+        suggestedFix: `Redistribute closing beats: move at least one resolution-purposed scene into the empty zone(s) -- ${emptyNames896c} -- so dialogue can settle threads across the whole story, not only the quarter currently carrying most of it.`,
       });
     }
   }
