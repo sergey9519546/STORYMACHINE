@@ -931,6 +931,74 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 766 — themePass: theme suspense zone cluster, theme curiosity zone cluster, theme suspense peak uncaused', async () => {
+    const runT766 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspenseDelta>0 scenes at 0,1,2 → 100% opening third
+    it('THEME_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs766a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT766(recs766a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_ZONE_CLUSTER'), 'THEME_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs766an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT766(recs766an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_ZONE_CLUSTER'), 'THEME_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosityDelta>0 scenes at 0,1,2 → 100% opening third
+    it('THEME_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs766b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT766(recs766b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_ZONE_CLUSTER'), 'THEME_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs766bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runT766(recs766bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CURIOSITY_ZONE_CLUSTER'), 'THEME_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('THEME_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs766c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs766c[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs766c[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      const res = await runT766(recs766c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_PEAK_UNCAUSED'), 'THEME_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('THEME_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs766cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs766cn[2] = makeSharedRecord(2, { suspenseDelta: 3 });
+      recs766cn[5] = makeSharedRecord(5, { suspenseDelta: 3 });
+      recs766cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runT766(recs766cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SUSPENSE_PEAK_UNCAUSED'), 'THEME_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+  });
+
+
   describe('Wave 752 — themePass: theme clock delta zone cluster, theme turn drought run, theme character moment drought run', async () => {
     const runT752 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

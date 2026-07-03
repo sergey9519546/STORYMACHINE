@@ -298,6 +298,18 @@
 // it), THEME_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence —
 // Wave 682 applied the zone-cluster mode to this signal; the drought-run mode has never been
 // applied to it).
+// Wave 766 additions: THEME_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0 presence
+// × structural thirds — existing suspense checks in this pass are co-occurrence [does the group of
+// high-suspense scenes carry theme] and peak-resonance-absence [does the single peak scene carry
+// theme]; the shared-library thirds-based cluster mode has never been applied to it),
+// THEME_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence × structural
+// thirds — existing curiosity checks are co-occurrence and peak-resonance-absence; the
+// shared-library cluster mode has never been applied to it), THEME_SUSPENSE_PEAK_UNCAUSED
+// (backward-cause × suspenseDelta-as-magnitude × 2-scene lookback — THEME_SUSPENSE_PEAK_ABSENT
+// audits whether the peak scene ITSELF carries thematic resonance; this looks backward from the
+// peak for a structural cause [dramatic turn or revelation] in the 2 preceding scenes, a wholly
+// different analytical claim, so the shared-library backward-cause mode has never been applied to
+// suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4336,6 +4348,76 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r752c.longestRun} consecutive scenes purposed otherwise than a character moment, even though ${r752c.presentCount} scenes elsewhere are dedicated to the protagonist's inner life. A long unbroken stretch with nothing but plot-forward scenes leaves the theme with no interior beat to be voiced through for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r752c.longestRun}-scene stretch as a character moment so the theme keeps a beat of interior reflection to be voiced through throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 766: THEME_SUSPENSE_ZONE_CLUSTER, THEME_CURIOSITY_ZONE_CLUSTER,
+  //              THEME_SUSPENSE_PEAK_UNCAUSED ─────────────────────────────────────
+
+  // THEME_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Existing suspense
+  // checks in this pass are co-occurrence (does the group of high-suspense scenes carry theme) and
+  // peak-resonance-absence (does the single peak scene carry theme); the shared-library
+  // thirds-based cluster mode has never been applied to it.
+  {
+    const r766a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r766a.fires) {
+      issues.push({
+        location: `${r766a.zoneNames[r766a.maxZoneIdx]} third — ${r766a.maxZoneCount} of ${r766a.count} suspense-positive scenes`,
+        rule: 'THEME_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r766a.maxZoneCount / r766a.count) * 100)}% of the scenes where tension rises cluster in the ${r766a.zoneNames[r766a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the theme has no rising tension testing it anywhere else across the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r766a.zoneNames[r766a.maxZoneIdx]} third so tension keeps pressing on the theme more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Existing curiosity
+  // checks are co-occurrence and peak-resonance-absence; the shared-library cluster mode has never
+  // been applied to it.
+  {
+    const r766b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r766b.fires) {
+      issues.push({
+        location: `${r766b.zoneNames[r766b.maxZoneIdx]} third — ${r766b.maxZoneCount} of ${r766b.count} curiosity-positive scenes`,
+        rule: 'THEME_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r766b.maxZoneCount / r766b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r766b.zoneNames[r766b.maxZoneIdx]} third. When every question the story raises lands in the same structural window, the theme has no fresh mystery pulling the audience through the rest of the piece.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r766b.zoneNames[r766b.maxZoneIdx]} third so questions keep pulling the audience toward the theme more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene lookback.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-positive scenes,
+  // fires when the peak (earliest, on magnitude ties) suspense scene has no dramatic turn or
+  // revelation in the 2 scenes preceding it. THEME_SUSPENSE_PEAK_ABSENT audits whether the peak
+  // scene ITSELF carries thematic resonance; this looks backward from the peak for a structural
+  // cause, a wholly different analytical claim, so the shared-library backward-cause mode has
+  // never been applied to suspenseDelta.
+  {
+    const r766c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.suspenseDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r766c.fires) {
+      issues.push({
+        location: `scene ${r766c.peakIdx} (peak suspenseDelta ${r766c.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'THEME_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r766c.peakIdx}, suspenseDelta ${r766c.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r766c.qualifyingCount} scenes elsewhere carry tension. The moment the audience is most gripped lands out of nowhere — nothing in the theme's structural build-up prepared this peak.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r766c.peakIdx} so the theme earns its peak suspense instead of springing it without preparation.`,
       });
     }
   }
