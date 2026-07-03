@@ -352,6 +352,17 @@
 // STRUCTURE_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
 // completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
 // same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 835 additions: STRUCTURE_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose
+// === 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass, not even inside the setupPurposes/payoffPurposes composite sets; a
+// virgin field), STRUCTURE_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completing 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in this same wave; peak mode conventionally skipped for this
+// categorical field), STRUCTURE_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'positive' × structural thirds — mirrors the completed negative-valence
+// trio; the positive valence has never been isolated by any of the three shared-library trio
+// modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4595,6 +4606,74 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r821c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r821c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the story's architecture coasting without a pivot for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r821c.longestRun}-scene stretch as a turning point so the structure keeps redirecting the story throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 835: STRUCTURE_INTRODUCE_CONFLICT_ZONE_CLUSTER, STRUCTURE_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              STRUCTURE_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // STRUCTURE_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass,
+  // not even inside the setupPurposes/payoffPurposes composite sets — a virgin field for all
+  // three shared-library trio modes.
+  {
+    const r835a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r835a.fires) {
+      issues.push({
+        location: `${r835a.zoneNames[r835a.maxZoneIdx]} third — ${r835a.maxZoneCount} of ${r835a.count} conflict-introducing scenes`,
+        rule: 'STRUCTURE_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r835a.maxZoneCount / r835a.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r835a.zoneNames[r835a.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the story's architecture has no fresh friction anywhere else across its full shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r835a.zoneNames[r835a.maxZoneIdx]} third to introduce conflict so the structure keeps opening fresh friction more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // STRUCTURE_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in this same wave (peak mode conventionally skipped
+  // for this categorical field).
+  {
+    const r835b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r835b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r835b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r835b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r835b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the story's architecture coasting on old conflict for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r835b.longestRun}-scene stretch to introduce conflict so the structure keeps opening fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed negative-valence trio; the positive valence has never been isolated by
+  // any of the three shared-library trio modes in this pass.
+  {
+    const r835c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r835c.fires) {
+      issues.push({
+        location: `${r835c.zoneNames[r835c.maxZoneIdx]} third — ${r835c.maxZoneCount} of ${r835c.count} positive-emotion scenes`,
+        rule: 'STRUCTURE_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r835c.maxZoneCount / r835c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r835c.zoneNames[r835c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the story's architecture carries its emotional payoff in only one part of the story instead of throughout its full shape.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r835c.zoneNames[r835c.maxZoneIdx]} third so the structure delivers its emotional payoff more evenly across its full shape.`,
       });
     }
   }
