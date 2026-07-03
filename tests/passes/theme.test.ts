@@ -931,6 +931,83 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 710 — themePass: theme clock zone cluster, theme open thread drought run, theme seed peak uncaused', async () => {
+    const runT710 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-raised scenes at 0,1,2 → 100% opening third
+    it('THEME_CLOCK_ZONE_CLUSTER fires when >75% of clock-raised scenes cluster in one third', async () => {
+      const recs710a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs710a[0] = makeSharedRecord(0, { clockRaised: true });
+      recs710a[1] = makeSharedRecord(1, { clockRaised: true });
+      recs710a[2] = makeSharedRecord(2, { clockRaised: true });
+      const res = await runT710(recs710a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_ZONE_CLUSTER'), 'THEME_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_CLOCK_ZONE_CLUSTER no-fire:
+    // clock-raised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_CLOCK_ZONE_CLUSTER does not fire when clock-raised scenes are distributed across thirds', async () => {
+      const recs710an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs710an[0] = makeSharedRecord(0, { clockRaised: true });
+      recs710an[4] = makeSharedRecord(4, { clockRaised: true });
+      recs710an[7] = makeSharedRecord(7, { clockRaised: true });
+      const res = await runT710(recs710an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_ZONE_CLUSTER'), 'THEME_CLOCK_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; open threads at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('THEME_OPEN_THREAD_DROUGHT_RUN fires when the longest no-open-thread run is ≥6', async () => {
+      const recs710b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs710b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs710b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs710b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      recs710b[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runT710(recs710b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_DROUGHT_RUN'), 'THEME_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // THEME_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // open threads at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_OPEN_THREAD_DROUGHT_RUN does not fire when open threads are distributed without a long drought', async () => {
+      const recs710bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs710bn[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs710bn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs710bn[9] = makeSharedRecord(9, { unresolvedClues: ['c'] });
+      const res = await runT710(recs710bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_DROUGHT_RUN'), 'THEME_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('THEME_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs710c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs710c[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs710c[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT710(recs710c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_PEAK_UNCAUSED'), 'THEME_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs710cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs710cn[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs710cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs710cn[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT710(recs710cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_PEAK_UNCAUSED'), 'THEME_SEED_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 696 — themePass: theme staging zone cluster, theme payoff peak uncaused, theme seed drought run', async () => {
     const runT696 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

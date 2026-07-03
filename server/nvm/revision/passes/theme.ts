@@ -266,6 +266,14 @@
 // zone-cluster [Wave 640] and drought-run [Wave 668] checks), THEME_SEED_DROUGHT_RUN (run-based ×
 // seededClueIds absence — Wave 654 applied the zone-cluster mode to seededClueIds; the drought-run
 // mode has never been applied to this channel).
+// Wave 710 additions: THEME_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaised × structural
+// thirds — Wave 640 applied the drought-run mode to clockRaised; the zone-cluster mode has never
+// been applied to this channel), THEME_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues
+// absence — Wave 654 applied the backward-cause peak mode to unresolvedClues; the drought-run
+// mode has never been applied to this channel), THEME_SEED_PEAK_UNCAUSED (single-peak isolation/
+// backward-cause × seededClueIds magnitude — Waves 654/696 applied the zone-cluster and
+// drought-run modes to seededClueIds; the backward-cause peak mode has never been applied to it,
+// completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4038,6 +4046,73 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r696c.longestRun} consecutive scenes with no clue seeded at all, even though ${r696c.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the theme's sense of gradual accumulation dormant for an extended run.`,
         suggestedFix: `Seed a new clue or thread somewhere within the ${r696c.longestRun}-scene stretch so the theme's sense of accumulating mystery keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 710: THEME_CLOCK_ZONE_CLUSTER, THEME_OPEN_THREAD_DROUGHT_RUN, THEME_SEED_PEAK_UNCAUSED ──
+
+  // THEME_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 clock-raised scenes, fires when >75%
+  // of them fall in a single structural third. Wave 640 applied the drought-run mode to
+  // clockRaised; the zone-cluster mode has never been applied to this channel.
+  {
+    const r710a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r710a.fires) {
+      const zoneName710a = r710a.zoneNames[r710a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName710a} third — ${r710a.maxZoneCount}/${r710a.count} clock-raised scenes`,
+        rule: 'THEME_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r710a.maxZoneCount} of the story's ${r710a.count} clock-raised scenes (${Math.round((r710a.maxZoneCount / r710a.count) * 100)}%) cluster in the ${zoneName710a} third. Time pressure concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's sense of mounting urgency an uneven structural rhythm.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${zoneName710a} third — spreading time pressure across the story lets every structural third carry some thematic urgency.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires when the longest
+  // consecutive run of scenes with zero outstanding clue-debt reaches 6. Wave 654 applied the
+  // backward-cause peak mode to unresolvedClues; the drought-run mode has never been applied to
+  // this channel.
+  {
+    const r710b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r710b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r710b.longestRun} consecutive scenes`,
+        rule: 'THEME_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r710b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r710b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved leaves the theme's sense of gathering mystery dormant for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r710b.longestRun}-scene stretch so the theme's sense of accumulating mystery keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Waves
+  // 654/696 applied the zone-cluster and drought-run modes to seededClueIds; the backward-cause
+  // peak mode has never been applied to it, completing the trio.
+  {
+    const r710c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r710c.fires) {
+      issues.push({
+        location: `scene ${r710c.peakIdx + 1} — peak seed density (${r710c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r710c.peakIdx + 1}, with ${r710c.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the theme's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r710c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
       });
     }
   }
