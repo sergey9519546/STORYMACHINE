@@ -1365,6 +1365,70 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 902 — payoffPass: payoff turning point zone imbalance, payoff complicate zone imbalance, payoff introduce conflict zone imbalance', async () => {
+    const runPY902 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Filler is 'establish_world' (not one of the tested purpose values).
+    it('PAYOFF_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs902a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURNING_POINT_ZONE_IMBALANCE'), 'PAYOFF_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs902an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURNING_POINT_ZONE_IMBALANCE'), 'PAYOFF_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs902b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_ZONE_IMBALANCE'), 'PAYOFF_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs902bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_ZONE_IMBALANCE'), 'PAYOFF_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs902c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs902cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runPY902(recs902cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 888 — payoffPass: payoff climax zone imbalance, payoff establish world zone imbalance, payoff resolution zone imbalance', async () => {
     const runPY888 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

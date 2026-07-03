@@ -407,6 +407,13 @@
 // PAYOFF_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution' -- distinct from
 // RESOLUTION_CRAMMED_AT_END/PAYOFF_POST_CLIMAX_CLUSTER, which audit payoffSetupIds temporal
 // position rather than this purpose enum value).
+//
+// Wave 902 additions: continuing the checkZoneImbalance rollout begun in Wave 888, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: PAYOFF_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
+// PAYOFF_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate'), and
+// PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4929,6 +4936,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r888c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName888c} contains ${r888c.counts[r888c.bloatZoneIdx]} of them (${Math.round((r888c.counts[r888c.bloatZoneIdx] / r888c.totalCount) * 100)}%) while ${emptyNames888c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the payoff engine's closure an uneven structural rhythm.`,
         suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames888c} — so the payoff engine's threads keep settling more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 888. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone PAYOFF_TURNING_POINT_ZONE_CLUSTER and run-based
+  // PAYOFF_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r902a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r902a.fires) {
+      const emptyNames902a = r902a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName902a = FOUR_ZONE_NAMES[r902a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames902a} empty; ${bloatName902a} has ${r902a.counts[r902a.bloatZoneIdx]}/${r902a.totalCount} turning-point scenes`,
+        rule: 'PAYOFF_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r902a.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName902a} contains ${r902a.counts[r902a.bloatZoneIdx]} of them (${Math.round((r902a.counts[r902a.bloatZoneIdx] / r902a.totalCount) * 100)}%) while ${emptyNames902a} contains none. Pivots bloat in one structural quarter and vanish from another, giving the payoff engine's direction changes an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames902a} — so the payoff engine cashes in its pivots more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 888. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone PAYOFF_COMPLICATE_ZONE_CLUSTER and run-based
+  // PAYOFF_COMPLICATE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r902b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r902b.fires) {
+      const emptyNames902b = r902b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName902b = FOUR_ZONE_NAMES[r902b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames902b} empty; ${bloatName902b} has ${r902b.counts[r902b.bloatZoneIdx]}/${r902b.totalCount} complicating scenes`,
+        rule: 'PAYOFF_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r902b.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName902b} contains ${r902b.counts[r902b.bloatZoneIdx]} of them (${Math.round((r902b.counts[r902b.bloatZoneIdx] / r902b.totalCount) * 100)}%) while ${emptyNames902b} contains none. Complications bloat in one structural quarter and vanish from another, giving the payoff engine's fresh debts an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames902b} — so the payoff engine keeps opening fresh debts more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'introduce_conflict'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 888. n≥10, ≥4 conflict-introducing scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER and
+  // run-based PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r902c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r902c.fires) {
+      const emptyNames902c = r902c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName902c = FOUR_ZONE_NAMES[r902c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames902c} empty; ${bloatName902c} has ${r902c.counts[r902c.bloatZoneIdx]}/${r902c.totalCount} conflict-introducing scenes`,
+        rule: 'PAYOFF_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r902c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName902c} contains ${r902c.counts[r902c.bloatZoneIdx]} of them (${Math.round((r902c.counts[r902c.bloatZoneIdx] / r902c.totalCount) * 100)}%) while ${emptyNames902c} contains none. New conflicts bloat in one structural quarter and vanish from another, giving the payoff engine's fresh setups an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames902c} — so the payoff engine keeps seeding fresh setups more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
