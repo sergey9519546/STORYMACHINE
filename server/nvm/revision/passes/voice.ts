@@ -207,10 +207,16 @@
 // revelations while another holds ≥50%; first use of the revelation field as a per-scene signal
 // in this file at all, and the first application of checkZoneImbalance to the revelation channel
 // across every pass this session).
+// Wave 613 additions (built on the shared checks library, audit M2.2): DRAMATIC_TURN_DIALOGUE_
+// HIGHLIGHT_DECOUPLED (co-occurrence/decoupling × dramaticTurn × dialogueHighlights — first use
+// of dramaticTurn anywhere in this 104-rule pass), VOICE_STAGING_ZONE_IMBALANCE
+// (underweight/bloat × visualBeats × four structural zones — first use of visualBeats anywhere
+// in this pass), CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × clockRaised
+// trigger → dialogueHighlights absence — first use of clockRaised anywhere in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
@@ -3801,6 +3807,87 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r599c.totalCount} revelations are unevenly distributed across its four structural zones: ${bloatName599c} contains ${r599c.counts[r599c.bloatZoneIdx]} of them (${Math.round((r599c.counts[r599c.bloatZoneIdx] / r599c.totalCount) * 100)}%) while ${emptyNames599c} contains none. Disclosure bloats in one structural quarter and vanishes from another, giving the audience's sense of ongoing discovery an uneven rhythm across the story.`,
         suggestedFix: `Redistribute disclosures: move at least one revelation from ${bloatName599c} into the empty zone(s) — ${emptyNames599c} — so every structural quarter carries some new information coming to light.`,
+      });
+    }
+  }
+
+  // ── Wave 613: DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED, VOICE_STAGING_ZONE_IMBALANCE,
+  //              CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ────────────────────────────────────
+
+  // DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED — Co-occurrence/decoupling × dramaticTurn ×
+  // dialogueHighlights. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 dramatic-turn scenes, ≥2 scenes carrying a curated dialogue highlight. Zero overlap →
+  // fire. The story's structural pivots never coincide with a line the story itself judged worth
+  // highlighting — every reversal, revelation, or turning point lands in a scene with no standout
+  // dialogue, and every memorable line lands while nothing pivots. First use of the dramaticTurn
+  // field anywhere in this 104-rule pass. Distinct from DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED
+  // (Wave 599: pairs dialogueHighlights with revelation specifically — a narrower disclosure
+  // event — not the broader dramaticTurn channel, which also covers reversals and other pivots).
+  {
+    const r613a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r613a.fires) {
+      issues.push({
+        location: `${r613a.aCount} dramatic-turn scene(s), ${r613a.bCount} dialogue-highlight scene(s) — zero overlap`,
+        rule: 'DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r613a.aCount} scenes carrying a dramatic turn never coincide with the ${r613a.bCount} scenes flagged as containing a standout line of dialogue — the story's structural pivots and its most memorable dialogue run on entirely separate tracks. A reversal or turning point often lands hardest through the line that names what just changed; when the two channels never touch, the story's pivots happen in verbal silence while its memorable lines carry no structural weight.`,
+        suggestedFix: `Let at least one dramatic turn land in a scene that also carries a line worth remembering — a character naming what the reversal costs, or a piece of dialogue whose weight comes precisely from the pivot happening. Tying the story's most memorable lines to its structural turns gives each pivot a voice.`,
+      });
+    }
+  }
+
+  // VOICE_STAGING_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass — every existing check here is either a pure
+  // text-scan over dialogue/action lines or (since Wave 599) a check on dialogueHighlights/
+  // revelation/unresolvedClues; this is the first to audit how physical staging — as opposed to
+  // spoken voice — is spread across the four structural quarters.
+  {
+    const r613b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r613b.fires) {
+      const emptyNames613b = r613b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName613b = FOUR_ZONE_NAMES[r613b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames613b} empty; ${bloatName613b} has ${r613b.counts[r613b.bloatZoneIdx]}/${r613b.totalCount} visually dense scenes`,
+        rule: 'VOICE_STAGING_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r613b.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName613b} contains ${r613b.counts[r613b.bloatZoneIdx]} of them (${Math.round((r613b.counts[r613b.bloatZoneIdx] / r613b.totalCount) * 100)}%) while ${emptyNames613b} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's balance between staged and spoken scenes an uneven rhythm across its four quarters.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames613b}, or thin out ${bloatName613b}'s concentration by letting one of its visually dense scenes lean more on dialogue instead. A more even spread keeps physical presence active alongside the story's spoken voice throughout.`,
+      });
+    }
+  }
+
+  // CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clockRaised scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a
+  // 2-scene lookahead window. Fires when every clock-raising scene's two-scene aftermath contains
+  // no highlighted dialogue, while highlighted dialogue does occur elsewhere in the story. First
+  // use of the clockRaised field anywhere in this pass. Every deadline-raising beat passes into an
+  // aftermath with no memorable verbal moment — the mounting time pressure never gets a voice.
+  // Distinct from DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED (Wave 599: same-scene co-occurrence
+  // with the revelation channel, not a windowed check on the clock channel).
+  {
+    const r613c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r613c.fires) {
+      issues.push({
+        location: `${r613c.triggerCount} clock-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r613c.triggerCount} clock-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r613c.aftermathCount} such scenes exist elsewhere in the script. Time pressure that mounts without a nearby memorable line means the deadline's weight is tracked mechanically but never voiced — no character's speech registers the tightening clock in a way the story itself flags as worth remembering.`,
+        suggestedFix: `After at least one clock-raising scene, let one of the following two scenes carry a line worth remembering — a character naming what the shrinking time means or what it will cost. Give the mounting deadline pressure a voice, not just a structural countdown.`,
       });
     }
   }

@@ -1438,6 +1438,94 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 613 — voicePass: dramatic turn dialogue highlight decoupled, voice staging zone imbalance, clock dialogue highlight aftermath void', async () => {
+    const runV613 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED fire:
+    // n=6; turns at 0,1 (no highlight); highlights at 4,5 (no turn) → zero overlap → fires
+    it('DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED fires when dramatic-turn scenes and dialogue highlights never overlap', async () => {
+      const recs613a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs613a[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs613a[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs613a[4] = makeSharedRecord(4, { dialogueHighlights: ['alice: believes X'] });
+      recs613a[5] = makeSharedRecord(5, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runV613(recs613a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED should fire');
+    });
+
+    // DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED no-fire:
+    // scene 0 carries BOTH a dramatic turn and a dialogue highlight → overlap exists
+    it('DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs613an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs613an[0] = makeSharedRecord(0, { dramaticTurn: 'reversal', dialogueHighlights: ['alice: believes X'] });
+      recs613an[1] = makeSharedRecord(1, { dramaticTurn: 'revelation' });
+      recs613an[4] = makeSharedRecord(4, { dialogueHighlights: ['bob: believes Y'] });
+      const res = await runV613(recs613an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'DRAMATIC_TURN_DIALOGUE_HIGHLIGHT_DECOUPLED should not fire');
+    });
+
+    // VOICE_STAGING_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('VOICE_STAGING_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs613b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs613b[6] = makeSharedRecord(6, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613b[9] = makeSharedRecord(9, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613b[10] = makeSharedRecord(10, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613b[11] = makeSharedRecord(11, { visualBeats: ['grips the phone', 'checks the door'] });
+      const res = await runV613(recs613b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAGING_ZONE_IMBALANCE'), 'VOICE_STAGING_ZONE_IMBALANCE should fire');
+    });
+
+    // VOICE_STAGING_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('VOICE_STAGING_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs613bn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs613bn[1] = makeSharedRecord(1, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613bn[4] = makeSharedRecord(4, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613bn[7] = makeSharedRecord(7, { visualBeats: ['grips the phone', 'checks the door'] });
+      recs613bn[10] = makeSharedRecord(10, { visualBeats: ['grips the phone', 'checks the door'] });
+      const res = await runV613(recs613bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAGING_ZONE_IMBALANCE'), 'VOICE_STAGING_ZONE_IMBALANCE should not fire');
+    });
+
+    // CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; clock triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no clock-raising scene is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs613c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs613c[0] = makeSharedRecord(0, { clockRaised: true });
+      recs613c[1] = makeSharedRecord(1, { clockRaised: true });
+      recs613c[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs613c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs613c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runV613(recs613c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs613cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs613cn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs613cn[1] = makeSharedRecord(1, { clockRaised: true });
+      recs613cn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs613cn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs613cn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs613cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runV613(recs613cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 599 — voicePass: dialogue highlight revelation decoupled, unresolved clue drought run, revelation zone imbalance', async () => {
     const runV599 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
