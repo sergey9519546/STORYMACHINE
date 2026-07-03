@@ -431,6 +431,13 @@
 // ORIGINALITY_TURNING_POINT_ZONE_IMBALANCE, continuing the checkZoneImbalance rollout begun in
 // Wave 886: purpose === 'turning_point' already has a complete 3-zone/run-based trio but has never
 // been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 914 additions: continuing the checkZoneImbalance rollout begun in Wave 886, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: ORIGINALITY_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
+// ORIGINALITY_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate', whose trio was completed in
+// Wave 900), and ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5530,6 +5537,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r900c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName900c} contains ${r900c.counts[r900c.bloatZoneIdx]} of them (${Math.round((r900c.counts[r900c.bloatZoneIdx] / r900c.totalCount) * 100)}%) while ${emptyNames900c} contains none — a predictable concentration the audience can learn to anticipate rather than pivots distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames900c} — so the story's pivots stay less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 886. n≥10, ≥4 resolution-purposed scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone ORIGINALITY_RESOLUTION_ZONE_CLUSTER and
+  // run-based ORIGINALITY_RESOLUTION_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r914a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r914a.fires) {
+      const emptyNames914a = r914a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName914a = FOUR_ZONE_NAMES[r914a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames914a} empty; ${bloatName914a} has ${r914a.counts[r914a.bloatZoneIdx]}/${r914a.totalCount} resolution-purposed scenes`,
+        rule: 'ORIGINALITY_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r914a.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName914a} contains ${r914a.counts[r914a.bloatZoneIdx]} of them (${Math.round((r914a.counts[r914a.bloatZoneIdx] / r914a.totalCount) * 100)}%) while ${emptyNames914a} contains none — a predictable concentration the audience can learn to anticipate rather than closure distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames914a} — so closure stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 886. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone ORIGINALITY_COMPLICATE_ZONE_CLUSTER and run-based
+  // ORIGINALITY_COMPLICATE_DROUGHT_RUN (both Wave 900) — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r914b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r914b.fires) {
+      const emptyNames914b = r914b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName914b = FOUR_ZONE_NAMES[r914b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames914b} empty; ${bloatName914b} has ${r914b.counts[r914b.bloatZoneIdx]}/${r914b.totalCount} complicating scenes`,
+        rule: 'ORIGINALITY_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r914b.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName914b} contains ${r914b.counts[r914b.bloatZoneIdx]} of them (${Math.round((r914b.counts[r914b.bloatZoneIdx] / r914b.totalCount) * 100)}%) while ${emptyNames914b} contains none — a predictable concentration the audience can learn to anticipate rather than fresh trouble distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames914b} — so new trouble stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'introduce_conflict' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library, continuing the rollout begun in Wave 886. n≥10, ≥4 conflict-introducing scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_
+  // INTRODUCE_CONFLICT_ZONE_CLUSTER and run-based ORIGINALITY_INTRODUCE_CONFLICT_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r914c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r914c.fires) {
+      const emptyNames914c = r914c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName914c = FOUR_ZONE_NAMES[r914c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames914c} empty; ${bloatName914c} has ${r914c.counts[r914c.bloatZoneIdx]}/${r914c.totalCount} conflict-introducing scenes`,
+        rule: 'ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r914c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName914c} contains ${r914c.counts[r914c.bloatZoneIdx]} of them (${Math.round((r914c.counts[r914c.bloatZoneIdx] / r914c.totalCount) * 100)}%) while ${emptyNames914c} contains none — a predictable concentration the audience can learn to anticipate rather than fresh opposition distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames914c} — so fresh opposition stays less predictable across the story's whole shape.`,
       });
     }
   }
