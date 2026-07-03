@@ -1136,6 +1136,81 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 722 — rhythmPass: clock signal zone cluster, unresolved signal peak uncaused, staging signal peak uncaused', async () => {
+    const runR722 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // CLOCK_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-advancing scenes at 0,1,2 → 100% opening third
+    it('CLOCK_SIGNAL_ZONE_CLUSTER fires when >75% of clock-advancing scenes cluster in one third', async () => {
+      const recs722a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs722a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs722a[1] = makeSharedRecord(1, { clockDelta: 1 });
+      recs722a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runR722(recs722a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_ZONE_CLUSTER'), 'CLOCK_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // CLOCK_SIGNAL_ZONE_CLUSTER no-fire:
+    // clock-advancing scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CLOCK_SIGNAL_ZONE_CLUSTER does not fire when clock-advancing scenes are distributed across thirds', async () => {
+      const recs722an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs722an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs722an[4] = makeSharedRecord(4, { clockDelta: 1 });
+      recs722an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runR722(recs722an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_ZONE_CLUSTER'), 'CLOCK_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+
+    // UNRESOLVED_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('UNRESOLVED_SIGNAL_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs722b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs722b[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs722b[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR722(recs722b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'UNRESOLVED_SIGNAL_PEAK_UNCAUSED'), 'UNRESOLVED_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // UNRESOLVED_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('UNRESOLVED_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs722bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs722bn[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs722bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs722bn[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR722(recs722bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'UNRESOLVED_SIGNAL_PEAK_UNCAUSED'), 'UNRESOLVED_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+
+    // STAGING_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; visual beats at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('STAGING_SIGNAL_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs722c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs722c[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs722c[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR722(recs722c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAGING_SIGNAL_PEAK_UNCAUSED'), 'STAGING_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // STAGING_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('STAGING_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs722cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs722cn[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs722cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs722cn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR722(recs722cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAGING_SIGNAL_PEAK_UNCAUSED'), 'STAGING_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 708 — rhythmPass: dialogue signal zone cluster, seed signal peak uncaused, payoff signal drought run', async () => {
     const runR708 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

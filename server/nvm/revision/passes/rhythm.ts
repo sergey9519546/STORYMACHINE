@@ -265,6 +265,14 @@
 // absence — Waves 638/680 applied the zone-cluster and backward-cause peak modes to
 // payoffSetupIds; the drought-run mode has never been applied to it, completing the channel's
 // coverage).
+// Wave 722 additions: CLOCK_SIGNAL_ZONE_CLUSTER (distribution/timing × clockDelta>0 × structural
+// thirds — Wave 610 applied the backward-cause peak mode to clockDelta; the zone-cluster mode has
+// never been applied to it), UNRESOLVED_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-
+// cause × unresolvedClues magnitude — Waves 638/652/680 applied co-occurrence-decoupling and
+// drought-run modes to unresolvedClues; the backward-cause peak mode has never been applied to
+// it), STAGING_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-cause × visualBeats magnitude
+// — Wave 652 applied the drought-run mode to visualBeats; the backward-cause peak mode has never
+// been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3541,6 +3549,76 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r708c.longestRun} consecutive scenes with no thread resolving at all, even though ${r708c.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the story's rhythm running on unresolved momentum for an extended run.`,
         suggestedFix: `Resolve at least one thread somewhere within the ${r708c.longestRun}-scene stretch so the story's rhythm keeps building toward release throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 722: CLOCK_SIGNAL_ZONE_CLUSTER, UNRESOLVED_SIGNAL_PEAK_UNCAUSED,
+  //              STAGING_SIGNAL_PEAK_UNCAUSED ───────────────────────────────────────────────
+
+  // CLOCK_SIGNAL_ZONE_CLUSTER — Distribution/timing × clockDelta>0 × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 scenes with a positive clock delta,
+  // fires when >75% of them fall in a single structural third. Wave 610 applied the backward-
+  // cause peak mode to clockDelta; the zone-cluster mode has never been applied to it.
+  {
+    const r722a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) > 0,
+    });
+    if (r722a.fires) {
+      const zoneName722a = r722a.zoneNames[r722a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName722a} third — ${r722a.maxZoneCount}/${r722a.count} clock-advancing scenes`,
+        rule: 'CLOCK_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r722a.maxZoneCount} of the story's ${r722a.count} scenes where the clock advances (${Math.round((r722a.maxZoneCount / r722a.count) * 100)}%) cluster in the ${zoneName722a} third. Time pressure concentrates almost exclusively in that stretch rather than surfacing throughout, giving the story's rhythm an uneven pulse of urgency.`,
+        suggestedFix: `Advance the clock in at least one scene outside the ${zoneName722a} third — spreading time pressure across the story keeps the rhythm's sense of urgency alive in every structural third.`,
+      });
+    }
+  }
+
+  // UNRESOLVED_SIGNAL_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 638/652/680 applied co-occurrence-decoupling and drought-
+  // run modes to unresolvedClues; the backward-cause peak mode has never been applied to it.
+  {
+    const r722b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r722b.fires) {
+      issues.push({
+        location: `scene ${r722b.peakIdx + 1} — peak open-thread density (${r722b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'UNRESOLVED_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r722b.peakIdx + 1}, with ${r722b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's rhythm to spend its most mystery-dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r722b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // STAGING_SIGNAL_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Wave 652 applied the drought-run mode to visualBeats; the backward-cause peak mode has never
+  // been applied to it.
+  {
+    const r722c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r722c.fires) {
+      issues.push({
+        location: `scene ${r722c.peakIdx + 1} — peak physical-staging density (${r722c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'STAGING_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r722c.peakIdx + 1}, with ${r722c.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's rhythm to spend its most physically dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r722c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
       });
     }
   }
