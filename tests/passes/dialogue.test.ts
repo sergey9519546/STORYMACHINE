@@ -1598,6 +1598,91 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 672 — dialoguePass: dialogue clock delta peak uncaused, dialogue clock drought run, dialogue suspense zone cluster', async () => {
+    const makeRec672 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: 'complicate', slug: `s${sceneIdx}`, ...extra,
+    });
+    const buildScenes672 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD672 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // n=8; clockDelta at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs672a = Array.from({ length: 8 }, (_, i) => makeRec672(i,
+        i === 2 ? { clockDelta: 1 }
+        : i === 6 ? { clockDelta: 5 }
+        : {}
+      ));
+      const res = await runD672(buildScenes672(8), recs672a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED'), 'DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs672an = Array.from({ length: 8 }, (_, i) => makeRec672(i,
+        i === 2 ? { clockDelta: 1 }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { clockDelta: 5 }
+        : {}
+      ));
+      const res = await runD672(buildScenes672(8), recs672an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED'), 'DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clock raised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs672b = Array.from({ length: 10 }, (_, i) => makeRec672(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { clockRaised: true } : {}
+      ));
+      const res = await runD672(buildScenes672(10), recs672b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DROUGHT_RUN'), 'DIALOGUE_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_CLOCK_DROUGHT_RUN no-fire:
+    // clock raised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs672bn = Array.from({ length: 10 }, (_, i) => makeRec672(i,
+        (i === 0 || i === 4 || i === 9) ? { clockRaised: true } : {}
+      ));
+      const res = await runD672(buildScenes672(10), recs672bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DROUGHT_RUN'), 'DIALOGUE_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; rising-suspense scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_SUSPENSE_ZONE_CLUSTER fires when >75% of rising-suspense scenes cluster in one third', async () => {
+      const recs672c = Array.from({ length: 9 }, (_, i) => makeRec672(i,
+        (i === 0 || i === 1 || i === 2) ? { suspenseDelta: 1 } : {}
+      ));
+      const res = await runD672(buildScenes672(9), recs672c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_ZONE_CLUSTER'), 'DIALOGUE_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_SUSPENSE_ZONE_CLUSTER no-fire:
+    // rising-suspense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_SUSPENSE_ZONE_CLUSTER does not fire when rising-suspense scenes are distributed across thirds', async () => {
+      const recs672cn = Array.from({ length: 9 }, (_, i) => makeRec672(i,
+        (i === 0 || i === 4 || i === 7) ? { suspenseDelta: 1 } : {}
+      ));
+      const res = await runD672(buildScenes672(9), recs672cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_ZONE_CLUSTER'), 'DIALOGUE_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 658 — dialoguePass: dialogue staging peak uncaused, dialogue seed drought run, dialogue payoff zone cluster', async () => {
     const makeRec658 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,

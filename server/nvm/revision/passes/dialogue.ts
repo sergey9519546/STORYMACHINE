@@ -258,6 +258,15 @@
 // PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds — distinct from
 // the existing DIALOGUE_PAYOFF_ZONE_IMBALANCE [Wave 630 — four-zone bloat/empty check]; this is a
 // three-zone concentration measure on the same field, firing on skew even when no zone is empty).
+// Wave 672 additions (built on the shared checks library, audit M2.2): DIALOGUE_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — distinct from the
+// existing hand-rolled DIALOGUE_CLOCK_PEAK_SILENT [Wave 574], which checks whether the peak-
+// clockDelta scene has any raw dialogue at all; this instead asks whether that scene is
+// structurally caused by a dramatic turn or revelation), DIALOGUE_CLOCK_DROUGHT_RUN (run-based ×
+// clockRaised absence — clockRaised has only ever served as a hand-rolled aftermath trigger in
+// this pass, never drought-audited via the shared helper), DIALOGUE_SUSPENSE_ZONE_CLUSTER
+// (distribution/timing × suspenseDelta>0 × structural thirds — suspenseDelta is this pass's
+// least-touched signal field; the zone-cluster mode applied to it for the first time).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4000,6 +4009,74 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r658c.maxZoneCount} of the story's ${r658c.count} thread-resolution scenes (${Math.round((r658c.maxZoneCount / r658c.count) * 100)}%) cluster in the ${zoneName658c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no verbal sense of a question being answered.`,
         suggestedFix: `Let at least one thread resolve outside the ${zoneName658c} third — spreading resolutions across the story lets each structural third carry its own verbal sense of an answer arriving.`,
+      });
+    }
+  }
+
+  // ── Wave 672: DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED, DIALOGUE_CLOCK_DROUGHT_RUN,
+  //              DIALOGUE_SUSPENSE_ZONE_CLUSTER ─────────────────────────────────────────────
+
+  // DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with
+  // clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Distinct from the existing hand-rolled DIALOGUE_CLOCK_PEAK_SILENT (Wave 574),
+  // which checks whether the peak-clockDelta scene has any raw dialogue at all; this instead asks
+  // whether that scene is structurally caused by a dramatic turn or revelation.
+  {
+    const r672a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r672a.fires) {
+      issues.push({
+        location: `scene ${r672a.peakIdx + 1} — peak clockDelta (${r672a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (scene ${r672a.peakIdx + 1}, at ${r672a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment time pressure compresses most sharply arrives without any structural pivot or disclosure driving it — the peak of urgency carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r672a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest deadline compression is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. clockRaised has only ever served
+  // as a hand-rolled aftermath trigger in this pass, never drought-audited via the shared helper.
+  {
+    const r672b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r672b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r672b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r672b.longestRun} consecutive scenes with no clock raised at all, even though ${r672b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the dialogue's sense of urgency dormant for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r672b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the dialogue keeps some sense of time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 rising-suspense scenes,
+  // fires when >75% of them fall in a single structural third. suspenseDelta is this pass's
+  // least-touched signal field; the zone-cluster mode applied to it for the first time.
+  {
+    const r672c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r672c.fires) {
+      const zoneName672c = r672c.zoneNames[r672c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName672c} third — ${r672c.maxZoneCount}/${r672c.count} rising-suspense scenes`,
+        rule: 'DIALOGUE_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r672c.maxZoneCount} of the story's ${r672c.count} scenes where suspense actively rises (${Math.round((r672c.maxZoneCount / r672c.count) * 100)}%) cluster in the ${zoneName672c} third. Tension-building concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no rising pressure for dialogue to play against.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName672c} third a rising-suspense beat — spreading tension-building across the story lets dialogue in every structural third play against some mounting pressure.`,
       });
     }
   }
