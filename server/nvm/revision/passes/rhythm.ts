@@ -387,6 +387,13 @@
 // by it: RHYTHM_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
 // RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict'), and
 // RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose === 'character_moment').
+//
+// Wave 918 additions: purpose === 'complicate' has never been referenced anywhere in this pass --
+// a genuinely virgin field. This wave adds RHYTHM_COMPLICATE_ZONE_CLUSTER and RHYTHM_COMPLICATE_
+// DROUGHT_RUN (peak mode conventionally skipped for this categorical field), plus RHYTHM_NEGATIVE_
+// EMOTION_ZONE_IMBALANCE, extending the 4-zone checkZoneImbalance mode to the emotionalShift
+// valence signal: emotionalShift === 'negative' already has a complete 3-zone/run-based trio
+// (RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER + _DROUGHT_RUN) but has never been audited by it.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4615,6 +4622,73 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r904c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName904c} contains ${r904c.counts[r904c.bloatZoneIdx]} of them (${Math.round((r904c.counts[r904c.bloatZoneIdx] / r904c.totalCount) * 100)}%) while ${emptyNames904c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the rhythm's breathing room an uneven structural pattern.`,
         suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames904c} — so the rhythm's breathing room is spread more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 complicating scenes,
+  // fires when more than 75% of them fall in a single structural third. purpose === 'complicate'
+  // has never been referenced anywhere in this pass — a genuinely virgin field for all three
+  // shared-library trio modes.
+  {
+    const r918a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r918a.fires) {
+      issues.push({
+        location: `${r918a.zoneNames[r918a.maxZoneIdx]} third — ${r918a.maxZoneCount} of ${r918a.count} complicating scenes`,
+        rule: 'RHYTHM_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r918a.maxZoneCount / r918a.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r918a.zoneNames[r918a.maxZoneIdx]} third. When every complication concentrates in one structural window, the rhythm's rising trouble bunches in one part of the story instead of pulsing across its full length.`,
+        suggestedFix: `Purpose at least one scene outside the ${r918a.zoneNames[r918a.maxZoneIdx]} third to complicate the story so the rhythm's rising trouble pulses more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6. Completes
+  // 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave
+  // (peak mode conventionally skipped for this categorical field).
+  {
+    const r918b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r918b.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r918b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r918b.longestRun} consecutive scenes with no complicating purpose at all, even though ${r918b.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the rhythm flat for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r918b.longestRun}-scene stretch to complicate the story so the rhythm keeps pulsing with fresh trouble throughout that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone RHYTHM_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r918c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r918c.fires) {
+      const emptyNames918c = r918c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName918c = FOUR_ZONE_NAMES[r918c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames918c} empty; ${bloatName918c} has ${r918c.counts[r918c.bloatZoneIdx]}/${r918c.totalCount} negative-shift scenes`,
+        rule: 'RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r918c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName918c} contains ${r918c.counts[r918c.bloatZoneIdx]} of them (${Math.round((r918c.counts[r918c.bloatZoneIdx] / r918c.totalCount) * 100)}%) while ${emptyNames918c} contains none. Downturns bloat in one structural quarter and vanish from another, giving the rhythm's darker beats an uneven structural pattern.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames918c} — so the rhythm's darker beats pulse across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

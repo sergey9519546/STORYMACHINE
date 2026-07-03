@@ -1136,6 +1136,65 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 918 — rhythmPass: rhythm complicate zone cluster, rhythm complicate drought run, rhythm negative emotion zone imbalance', async () => {
+    const runR918 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_COMPLICATE_ZONE_CLUSTER fire: n=9, 3 thirds; complicate at 0,1,2 (opening third) →
+    // 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('RHYTHM_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs918a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR918(recs918a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_ZONE_CLUSTER'), 'RHYTHM_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs918an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR918(recs918an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_ZONE_CLUSTER'), 'RHYTHM_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_COMPLICATE_DROUGHT_RUN fire: n=10; complicate at 0,1,2 only, then a run of 7
+    // consecutive scenes (3-9) with none.
+    it('RHYTHM_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs918b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR918(recs918b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_DROUGHT_RUN'), 'RHYTHM_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs918bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR918(recs918bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_DROUGHT_RUN'), 'RHYTHM_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // negative at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty. Filler 'neutral'.
+    it('RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs918c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runR918(recs918c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs918cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runR918(recs918cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'RHYTHM_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 904 — rhythmPass: rhythm turning point zone imbalance, rhythm introduce conflict zone imbalance, rhythm character moment zone imbalance', async () => {
     const runR904 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
