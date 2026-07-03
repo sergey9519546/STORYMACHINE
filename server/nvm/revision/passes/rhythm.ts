@@ -197,10 +197,18 @@
 // checkZoneImbalance from the shared checks library — audit M2.2, its third use across passes after
 // payoff.ts's seed channel and relationship-arc.ts's shift channel — n≥10, ≥4 stakes-raise scenes;
 // fires only when one zone has zero stakes-raises while another holds ≥50% of the total).
+// Wave 610 additions: RELATIONAL_SIGNAL_DROUGHT_RUN (run-based × relationshipShifts absence —
+// first use of relationshipShifts anywhere in this 101-rule pass), CLOCK_SIGNAL_PEAK_UNCAUSED
+// (backward-cause × clockDelta peak × dramaticTurn cause — first use of clockDelta and
+// dramaticTurn in this pass), REVELATION_SIGNAL_AFTERMATH_FLAT (sequence/aftermath × revelation
+// trigger → emotionalShift absence — first use of revelation and emotionalShift in this pass).
+// Continues the Wave 596 "narrative signal rhythm" extension with three modes not yet used on
+// records here (run-based, backward-cause, sequence/aftermath, vs. Wave 596's average/aggregate
+// and underweight/bloat).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action lines (non-dialogue, non-slug, non-transition) from fountain */
 function extractActionLines(fountain: string): Array<{ text: string; lineNum: number }> {
@@ -2890,6 +2898,90 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r596c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName596c} contains ${r596c.counts[r596c.bloatZoneIdx]} of them (${Math.round((r596c.counts[r596c.bloatZoneIdx] / r596c.totalCount) * 100)}%) while ${emptyNames596c} contains none. Escalation simultaneously bloats in one zone and vanishes from another: the audience experiences a burst of rising stakes in one structural quarter while another quarter passes with the cost of failure never increasing.`,
         suggestedFix: `Redistribute stakes-raising beats: move at least one from ${bloatName596c} into the empty zone(s) — ${emptyNames596c} — so every structural quarter carries some escalation. The goal is not perfect uniformity, but that no zone is completely stakes-free while another carries more than half the total load.`,
+      });
+    }
+  }
+
+  // ── Wave 610: RELATIONAL_SIGNAL_DROUGHT_RUN, CLOCK_SIGNAL_PEAK_UNCAUSED,
+  //              REVELATION_SIGNAL_AFTERMATH_FLAT ───────────────────────────────────────────
+
+  // RELATIONAL_SIGNAL_DROUGHT_RUN — Run-based × relationshipShifts absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 scenes carrying a relationship
+  // shift elsewhere, longest consecutive run of scenes with no shift ≥6 → fire. First use of the
+  // relationshipShifts field anywhere in this 101-rule pass. A story's relational rhythm —
+  // characters moving closer or further apart — should have its own cadence just as this pass
+  // tracks in prose and other structural signals; an extended stretch with no bond movement at
+  // all is a run-based flatline in the relational channel, distinct from SUSPENSE_SIGNAL_
+  // FLATLINE/CURIOSITY_SIGNAL_FLATLINE (Wave 596: average-deviation shape, not consecutive-
+  // absence run) and from every prose-rhythm run check in this file (different signal source).
+  {
+    const r610a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r610a.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r610a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r610a.longestRun} consecutive scenes with no relationship shift at all, even though ${r610a.presentCount} scenes elsewhere do carry a bond moving. A long stretch where every relationship holds perfectly steady means the story's relational rhythm goes flat for an extended run — the audience feels no interpersonal movement at all during that stretch, even if the plot itself is eventful.`,
+        suggestedFix: `Introduce at least one relationship shift somewhere within the ${r610a.longestRun}-scene stretch — even a small movement, a flicker of trust gained or lost, keeps the relational channel alive rather than letting it sit motionless for an extended run.`,
+      });
+    }
+  }
+
+  // CLOCK_SIGNAL_PEAK_UNCAUSED — Backward-cause × clockDelta peak × dramaticTurn cause. Built on
+  // checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with clockDelta>0, a
+  // 2-scene lookback. Finds the single scene with the highest clockDelta and fires when neither
+  // that scene nor either of the 2 scenes before it contains a dramatic turn. First use of both
+  // clockDelta and dramaticTurn as a paired signal in this pass. The story's single sharpest
+  // deadline compression should be prepared by some pivot — a reversal, a revelation, a turning
+  // point — that explains why time suddenly tightens; when the peak arrives with no dramatic
+  // turn anywhere nearby, the story's biggest mechanical time-pressure spike reads as arbitrary
+  // rather than earned. Distinct from every prose-rhythm peak/cluster check in this file
+  // (different signal source) and from STAKES_ZONE_IMBALANCE (Wave 596: distribution across
+  // zones, not a single-peak causation check).
+  {
+    const r610b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r610b.fires) {
+      issues.push({
+        location: `Scene at position ${r610b.peakIdx + 1} — peak clockDelta (${r610b.peakMagnitude}) with no dramatic turn nearby`,
+        rule: 'CLOCK_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (${r610b.peakMagnitude}, out of ${r610b.qualifyingCount} scenes that raise the clock at all) has no dramatic turn in itself or in either of the 2 scenes before it. The moment time pressure compresses most sharply arrives with no pivot preparing it — no reversal, revelation, or turning point explains why the deadline suddenly tightens this hard, so the story's biggest mechanical time-pressure spike reads as arbitrary rather than earned.`,
+        suggestedFix: `Add a dramatic turn — a reversal, a revelation, or a clear pivot — in the scene that raises the clock most sharply, or in one of the two scenes before it. The audience should understand why time is suddenly compressing this much, not just observe that a countdown got shorter.`,
+      });
+    }
+  }
+
+  // REVELATION_SIGNAL_AFTERMATH_FLAT — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥3 scenes anywhere with a non-neutral emotionalShift,
+  // a 2-scene lookahead window. Fires when every revelation's two-scene aftermath is emotionally
+  // neutral, while non-neutral emotion does occur elsewhere in the story. First use of both
+  // revelation and emotionalShift as a paired signal in this pass. A disclosed truth should
+  // register on someone; when every revelation's aftermath is affectively flat, the story's
+  // structural rhythm of "disclosure, then felt consequence" goes silent. Distinct from every
+  // prose-rhythm aftermath-adjacent check in this file (different signal source) and from
+  // RELATIONAL_SIGNAL_DROUGHT_RUN above (run-based global absence vs. a windowed per-trigger
+  // check here).
+  {
+    const r610c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r610c.fires) {
+      issues.push({
+        location: `${r610c.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'REVELATION_SIGNAL_AFTERMATH_FLAT',
+        severity: 'minor',
+        description: `Every one of the story's ${r610c.triggerCount} revelation scenes is followed by two emotionally neutral scenes, even though ${r610c.aftermathCount} emotionally-charged scene(s) exist elsewhere in the script. A disclosed truth should land on someone — shock, relief, dread, or resolve — and when every revelation's aftermath is affectively flat, the story's rhythm of disclosure-then-felt-consequence goes silent right when it should be most audible.`,
+        suggestedFix: `After at least one revelation, let the following scene or the one after carry a non-neutral emotional beat from a character absorbing what was just disclosed — visible shock, quiet relief, or a hardening resolve. The truth should be felt by someone nearby, not just registered as a plot event.`,
       });
     }
   }

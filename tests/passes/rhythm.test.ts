@@ -1136,6 +1136,87 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 610 — rhythmPass: relational signal drought run, clock signal peak uncaused, revelation signal aftermath flat', async () => {
+    const runR610 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; shifts at 0,8,9; drought run 1-7 = 7 consecutive scenes ≥ 6
+    it('RELATIONAL_SIGNAL_DROUGHT_RUN fires when the longest no-shift run is ≥6', async () => {
+      const recs610a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs610a[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs610a[8] = makeSharedRecord(8, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      recs610a[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runR610(recs610a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_DROUGHT_RUN'), 'RELATIONAL_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_SIGNAL_DROUGHT_RUN no-fire:
+    // shifts at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_SIGNAL_DROUGHT_RUN does not fire when shifts are distributed without a long drought', async () => {
+      const recs610an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs610an[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs610an[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.4 }] });
+      recs610an[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runR610(recs610an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_DROUGHT_RUN'), 'RELATIONAL_SIGNAL_DROUGHT_RUN should not fire');
+    });
+
+    // CLOCK_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta>0 at 2 (val=1) and 6 (val=5, the peak); no dramaticTurn at 6, 5, or 4
+    it('CLOCK_SIGNAL_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn nearby', async () => {
+      const recs610b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs610b[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs610b[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runR610(recs610b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_PEAK_UNCAUSED'), 'CLOCK_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // CLOCK_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CLOCK_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs610bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs610bn[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs610bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs610bn[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runR610(recs610bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_SIGNAL_PEAK_UNCAUSED'), 'CLOCK_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+
+    // REVELATION_SIGNAL_AFTERMATH_FLAT fire:
+    // 8 scenes; revelations at 0,1 (windows reach at most scene 3); emotional shifts at 5,6,7
+    it('REVELATION_SIGNAL_AFTERMATH_FLAT fires when no revelation is followed by an emotional shift within 2 scenes', async () => {
+      const recs610c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs610c[0] = makeSharedRecord(0, { revelation: 'The truth comes out' });
+      recs610c[1] = makeSharedRecord(1, { revelation: 'Another truth' });
+      recs610c[5] = makeSharedRecord(5, { emotionalShift: 'negative' });
+      recs610c[6] = makeSharedRecord(6, { emotionalShift: 'positive' });
+      recs610c[7] = makeSharedRecord(7, { emotionalShift: 'negative' });
+      const res = await runR610(recs610c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_SIGNAL_AFTERMATH_FLAT'), 'REVELATION_SIGNAL_AFTERMATH_FLAT should fire');
+    });
+
+    // REVELATION_SIGNAL_AFTERMATH_FLAT no-fire:
+    // scene 2 (inside trigger 0's window {1,2}) now carries an emotional shift
+    it('REVELATION_SIGNAL_AFTERMATH_FLAT does not fire when a trigger window contains an emotional shift', async () => {
+      const recs610cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs610cn[0] = makeSharedRecord(0, { revelation: 'The truth comes out' });
+      recs610cn[1] = makeSharedRecord(1, { revelation: 'Another truth' });
+      recs610cn[2] = makeSharedRecord(2, { emotionalShift: 'positive' });
+      recs610cn[5] = makeSharedRecord(5, { emotionalShift: 'negative' });
+      recs610cn[6] = makeSharedRecord(6, { emotionalShift: 'positive' });
+      recs610cn[7] = makeSharedRecord(7, { emotionalShift: 'negative' });
+      const res = await runR610(recs610cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_SIGNAL_AFTERMATH_FLAT'), 'REVELATION_SIGNAL_AFTERMATH_FLAT should not fire');
+    });
+  });
+
   describe('Wave 596 — rhythmPass: suspense signal flatline, curiosity signal flatline, stakes zone imbalance', async () => {
     const runR596 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
