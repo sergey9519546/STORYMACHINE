@@ -1365,6 +1365,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 776 — payoffPass: payoff curiosity peak uncaused, payoff curiosity zone cluster, payoff suspense zone cluster', async () => {
+    const runPY776 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('PAYOFF_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs776a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs776a[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs776a[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runPY776(recs776a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_PEAK_UNCAUSED'), 'PAYOFF_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs776an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs776an[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs776an[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs776an[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runPY776(recs776an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_PEAK_UNCAUSED'), 'PAYOFF_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs776b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY776(recs776b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_ZONE_CLUSTER'), 'PAYOFF_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes spread across thirds', async () => {
+      const recs776bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY776(recs776bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_ZONE_CLUSTER'), 'PAYOFF_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs776c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY776(recs776c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_ZONE_CLUSTER'), 'PAYOFF_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs776cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY776(recs776cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_ZONE_CLUSTER'), 'PAYOFF_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 762 — payoffPass: payoff clock zone cluster, payoff negative emotion drought run, payoff curiosity drought run', async () => {
     const runPY762 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

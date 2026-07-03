@@ -313,6 +313,18 @@
 // drought-run mode has never been applied to it), PAYOFF_CURIOSITY_DROUGHT_RUN (run-based ×
 // curiosityDelta>0 absence — curiosityDelta has never anchored any of the three shared-library
 // modes in this pass).
+// Wave 776 additions: PAYOFF_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityDelta-as-
+// magnitude × 2-scene lookback — Wave 762 applied the run-based drought mode to curiosityDelta;
+// the existing PAYOFF_CURIOSITY_PEAK_DECOUPLED audits whether a PAYOFF co-occurs AT the peak
+// curiosity scene, not a preparing cause before it — the backward-cause peak mode has never been
+// applied to curiosityDelta itself), PAYOFF_CURIOSITY_ZONE_CLUSTER (distribution/timing ×
+// curiosityDelta>0 presence × structural thirds — completing the trio for curiosityDelta; the
+// zone-cluster mode has never been applied to it), PAYOFF_SUSPENSE_ZONE_CLUSTER
+// (distribution/timing × suspenseDelta>0 presence × structural thirds — every existing suspense
+// check in this pass is co-occurrence/decoupling or aftermath [PAYOFF_SUSPENSE_MISMATCH,
+// PAYOFF_SUSPENSE_PEAK_DECOUPLED, PAYOFF_SUSPENSE_RECOIL_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT];
+// none of the three shared-library trio modes has ever been applied to suspenseDelta as a
+// primary signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4222,6 +4234,73 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r762c.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r762c.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the payoff engine resolving old questions without planting new ones for an extended run.`,
         suggestedFix: `Raise curiosity somewhere within the ${r762c.longestRun}-scene stretch so the payoff engine keeps planting fresh questions alongside its resolutions throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 776: PAYOFF_CURIOSITY_PEAK_UNCAUSED, PAYOFF_CURIOSITY_ZONE_CLUSTER,
+  //              PAYOFF_SUSPENSE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PAYOFF_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in
+  // the 2 scenes preceding it. The existing PAYOFF_CURIOSITY_PEAK_DECOUPLED audits whether a
+  // PAYOFF co-occurs AT the peak curiosity scene, not a preparing cause before it — the
+  // backward-cause peak mode has never been applied to curiosityDelta itself.
+  {
+    const r776a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r776a.fires) {
+      issues.push({
+        location: `scene ${r776a.peakIdx} (peak curiosityDelta ${r776a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'PAYOFF_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r776a.peakIdx}, curiosityDelta ${r776a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r776a.qualifyingCount} scenes elsewhere spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the payoff engine hasn't built toward the mystery it's about to pose.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r776a.peakIdx} so the payoff engine earns its peak curiosity instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // PAYOFF_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Completing the
+  // trio for curiosityDelta; the zone-cluster mode has never been applied to it.
+  {
+    const r776b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r776b.fires) {
+      issues.push({
+        location: `${r776b.zoneNames[r776b.maxZoneIdx]} third — ${r776b.maxZoneCount} of ${r776b.count} curiosity-positive scenes`,
+        rule: 'PAYOFF_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r776b.maxZoneCount / r776b.count) * 100)}% of the scenes where curiosity rises cluster in the ${r776b.zoneNames[r776b.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, the payoff engine has no fresh question to plant anywhere else across the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r776b.zoneNames[r776b.maxZoneIdx]} third so the payoff engine keeps planting fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Every existing
+  // suspense check in this pass is co-occurrence/decoupling or aftermath; none of the three
+  // shared-library trio modes has ever been applied to suspenseDelta as a primary signal.
+  {
+    const r776c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r776c.fires) {
+      issues.push({
+        location: `${r776c.zoneNames[r776c.maxZoneIdx]} third — ${r776c.maxZoneCount} of ${r776c.count} suspense-positive scenes`,
+        rule: 'PAYOFF_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r776c.maxZoneCount / r776c.count) * 100)}% of the scenes where tension rises cluster in the ${r776c.zoneNames[r776c.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the payoff engine has no rising danger testing the audience's investment anywhere else across the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r776c.zoneNames[r776c.maxZoneIdx]} third so the payoff engine keeps rising danger testing the audience's investment more evenly across the story.`,
       });
     }
   }
