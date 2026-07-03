@@ -282,6 +282,14 @@
 // completing the trio), RELATIONAL_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence
 // — Wave 651 applied the backward-cause peak mode to dialogueHighlights; the drought-run mode has
 // never been applied to this channel).
+// Wave 721 additions (built on the shared checks library): RELATIONAL_HIGHLIGHT_ZONE_CLUSTER
+// (distribution/timing × dialogueHighlights × structural thirds — Waves 651/707 applied the
+// backward-cause peak and drought-run modes to dialogueHighlights; the zone-cluster mode has
+// never been applied to it, completing the trio), RELATIONAL_PAYOFF_DROUGHT_RUN (run-based ×
+// payoffSetupIds absence — Wave 665 applied the backward-cause peak mode to payoffSetupIds; the
+// drought-run mode has never been applied to it), RELATIONAL_STAKES_ZONE_CLUSTER (distribution/
+// timing × purpose === 'raise_stakes' × structural thirds — Wave 679 applied the drought-run mode
+// to this signal; the zone-cluster mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4177,6 +4185,74 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r707c.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r707c.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the relationship running on unremarkable dialogue for an extended run.`,
         suggestedFix: `Give at least one scene within the ${r707c.longestRun}-scene stretch a standout line of dialogue — a character voicing something close to the relationship's arc memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 721: RELATIONAL_HIGHLIGHT_ZONE_CLUSTER, RELATIONAL_PAYOFF_DROUGHT_RUN,
+  //              RELATIONAL_STAKES_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // RELATIONAL_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-
+  // dialogue scenes, fires when >75% of them fall in a single structural third. Waves 651/707
+  // applied the backward-cause peak and drought-run modes to dialogueHighlights; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r721a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r721a.fires) {
+      const zoneName721a = r721a.zoneNames[r721a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName721a} third — ${r721a.maxZoneCount}/${r721a.count} highlighted-dialogue scenes`,
+        rule: 'RELATIONAL_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r721a.maxZoneCount} of the story's ${r721a.count} scenes carrying a standout line of dialogue (${Math.round((r721a.maxZoneCount / r721a.count) * 100)}%) cluster in the ${zoneName721a} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the relationship.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName721a} third a standout line of dialogue — spreading memorable dialogue across the story lets each structural third carry its own verbal high point for the relationship.`,
+      });
+    }
+  }
+
+  // RELATIONAL_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. Wave 665 applied the
+  // backward-cause peak mode to payoffSetupIds; the drought-run mode has never been applied to
+  // it.
+  {
+    const r721b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r721b.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r721b.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r721b.longestRun} consecutive scenes with no thread resolving at all, even though ${r721b.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the relationship without a sense of accumulating clarity for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r721b.longestRun}-scene stretch so the relationship keeps building toward resolution throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // stakes-raising scenes, fires when >75% of them fall in a single structural third. Wave 679
+  // applied the drought-run mode to this signal; the zone-cluster mode has never been applied to
+  // it.
+  {
+    const r721c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r721c.fires) {
+      const zoneName721c = r721c.zoneNames[r721c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName721c} third — ${r721c.maxZoneCount}/${r721c.count} stakes-raising scenes`,
+        rule: 'RELATIONAL_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r721c.maxZoneCount} of the story's ${r721c.count} scenes purposed to raise stakes (${Math.round((r721c.maxZoneCount / r721c.count) * 100)}%) cluster in the ${zoneName721c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure on the relationship.`,
+        suggestedFix: `Purpose at least one scene outside the ${zoneName721c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of pressure on the relationship.`,
       });
     }
   }

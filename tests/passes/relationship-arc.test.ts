@@ -1376,6 +1376,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 721 — relationshipArcPass: relational highlight zone cluster, relational payoff drought run, relational stakes zone cluster', async () => {
+    const runRA721 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_HIGHLIGHT_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs721a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs721a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs721a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs721a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runRA721(recs721a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_ZONE_CLUSTER'), 'RELATIONAL_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_HIGHLIGHT_ZONE_CLUSTER does not fire when highlighted-dialogue scenes are distributed across thirds', async () => {
+      const recs721an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs721an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs721an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs721an[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runRA721(recs721an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_ZONE_CLUSTER'), 'RELATIONAL_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs721b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs721b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs721b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs721b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs721b[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runRA721(recs721b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_DROUGHT_RUN'), 'RELATIONAL_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs721bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs721bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs721bn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs721bn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runRA721(recs721bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_PAYOFF_DROUGHT_RUN'), 'RELATIONAL_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs721c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs721c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs721c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs721c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      const res = await runRA721(recs721c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_ZONE_CLUSTER'), 'RELATIONAL_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_STAKES_ZONE_CLUSTER no-fire:
+    // stakes-raising scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes are distributed across thirds', async () => {
+      const recs721cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs721cn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs721cn[4] = makeSharedRecord(4, { purpose: 'raise_stakes' });
+      recs721cn[7] = makeSharedRecord(7, { purpose: 'raise_stakes' });
+      const res = await runRA721(recs721cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_ZONE_CLUSTER'), 'RELATIONAL_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 707 — relationshipArcPass: relational staging peak uncaused, relational seed peak uncaused, relational highlight drought run', async () => {
     const runRA707 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
