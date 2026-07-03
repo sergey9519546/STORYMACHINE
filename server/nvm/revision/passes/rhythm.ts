@@ -237,6 +237,14 @@
 // TURN_SIGNAL_ZONE_CLUSTER (distribution/timing × dramaticTurn presence × structural thirds —
 // the zone-cluster mode had only been applied to payoffSetupIds and emotionalShift; dramaticTurn
 // itself has never been cluster-audited despite anchoring an aftermath-void check already).
+// Wave 680 additions: PAYOFF_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// payoffSetupIds magnitude — the peak-uncaused mode had only been applied to clockDelta and
+// dialogueHighlights; payoffSetupIds itself has only ever been zone-cluster-audited),
+// OPEN_THREAD_SIGNAL_DROUGHT_RUN (run-based × unresolvedClues absence — unresolvedClues has only
+// ever anchored two decoupled checks; the drought-run mode applied to this channel for the first
+// time), RELATIONAL_SIGNAL_ZONE_CLUSTER (distribution/timing × relationshipShifts × structural
+// thirds — Wave 610's RELATIONAL_SIGNAL_DROUGHT_RUN applied the drought-run mode to
+// relationshipShifts; the zone-cluster mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3307,6 +3315,75 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r666c.maxZoneCount} of the story's ${r666c.count} dramatic-turn scenes (${Math.round((r666c.maxZoneCount / r666c.count) * 100)}%) cluster in the ${zoneName666c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds paced without a reversal to punctuate them.`,
         suggestedFix: `Give at least one scene outside the ${zoneName666c} third a dramatic turn — spreading structural pivots across the story lets each structural third carry its own reversal.`,
+      });
+    }
+  }
+
+  // ── Wave 680: PAYOFF_SIGNAL_PEAK_UNCAUSED, OPEN_THREAD_SIGNAL_DROUGHT_RUN,
+  //              RELATIONAL_SIGNAL_ZONE_CLUSTER ──────────────────────────────────────────────
+
+  // PAYOFF_SIGNAL_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous thread resolutions;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. The peak-uncaused mode had only been applied to clockDelta and
+  // dialogueHighlights; payoffSetupIds itself has only ever been zone-cluster-audited.
+  {
+    const r680a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r680a.fires) {
+      issues.push({
+        location: `scene ${r680a.peakIdx + 1} — peak payoff density (${r680a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r680a.peakIdx + 1}, with ${r680a.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r680a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_SIGNAL_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6.
+  // unresolvedClues has only ever anchored two decoupled checks; the drought-run mode applied to
+  // this channel for the first time.
+  {
+    const r680b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r680b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r680b.longestRun} consecutive scenes`,
+        rule: 'OPEN_THREAD_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r680b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r680b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the story's rhythm has no open question to modulate against for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r680b.longestRun}-scene stretch so the rhythm keeps some outstanding mystery to work against throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SIGNAL_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when >75% of them fall in a single structural third. Wave 610's RELATIONAL_
+  // SIGNAL_DROUGHT_RUN applied the drought-run mode to relationshipShifts; the zone-cluster mode
+  // has never been applied to this channel.
+  {
+    const r680c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r680c.fires) {
+      const zoneName680c = r680c.zoneNames[r680c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName680c} third — ${r680c.maxZoneCount}/${r680c.count} relationship-shift scenes`,
+        rule: 'RELATIONAL_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r680c.maxZoneCount} of the story's ${r680c.count} relationship-shift scenes (${Math.round((r680c.maxZoneCount / r680c.count) * 100)}%) cluster in the ${zoneName680c} third. Bond changes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds without any relational movement carrying the rhythm.`,
+        suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName680c} third — spreading relational movement across the story lets each structural third carry its own sense of changing dynamics.`,
       });
     }
   }
