@@ -336,6 +336,18 @@
 // checks in this pass; none of the three shared-library trio modes has ever been applied to
 // revelation itself as the primary signal. hasCause here deliberately references only
 // dramaticTurn, never revelation, to avoid a circular/self-referential audit).
+// Wave 783 additions (closes the fourteenth rotation cycle, 770-783): CAUSALITY_REVELATION_
+// DROUGHT_RUN (run-based × revelation absence — Wave 769 applied the zone-cluster and
+// backward-cause peak modes to revelation; REVELATION_CASCADE audits global density, not
+// longest-run absence — the run-based drought mode has never been applied to it, completing the
+// trio), CAUSALITY_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — the hand-rolled
+// CURIOSITY_TEMPORAL_CLUSTER and CURIOSITY_SPIKE_WITHOUT_CAUSE already cover the cluster and
+// backward-cause peak modes; CURIOSITY_DECLINE_RUN audits a run of NEGATIVE curiosityDelta, a
+// distinct condition from a run where curiosityDelta simply never rises — the run-based
+// absence-of-rise drought mode has never been applied to it, completing the trio),
+// CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment'
+// presence × structural thirds — this specific purpose value has never been referenced anywhere
+// in this pass; none of the three shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4547,6 +4559,75 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Scene ${r769c.peakIdx + 1} is the earliest of ${r769c.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the causal chain slack right before the reveal.`,
         suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r769c.peakIdx + 1} so the causal chain builds pressure into the revelation instead of arriving flat.`,
+      });
+    }
+  }
+
+  // ── Wave 783: CAUSALITY_REVELATION_DROUGHT_RUN, CAUSALITY_CURIOSITY_DROUGHT_RUN,
+  //              CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER ─────────────────────────────────────
+
+  // CAUSALITY_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Wave 769 applied the zone-cluster and
+  // backward-cause peak modes to revelation; REVELATION_CASCADE audits global density, not
+  // longest-run absence — the run-based drought mode has never been applied to it, completing the
+  // trio.
+  {
+    const r783a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r783a.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r783a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r783a.longestRun} consecutive scenes with no revelation at all, even though ${r783a.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the causal chain with no fresh disclosure reshaping events for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r783a.longestRun}-scene stretch so the causal chain keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6. The
+  // hand-rolled CURIOSITY_TEMPORAL_CLUSTER and CURIOSITY_SPIKE_WITHOUT_CAUSE already cover the
+  // cluster and backward-cause peak modes; CURIOSITY_DECLINE_RUN audits a run of NEGATIVE
+  // curiosityDelta, a distinct condition from a run where curiosityDelta simply never rises — the
+  // run-based absence-of-rise drought mode has never been applied to it, completing the trio.
+  {
+    const r783b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r783b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r783b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r783b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r783b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the causal chain without a driving question for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r783b.longestRun}-scene stretch so the causal chain keeps a live question driving events throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment'
+  // presence × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9,
+  // ≥3 character-moment scenes, fires when more than 75% of those scenes cluster in a single
+  // third. This specific purpose value has never been referenced anywhere in this pass; none of
+  // the three shared-library trio modes has ever been applied to it.
+  {
+    const r783c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r783c.fires) {
+      issues.push({
+        location: `${r783c.zoneNames[r783c.maxZoneIdx]} third — ${r783c.maxZoneCount} of ${r783c.count} character-moment scenes`,
+        rule: 'CAUSALITY_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r783c.maxZoneCount / r783c.count) * 100)}% of the story's character-moment scenes cluster in the ${r783c.zoneNames[r783c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the causal chain has no pause for the protagonist's inner life anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r783c.zoneNames[r783c.maxZoneIdx]} third as a character moment so the causal chain keeps room for interior reflection more evenly across the story.`,
       });
     }
   }
