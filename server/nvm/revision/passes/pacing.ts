@@ -399,6 +399,12 @@
 // by it: PACING_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
 // PACING_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'), and
 // PACING_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate').
+//
+// Wave 915 additions: continuing the checkZoneImbalance rollout begun in Wave 887, this wave
+// applies the 4-zone bloat+empty-zone mode to the three remaining purpose values with complete
+// 3-zone/run-based trios that had never been audited by it: PACING_INTRODUCE_CONFLICT_ZONE_
+// IMBALANCE (purpose === 'introduce_conflict'), PACING_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose
+// === 'character_moment'), and PACING_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5142,6 +5148,81 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r901c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName901c} contains ${r901c.counts[r901c.bloatZoneIdx]} of them (${Math.round((r901c.counts[r901c.bloatZoneIdx] / r901c.totalCount) * 100)}%) while ${emptyNames901c} contains none. Complications bloat in one structural quarter and vanish from another, giving pacing's escalation an uneven structural rhythm.`,
         suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames901c} — so pacing keeps deepening its trouble more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'introduce_conflict'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 887. n≥10, ≥4 conflict-introducing scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER and
+  // run-based PACING_INTRODUCE_CONFLICT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r915a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r915a.fires) {
+      const emptyNames915a = r915a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName915a = FOUR_ZONE_NAMES[r915a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames915a} empty; ${bloatName915a} has ${r915a.counts[r915a.bloatZoneIdx]}/${r915a.totalCount} conflict-introducing scenes`,
+        rule: 'PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r915a.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName915a} contains ${r915a.counts[r915a.bloatZoneIdx]} of them (${Math.round((r915a.counts[r915a.bloatZoneIdx] / r915a.totalCount) * 100)}%) while ${emptyNames915a} contains none. New conflicts bloat in one structural quarter and vanish from another, giving pacing's fresh friction an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames915a} — so pacing introduces fresh friction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 887. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone PACING_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based PACING_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r915b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r915b.fires) {
+      const emptyNames915b = r915b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName915b = FOUR_ZONE_NAMES[r915b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames915b} empty; ${bloatName915b} has ${r915b.counts[r915b.bloatZoneIdx]}/${r915b.totalCount} character-moment scenes`,
+        rule: 'PACING_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r915b.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName915b} contains ${r915b.counts[r915b.bloatZoneIdx]} of them (${Math.round((r915b.counts[r915b.bloatZoneIdx] / r915b.totalCount) * 100)}%) while ${emptyNames915b} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving pacing's breathing room an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames915b} — so pacing's breathing room is spread more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 887. n≥10, ≥4 stakes-raising scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone PACING_STAKES_ZONE_CLUSTER and run-based
+  // PACING_STAKES_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this
+  // purpose value.
+  {
+    const r915c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r915c.fires) {
+      const emptyNames915c = r915c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName915c = FOUR_ZONE_NAMES[r915c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames915c} empty; ${bloatName915c} has ${r915c.counts[r915c.bloatZoneIdx]}/${r915c.totalCount} stakes-raising scenes`,
+        rule: 'PACING_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r915c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName915c} contains ${r915c.counts[r915c.bloatZoneIdx]} of them (${Math.round((r915c.counts[r915c.bloatZoneIdx] / r915c.totalCount) * 100)}%) while ${emptyNames915c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving pacing's escalation an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames915c} — so pacing escalates more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

@@ -934,6 +934,64 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 915 — pacingPass: pacing introduce conflict zone imbalance, pacing character moment zone imbalance, pacing stakes zone imbalance', async () => {
+    const runP915 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Filler 'establish_world' is not one of the tested purpose values.
+    it('PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs915a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'establish_world' }));
+      const res = await runP915(recs915a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs915an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'establish_world' }));
+      const res = await runP915(recs915an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'PACING_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of character-moment scenes', async () => {
+      const recs915b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runP915(recs915b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'PACING_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const recs915bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runP915(recs915bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'PACING_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs915c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runP915(recs915c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAKES_ZONE_IMBALANCE'), 'PACING_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs915cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runP915(recs915cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAKES_ZONE_IMBALANCE'), 'PACING_STAKES_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 901 — pacingPass: pacing resolution zone imbalance, pacing turning point zone imbalance, pacing complicate zone imbalance', async () => {
     const runP901 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
