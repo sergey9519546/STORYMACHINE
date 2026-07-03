@@ -432,6 +432,11 @@
 // 4-zone-audited: BELIEF_PAYOFF_ZONE_IMBALANCE (payoffSetupIds), BELIEF_OPEN_THREAD_ZONE_IMBALANCE
 // (unresolvedClues), and BELIEF_SEED_ZONE_IMBALANCE (seededClueIds) — three genuinely different arrays
 // (setups-paid, questions-open, clues-planted), all distinct from the visualBeats BELIEF_STAGING one.
+// Wave 964 additions: auditing the three remaining trio-complete signals in this pass, spanning two
+// more distinct array fields and one categorical: BELIEF_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights
+// array), BELIEF_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array), and BELIEF_TURN_ZONE_IMBALANCE
+// (dramaticTurn !== 'nothing' categorical) — the highlight and relationship arrays are distinct from
+// all previously audited belief arrays (payoff/open-thread/seed/staging).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5340,6 +5345,80 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r950c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName950c} contains ${r950c.counts[r950c.bloatZoneIdx]} of them (${Math.round((r950c.counts[r950c.bloatZoneIdx] / r950c.totalCount) * 100)}%) while ${emptyNames950c} contains none. Seeds bloat in one structural quarter and never get planted in another, so the beliefs the audience is invited to form are seeded in only part of the story.`,
         suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames950c} — so the belief-tracking layer keeps forming new expectations across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × (dialogueHighlights.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a dialogue highlight total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone BELIEF_HIGHLIGHT_ZONE_CLUSTER and run-based BELIEF_HIGHLIGHT_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the dialogueHighlights array field, distinct
+  // from the already-audited visualBeats/payoff/open-thread/seed array imbalances.
+  {
+    const r964a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r964a.fires) {
+      const emptyNames964a = r964a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName964a = FOUR_ZONE_NAMES[r964a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames964a} empty; ${bloatName964a} has ${r964a.counts[r964a.bloatZoneIdx]}/${r964a.totalCount} dialogue-highlight scenes`,
+        rule: 'BELIEF_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r964a.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName964a} contains ${r964a.counts[r964a.bloatZoneIdx]} of them (${Math.round((r964a.counts[r964a.bloatZoneIdx] / r964a.totalCount) * 100)}%) while ${emptyNames964a} contains none. Memorable lines bloat in one structural quarter and never land in another, so the belief-tracking layer's most quotable turns cluster in only part of the story.`,
+        suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames964a} — a dialogue highlight so the belief-tracking layer's standout lines land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone BELIEF_RELATIONSHIP_ZONE_CLUSTER and run-based BELIEF_RELATIONSHIP_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the relationshipShifts array field, distinct
+  // from the dialogueHighlights field audited just above and the other audited arrays.
+  {
+    const r964b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r964b.fires) {
+      const emptyNames964b = r964b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName964b = FOUR_ZONE_NAMES[r964b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames964b} empty; ${bloatName964b} has ${r964b.counts[r964b.bloatZoneIdx]}/${r964b.totalCount} relationship-shift scenes`,
+        rule: 'BELIEF_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r964b.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName964b} contains ${r964b.counts[r964b.bloatZoneIdx]} of them (${Math.round((r964b.counts[r964b.bloatZoneIdx] / r964b.totalCount) * 100)}%) while ${emptyNames964b} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the belief-tracking layer's revisions of who-trusts-whom concentrate in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames964b} — a relationship shift so the belief-tracking layer keeps revising its relational expectations across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone BELIEF_TURN_ZONE_CLUSTER and run-based BELIEF_TURN_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical signal.
+  {
+    const r964c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r964c.fires) {
+      const emptyNames964c = r964c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName964c = FOUR_ZONE_NAMES[r964c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames964c} empty; ${bloatName964c} has ${r964c.counts[r964c.bloatZoneIdx]}/${r964c.totalCount} dramatic-turn scenes`,
+        rule: 'BELIEF_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r964c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName964c} contains ${r964c.counts[r964c.bloatZoneIdx]} of them (${Math.round((r964c.counts[r964c.bloatZoneIdx] / r964c.totalCount) * 100)}%) while ${emptyNames964c} contains none. Turns bloat in one structural quarter and never fire in another, so the beats that overturn the audience's expectations concentrate in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames964c} — a dramatic turn so the belief-tracking layer keeps overturning expectations across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

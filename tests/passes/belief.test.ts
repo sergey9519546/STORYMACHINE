@@ -1204,6 +1204,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 964 — beliefPass: belief highlight zone imbalance, belief relationship zone imbalance, belief turn zone imbalance', async () => {
+    const runBF964 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('BELIEF_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dialogue-highlight scenes', async () => {
+      const recs964a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runBF964(recs964a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_ZONE_IMBALANCE'), 'BELIEF_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_HIGHLIGHT_ZONE_IMBALANCE does not fire when dialogue-highlight scenes touch every zone', async () => {
+      const recs964an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runBF964(recs964an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_ZONE_IMBALANCE'), 'BELIEF_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs964b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runBF964(recs964b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_ZONE_IMBALANCE'), 'BELIEF_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs964bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runBF964(recs964bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_RELATIONSHIP_ZONE_IMBALANCE'), 'BELIEF_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs964c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runBF964(recs964c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURN_ZONE_IMBALANCE'), 'BELIEF_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs964cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runBF964(recs964cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURN_ZONE_IMBALANCE'), 'BELIEF_TURN_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 950 — beliefPass: belief payoff zone imbalance, belief open thread zone imbalance, belief seed zone imbalance', async () => {
     const runBF950 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
