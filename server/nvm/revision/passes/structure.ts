@@ -317,6 +317,19 @@
 // trio), STRUCTURE_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — Wave 765 applied
 // the zone-cluster and backward-cause peak modes to curiosityDelta; the run-based drought mode has
 // never been applied to it, completing the trio).
+// Wave 793 additions: STRUCTURE_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift='negative' × structural thirds — existing negative-emotion checks are
+// valence-ratio [NEGATIVE_SCENE_DROUGHT], presence-run [NEGATIVE_SCENE_RUN], and fixed-zone
+// [ACT2A/ACT2B/ACT3_EMOTIONAL_FLATLINE, which test 'neutral' not 'negative']; the general
+// thirds-based >75%-cluster mode has never been applied to emotionalShift as a categorical
+// signal), STRUCTURE_REVELATION_ZONE_CLUSTER (distribution/timing × revelation × structural
+// thirds — the existing REVELATION_CLUSTERED fires on a fixed 4-scene span anywhere in the
+// story, not a >75% concentration within one of the three structural thirds; the shared-library
+// thirds-based cluster mode has never been applied to revelation), STRUCTURE_REVELATION_
+// DROUGHT_RUN (run-based × revelation absence — the existing REVELATION_DROUGHT fires on a
+// composite absence of revelation OR seededClueIds OR relationshipShifts together at a 4-scene
+// threshold; a pure single-field run-based absence check on revelation alone, at the
+// shared-library's 6-scene threshold, has never been applied).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4350,6 +4363,78 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r779c.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r779c.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the story's architecture without a driving question for an extended run.`,
         suggestedFix: `Raise curiosity somewhere within the ${r779c.longestRun}-scene stretch so the structure keeps a live question driving it throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 793: STRUCTURE_NEGATIVE_EMOTION_ZONE_CLUSTER, STRUCTURE_REVELATION_ZONE_CLUSTER,
+  //              STRUCTURE_REVELATION_DROUGHT_RUN ──────────────────────────────────────
+
+  // STRUCTURE_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift='negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from NEGATIVE_SCENE_DROUGHT (global ratio underweight, not positional), NEGATIVE_
+  // SCENE_RUN (consecutive-run presence, not thirds distribution), and ACT2A/ACT2B/ACT3_
+  // EMOTIONAL_FLATLINE (fixed named-act zones testing 'neutral', not the general thirds-based
+  // test on 'negative').
+  {
+    const r793a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r793a.fires) {
+      issues.push({
+        location: `${r793a.zoneNames[r793a.maxZoneIdx]} third — ${r793a.maxZoneCount} of ${r793a.count} negative-emotion scenes`,
+        rule: 'STRUCTURE_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r793a.maxZoneCount / r793a.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r793a.zoneNames[r793a.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the rest of the story's shape carries no emotional cost to contrast against whatever positive or neutral scenes surround it.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r793a.zoneNames[r793a.maxZoneIdx]} third so the story's structure carries emotional cost more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of them fall in a single structural third. Distinct from the existing
+  // REVELATION_CLUSTERED (Wave 264), which fires on a fixed 4-scene span found anywhere in the
+  // story regardless of structural position — this instead tests whether disclosures concentrate
+  // in one of the three fixed structural thirds, a positional test rather than a span-width test.
+  {
+    const r793b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r793b.fires) {
+      issues.push({
+        location: `${r793b.zoneNames[r793b.maxZoneIdx]} third — ${r793b.maxZoneCount} of ${r793b.count} revelation scenes`,
+        rule: 'STRUCTURE_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r793b.maxZoneCount / r793b.count) * 100)}% of the story's revelation scenes cluster in the ${r793b.zoneNames[r793b.maxZoneIdx]} third. When every disclosure lands in the same structural window, the story's architecture goes silent on new information for the rest of its shape.`,
+        suggestedFix: `Move at least one revelation outside the ${r793b.zoneNames[r793b.maxZoneIdx]} third so the structure keeps disclosures punctuating it more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Distinct from the existing
+  // REVELATION_DROUGHT (Wave 152), which fires at a 4-scene threshold on a COMPOSITE absence of
+  // revelation OR seededClueIds OR relationshipShifts together — any one of the three breaks the
+  // drought there. This instead isolates revelation alone at the shared-library's 6-scene
+  // threshold, so a story could satisfy REVELATION_DROUGHT (clues or shifts keep appearing) while
+  // still going twice as long without any actual revelation specifically.
+  {
+    const r793c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r793c.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r793c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r793c.longestRun} consecutive scenes with no revelation at all, even though ${r793c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the story's architecture without a disclosure punctuating it for an extended run — even if clues or relationship shifts keep the composite REVELATION_DROUGHT check satisfied elsewhere.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r793c.longestRun}-scene stretch so the structure keeps a disclosure punctuating it throughout that stretch.`,
       });
     }
   }
