@@ -191,9 +191,27 @@
 // and foreshadowing planting never coincide; first check in this pass pairing the seed channel
 // with relationship shift in co-occurrence mode; distinct from all existing co-occurrence checks
 // that pair shift with curiosity/suspense/turn/clock/payoff/revelation and from aftermath checks).
+// Wave 595 additions: relationship shift purpose monotone (average/aggregate × relationship-shift
+// × scene-purpose — n≥8, ≥4 shift scenes [|amount|≥0.3], >70% share the identical `purpose` value;
+// relational movement is confined to one narrative function rather than distributed across the
+// story's structural range; the `purpose` field — a fixed ScenePurpose enum — was completely
+// unused anywhere else in this 99-rule file, despite 9 existing checks already keying on the
+// DIMENSION field of a shift; first check on the purpose signal here), relationship shift zone
+// imbalance (underweight/bloat × relationship-shift × four structural zones, built on
+// checkZoneImbalance from the shared checks library — audit M2.2 — n≥10, ≥4 shift scenes; fires
+// only when one zone has zero shifts while another holds ≥50% of the total; distinct from
+// RELATIONSHIP_SHIFT_THIRDS_CLUSTER [thirds, no zero-zone requirement] and from the various
+// single-zone-absence checks [PAIR_MIDPOINT_VOID, PAIR_FIRST/SECOND_HALF_VOID, RELATIONSHIP_
+// CLIMAX_VOID] which each audit one fixed zone rather than requiring a void+bloat co-presence
+// across all four), relationship shift stakes decoupled (co-occurrence/decoupling × relationship-
+// shift × stakes-raise purpose, built on checkCoOccurrenceDecoupled — n≥8, ≥3 shift scenes, ≥2
+// raise_stakes-purpose scenes, zero overlap; bond-moving never coincides with the scene explicitly
+// raising what's at risk; first co-occurrence check in this pass pairing shift with the purpose
+// signal rather than with a numeric delta channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkZoneImbalance, checkCoOccurrenceDecoupled, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 // Minimum co-appearances before a never-shifting pair is considered static.
 const STATIC_COAPPEAR_THRESHOLD = 3;
@@ -3417,6 +3435,95 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
           });
         }
       }
+    }
+  }
+
+  // ── Wave 595: RELATIONSHIP_SHIFT_PURPOSE_MONOTONE, RELATIONSHIP_SHIFT_ZONE_IMBALANCE,
+  //              RELATIONSHIP_SHIFT_STAKES_DECOUPLED ────────────────────────────────────────
+
+  // RELATIONSHIP_SHIFT_PURPOSE_MONOTONE — Average/aggregate × relationship-shift × scene-purpose.
+  // n≥8, ≥4 meaningful shift scenes (any relationshipShifts entry with |amount|≥0.3). More than
+  // 70% of those scenes share the identical `purpose` value → fire. Relational movement is
+  // confined to one narrative function — e.g. every bond-shift happens during a 'complicate' beat
+  // and never during a quieter character moment or a raised-stakes confrontation — rather than
+  // being woven across the story's varied structural functions.
+  // Distinct from: every other check in this pass, none of which key on the scene's own declared
+  // `purpose` (9 existing checks key on the shift's DIMENSION field instead — a different signal
+  // entirely). First — and, together with its two siblings below, only — purpose-distribution
+  // check in this 99-rule file.
+  if (records.length >= 8) {
+    const shiftRecs595a = (records as any[]).filter(r =>
+      ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => Math.abs(s.amount) >= 0.3),
+    );
+    if (shiftRecs595a.length >= 4) {
+      const purposeCounts595a = new Map<string, number>();
+      for (const r of shiftRecs595a) purposeCounts595a.set(r.purpose, (purposeCounts595a.get(r.purpose) ?? 0) + 1);
+      const [domPurpose595a, domCount595a] = [...purposeCounts595a.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (domCount595a / shiftRecs595a.length > 0.70) {
+        issues.push({
+          location: `${domCount595a} of ${shiftRecs595a.length} relationship-shift scene(s) share purpose "${domPurpose595a}"`,
+          rule: 'RELATIONSHIP_SHIFT_PURPOSE_MONOTONE',
+          severity: 'minor',
+          description: `${Math.round((domCount595a / shiftRecs595a.length) * 100)}% of the story's ${shiftRecs595a.length} meaningful relationship-shift scenes (${domCount595a} of them) share the single scene purpose "${domPurpose595a}". Bonds only move during one kind of narrative beat rather than across the story's varied structural functions — the audience learns, even subconsciously, which type of scene tends to carry relational movement, and bond changes elsewhere start to feel less likely. The most alive relational arcs move through many different kinds of scenes: a quiet aside, a raised-stakes confrontation, an unplanned collision.`,
+          suggestedFix: `Let at least one relationship shift land in a scene serving a different structural purpose than "${domPurpose595a}" — a bond moving during a raise_stakes confrontation reads very differently than one moving during quiet exposition. Spreading relational movement across purposes keeps bonds feeling alive throughout the story's structure rather than tied to one recurring beat-type.`,
+        });
+      }
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_ZONE_IMBALANCE — Underweight/bloat × relationship-shift × four zones.
+  // Built on checkZoneImbalance from the shared check-template library (audit M2.2). n≥10, ≥4
+  // meaningful shift scenes (|amount|≥0.3) total, divided across four equal structural zones
+  // (Act 1/2a/2b/3). Fires only when at least one zone has ZERO shifts while another holds ≥50%
+  // of the total — the co-presence of a void AND a bloat, not concentration alone.
+  // Distinct from: RELATIONSHIP_SHIFT_THIRDS_CLUSTER (thirds, not quarters, and no requirement
+  // that any zone be literally empty — a story with shifts spread [1,1,1,7] would trip that check
+  // without ever having a void zone), PAIR_MIDPOINT_VOID / PAIR_FIRST_HALF_VOID / PAIR_SECOND_
+  // HALF_VOID / RELATIONSHIP_CLIMAX_VOID (each audits exactly one fixed zone in isolation, with
+  // no bloat requirement elsewhere, and each is scoped to a single pair or a single fixed zone
+  // rather than the global shift channel across all four zones at once).
+  {
+    const r595b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => Math.abs(s.amount) >= 0.3),
+    });
+    if (r595b.fires) {
+      const emptyNames595b = r595b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName595b = FOUR_ZONE_NAMES[r595b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames595b} empty; ${bloatName595b} has ${r595b.counts[r595b.bloatZoneIdx]}/${r595b.totalCount} relationship shifts`,
+        rule: 'RELATIONSHIP_SHIFT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r595b.totalCount} meaningful relationship shifts are unevenly distributed across its four structural zones: ${bloatName595b} contains ${r595b.counts[r595b.bloatZoneIdx]} of them (${Math.round((r595b.counts[r595b.bloatZoneIdx] / r595b.totalCount) * 100)}%) while ${emptyNames595b} contains none. Relational movement simultaneously bloats in one zone and vanishes from another: the audience experiences a burst of bond-changes in one structural quarter while another quarter passes with every relationship frozen.`,
+        suggestedFix: `Redistribute relational movement: move at least one meaningful shift from ${bloatName595b} into the empty zone(s) — ${emptyNames595b} — so every structural quarter carries some evidence of bonds changing. The goal is not perfect uniformity, but that no zone is completely shift-free while another carries more than half the total load.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_STAKES_DECOUPLED — Co-occurrence/decoupling × relationship-shift ×
+  // stakes-raise purpose. Built on checkCoOccurrenceDecoupled from the shared checks library.
+  // n≥8, ≥3 meaningful shift scenes (|amount|≥0.3), ≥2 raise_stakes-purpose scenes. Zero overlap
+  // between the two → fire. The scene that explicitly raises what's at risk never coincides with
+  // a bond actually moving — stakes escalate in the abstract while the relationships that would
+  // make that escalation felt stay frozen in the same beat.
+  // Distinct from: all existing co-occurrence checks in this pass, which pair relationship shift
+  // with a numeric delta channel (curiosity/suspense/clock/dramatic-turn) or another event-presence
+  // channel (seed/payoff/revelation) — none pairs shift with the scene's own declared purpose.
+  // First check in this pass to use the purpose signal in co-occurrence mode.
+  {
+    const r595c = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 3, minBCount: 2,
+      isA: r => ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => Math.abs(s.amount) >= 0.3),
+      isB: r => r.purpose === 'raise_stakes',
+    });
+    if (r595c.fires) {
+      issues.push({
+        location: `${r595c.aCount} relationship-shift scene(s) and ${r595c.bCount} stakes-raise scene(s) — zero overlap`,
+        rule: 'RELATIONSHIP_SHIFT_STAKES_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${r595c.aCount} meaningful relationship-shift scene(s) and ${r595c.bCount} scene(s) whose purpose is to raise the stakes, but the two never coincide. The moment a story tells the audience more is now at risk is a natural moment for a bond to move — the newly-raised cost could test a relationship, force an alliance, or expose a rift. When stakes-raising and relational movement are fully decoupled, escalation stays abstract: the audience is told more is at risk without feeling it through any relationship actually shifting in response.`,
+        suggestedFix: `Let at least one stakes-raising scene also carry a relationship shift — the higher cost forces two characters to choose sides, tests a fragile alliance, or exposes a fault line neither had acknowledged. A stakes-raise that also moves a bond does double dramatic work: the audience feels the escalation through a relationship, not just through exposition.`,
+      });
     }
   }
 

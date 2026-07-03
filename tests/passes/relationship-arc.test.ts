@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1372,6 +1375,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+
+  describe('Wave 595 — relationshipArcPass: relationship shift purpose monotone, relationship shift zone imbalance, relationship shift stakes decoupled', async () => {
+    const runRA595 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('RELATIONSHIP_SHIFT_PURPOSE_MONOTONE fires when >70% of shift scenes share the same purpose', async () => {
+      // 8 scenes; meaningful shifts (|amount|>=0.3) at 0,1,2,4 — 3 of them 'complicate' = 75% > 70%
+      const recs595a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs595a[0] = makeSharedRecord(0, { purpose: 'complicate', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595a[1] = makeSharedRecord(1, { purpose: 'complicate', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595a[2] = makeSharedRecord(2, { purpose: 'complicate', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595a[4] = makeSharedRecord(4, { purpose: 'raise_stakes', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runRA595(recs595a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_PURPOSE_MONOTONE'), 'RELATIONSHIP_SHIFT_PURPOSE_MONOTONE should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_PURPOSE_MONOTONE does not fire when shift scenes are spread across purposes', async () => {
+      const recs595a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs595a[0] = makeSharedRecord(0, { purpose: 'complicate', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595a[1] = makeSharedRecord(1, { purpose: 'raise_stakes', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595a[2] = makeSharedRecord(2, { purpose: 'establish_world', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595a[4] = makeSharedRecord(4, { purpose: 'character_moment', relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runRA595(recs595a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_PURPOSE_MONOTONE'), 'RELATIONSHIP_SHIFT_PURPOSE_MONOTONE should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_ZONE_IMBALANCE fires when one zone has zero shifts and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: meaningful shifts at 6,7,8 (zone 2) plus one at 9 (zone 3) to meet minCount=4
+      const recs595b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs595b[6] = makeSharedRecord(6, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595b[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595b[8] = makeSharedRecord(8, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595b[9] = makeSharedRecord(9, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runRA595(recs595b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_ZONE_IMBALANCE'), 'RELATIONSHIP_SHIFT_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_ZONE_IMBALANCE does not fire when shifts are spread across all zones', async () => {
+      const recs595b = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs595b[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595b[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595b[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595b[10] = makeSharedRecord(10, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.3 }] });
+      const res = await runRA595(recs595b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_ZONE_IMBALANCE'), 'RELATIONSHIP_SHIFT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_STAKES_DECOUPLED fires when no relationship shift coincides with a stakes-raise scene', async () => {
+      // 8 scenes; shifts at 0,2,4 (purpose 'complicate'); stakes-raises at 5,6 (no shift there)
+      const recs595c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs595c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595c[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595c[5] = makeSharedRecord(5, { purpose: 'raise_stakes' });
+      recs595c[6] = makeSharedRecord(6, { purpose: 'raise_stakes' });
+      const res = await runRA595(recs595c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_STAKES_DECOUPLED'), 'RELATIONSHIP_SHIFT_STAKES_DECOUPLED should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_STAKES_DECOUPLED does not fire when a relationship shift coincides with a stakes-raise scene', async () => {
+      const recs595c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs595c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+      recs595c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.4 }] });
+      recs595c[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: -0.6 }] });
+      recs595c[5] = makeSharedRecord(5, {
+        purpose: 'raise_stakes',
+        relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.7 }],
+      });
+      recs595c[6] = makeSharedRecord(6, { purpose: 'raise_stakes' });
+      const res = await runRA595(recs595c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_STAKES_DECOUPLED'), 'RELATIONSHIP_SHIFT_STAKES_DECOUPLED should not fire');
+    });
+  });
 
   describe('Wave 581 — relationshipArcPass: relationship peak uncaused, pair amplitude decay, relationship clock valence uniform', async () => {
     const mkSh581 = (amount: number, pair = 'A|B') => [{ pairKey: pair, dimension: 'trust', amount }];
