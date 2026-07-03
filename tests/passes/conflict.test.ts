@@ -1535,6 +1535,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 912 — conflictPass: conflict complicate zone imbalance, conflict introduce conflict zone imbalance, conflict character moment zone imbalance', async () => {
+    const makeRec912 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF912 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Default filler purpose 'establish_world' is not one of the tested values.
+    it('CONFLICT_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs912a = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runCF912(recs912a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_ZONE_IMBALANCE'), 'CONFLICT_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs912an = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runCF912(recs912an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_ZONE_IMBALANCE'), 'CONFLICT_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs912b = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'establish_world' }));
+      const res = await runCF912(recs912b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs912bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'establish_world' }));
+      const res = await runCF912(recs912bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'CONFLICT_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of character-moment scenes', async () => {
+      const recs912c = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runCF912(recs912c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const recs912cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec912(i, { purpose: [0, 3, 5, 8].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runCF912(recs912cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'CONFLICT_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 898 — conflictPass: conflict revelation purpose zone cluster, conflict revelation purpose drought run, conflict turning point zone imbalance', async () => {
     const makeRec898 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
