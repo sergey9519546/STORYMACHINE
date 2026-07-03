@@ -1598,6 +1598,73 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 952 — dialoguePass: dialogue revelation_purpose zone imbalance, dialogue suspense zone imbalance, dialogue open_thread zone imbalance', async () => {
+    const makeRec952 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes952 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD952 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const records952a = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD952(buildScenes952(10), records952a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const records952an = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 3, 5, 8].includes(i) ? { purpose: 'revelation' } : {}));
+      const res = await runD952(buildScenes952(10), records952an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const records952b = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 1, 2, 8, 9].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runD952(buildScenes952(10), records952b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SUSPENSE_ZONE_IMBALANCE'), 'DIALOGUE_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const records952bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 3, 5, 8].includes(i) ? { suspenseDelta: 1 } : {}));
+      const res = await runD952(buildScenes952(10), records952bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SUSPENSE_ZONE_IMBALANCE'), 'DIALOGUE_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const records952c = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 1, 2, 8, 9].includes(i) ? { unresolvedClues: ['q1'] } : {}));
+      const res = await runD952(buildScenes952(10), records952c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE'), 'DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const records952cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec952(i, [0, 3, 5, 8].includes(i) ? { unresolvedClues: ['q1'] } : {}));
+      const res = await runD952(buildScenes952(10), records952cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE'), 'DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 938 — dialoguePass: dialogue revelation_purpose zone cluster, dialogue revelation_purpose drought run, dialogue positive_emotion zone imbalance', async () => {
     const makeRec938 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

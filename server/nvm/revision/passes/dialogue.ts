@@ -441,6 +441,12 @@
 // plus DIALOGUE_POSITIVE_EMOTION_ZONE_IMBALANCE, extending the 4-zone checkZoneImbalance mode to
 // the emotionalShift valence signal (emotionalShift === 'positive' has a complete 3-zone/run trio
 // but has never been audited by it).
+// Wave 952 additions (opens the twenty-seventh rotation cycle): extending the checkZoneImbalance
+// rollout to three more trio-complete signals spanning three distinct signal classes: DIALOGUE_
+// REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', trio completed Wave 938), DIALOGUE_
+// SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 -- tension-delta magnitude), and DIALOGUE_OPEN_THREAD_
+// ZONE_IMBALANCE (unresolvedClues.length > 0 -- an open-thread array field distinct from the already-
+// audited payoffSetupIds imbalance).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5553,6 +5559,82 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r938c.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName938c} contains ${r938c.counts[r938c.bloatZoneIdx]} of them (${Math.round((r938c.counts[r938c.bloatZoneIdx] / r938c.totalCount) * 100)}%) while ${emptyNames938c} contains none. Dialogue lifts in one quarter and stays even elsewhere, giving its warmer register an uneven structural rhythm.`,
         suggestedFix: `Redistribute upswings: place a positive emotional beat in at least one scene inside the empty zone(s) -- ${emptyNames938c} -- so dialogue's warmer register recurs across the whole story, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE -- Underweight/bloat x purpose === 'revelation' x four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the 4-zone
+  // gap for this purpose value (its 3-zone/run trio was completed in Wave 938). n>=10, >=4 revelation-
+  // purposed scenes total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds >=50% of the total. Distinct from DIALOGUE_REVELATION_PURPOSE_
+  // ZONE_CLUSTER/DROUGHT_RUN (Wave 938) -- the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value, and distinct from the separate revelation-FIELD rules (DIALOGUE_REVELATION_
+  // ZONE_CLUSTER/DROUGHT_RUN audit the revelation string, not the purpose enum).
+  {
+    const r952a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r952a.fires) {
+      const emptyNames952a = r952a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName952a = FOUR_ZONE_NAMES[r952a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames952a} empty; ${bloatName952a} has ${r952a.counts[r952a.bloatZoneIdx]}/${r952a.totalCount} revelation-purposed scenes`,
+        rule: 'DIALOGUE_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r952a.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName952a} contains ${r952a.counts[r952a.bloatZoneIdx]} of them (${Math.round((r952a.counts[r952a.bloatZoneIdx] / r952a.totalCount) * 100)}%) while ${emptyNames952a} contains none. Scenes built to disclose bloat in one quarter and vanish from another, so dialogue's register of revelation carries only part of the story.`,
+        suggestedFix: `Redistribute disclosures: purpose at least one scene inside the empty zone(s) -- ${emptyNames952a} -- as a revelation so dialogue's disclosing register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_ZONE_IMBALANCE -- Underweight/bloat x (suspenseDelta > 0) x four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds >=50% of the total. Distinct from the existing 3-zone DIALOGUE_
+  // SUSPENSE_ZONE_CLUSTER and run-based DIALOGUE_SUSPENSE_DROUGHT_RUN -- the first application of the
+  // 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than categorical purpose or emotional valence.
+  {
+    const r952b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r952b.fires) {
+      const emptyNames952b = r952b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName952b = FOUR_ZONE_NAMES[r952b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames952b} empty; ${bloatName952b} has ${r952b.counts[r952b.bloatZoneIdx]}/${r952b.totalCount} suspense-raising scenes`,
+        rule: 'DIALOGUE_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r952b.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName952b} contains ${r952b.counts[r952b.bloatZoneIdx]} of them (${Math.round((r952b.counts[r952b.bloatZoneIdx] / r952b.totalCount) * 100)}%) while ${emptyNames952b} contains none. Tension bloats in one quarter and flatlines in another, giving dialogue's taut register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) -- ${emptyNames952b} -- so dialogue's taut register recurs across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE -- Underweight/bloat x (unresolvedClues.length > 0) x four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4 scenes
+  // leaving an open thread total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds >=50% of the total. Distinct from the existing
+  // 3-zone DIALOGUE_OPEN_THREAD_ZONE_CLUSTER and run-based DIALOGUE_OPEN_THREAD_DROUGHT_RUN, and
+  // distinct from the already-audited DIALOGUE_PAYOFF_ZONE_IMBALANCE (payoffSetupIds) -- this keys on
+  // the unresolvedClues array, a genuinely different field.
+  {
+    const r952c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r952c.fires) {
+      const emptyNames952c = r952c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName952c = FOUR_ZONE_NAMES[r952c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames952c} empty; ${bloatName952c} has ${r952c.counts[r952c.bloatZoneIdx]}/${r952c.totalCount} open-thread scenes`,
+        rule: 'DIALOGUE_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r952c.totalCount} scenes leaving an open thread are unevenly distributed across its four structural zones: ${bloatName952c} contains ${r952c.counts[r952c.bloatZoneIdx]} of them (${Math.round((r952c.counts[r952c.bloatZoneIdx] / r952c.totalCount) * 100)}%) while ${emptyNames952c} contains none. Unanswered questions bloat in one quarter and never open in another, so the pull of dialogue's unfinished exchanges is confined to part of the story.`,
+        suggestedFix: `Redistribute open threads: leave an unresolved question (non-empty unresolvedClues) in at least one scene inside the empty zone(s) -- ${emptyNames952c} -- so dialogue keeps threads open across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
