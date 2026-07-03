@@ -311,6 +311,13 @@
 // applied to it, completing the trio), DIALOGUE_STAGING_DROUGHT_RUN (run-based × visualBeats
 // absence — Waves 658/728 applied the backward-cause peak and zone-cluster modes to visualBeats;
 // the drought-run mode has never been applied to it, completing the trio).
+// Wave 756 additions (opens the thirteenth rotation cycle): DIALOGUE_RELATIONSHIP_ZONE_CLUSTER
+// (distribution/timing × relationshipShifts × structural thirds — Wave 686 applied the
+// backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been applied to
+// it), DIALOGUE_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 672 applied the
+// backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it),
+// DIALOGUE_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 672 applied the
+// zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4467,6 +4474,70 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r742c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r742c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves dialogue doing all the work alone without a visual counterweight for an extended run.`,
         suggestedFix: `Add a physical staging beat somewhere within the ${r742c.longestRun}-scene stretch so staging shares the load with dialogue throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 756: DIALOGUE_RELATIONSHIP_ZONE_CLUSTER, DIALOGUE_CLOCK_DELTA_DROUGHT_RUN,
+  //              DIALOGUE_SUSPENSE_DROUGHT_RUN ───────────────────────────────────────────
+
+  // DIALOGUE_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Wave 686 applied
+  // the backward-cause peak mode to relationshipShifts; the zone-cluster mode has never been
+  // applied to it.
+  {
+    const r756a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r756a.fires) {
+      issues.push({
+        location: `${r756a.zoneNames[r756a.maxZoneIdx]} third — ${r756a.maxZoneCount} of ${r756a.count} relationship-shift scenes`,
+        rule: 'DIALOGUE_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r756a.maxZoneCount / r756a.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r756a.zoneNames[r756a.maxZoneIdx]} third. When every bond change lands in the same structural window, dialogue has no relational testing ground anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r756a.zoneNames[r756a.maxZoneIdx]} third so dialogue keeps testing bonds more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Wave 672 applied the
+  // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it.
+  {
+    const r756b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r756b.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r756b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r756b.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r756b.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves dialogue with no mechanical pressure to speak against for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r756b.longestRun}-scene stretch so dialogue keeps a mechanical pressure to speak against throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no rising tension reaches 6. Wave 672 applied the
+  // zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to it.
+  {
+    const r756c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r756c.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r756c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r756c.longestRun} consecutive scenes with no rise in tension at all, even though ${r756c.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves dialogue with no rising threat to react to for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r756c.longestRun}-scene stretch so dialogue keeps something rising to react to throughout that stretch.`,
       });
     }
   }
