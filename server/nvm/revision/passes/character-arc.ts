@@ -451,6 +451,14 @@
 // ARC_STAKES_ZONE_IMBALANCE, continuing the checkZoneImbalance rollout begun in Wave 869: purpose
 // === 'raise_stakes' already has a complete 3-zone/run-based trio (ARC_STAKES_ZONE_CLUSTER,
 // ARC_STAKES_DROUGHT_RUN) but has never been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 911 additions: every purpose enum value except 'revelation' has now been audited by the
+// 4-zone checkZoneImbalance mode. This wave closes that gap with ARC_REVELATION_PURPOSE_ZONE_
+// IMBALANCE (purpose === 'revelation', whose 3-zone/run trio was completed in Wave 897), and
+// extends the 4-zone mode to the emotionalShift valence signals, which have complete 3-zone/run
+// trios (ARC_POSITIVE/NEGATIVE_EMOTION_ZONE_CLUSTER + _DROUGHT_RUN) but have never been audited by
+// it: ARC_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive') and ARC_NEGATIVE_
+// EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5142,6 +5150,81 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r897c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName897c} contains ${r897c.counts[r897c.bloatZoneIdx]} of them (${Math.round((r897c.counts[r897c.bloatZoneIdx] / r897c.totalCount) * 100)}%) while ${emptyNames897c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the arc's escalation an uneven structural rhythm.`,
         suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames897c} — so every structural quarter carries some escalation for the arc to face, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the last
+  // purpose-value gap in this pass's 4-zone coverage. n≥10, ≥4 revelation-purposed scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the 3-zone ARC_REVELATION_PURPOSE_ZONE_CLUSTER
+  // and run-based ARC_REVELATION_PURPOSE_DROUGHT_RUN (both Wave 897), and from the separate
+  // revelation-string-field rules — the first application of the 4-zone mode to this purpose value.
+  {
+    const r911a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r911a.fires) {
+      const emptyNames911a = r911a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName911a = FOUR_ZONE_NAMES[r911a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames911a} empty; ${bloatName911a} has ${r911a.counts[r911a.bloatZoneIdx]}/${r911a.totalCount} revelation-purposed scenes`,
+        rule: 'ARC_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r911a.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName911a} contains ${r911a.counts[r911a.bloatZoneIdx]} of them (${Math.round((r911a.counts[r911a.bloatZoneIdx] / r911a.totalCount) * 100)}%) while ${emptyNames911a} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the arc is reshaped by new truth in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames911a} — so the arc keeps being reshaped by new truth across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, extending the
+  // 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 positive-shift scenes total, divided
+  // across four equal structural zones. Fires only when one zone has zero such scenes while another
+  // holds ≥50% of the total. Distinct from the existing 3-zone ARC_POSITIVE_EMOTION_ZONE_CLUSTER,
+  // run-based ARC_POSITIVE_EMOTION_DROUGHT_RUN, and consecutive-run ARC_POSITIVE_EMOTION_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r911b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r911b.fires) {
+      const emptyNames911b = r911b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName911b = FOUR_ZONE_NAMES[r911b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames911b} empty; ${bloatName911b} has ${r911b.counts[r911b.bloatZoneIdx]}/${r911b.totalCount} positive-shift scenes`,
+        rule: 'ARC_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r911b.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName911b} contains ${r911b.counts[r911b.bloatZoneIdx]} of them (${Math.round((r911b.counts[r911b.bloatZoneIdx] / r911b.totalCount) * 100)}%) while ${emptyNames911b} contains none. The protagonist's upswings bloat in one structural quarter and vanish from another, giving the arc's positive feeling an uneven structural rhythm.`,
+        suggestedFix: `Redistribute upswings: give the protagonist a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames911b} — so hope threads through every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, extending the
+  // 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total, divided
+  // across four equal structural zones. Fires only when one zone has zero such scenes while another
+  // holds ≥50% of the total. Distinct from the existing 3-zone ARC_NEGATIVE_EMOTION_ZONE_CLUSTER,
+  // run-based ARC_NEGATIVE_EMOTION_DROUGHT_RUN, and consecutive-run ARC_NEGATIVE_EMOTION_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r911c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r911c.fires) {
+      const emptyNames911c = r911c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName911c = FOUR_ZONE_NAMES[r911c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames911c} empty; ${bloatName911c} has ${r911c.counts[r911c.bloatZoneIdx]}/${r911c.totalCount} negative-shift scenes`,
+        rule: 'ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r911c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName911c} contains ${r911c.counts[r911c.bloatZoneIdx]} of them (${Math.round((r911c.counts[r911c.bloatZoneIdx] / r911c.totalCount) * 100)}%) while ${emptyNames911c} contains none. The protagonist's downturns bloat in one structural quarter and vanish from another, giving the arc's adversity an uneven structural rhythm.`,
+        suggestedFix: `Redistribute downturns: give the protagonist a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames911c} — so pressure threads through every structural quarter, not only the quarter currently carrying most of it.`,
       });
     }
   }

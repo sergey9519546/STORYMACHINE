@@ -1080,6 +1080,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 911 — characterArcPass: arc revelation purpose zone imbalance, arc positive emotion zone imbalance, arc negative emotion zone imbalance', async () => {
+    const makeRec911 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc911 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ARC_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs911a = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'development' }));
+      const res = await runArc911(recs911a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'ARC_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs911an = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'development' }));
+      const res = await runArc911(recs911an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'ARC_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs911b = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runArc911(recs911b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'ARC_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs911bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runArc911(recs911bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'ARC_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs911c = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runArc911(recs911c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs911cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec911(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runArc911(recs911cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'ARC_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 897 — characterArcPass: arc revelation purpose zone cluster, arc revelation purpose drought run, arc stakes zone imbalance', async () => {
     const makeRec897 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
