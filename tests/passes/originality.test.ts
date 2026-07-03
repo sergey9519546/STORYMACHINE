@@ -1210,6 +1210,100 @@ He sits at his desk.
   });
 
 
+  describe('Wave 858 — originalityPass: originality positive emotion drought run, originality establish world zone cluster, originality climax zone cluster', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830/844
+    // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const EMOTION_POOL_858 = ['neutral', 'neutral', 'neutral'];
+    const PURPOSE_POOL_858 = ['complicate', 'raise_stakes', 'turning_point', 'character_moment'];
+    const SENTENCE_POOL_858 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor858 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec858 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor858(idx),
+      emotionalShift: EMOTION_POOL_858[idx % EMOTION_POOL_858.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_858[idx % PURPOSE_POOL_858.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain858 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor858(i)}\n\n${SENTENCE_POOL_858[i % SENTENCE_POOL_858.length]}`).join('\n\n');
+    const runO858 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain858(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs858a = Array.from({ length: 10 }, (_, i) => makeRec858(i, {
+        emotionalShift: (i === 0 || i === 1 || i === 2) ? 'positive' : EMOTION_POOL_858[i % EMOTION_POOL_858.length],
+      }));
+      const res = await runO858(recs858a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN'), 'ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs858an = Array.from({ length: 10 }, (_, i) => makeRec858(i, {
+        emotionalShift: (i === 0 || i === 3 || i === 6 || i === 9) ? 'positive' : EMOTION_POOL_858[i % EMOTION_POOL_858.length],
+      }));
+      const res = await runO858(recs858an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN'), 'ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs858b = Array.from({ length: 9 }, (_, i) => makeRec858(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'establish_world' : PURPOSE_POOL_858[i % PURPOSE_POOL_858.length],
+      }));
+      const res = await runO858(recs858b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER'), 'ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs858bn = Array.from({ length: 9 }, (_, i) => makeRec858(i, {
+        purpose: (i === 0 || i === 4 || i === 8) ? 'establish_world' : PURPOSE_POOL_858[i % PURPOSE_POOL_858.length],
+      }));
+      const res = await runO858(recs858bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER'), 'ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs858c = Array.from({ length: 9 }, (_, i) => makeRec858(i, {
+        purpose: (i === 0 || i === 1 || i === 2) ? 'climax' : PURPOSE_POOL_858[i % PURPOSE_POOL_858.length],
+      }));
+      const res = await runO858(recs858c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLIMAX_ZONE_CLUSTER'), 'ORIGINALITY_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs858cn = Array.from({ length: 9 }, (_, i) => makeRec858(i, {
+        purpose: (i === 0 || i === 4 || i === 8) ? 'climax' : PURPOSE_POOL_858[i % PURPOSE_POOL_858.length],
+      }));
+      const res = await runO858(recs858cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLIMAX_ZONE_CLUSTER'), 'ORIGINALITY_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 844 — originalityPass: originality introduce conflict drought run, originality negative emotion drought run, originality positive emotion zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760/774/788/802/816/830
     // above — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid

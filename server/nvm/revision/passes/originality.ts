@@ -397,6 +397,14 @@
 // × structural thirds — distinct from ORIGINALITY_EMOTION_ZONE_CLUSTER, which tests combined
 // non-neutral emotionalShift [either valence]; this isolates the positive valence alone, opening
 // a new trio in this pass).
+//
+// Wave 858 additions: ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
+// 'positive' absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode
+// added in Wave 844; peak mode conventionally skipped for this categorical field),
+// ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field), ORIGINALITY_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' ×
+// structural thirds — likewise a virgin field, never referenced in this pass before).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5224,6 +5232,72 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r844c.maxZoneCount / r844c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r844c.zoneNames[r844c.maxZoneIdx]} third — a predictable concentration of relief the audience can learn to anticipate rather than emotional reward distributed unevenly across the whole story.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r844c.zoneNames[r844c.maxZoneIdx]} third so emotional relief stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ── Wave 858: ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN, ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER,
+  //              ORIGINALITY_CLIMAX_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 844 (peak mode conventionally skipped for this categorical field).
+  {
+    const r858a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r858a.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r858a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r858a.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r858a.presentCount} scenes elsewhere carry one — a long, predictable stretch of emotional restraint the audience can learn to anticipate.`,
+        suggestedFix: `Give at least one scene within the ${r858a.longestRun}-scene stretch a positive-emotion charge so emotional relief stays unpredictable throughout that stretch rather than absent for a learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'establish_world' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 world-establishing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass
+  // — a virgin field for all three shared-library trio modes.
+  {
+    const r858b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r858b.fires) {
+      issues.push({
+        location: `${r858b.zoneNames[r858b.maxZoneIdx]} third — ${r858b.maxZoneCount} of ${r858b.count} world-establishing scenes`,
+        rule: 'ORIGINALITY_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r858b.maxZoneCount / r858b.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r858b.zoneNames[r858b.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than world-building distributed unevenly across the whole story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r858b.zoneNames[r858b.maxZoneIdx]} third to establish the world so world-building stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. This purpose
+  // value has never been referenced anywhere in this pass — a virgin field for all three
+  // shared-library trio modes.
+  {
+    const r858c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r858c.fires) {
+      issues.push({
+        location: `${r858c.zoneNames[r858c.maxZoneIdx]} third — ${r858c.maxZoneCount} of ${r858c.count} climax-purposed scenes`,
+        rule: 'ORIGINALITY_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r858c.maxZoneCount / r858c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r858c.zoneNames[r858c.maxZoneIdx]} third — the same predictable window every time, rather than the story's biggest moments landing unevenly across its whole shape.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r858c.zoneNames[r858c.maxZoneIdx]} third so the story's peak moments stay less predictable across its whole shape.`,
       });
     }
   }
