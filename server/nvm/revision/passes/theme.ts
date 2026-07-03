@@ -349,6 +349,18 @@
 // trio modes), THEME_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
 // 'introduce_conflict' × structural thirds — likewise a virgin field, never referenced in this
 // file before).
+//
+// Wave 836 additions: THEME_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 822; peak mode conventionally skipped for this categorical field),
+// THEME_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose === 'introduce_conflict' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 822; peak mode conventionally skipped for this categorical field), THEME_POSITIVE_EMOTION_ZONE_
+// CLUSTER (distribution/timing × emotionalShift === 'positive' × structural thirds — the existing
+// positive-emotion checks in this pass are decoupling [THEME_POSITIVE_EMOTION_DECOUPLED] and
+// sequence/aftermath [THEME_POSITIVE_EMOTION_AFTERMATH_SILENT]; none of the three shared-library
+// trio modes has ever isolated this valence, mirroring the negative-valence trio completed in
+// Wave 808).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4728,6 +4740,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r822c.maxZoneCount / r822c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r822c.zoneNames[r822c.maxZoneIdx]} third. When every new conflict lands in the same structural window, the theme has no fresh friction testing it anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r822c.zoneNames[r822c.maxZoneIdx]} third to introduce conflict so the theme keeps facing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 836: THEME_TURNING_POINT_DROUGHT_RUN, THEME_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              THEME_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // THEME_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall, fires
+  // when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 822 (peak mode conventionally skipped for this categorical field).
+  {
+    const r836a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r836a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r836a.longestRun} consecutive scenes`,
+        rule: 'THEME_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r836a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r836a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the theme untested by any pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r836a.longestRun}-scene stretch as a turning point so the theme keeps facing redirection throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-introducing scenes
+  // overall, fires when the longest consecutive run of scenes with no conflict-introducing
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 822 (peak mode conventionally skipped for this categorical field).
+  {
+    const r836b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r836b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r836b.longestRun} consecutive scenes`,
+        rule: 'THEME_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r836b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r836b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the theme untested for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r836b.longestRun}-scene stretch to introduce conflict so the theme keeps facing fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // The existing positive-emotion checks in this pass are decoupling
+  // (THEME_POSITIVE_EMOTION_DECOUPLED) and sequence/aftermath (THEME_POSITIVE_EMOTION_AFTERMATH_
+  // SILENT); none of the three shared-library trio modes has ever isolated this valence,
+  // mirroring the negative-valence trio completed in Wave 808.
+  {
+    const r836c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r836c.fires) {
+      issues.push({
+        location: `${r836c.zoneNames[r836c.maxZoneIdx]} third — ${r836c.maxZoneCount} of ${r836c.count} positive-emotion scenes`,
+        rule: 'THEME_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r836c.maxZoneCount / r836c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r836c.zoneNames[r836c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the theme carries its emotional payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r836c.zoneNames[r836c.maxZoneIdx]} third so the theme delivers its emotional payoff more evenly across the story.`,
       });
     }
   }
