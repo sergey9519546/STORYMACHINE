@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 853 — causalityPass: causality climax drought run, causality resolution drought run, causality establish world drought run', async () => {
+    const runCA853 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CLIMAX_DROUGHT_RUN fire:
+    // n=10; climax present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_CLIMAX_DROUGHT_RUN fires when a long run has no climax-purposed scene', async () => {
+      const recs853a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA853(recs853a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_DROUGHT_RUN'), 'CAUSALITY_CLIMAX_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_CLIMAX_DROUGHT_RUN does not fire when climax-purposed scenes are evenly spread', async () => {
+      const recs853an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runCA853(recs853an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLIMAX_DROUGHT_RUN'), 'CAUSALITY_CLIMAX_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs853b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runCA853(recs853b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_DROUGHT_RUN'), 'CAUSALITY_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs853bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runCA853(recs853bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_RESOLUTION_DROUGHT_RUN'), 'CAUSALITY_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN fire:
+    // n=10; establish_world present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN fires when a long run has no world-building', async () => {
+      const recs853c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA853(recs853c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN'), 'CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN does not fire when world-establishing scenes are evenly spread', async () => {
+      const recs853cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runCA853(recs853cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN'), 'CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 839 — causalityPass: causality climax zone cluster, causality resolution zone cluster, causality establish world zone cluster', async () => {
     const runCA839 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

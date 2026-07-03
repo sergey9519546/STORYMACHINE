@@ -399,6 +399,16 @@
 // standalone signal), CAUSALITY_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose ===
 // 'establish_world' × structural thirds — this purpose value has never been referenced anywhere
 // in this pass; a virgin field).
+//
+// Wave 853 additions (closes the nineteenth rotation cycle, 840-853): CAUSALITY_CLIMAX_DROUGHT_RUN
+// (run-based × purpose === 'climax' absence — completes 2 of 3 slots for this purpose value
+// alongside the zone-cluster mode added in Wave 839; peak mode conventionally skipped for this
+// categorical field), CAUSALITY_RESOLUTION_DROUGHT_RUN (run-based × purpose === 'resolution'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 839; peak mode conventionally skipped for this categorical field),
+// CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose === 'establish_world' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 839; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4950,6 +4960,72 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r839c.maxZoneCount / r839c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r839c.zoneNames[r839c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the causal chain has no ground to build fresh cause-and-effect from anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r839c.zoneNames[r839c.maxZoneIdx]} third to establish the world so the causal chain keeps building fresh cause-and-effect more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 853: CAUSALITY_CLIMAX_DROUGHT_RUN, CAUSALITY_RESOLUTION_DROUGHT_RUN,
+  //              CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN ──────────────────────────────────────
+
+  // CAUSALITY_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 839 (peak mode conventionally skipped for this categorical field).
+  {
+    const r853a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r853a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r853a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r853a.longestRun} consecutive scenes purposed otherwise than the climax, even though ${r853a.presentCount} scenes elsewhere are dedicated to the story's peak. A long unbroken stretch with no climactic scene leaves the causal chain without a payoff to build toward for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r853a.longestRun}-scene stretch as the climax so the causal chain keeps a payoff to build toward throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 839 (peak mode conventionally skipped for this categorical field).
+  {
+    const r853b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r853b.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r853b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r853b.longestRun} consecutive scenes purposed otherwise than resolving the story, even though ${r853b.presentCount} scenes elsewhere settle a thread. A long unbroken stretch with nothing resolved leaves the causal chain's threads dangling for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r853b.longestRun}-scene stretch to resolve the story so the causal chain keeps settling its threads throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes
+  // overall, fires when the longest consecutive run of scenes with no world-establishing purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 839 (peak mode conventionally skipped for this categorical field).
+  {
+    const r853c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r853c.fires) {
+      issues.push({
+        location: `longest stretch with no world-building: ${r853c.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r853c.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r853c.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves the causal chain without fresh ground to build fresh cause-and-effect from for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r853c.longestRun}-scene stretch to establish the world so the causal chain keeps fresh ground to build from throughout that stretch.`,
       });
     }
   }
