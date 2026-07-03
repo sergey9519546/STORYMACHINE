@@ -428,6 +428,11 @@
 // === 'positive', the positive-valence mirror of Wave 933's negative one), STRUCTURE_SUSPENSE_ZONE_
 // IMBALANCE (suspenseDelta > 0 — tension-delta magnitude), and STRUCTURE_OPEN_THREAD_ZONE_IMBALANCE
 // (unresolvedClues.length > 0 — open-thread array field).
+// Wave 961 additions: continuing the non-purpose 4-zone rollout with three more trio-complete signals
+// spanning three distinct classes: STRUCTURE_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — the
+// question-raising delta beside Wave 947's suspense one), STRUCTURE_PAYOFF_ZONE_IMBALANCE
+// (payoffSetupIds.length > 0 — the payoff array beside 947's open-thread one), and STRUCTURE_
+// REVELATION_ZONE_IMBALANCE (revelation != null — the revelation string field, a new class).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5311,6 +5316,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r947c.totalCount} scenes leaving an open thread are unevenly distributed across its four structural zones: ${bloatName947c} contains ${r947c.counts[r947c.bloatZoneIdx]} of them (${Math.round((r947c.counts[r947c.bloatZoneIdx] / r947c.totalCount) * 100)}%) while ${emptyNames947c} contains none. Unresolved questions bloat in one structural quarter and never open in another, leaving the story's architecture lopsided around where its loose ends accumulate.`,
         suggestedFix: `Redistribute open threads: leave an unresolved question (non-empty unresolvedClues) in at least one scene inside the empty zone(s) — ${emptyNames947c} — so the structure keeps forward pull alive across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone STRUCTURE_
+  // CURIOSITY_ZONE_CLUSTER and run-based STRUCTURE_CURIOSITY_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on
+  // question-raising change rather than the suspense delta audited in Wave 947.
+  {
+    const r961a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r961a.fires) {
+      const emptyNames961a = r961a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName961a = FOUR_ZONE_NAMES[r961a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames961a} empty; ${bloatName961a} has ${r961a.counts[r961a.bloatZoneIdx]}/${r961a.totalCount} curiosity-raising scenes`,
+        rule: 'STRUCTURE_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r961a.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName961a} contains ${r961a.counts[r961a.bloatZoneIdx]} of them (${Math.round((r961a.counts[r961a.bloatZoneIdx] / r961a.totalCount) * 100)}%) while ${emptyNames961a} contains none. New questions bloat in one structural quarter and never open in another, leaving the story's architecture lopsided around where it invites the audience to wonder.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames961a} — so the structure keeps opening fresh questions across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone STRUCTURE_PAYOFF_ZONE_CLUSTER
+  // and run-based STRUCTURE_PAYOFF_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to the payoffSetupIds array field, distinct from the unresolvedClues field audited in Wave 947.
+  {
+    const r961b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r961b.fires) {
+      const emptyNames961b = r961b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName961b = FOUR_ZONE_NAMES[r961b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames961b} empty; ${bloatName961b} has ${r961b.counts[r961b.bloatZoneIdx]}/${r961b.totalCount} payoff scenes`,
+        rule: 'STRUCTURE_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r961b.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName961b} contains ${r961b.counts[r961b.bloatZoneIdx]} of them (${Math.round((r961b.counts[r961b.bloatZoneIdx] / r961b.totalCount) * 100)}%) while ${emptyNames961b} contains none. Payoffs bloat in one structural quarter and never land in another, leaving the story's architecture lopsided around where its setups discharge.`,
+        suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames961b} — so the structure keeps closing threads across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone STRUCTURE_REVELATION_
+  // ZONE_CLUSTER and run-based STRUCTURE_REVELATION_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the revelation STRING field (revelation != null), and distinct from
+  // STRUCTURE_REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation' enum.
+  {
+    const r961c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r961c.fires) {
+      const emptyNames961c = r961c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName961c = FOUR_ZONE_NAMES[r961c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames961c} empty; ${bloatName961c} has ${r961c.counts[r961c.bloatZoneIdx]}/${r961c.totalCount} revelation scenes`,
+        rule: 'STRUCTURE_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r961c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName961c} contains ${r961c.counts[r961c.bloatZoneIdx]} of them (${Math.round((r961c.counts[r961c.bloatZoneIdx] / r961c.totalCount) * 100)}%) while ${emptyNames961c} contains none. Disclosures bloat in one structural quarter and never land in another, leaving the story's architecture lopsided around where new information reframes it.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames961c} — so the structure keeps reframing across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

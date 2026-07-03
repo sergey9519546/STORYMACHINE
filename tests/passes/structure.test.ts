@@ -1006,6 +1006,61 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 961 — structurePass: structure curiosity zone imbalance, structure payoff zone imbalance, structure revelation zone imbalance', async () => {
+    const runST961 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('STRUCTURE_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs961a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runST961(recs961a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_ZONE_IMBALANCE'), 'STRUCTURE_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs961an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runST961(recs961an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_ZONE_IMBALANCE'), 'STRUCTURE_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs961b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 1, 2, 8, 9].includes(i) ? ['s1'] : [] }));
+      const res = await runST961(recs961b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_ZONE_IMBALANCE'), 'STRUCTURE_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs961bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 3, 5, 8].includes(i) ? ['s1'] : [] }));
+      const res = await runST961(recs961bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_ZONE_IMBALANCE'), 'STRUCTURE_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs961c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runST961(recs961c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_ZONE_IMBALANCE'), 'STRUCTURE_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs961cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runST961(recs961cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_ZONE_IMBALANCE'), 'STRUCTURE_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 947 — structurePass: structure positive emotion zone imbalance, structure suspense zone imbalance, structure open thread zone imbalance', async () => {
     const runST947 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
