@@ -934,6 +934,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 761 — pacingPass: pacing staging drought run, pacing suspense drought run, pacing curiosity zone cluster', async () => {
+    const runP761 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_STAGING_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry visual beats (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PACING_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run reaches 6', async () => {
+      const recs761a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs761a[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs761a[1] = makeSharedRecord(1, { visualBeats: ['a beat'] });
+      recs761a[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      const res = await runP761(recs761a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAGING_DROUGHT_RUN'), 'PACING_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // PACING_STAGING_DROUGHT_RUN no-fire:
+    // visual-beat scenes spread out so no gap reaches 6 consecutive scenes
+    it('PACING_STAGING_DROUGHT_RUN does not fire when visual beats are spread through the story', async () => {
+      const recs761an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs761an[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs761an[3] = makeSharedRecord(3, { visualBeats: ['a beat'] });
+      recs761an[6] = makeSharedRecord(6, { visualBeats: ['a beat'] });
+      recs761an[9] = makeSharedRecord(9, { visualBeats: ['a beat'] });
+      const res = await runP761(recs761an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAGING_DROUGHT_RUN'), 'PACING_STAGING_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 have rising suspense (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PACING_SUSPENSE_DROUGHT_RUN fires when the longest no-rising-suspense run reaches 6', async () => {
+      const recs761b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs761b[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs761b[1] = makeSharedRecord(1, { suspenseDelta: 1 });
+      recs761b[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      const res = await runP761(recs761b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_DROUGHT_RUN'), 'PACING_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    // PACING_SUSPENSE_DROUGHT_RUN no-fire:
+    // rising-suspense scenes spread out so no gap reaches 6 consecutive scenes
+    it('PACING_SUSPENSE_DROUGHT_RUN does not fire when rising suspense is spread through the story', async () => {
+      const recs761bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs761bn[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs761bn[3] = makeSharedRecord(3, { suspenseDelta: 1 });
+      recs761bn[6] = makeSharedRecord(6, { suspenseDelta: 1 });
+      recs761bn[9] = makeSharedRecord(9, { suspenseDelta: 1 });
+      const res = await runP761(recs761bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_DROUGHT_RUN'), 'PACING_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('PACING_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs761c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs761c[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs761c[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs761c[2] = makeSharedRecord(2, { curiosityDelta: 1 });
+      const res = await runP761(recs761c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_ZONE_CLUSTER'), 'PACING_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_CURIOSITY_ZONE_CLUSTER no-fire:
+    // curiosity-positive scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes are distributed across thirds', async () => {
+      const recs761cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs761cn[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs761cn[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs761cn[7] = makeSharedRecord(7, { curiosityDelta: 1 });
+      const res = await runP761(recs761cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CURIOSITY_ZONE_CLUSTER'), 'PACING_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 747 — pacingPass: pacing relationship drought run, pacing clock delta zone cluster, pacing stakes drought run', async () => {
     const runP747 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

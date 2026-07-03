@@ -299,6 +299,14 @@
 // clockDelta; the zone-cluster mode has never been applied to it, completing the trio),
 // PACING_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence — Wave 677 applied
 // the zone-cluster mode to this signal; the drought-run mode has never been applied to it).
+// Wave 761 additions: PACING_STAGING_DROUGHT_RUN (run-based × visualBeats absence — this pass
+// has only ever anchored the backward-cause peak mode to visualBeats [PACING_STAGING_PEAK_
+// UNCAUSED]; the run-based drought mode has never been applied to it), PACING_SUSPENSE_DROUGHT_
+// RUN (run-based × suspenseDelta>0 absence — SUSPENSE_CLOSING_ZONE_ABSENT audits only the closing
+// third specifically; the general run-based drought mode has never been applied to it),
+// PACING_CURIOSITY_ZONE_CLUSTER (distribution/timing × curiosityDelta>0 presence × structural
+// thirds — curiosityDelta has only ever anchored aftermath/decoupling and average/aggregate
+// checks in this pass; none of the three shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4293,6 +4301,72 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r747c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r747c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves pacing flat without mounting pressure for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r747c.longestRun}-scene stretch to raise stakes — even a small escalation keeps pacing under mounting pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 761: PACING_STAGING_DROUGHT_RUN, PACING_SUSPENSE_DROUGHT_RUN,
+  //              PACING_CURIOSITY_ZONE_CLUSTER ────────────────────────────────────────────
+
+  // PACING_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 visually dense scenes overall, fires when the longest
+  // consecutive run of scenes with no staged beats reaches 6. This pass has only ever anchored
+  // the backward-cause peak mode to visualBeats (PACING_STAGING_PEAK_UNCAUSED); the run-based
+  // drought mode has never been applied to it.
+  {
+    const r761a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r761a.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r761a.longestRun} consecutive scenes`,
+        rule: 'PACING_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r761a.longestRun} consecutive scenes with no visual staging beats at all, even though ${r761a.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves pacing running on dialogue alone without a visual counterweight for an extended run.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r761a.longestRun}-scene stretch so pacing keeps a visual counterweight throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no rising tension reaches 6. SUSPENSE_CLOSING_ZONE_
+  // ABSENT audits only the closing third specifically; the general run-based drought mode has
+  // never been applied to it.
+  {
+    const r761b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r761b.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r761b.longestRun} consecutive scenes`,
+        rule: 'PACING_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r761b.longestRun} consecutive scenes with no rise in tension at all, even though ${r761b.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves pacing flat without mounting pressure for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r761b.longestRun}-scene stretch so pacing keeps mounting pressure acting on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 curiosity-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. curiosityDelta
+  // has only ever anchored aftermath/decoupling and average/aggregate checks in this pass; none
+  // of the three shared-library trio modes has ever been applied to it.
+  {
+    const r761c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r761c.fires) {
+      issues.push({
+        location: `${r761c.zoneNames[r761c.maxZoneIdx]} third — ${r761c.maxZoneCount} of ${r761c.count} curiosity-positive scenes`,
+        rule: 'PACING_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r761c.maxZoneCount / r761c.count) * 100)}% of the scenes where curiosity rises cluster in the ${r761c.zoneNames[r761c.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, pacing has no fresh question to drive momentum anywhere else in the story.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r761c.zoneNames[r761c.maxZoneIdx]} third so pacing keeps generating fresh questions more evenly across the story.`,
       });
     }
   }
