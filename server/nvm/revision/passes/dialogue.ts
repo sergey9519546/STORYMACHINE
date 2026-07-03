@@ -302,6 +302,15 @@
 // DIALOGUE_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural thirds — Wave 658
 // applied the backward-cause peak mode to visualBeats; the zone-cluster mode has never been
 // applied to it).
+// Wave 742 additions (opens the twelfth rotation cycle): DIALOGUE_CURIOSITY_ZONE_CLUSTER
+// (distribution/timing × curiosityDelta>0 presence × structural thirds — Waves 644/728 applied
+// the run-based drought and backward-cause peak modes to curiosityDelta; the zone-cluster mode has
+// never been applied to it, completing the trio), DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × unresolvedClues magnitude — Waves 644/728 applied the zone-cluster
+// and run-based drought modes to unresolvedClues; the backward-cause peak mode has never been
+// applied to it, completing the trio), DIALOGUE_STAGING_DROUGHT_RUN (run-based × visualBeats
+// absence — Waves 658/728 applied the backward-cause peak and zone-cluster modes to visualBeats;
+// the drought-run mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4389,6 +4398,75 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r728c.maxZoneCount / r728c.count) * 100)}% of the story's visually dense scenes cluster in the ${r728c.zoneNames[r728c.maxZoneIdx]} third. When staging carries the scene almost everywhere in one window, dialogue elsewhere is left to do the work alone without a visual counterweight.`,
         suggestedFix: `Move at least one visually dense beat outside the ${r728c.zoneNames[r728c.maxZoneIdx]} third so staging shares the load with dialogue more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 742: DIALOGUE_CURIOSITY_ZONE_CLUSTER, DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED,
+  //              DIALOGUE_STAGING_DROUGHT_RUN ─────────────────────────────────────────────
+
+  // DIALOGUE_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // curiosity-positive scenes, fires when more than 75% of those scenes cluster in a single
+  // third. Waves 644/728 applied the run-based drought and backward-cause peak modes to
+  // curiosityDelta; the zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r742a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r742a.fires) {
+      issues.push({
+        location: `${r742a.zoneNames[r742a.maxZoneIdx]} third — ${r742a.maxZoneCount} of ${r742a.count} curiosity-positive scenes`,
+        rule: 'DIALOGUE_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r742a.maxZoneCount / r742a.count) * 100)}% of the scenes where curiosity rises cluster in the ${r742a.zoneNames[r742a.maxZoneIdx]} third. When every spike in audience wonder lands in the same structural window, dialogue elsewhere has nothing new to hook the audience's attention with.`,
+        suggestedFix: `Raise curiosity in at least one scene outside the ${r742a.zoneNames[r742a.maxZoneIdx]} third so dialogue keeps generating fresh questions more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 644/728 applied the zone-cluster and run-based drought
+  // modes to unresolvedClues; the backward-cause peak mode has never been applied to it,
+  // completing the trio.
+  {
+    const r742b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r742b.fires) {
+      issues.push({
+        location: `scene ${r742b.peakIdx + 1} — peak open-thread density (${r742b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r742b.peakIdx + 1}, with ${r742b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — dialogue in that scene has nothing causal to press against.`,
+        suggestedFix: `Give scene ${r742b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 visually dense scenes overall, fires when the longest
+  // consecutive run of scenes with no staged beats reaches 6. Waves 658/728 applied the
+  // backward-cause peak and zone-cluster modes to visualBeats; the drought-run mode has never been
+  // applied to it, completing the trio.
+  {
+    const r742c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r742c.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r742c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r742c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r742c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves dialogue doing all the work alone without a visual counterweight for an extended run.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r742c.longestRun}-scene stretch so staging shares the load with dialogue throughout that stretch.`,
       });
     }
   }

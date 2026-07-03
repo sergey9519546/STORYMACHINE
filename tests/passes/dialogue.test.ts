@@ -1598,6 +1598,94 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 742 — dialoguePass: dialogue curiosity zone cluster, dialogue open thread peak uncaused, dialogue staging drought run', async () => {
+    const makeRec742 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes742 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD742 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosity-positive scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-positive scenes cluster in one third', async () => {
+      const recs742a = Array.from({ length: 9 }, (_, i) => makeRec742(i,
+        (i === 0 || i === 1 || i === 2) ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runD742(buildScenes742(9), recs742a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_ZONE_CLUSTER'), 'DIALOGUE_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_CURIOSITY_ZONE_CLUSTER no-fire:
+    // curiosity-positive scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-positive scenes are distributed across thirds', async () => {
+      const recs742an = Array.from({ length: 9 }, (_, i) => makeRec742(i,
+        (i === 0 || i === 4 || i === 7) ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runD742(buildScenes742(9), recs742an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_ZONE_CLUSTER'), 'DIALOGUE_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // n=8; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs742b = Array.from({ length: 8 }, (_, i) => makeRec742(i,
+        i === 2 ? { unresolvedClues: ['clue-a'] }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD742(buildScenes742(8), recs742b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED'), 'DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs742bn = Array.from({ length: 8 }, (_, i) => makeRec742(i,
+        i === 2 ? { unresolvedClues: ['clue-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD742(buildScenes742(8), recs742bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED'), 'DIALOGUE_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_STAGING_DROUGHT_RUN fire:
+    // 10 scenes; visual beats at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run is ≥6', async () => {
+      const recs742c = Array.from({ length: 10 }, (_, i) => makeRec742(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { visualBeats: ['a beat'] } : {}
+      ));
+      const res = await runD742(buildScenes742(10), recs742c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_STAGING_DROUGHT_RUN'), 'DIALOGUE_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_STAGING_DROUGHT_RUN no-fire:
+    // visual beats at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_STAGING_DROUGHT_RUN does not fire when visual beats are distributed without a long drought', async () => {
+      const recs742cn = Array.from({ length: 10 }, (_, i) => makeRec742(i,
+        (i === 0 || i === 4 || i === 9) ? { visualBeats: ['a beat'] } : {}
+      ));
+      const res = await runD742(buildScenes742(10), recs742cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_STAGING_DROUGHT_RUN'), 'DIALOGUE_STAGING_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 728 — dialoguePass: dialogue curiosity peak uncaused, dialogue open thread drought run, dialogue staging zone cluster', async () => {
     const makeRec728 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
