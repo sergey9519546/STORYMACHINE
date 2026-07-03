@@ -1006,6 +1006,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 779 — structurePass: structure turn zone cluster, structure suspense drought run, structure curiosity drought run', async () => {
+    const runST779 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turn scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_TURN_ZONE_CLUSTER fires when >75% of turn scenes cluster in one third', async () => {
+      const recs779a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runST779(recs779a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_ZONE_CLUSTER'), 'STRUCTURE_TURN_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_TURN_ZONE_CLUSTER does not fire when turn scenes spread across thirds', async () => {
+      const recs779an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 4, 8].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runST779(recs779an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_ZONE_CLUSTER'), 'STRUCTURE_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('STRUCTURE_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs779b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST779(recs779b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_DROUGHT_RUN'), 'STRUCTURE_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs779bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST779(recs779bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_DROUGHT_RUN'), 'STRUCTURE_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('STRUCTURE_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs779c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST779(recs779c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_DROUGHT_RUN'), 'STRUCTURE_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs779cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runST779(recs779cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CURIOSITY_DROUGHT_RUN'), 'STRUCTURE_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 765 — structurePass: structure suspense zone cluster, structure curiosity zone cluster, structure curiosity peak uncaused', async () => {
     const runST765 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

@@ -307,6 +307,16 @@
 // PEAK_SUSPENSE_CURIOSITY_VOID] audit the co-occurring channel AT the peak scene itself; none
 // looks backward from the peak for a preparing cause, so the shared-library backward-cause mode
 // has never been applied to curiosityDelta).
+// Wave 779 additions: STRUCTURE_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn !== 'nothing'
+// presence × structural thirds — dramaticTurn is this pass's second most heavily used field and
+// has only ever had the run-based drought mode applied to it as a primary signal; the zone-
+// cluster mode has never been applied to it, completing the trio), STRUCTURE_SUSPENSE_DROUGHT_RUN
+// (run-based × suspenseDelta>0 absence — Wave 765 applied the zone-cluster mode and the
+// hand-rolled CLIMAX_UNPREPARED already covers the backward-cause peak mode restricted to the
+// climax zone; the general run-based drought mode has never been applied to it, completing the
+// trio), STRUCTURE_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — Wave 765 applied
+// the zone-cluster and backward-cause peak modes to curiosityDelta; the run-based drought mode has
+// never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4273,6 +4283,73 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single highest-curiosity scene (Scene ${r765c.peakIdx}, curiosityDelta ${r765c.peakMagnitude}) arrives with no dramatic turn, revelation, or clock raise in the 2 scenes leading into it, even though ${r765c.qualifyingCount} scenes elsewhere do spark wonder. The moment the audience is most gripped by an open question lands out of nowhere — the structure hasn't built toward the mystery it's about to pose.`,
         suggestedFix: `Add a dramatic turn, revelation, or clock raise in one of the 2 scenes before scene ${r765c.peakIdx} so the structure earns its peak curiosity instead of springing it without preparation.`,
+      });
+    }
+  }
+
+  // ── Wave 779: STRUCTURE_TURN_ZONE_CLUSTER, STRUCTURE_SUSPENSE_DROUGHT_RUN,
+  //              STRUCTURE_CURIOSITY_DROUGHT_RUN ──────────────────────────────────────
+
+  // STRUCTURE_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 turn
+  // scenes, fires when more than 75% of those scenes cluster in a single third. dramaticTurn has
+  // only ever had the run-based drought mode applied to it as a primary signal; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r779a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r779a.fires) {
+      issues.push({
+        location: `${r779a.zoneNames[r779a.maxZoneIdx]} third — ${r779a.maxZoneCount} of ${r779a.count} turn scenes`,
+        rule: 'STRUCTURE_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r779a.maxZoneCount / r779a.count) * 100)}% of the story's dramatic turns cluster in the ${r779a.zoneNames[r779a.maxZoneIdx]} third. When every pivot lands in the same structural window, the story's architecture has no reversal testing it anywhere else across the whole shape of the piece.`,
+        suggestedFix: `Introduce a dramatic turn in at least one scene outside the ${r779a.zoneNames[r779a.maxZoneIdx]} third so the structure keeps pivots redirecting it more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 suspense-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no rising tension reaches 6. Wave 765
+  // applied the zone-cluster mode and the hand-rolled CLIMAX_UNPREPARED already covers the
+  // backward-cause peak mode restricted to the climax zone; the general run-based drought mode
+  // has never been applied to it, completing the trio.
+  {
+    const r779b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r779b.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r779b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r779b.longestRun} consecutive scenes with no rise in suspense at all, even though ${r779b.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the story's architecture without mounting pressure for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r779b.longestRun}-scene stretch so the structure keeps mounting pressure acting on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6. Wave 765
+  // applied the zone-cluster and backward-cause peak modes to curiosityDelta; the run-based
+  // drought mode has never been applied to it, completing the trio.
+  {
+    const r779c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r779c.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r779c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r779c.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r779c.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the story's architecture without a driving question for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r779c.longestRun}-scene stretch so the structure keeps a live question driving it throughout that stretch.`,
       });
     }
   }
