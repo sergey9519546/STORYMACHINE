@@ -392,6 +392,12 @@
 // by it: VOICE_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
 // VOICE_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'), and
 // VOICE_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate').
+//
+// Wave 921 additions: continuing the checkZoneImbalance rollout begun in Wave 893, this wave
+// applies the 4-zone bloat+empty-zone mode to the three remaining purpose values with complete
+// 3-zone/run-based trios that had never been audited by it: VOICE_INTRODUCE_CONFLICT_ZONE_IMBALANCE
+// (purpose === 'introduce_conflict'), VOICE_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose ===
+// 'character_moment'), and VOICE_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5504,6 +5510,80 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r907c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName907c} contains ${r907c.counts[r907c.bloatZoneIdx]} of them (${Math.round((r907c.counts[r907c.bloatZoneIdx] / r907c.totalCount) * 100)}%) while ${emptyNames907c} contains none. Complications bloat in one structural quarter and vanish from another, giving the voice's tension an uneven structural rhythm.`,
         suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames907c} — so the voice sustains tension more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'introduce_conflict'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 893. n≥10, ≥4 conflict-introducing scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone VOICE_INTRODUCE_CONFLICT_ZONE_CLUSTER and
+  // run-based VOICE_INTRODUCE_CONFLICT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r921a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r921a.fires) {
+      const emptyNames921a = r921a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName921a = FOUR_ZONE_NAMES[r921a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames921a} empty; ${bloatName921a} has ${r921a.counts[r921a.bloatZoneIdx]}/${r921a.totalCount} conflict-introducing scenes`,
+        rule: 'VOICE_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r921a.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName921a} contains ${r921a.counts[r921a.bloatZoneIdx]} of them (${Math.round((r921a.counts[r921a.bloatZoneIdx] / r921a.totalCount) * 100)}%) while ${emptyNames921a} contains none. New conflicts bloat in one structural quarter and vanish from another, giving the voice's charge of fresh opposition an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames921a} — so the voice meets fresh opposition more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 893. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone VOICE_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based VOICE_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r921b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r921b.fires) {
+      const emptyNames921b = r921b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName921b = FOUR_ZONE_NAMES[r921b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames921b} empty; ${bloatName921b} has ${r921b.counts[r921b.bloatZoneIdx]}/${r921b.totalCount} character-moment scenes`,
+        rule: 'VOICE_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r921b.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName921b} contains ${r921b.counts[r921b.bloatZoneIdx]} of them (${Math.round((r921b.counts[r921b.bloatZoneIdx] / r921b.totalCount) * 100)}%) while ${emptyNames921b} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the voice's intimate register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames921b} — so the voice's intimate register recurs more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, continuing the rollout begun
+  // in Wave 893. n≥10, ≥4 stakes-raising scenes total, divided across four equal structural zones.
+  // Fires only when one zone has zero such scenes while another holds ≥50% of the total. Distinct
+  // from the existing 3-zone VOICE_STAKES_ZONE_CLUSTER and run-based VOICE_STAKES_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r921c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r921c.fires) {
+      const emptyNames921c = r921c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName921c = FOUR_ZONE_NAMES[r921c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames921c} empty; ${bloatName921c} has ${r921c.counts[r921c.bloatZoneIdx]}/${r921c.totalCount} stakes-raising scenes`,
+        rule: 'VOICE_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r921c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName921c} contains ${r921c.counts[r921c.bloatZoneIdx]} of them (${Math.round((r921c.counts[r921c.bloatZoneIdx] / r921c.totalCount) * 100)}%) while ${emptyNames921c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the voice's urgency an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames921c} — so the voice's urgency rises more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
