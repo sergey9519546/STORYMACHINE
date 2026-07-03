@@ -220,10 +220,15 @@
 // the many hand-rolled checks before them. These three instead pair two non-resonance record
 // fields directly (payoffSetupIds × visualBeats, seededClueIds × dialogueHighlights, payoffSetupIds
 // alone), none of which have been combined with each other anywhere in this 105-rule pass.
+// Wave 640 additions: THEME_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — first use of the
+// run-based mode in this 108-rule pass), THEME_STAGING_PEAK_UNCAUSED (backward-cause ×
+// visualBeats-density peak × revelation/dramaticTurn cause — first backward-cause check in this
+// file), THEME_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds —
+// first zone-cluster mode applied to records here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkDroughtRun, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -3642,6 +3647,81 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r626c.totalCount} thread-resolution scenes are unevenly distributed across its four structural zones: ${bloatName626c} contains ${r626c.counts[r626c.bloatZoneIdx]} of them (${Math.round((r626c.counts[r626c.bloatZoneIdx] / r626c.totalCount) * 100)}%) while ${emptyNames626c} contains none. Resolution bloats in one structural quarter and vanishes from another, giving the story's sense of thematic closure an uneven structural rhythm.`,
         suggestedFix: `Redistribute resolutions: let at least one thread pay off in the empty zone(s) — ${emptyNames626c} — so every structural quarter carries some sense of the theme resolving, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 640: THEME_CLOCK_DROUGHT_RUN, THEME_STAGING_PEAK_UNCAUSED,
+  //              THEME_PAYOFF_ZONE_CLUSTER ───────────────────────────────────────────────────
+  // Three modes this 108-rule pass had never used at all on records: run-based, backward-cause,
+  // and zone-cluster (thirds) — despite drought-run's absence, co-occurrence, aftermath, and
+  // zone-imbalance all being well established here.
+
+  // THEME_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 clockRaised scenes elsewhere, longest consecutive run of
+  // scenes with no clock raised ≥6 → fire. First use of the run-based mode in this pass. An
+  // extended stretch where deadline pressure never registers at all means the theme's stakes
+  // never get the added urgency a ticking clock can bring, even though the story does raise the
+  // clock elsewhere.
+  {
+    const r640a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r640a.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r640a.longestRun} consecutive scenes`,
+        rule: 'THEME_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r640a.longestRun} consecutive scenes with no clock raised at all, even though ${r640a.presentCount} scenes elsewhere do raise deadline pressure. An extended stretch where time pressure never registers is a run-based flatline in the clock channel — the theme's stakes go unpressed by urgency for that entire stretch.`,
+        suggestedFix: `Raise the clock somewhere within the ${r640a.longestRun}-scene stretch — even a small reminder of the deadline keeps thematic pressure alive rather than letting it sit dormant.`,
+      });
+    }
+  }
+
+  // THEME_STAGING_PEAK_UNCAUSED — Backward-cause × visualBeats-density peak × revelation/
+  // dramaticTurn cause. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes
+  // with visualBeats present, a 2-scene lookback. Finds the single scene with the most physical
+  // staging beats and fires when neither that scene nor either of the 2 scenes before it contains
+  // a revelation or a dramatic turn. First backward-cause check in this file. The story's single
+  // most visually dense scene should be motivated by a disclosed truth or a pivot the theme is
+  // dramatizing, not simply appear as unmotivated staging.
+  {
+    const r640b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.revelation != null || (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r640b.fires) {
+      issues.push({
+        location: `Scene at position ${r640b.peakIdx + 1} — peak physical staging (${r640b.peakMagnitude} beats) with no revelation or dramatic turn nearby`,
+        rule: 'THEME_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single densest physical staging (${r640b.peakMagnitude} visual beats, out of ${r640b.qualifyingCount} scenes with any staging at all) has no revelation and no dramatic turn in itself or in either of the 2 scenes before it. The moment the story invests most heavily in physical description arrives with no disclosure or pivot explaining why, leaving the theme's physical manifestation causally unmotivated.`,
+        suggestedFix: `Add a revelation or a dramatic turn in the scene with the densest physical staging, or in one of the two scenes before it, so the theme's physical expression is earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, more than 75%
+  // falling in a single structural third → fire. First zone-cluster (thirds) check applied to
+  // records in this pass — Wave 626's THEME_PAYOFF_ZONE_IMBALANCE used the four-zone template
+  // instead. A story whose resolutions cluster overwhelmingly in one third gives the theme's
+  // sense of closure a learnable, front- or back-loaded rhythm rather than a distributed release.
+  {
+    const r640c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r640c.fires) {
+      const zoneName640c = r640c.zoneNames[r640c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName640c} third — ${r640c.maxZoneCount}/${r640c.count} payoff scenes`,
+        rule: 'THEME_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r640c.maxZoneCount} of the story's ${r640c.count} payoff scenes (${Math.round((r640c.maxZoneCount / r640c.count) * 100)}%) cluster in the ${zoneName640c} third. Thematic resolution concentrates almost exclusively in that stretch of the story rather than resolving gradually throughout.`,
+        suggestedFix: `Resolve at least one thread outside the ${zoneName640c} third — spreading payoffs across the story lets the theme's sense of closure build gradually instead of arriving all at once.`,
       });
     }
   }

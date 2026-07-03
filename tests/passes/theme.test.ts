@@ -931,6 +931,83 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 640 — themePass: theme clock drought run, theme staging peak uncaused, theme payoff zone cluster', async () => {
+    const runT640 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clockRaised at 0,8,9; drought run 1-7 = 7 consecutive scenes ≥ 6
+    it('THEME_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs640a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs640a[0] = makeSharedRecord(0, { clockRaised: true });
+      recs640a[8] = makeSharedRecord(8, { clockRaised: true });
+      recs640a[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runT640(recs640a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DROUGHT_RUN'), 'THEME_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // THEME_CLOCK_DROUGHT_RUN no-fire:
+    // clockRaised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs640an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs640an[0] = makeSharedRecord(0, { clockRaised: true });
+      recs640an[4] = makeSharedRecord(4, { clockRaised: true });
+      recs640an[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runT640(recs640an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DROUGHT_RUN'), 'THEME_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; visualBeats present at 2 (1 beat) and 6 (5 beats, the peak); no revelation or
+    // dramaticTurn at 6, 5, or 4
+    it('THEME_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no revelation or dramatic turn nearby', async () => {
+      const recs640b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs640b[2] = makeSharedRecord(2, { visualBeats: ['glances at the photo'] });
+      recs640b[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT640(recs640b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAGING_PEAK_UNCAUSED'), 'THEME_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs640bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs640bn[2] = makeSharedRecord(2, { visualBeats: ['glances at the photo'] });
+      recs640bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs640bn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT640(recs640bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAGING_PEAK_UNCAUSED'), 'THEME_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // THEME_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoffs at 0,1,2 → 100% in opening third
+    it('THEME_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs640c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs640c[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs640c[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs640c[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runT640(recs640c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_ZONE_CLUSTER'), 'THEME_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoffs at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs640cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs640cn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs640cn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs640cn[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runT640(recs640cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_ZONE_CLUSTER'), 'THEME_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 626 — themePass: theme payoff staging decoupled, theme seed dialogue highlight aftermath void, theme payoff zone imbalance', async () => {
     const runT626 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
