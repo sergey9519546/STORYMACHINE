@@ -931,6 +931,71 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 850 — themePass: theme positive emotion drought run, theme establish world zone cluster, theme climax zone cluster', async () => {
+    const runT850 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('THEME_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs850a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runT850(recs850a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_POSITIVE_EMOTION_DROUGHT_RUN'), 'THEME_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs850an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runT850(recs850an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_POSITIVE_EMOTION_DROUGHT_RUN'), 'THEME_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('THEME_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs850b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT850(recs850b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_ZONE_CLUSTER'), 'THEME_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs850bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runT850(recs850bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_ESTABLISH_WORLD_ZONE_CLUSTER'), 'THEME_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_CLIMAX_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; climax scenes at 0,1,2 → 100% opening third
+    it('THEME_CLIMAX_ZONE_CLUSTER fires when >75% of climax-purposed scenes cluster in one third', async () => {
+      const recs850c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT850(recs850c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_ZONE_CLUSTER'), 'THEME_CLIMAX_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_CLIMAX_ZONE_CLUSTER does not fire when climax-purposed scenes spread across thirds', async () => {
+      const recs850cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runT850(recs850cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLIMAX_ZONE_CLUSTER'), 'THEME_CLIMAX_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 836 — themePass: theme turning point drought run, theme introduce conflict drought run, theme positive emotion zone cluster', async () => {
     const runT836 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
