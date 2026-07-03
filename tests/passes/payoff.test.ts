@@ -1365,6 +1365,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 958 — payoffPass: payoff curiosity zone imbalance, payoff revelation zone imbalance, payoff turn zone imbalance', async () => {
+    const runPY958 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PAYOFF_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs958a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runPY958(recs958a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_ZONE_IMBALANCE'), 'PAYOFF_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs958an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runPY958(recs958an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_ZONE_IMBALANCE'), 'PAYOFF_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs958b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runPY958(recs958b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_ZONE_IMBALANCE'), 'PAYOFF_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs958bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runPY958(recs958bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_ZONE_IMBALANCE'), 'PAYOFF_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs958c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runPY958(recs958c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_ZONE_IMBALANCE'), 'PAYOFF_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs958cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runPY958(recs958cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_ZONE_IMBALANCE'), 'PAYOFF_TURN_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 944 — payoffPass: payoff positive emotion zone imbalance, payoff suspense zone imbalance, payoff relationship zone imbalance', async () => {
     const runPY944 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

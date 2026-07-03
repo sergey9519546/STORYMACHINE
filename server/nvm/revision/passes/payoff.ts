@@ -434,6 +434,11 @@
 // 'positive', the positive-valence mirror of Wave 930's negative one), PAYOFF_SUSPENSE_ZONE_IMBALANCE
 // (suspenseDelta > 0 — tension-delta magnitude), and PAYOFF_RELATIONSHIP_ZONE_IMBALANCE
 // (relationshipShifts.length > 0 — relationship-shift array field).
+// Wave 958 additions: continuing the non-purpose 4-zone rollout with three more trio-complete signals
+// spanning three distinct classes: PAYOFF_CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0 — the question-
+// raising delta beside Wave 944's suspense one), PAYOFF_REVELATION_ZONE_IMBALANCE (revelation != null —
+// the revelation string field, distinct from the purpose-enum PAYOFF_REVELATION_PURPOSE one), and
+// PAYOFF_TURN_ZONE_IMBALANCE (dramaticTurn !== 'nothing' — the dramatic-turn categorical signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5248,6 +5253,80 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r944c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName944c} contains ${r944c.counts[r944c.bloatZoneIdx]} of them (${Math.round((r944c.counts[r944c.bloatZoneIdx] / r944c.totalCount) * 100)}%) while ${emptyNames944c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so relational payoffs — the shifts that let earlier setups between characters pay off — are confined to part of the story.`,
         suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames944c} — a relationship shift so bonds keep evolving toward payoff across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × (curiosityDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 curiosity-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone PAYOFF_CURIOSITY_
+  // ZONE_CLUSTER and run-based PAYOFF_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the curiosity-delta magnitude signal in this pass, keying on question-
+  // raising change rather than the suspense delta audited in Wave 944.
+  {
+    const r958a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r958a.fires) {
+      const emptyNames958a = r958a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName958a = FOUR_ZONE_NAMES[r958a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames958a} empty; ${bloatName958a} has ${r958a.counts[r958a.bloatZoneIdx]}/${r958a.totalCount} curiosity-raising scenes`,
+        rule: 'PAYOFF_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r958a.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName958a} contains ${r958a.counts[r958a.bloatZoneIdx]} of them (${Math.round((r958a.counts[r958a.bloatZoneIdx] / r958a.totalCount) * 100)}%) while ${emptyNames958a} contains none. New questions bloat in one structural quarter and never open in another, so the anticipation that makes a payoff satisfying is confined to part of the story.`,
+        suggestedFix: `Redistribute curiosity: move or add a scene that raises curiosity (curiosityDelta > 0) into the empty zone(s) — ${emptyNames958a} — so anticipation keeps building toward payoff across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone PAYOFF_REVELATION_ZONE_
+  // CLUSTER and run-based PAYOFF_REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+
+  // empty-zone mode to the revelation STRING field (revelation != null), and distinct from PAYOFF_
+  // REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation' enum value.
+  {
+    const r958b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r958b.fires) {
+      const emptyNames958b = r958b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName958b = FOUR_ZONE_NAMES[r958b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames958b} empty; ${bloatName958b} has ${r958b.counts[r958b.bloatZoneIdx]}/${r958b.totalCount} revelation scenes`,
+        rule: 'PAYOFF_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r958b.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName958b} contains ${r958b.counts[r958b.bloatZoneIdx]} of them (${Math.round((r958b.counts[r958b.bloatZoneIdx] / r958b.totalCount) * 100)}%) while ${emptyNames958b} contains none. Disclosures bloat in one structural quarter and never land in another, so the payoff of a well-timed reveal is confined to part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames958b} — so reveals pay off across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone PAYOFF_TURN_ZONE_CLUSTER and run-based PAYOFF_TURN_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical signal.
+  {
+    const r958c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r958c.fires) {
+      const emptyNames958c = r958c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName958c = FOUR_ZONE_NAMES[r958c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames958c} empty; ${bloatName958c} has ${r958c.counts[r958c.bloatZoneIdx]}/${r958c.totalCount} dramatic-turn scenes`,
+        rule: 'PAYOFF_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r958c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName958c} contains ${r958c.counts[r958c.bloatZoneIdx]} of them (${Math.round((r958c.counts[r958c.bloatZoneIdx] / r958c.totalCount) * 100)}%) while ${emptyNames958c} contains none. Turns bloat in one structural quarter and never fire in another, so the payoff of a beat that flips the situation is confined to part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames958c} — a dramatic turn so situation-flipping payoffs land across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
