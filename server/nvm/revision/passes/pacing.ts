@@ -346,6 +346,15 @@
 // PACING_TURNING_POINT_ZONE_CLUSTER (distribution/timing × purpose === 'turning_point' ×
 // structural thirds — this purpose value has never been referenced anywhere in this pass
 // either; none of the three shared-library trio modes has ever been applied to it).
+//
+// Wave 831 additions: PACING_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 817; peak mode conventionally skipped for this categorical field),
+// PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose === 'introduce_conflict'
+// × structural thirds — this purpose value has never been referenced anywhere in this pass; a
+// virgin field), PACING_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift ===
+// 'positive' × structural thirds — mirrors the completed negative-valence trio; the positive
+// valence has never been isolated by any of the three shared-library trio modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4675,6 +4684,72 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r817c.maxZoneCount / r817c.count) * 100)}% of the story's turning-point scenes cluster in the ${r817c.zoneNames[r817c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, pacing has no structural pivot to react to anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r817c.zoneNames[r817c.maxZoneIdx]} third as a turning point so pacing keeps a pivot to react to more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 831: PACING_TURNING_POINT_DROUGHT_RUN, PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              PACING_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall, fires
+  // when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 817 (peak mode conventionally skipped for this categorical field).
+  {
+    const r831a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r831a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r831a.longestRun} consecutive scenes`,
+        rule: 'PACING_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r831a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r831a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves pacing coasting without a pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r831a.longestRun}-scene stretch as a turning point so pacing keeps a pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r831b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r831b.fires) {
+      issues.push({
+        location: `${r831b.zoneNames[r831b.maxZoneIdx]} third — ${r831b.maxZoneCount} of ${r831b.count} conflict-introducing scenes`,
+        rule: 'PACING_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r831b.maxZoneCount / r831b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r831b.zoneNames[r831b.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, pacing has no fresh friction to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r831b.zoneNames[r831b.maxZoneIdx]} third to introduce conflict so pacing keeps facing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed negative-valence trio; the positive valence has never been isolated by
+  // any of the three shared-library trio modes in this pass.
+  {
+    const r831c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r831c.fires) {
+      issues.push({
+        location: `${r831c.zoneNames[r831c.maxZoneIdx]} third — ${r831c.maxZoneCount} of ${r831c.count} positive-emotion scenes`,
+        rule: 'PACING_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r831c.maxZoneCount / r831c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r831c.zoneNames[r831c.maxZoneIdx]} third. When all the relief concentrates in one structural window, pacing delivers its emotional payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r831c.zoneNames[r831c.maxZoneIdx]} third so pacing delivers its emotional payoff more evenly across the story.`,
       });
     }
   }
