@@ -1598,6 +1598,74 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 910 — dialoguePass: dialogue complicate zone imbalance, dialogue introduce_conflict zone imbalance, dialogue turning_point zone imbalance', async () => {
+    const makeRec910 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes910 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD910 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Default filler purpose 'establish_world' is not one of the tested values.
+    it('DIALOGUE_COMPLICATE_ZONE_IMBALANCE fires when complicating scenes cluster in two zones and two are empty', async () => {
+      const records910a = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'complicate' } : {}));
+      const res = await runD910(buildScenes910(10), records910a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_COMPLICATE_ZONE_IMBALANCE'), 'DIALOGUE_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const records910an = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 3, 5, 8].includes(i) ? { purpose: 'complicate' } : {}));
+      const res = await runD910(buildScenes910(10), records910an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_COMPLICATE_ZONE_IMBALANCE'), 'DIALOGUE_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when conflict-introducing scenes cluster in two zones and two are empty', async () => {
+      const records910b = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'introduce_conflict' } : {}));
+      const res = await runD910(buildScenes910(10), records910b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const records910bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 3, 5, 8].includes(i) ? { purpose: 'introduce_conflict' } : {}));
+      const res = await runD910(buildScenes910(10), records910bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_TURNING_POINT_ZONE_IMBALANCE fires when turning-point scenes cluster in two zones and two are empty', async () => {
+      const records910c = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'turning_point' } : {}));
+      const res = await runD910(buildScenes910(10), records910c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TURNING_POINT_ZONE_IMBALANCE'), 'DIALOGUE_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const records910cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec910(i, [0, 3, 5, 8].includes(i) ? { purpose: 'turning_point' } : {}));
+      const res = await runD910(buildScenes910(10), records910cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TURNING_POINT_ZONE_IMBALANCE'), 'DIALOGUE_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 896 — dialoguePass: dialogue climax zone imbalance, dialogue establish_world zone imbalance, dialogue resolution zone imbalance', async () => {
     const makeRec896 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

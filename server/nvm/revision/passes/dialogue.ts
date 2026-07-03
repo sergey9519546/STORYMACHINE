@@ -418,6 +418,13 @@
 // complete 3-zone/run-based trios: DIALOGUE_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
 // DIALOGUE_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and DIALOGUE_
 // RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
+//
+// Wave 910 additions (opens the twenty-fourth rotation cycle): continuing the checkZoneImbalance
+// rollout begun in Wave 896, this wave applies the 4-zone bloat+empty-zone mode to three more
+// purpose values that each already have a complete 3-zone/run-based trio (checkZoneCluster +
+// checkDroughtRun) but have never been audited by it: DIALOGUE_COMPLICATE_ZONE_IMBALANCE (purpose
+// === 'complicate'), DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict'),
+// and DIALOGUE_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5312,6 +5319,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r896c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName896c} contains ${r896c.counts[r896c.bloatZoneIdx]} of them (${Math.round((r896c.counts[r896c.bloatZoneIdx] / r896c.totalCount) * 100)}%) while ${emptyNames896c} contains none. Dialogue has nothing to settle in the empty zone(s), leaving loose threads dangling until resolution is crammed elsewhere.`,
         suggestedFix: `Redistribute closing beats: move at least one resolution-purposed scene into the empty zone(s) -- ${emptyNames896c} -- so dialogue can settle threads across the whole story, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_COMPLICATE_ZONE_IMBALANCE -- Underweight/bloat x purpose === 'complicate' x four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 896. n>=10, >=4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds >=50% of
+  // the total. Distinct from the existing 3-zone DIALOGUE_COMPLICATE_ZONE_CLUSTER and run-based
+  // DIALOGUE_COMPLICATE_DROUGHT_RUN -- the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r910a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r910a.fires) {
+      const emptyNames910a = r910a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName910a = FOUR_ZONE_NAMES[r910a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames910a} empty; ${bloatName910a} has ${r910a.counts[r910a.bloatZoneIdx]}/${r910a.totalCount} complicating scenes`,
+        rule: 'DIALOGUE_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r910a.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName910a} contains ${r910a.counts[r910a.bloatZoneIdx]} of them (${Math.round((r910a.counts[r910a.bloatZoneIdx] / r910a.totalCount) * 100)}%) while ${emptyNames910a} contains none. Dialogue has fresh trouble to react to in one quarter and none elsewhere, giving its friction an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) -- ${emptyNames910a} -- so dialogue keeps reacting to fresh trouble across the whole story, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE -- Underweight/bloat x purpose ===
+  // 'introduce_conflict' x four structural zones. Built on checkZoneImbalance from the shared
+  // checks library, continuing the rollout begun in Wave 896. n>=10, >=4 conflict-introducing
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds >=50% of the total. Distinct from the existing 3-zone
+  // DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER and run-based DIALOGUE_INTRODUCE_CONFLICT_DROUGHT_RUN
+  // -- the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r910b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r910b.fires) {
+      const emptyNames910b = r910b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName910b = FOUR_ZONE_NAMES[r910b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames910b} empty; ${bloatName910b} has ${r910b.counts[r910b.bloatZoneIdx]}/${r910b.totalCount} conflict-introducing scenes`,
+        rule: 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r910b.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName910b} contains ${r910b.counts[r910b.bloatZoneIdx]} of them (${Math.round((r910b.counts[r910b.bloatZoneIdx] / r910b.totalCount) * 100)}%) while ${emptyNames910b} contains none. Dialogue meets fresh opposition in one quarter and none elsewhere, giving its friction an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) -- ${emptyNames910b} -- so dialogue keeps meeting fresh opposition across the whole story, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURNING_POINT_ZONE_IMBALANCE -- Underweight/bloat x purpose === 'turning_point' x
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 896. n>=10, >=4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds >=50% of
+  // the total. Distinct from the existing 3-zone DIALOGUE_TURNING_POINT_ZONE_CLUSTER and run-based
+  // DIALOGUE_TURNING_POINT_DROUGHT_RUN -- the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r910c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r910c.fires) {
+      const emptyNames910c = r910c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName910c = FOUR_ZONE_NAMES[r910c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames910c} empty; ${bloatName910c} has ${r910c.counts[r910c.bloatZoneIdx]}/${r910c.totalCount} turning-point scenes`,
+        rule: 'DIALOGUE_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r910c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName910c} contains ${r910c.counts[r910c.bloatZoneIdx]} of them (${Math.round((r910c.counts[r910c.bloatZoneIdx] / r910c.totalCount) * 100)}%) while ${emptyNames910c} contains none. Dialogue voices a pivot in one quarter and none elsewhere, giving its shifts of direction an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) -- ${emptyNames910c} -- so dialogue voices the story's pivots across the whole story, not only the quarter currently carrying most of them.`,
       });
     }
   }
