@@ -457,6 +457,13 @@
 // field), plus CAUSALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE, extending the 4-zone checkZoneImbalance
 // mode to the emotionalShift valence signal (emotionalShift === 'negative' has a complete
 // 3-zone/run trio but has never been audited by it).
+//
+// Wave 937 additions (closes the twenty-fifth rotation cycle, 924-937): continuing the
+// checkZoneImbalance rollout, this wave applies the 4-zone mode to three more signals that each
+// already have a complete 3-zone/run-based trio but had never been audited by it: CAUSALITY_
+// REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in Wave
+// 923), CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive'), and CAUSALITY_
+// CURIOSITY_ZONE_IMBALANCE (curiosityDelta > 0).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5434,6 +5441,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r923c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName923c} contains ${r923c.counts[r923c.bloatZoneIdx]} of them (${Math.round((r923c.counts[r923c.bloatZoneIdx] / r923c.totalCount) * 100)}%) while ${emptyNames923c} contains none. Downturns bloat in one structural quarter and vanish from another, so the causal chain's adverse consequences cluster in only part of the story.`,
         suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames923c} — so the causal chain's adverse consequences land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, closing the
+  // 4-zone gap for this purpose value (its 3-zone/run trio was completed in Wave 923). n≥10, ≥4
+  // revelation-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from CAUSALITY_
+  // REVELATION_PURPOSE_ZONE_CLUSTER/DROUGHT_RUN (Wave 923) and from the revelation-string-field
+  // rules — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r937a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r937a.fires) {
+      const emptyNames937a = r937a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName937a = FOUR_ZONE_NAMES[r937a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames937a} empty; ${bloatName937a} has ${r937a.counts[r937a.bloatZoneIdx]}/${r937a.totalCount} revelation-purposed scenes`,
+        rule: 'CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r937a.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName937a} contains ${r937a.counts[r937a.bloatZoneIdx]} of them (${Math.round((r937a.counts[r937a.bloatZoneIdx] / r937a.totalCount) * 100)}%) while ${emptyNames937a} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the causal chain turns on new information in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames937a} — so the causal chain keeps turning on new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'positive' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 positive-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone CAUSALITY_POSITIVE_EMOTION_
+  // ZONE_CLUSTER and run-based CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r937b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r937b.fires) {
+      const emptyNames937b = r937b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName937b = FOUR_ZONE_NAMES[r937b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames937b} empty; ${bloatName937b} has ${r937b.counts[r937b.bloatZoneIdx]}/${r937b.totalCount} positive-shift scenes`,
+        rule: 'CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r937b.totalCount} scenes with a positive emotional shift are unevenly distributed across its four structural zones: ${bloatName937b} contains ${r937b.counts[r937b.bloatZoneIdx]} of them (${Math.round((r937b.counts[r937b.bloatZoneIdx] / r937b.totalCount) * 100)}%) while ${emptyNames937b} contains none. Upswings bloat in one structural quarter and vanish from another, so the causal chain's beneficial consequences cluster in only part of the story.`,
+        suggestedFix: `Redistribute upswings: place a positive emotional beat in at least one scene inside the empty zone(s) — ${emptyNames937b} — so the causal chain's beneficial consequences land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CURIOSITY_ZONE_IMBALANCE — Underweight/bloat × curiosityDelta > 0 × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, extending the 4-zone mode to
+  // the curiosityDelta magnitude signal. n≥10, ≥4 curiosity-raising scenes total, divided across
+  // four equal structural zones. Fires only when one zone has zero such scenes while another holds
+  // ≥50% of the total. Distinct from the existing 3-zone CAUSALITY_CURIOSITY_ZONE_CLUSTER and
+  // run-based CAUSALITY_CURIOSITY_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to this signal.
+  {
+    const r937c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r937c.fires) {
+      const emptyNames937c = r937c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName937c = FOUR_ZONE_NAMES[r937c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames937c} empty; ${bloatName937c} has ${r937c.counts[r937c.bloatZoneIdx]}/${r937c.totalCount} curiosity-raising scenes`,
+        rule: 'CAUSALITY_CURIOSITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r937c.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName937c} contains ${r937c.counts[r937c.bloatZoneIdx]} of them (${Math.round((r937c.counts[r937c.bloatZoneIdx] / r937c.totalCount) * 100)}%) while ${emptyNames937c} contains none. New questions bloat in one structural quarter and vanish from another, so the causal chain's open threads cluster in only part of the story.`,
+        suggestedFix: `Redistribute curiosity beats: raise a fresh question in at least one scene inside the empty zone(s) — ${emptyNames937c} — so the causal chain's open threads span every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

@@ -1247,6 +1247,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 937 — causalityPass: causality revelation purpose zone imbalance, causality positive emotion zone imbalance, causality curiosity zone imbalance', async () => {
+    const runCA937 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs937a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA937(recs937a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs937an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runCA937(recs937an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'CAUSALITY_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of positive-shift scenes', async () => {
+      const recs937b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runCA937(recs937b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE does not fire when positive-shift scenes touch every zone', async () => {
+      const recs937bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runCA937(recs937bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE'), 'CAUSALITY_POSITIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_CURIOSITY_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of curiosity-raising scenes', async () => {
+      const recs937c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2, 8, 9].includes(i) ? 2 : 0 }));
+      const res = await runCA937(recs937c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CURIOSITY_ZONE_IMBALANCE'), 'CAUSALITY_CURIOSITY_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_CURIOSITY_ZONE_IMBALANCE does not fire when curiosity-raising scenes touch every zone', async () => {
+      const recs937cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 3, 5, 8].includes(i) ? 2 : 0 }));
+      const res = await runCA937(recs937cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CURIOSITY_ZONE_IMBALANCE'), 'CAUSALITY_CURIOSITY_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 923 — causalityPass: causality revelation purpose zone cluster, causality revelation purpose drought run, causality negative emotion zone imbalance', async () => {
     const runCA923 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
