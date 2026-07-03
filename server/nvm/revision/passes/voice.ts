@@ -224,10 +224,18 @@
 // (underweight/bloat × curiosityDelta × four structural zones — first use of curiosityDelta in
 // this pass), VOICE_CLOCK_DELTA_PEAK_UNCAUSED (backward-cause × clockDelta-magnitude peak ×
 // dramaticTurn/revelation cause — first use of clockDelta and the backward-cause mode here).
+// Wave 655 additions: VOICE_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — first checkZoneCluster use in this 113-rule pass, and
+// the first genuine use of the `purpose` field, which had zero prior accesses despite being a
+// real ScenePurpose enum), VOICE_STAGING_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// visualBeats magnitude — Wave 641 applied the peak-uncaused mode to clockDelta; visualBeats
+// itself has never been peak-audited here), VOICE_SEED_DROUGHT_RUN (run-based × seededClueIds
+// absence — this pass already has UNRESOLVED_CLUE_DROUGHT_RUN on the unresolvedClues channel;
+// seededClueIds itself has never been drought-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
@@ -4044,6 +4052,76 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The scene with the story's single highest clockDelta (${r641c.peakMagnitude}, out of ${r641c.qualifyingCount} scenes that raise the clock at all) has no dramatic turn and no revelation in itself or in either of the 2 scenes before it. The moment time pressure compresses most sharply arrives with no pivot or disclosure explaining why.`,
         suggestedFix: `Add a dramatic turn or a revelation in the scene that raises the clock most sharply, or in one of the two scenes before it, so the audience understands why the deadline suddenly tightens this hard.`,
+      });
+    }
+  }
+
+  // ── Wave 655: VOICE_CHARACTER_MOMENT_ZONE_CLUSTER, VOICE_STAGING_PEAK_UNCAUSED,
+  //              VOICE_SEED_DROUGHT_RUN ─────────────────────────────────────────────────────
+
+  // VOICE_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // character-moment scenes, fires when >75% of them fall in a single structural third. First
+  // checkZoneCluster use in this pass, and the first genuine use of the `purpose` field, which had
+  // zero prior accesses in this 113-rule pass despite being a real ScenePurpose enum. A voice pass
+  // whose character-defining beats concentrate almost entirely in one third leaves the rest of the
+  // script with no dedicated space for personal voice to surface.
+  {
+    const r655a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r655a.fires) {
+      const zoneName655a = r655a.zoneNames[r655a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName655a} third — ${r655a.maxZoneCount}/${r655a.count} character-moment scenes`,
+        rule: 'VOICE_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r655a.maxZoneCount} of the story's ${r655a.count} scenes purposed as character moments (${Math.round((r655a.maxZoneCount / r655a.count) * 100)}%) cluster in the ${zoneName655a} third. Dedicated space for personal voice concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no scene purposed to let a character's individual voice lead.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName655a} third a character-moment purpose — spreading dedicated voice beats across the story lets every structural third carry some space for a character's individual perspective.`,
+      });
+    }
+  }
+
+  // VOICE_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Wave 641 applied the peak-uncaused mode to clockDelta; visualBeats itself has never been
+  // peak-audited here.
+  {
+    const r655b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r655b.fires) {
+      issues.push({
+        location: `scene ${r655b.peakIdx + 1} — peak physical-staging density (${r655b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r655b.peakIdx + 1}, with ${r655b.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r655b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive run of
+  // scenes with zero clue seeded reaches 6. This pass already has UNRESOLVED_CLUE_DROUGHT_RUN on
+  // the unresolvedClues channel; seededClueIds itself has never been drought-audited here.
+  {
+    const r655c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r655c.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r655c.longestRun} consecutive scenes`,
+        rule: 'VOICE_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r655c.longestRun} consecutive scenes with no clue seeded at all, even though ${r655c.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the story's voice coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r655c.longestRun}-scene stretch so the story keeps planting forward momentum throughout, not only in isolated bursts.`,
       });
     }
   }

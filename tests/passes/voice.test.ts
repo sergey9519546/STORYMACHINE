@@ -1438,6 +1438,84 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 655 — voicePass: voice character moment zone cluster, voice staging peak uncaused, voice seed drought run', async () => {
+    const runV655 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character-moment scenes at 0,1,2 → 100% opening third
+    it('VOICE_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs655a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs655a[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs655a[1] = makeSharedRecord(1, { purpose: 'character_moment' });
+      recs655a[2] = makeSharedRecord(2, { purpose: 'character_moment' });
+      const res = await runV655(recs655a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'VOICE_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_CHARACTER_MOMENT_ZONE_CLUSTER no-fire:
+    // character-moment scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes are distributed across thirds', async () => {
+      const recs655an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs655an[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs655an[4] = makeSharedRecord(4, { purpose: 'character_moment' });
+      recs655an[7] = makeSharedRecord(7, { purpose: 'character_moment' });
+      const res = await runV655(recs655an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CHARACTER_MOMENT_ZONE_CLUSTER'), 'VOICE_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // VOICE_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; staging at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('VOICE_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs655b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs655b[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs655b[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV655(recs655b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAGING_PEAK_UNCAUSED'), 'VOICE_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // VOICE_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VOICE_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs655bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs655bn[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs655bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs655bn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV655(recs655bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAGING_PEAK_UNCAUSED'), 'VOICE_STAGING_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeded at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('VOICE_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs655c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs655c[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs655c[1] = makeSharedRecord(1, { seededClueIds: ['clue-x'] });
+      recs655c[2] = makeSharedRecord(2, { seededClueIds: ['clue-x'] });
+      recs655c[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runV655(recs655c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SEED_DROUGHT_RUN'), 'VOICE_SEED_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_SEED_DROUGHT_RUN no-fire:
+    // seeded at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('VOICE_SEED_DROUGHT_RUN does not fire when seeding is distributed without a long drought', async () => {
+      const recs655cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs655cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs655cn[4] = makeSharedRecord(4, { seededClueIds: ['clue-x'] });
+      recs655cn[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runV655(recs655cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SEED_DROUGHT_RUN'), 'VOICE_SEED_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 641 — voicePass: voice suspense flatline, voice curiosity zone imbalance, voice clock delta peak uncaused', async () => {
     const runV641 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
