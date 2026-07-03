@@ -391,6 +391,17 @@
 // thirds — distinct from CONFLICT_RESOLUTION_PREMATURE, which checks timing relative to the
 // climax rather than distributional clustering; a virgin standalone signal for this purpose
 // value).
+//
+// Wave 870 additions: CONFLICT_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 856; distinct from CONFLICT_RESOLUTION_PREMATURE, which checks timing relative
+// to the climax rather than sustained absence; peak mode conventionally skipped for this
+// categorical field), CONFLICT_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'complicate' x structural thirds -- this purpose value has never been referenced anywhere in
+// this pass; a virgin field), CONFLICT_COMPLICATE_DROUGHT_RUN (run-based x purpose ===
+// 'complicate' absence -- completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in this same wave; peak mode conventionally skipped for this
+// categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5040,6 +5051,74 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r856c.maxZoneCount / r856c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r856c.zoneNames[r856c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the conflict settles its threads in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r856c.zoneNames[r856c.maxZoneIdx]} third so the conflict settles its threads more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 870: CONFLICT_RESOLUTION_DROUGHT_RUN, CONFLICT_COMPLICATE_ZONE_CLUSTER,
+  //              CONFLICT_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // CONFLICT_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 856. Distinct from CONFLICT_RESOLUTION_PREMATURE, which checks the timing of
+  // relationshipShifts negative events relative to the climax rather than sustained absence of
+  // this purpose value; peak mode conventionally skipped for this categorical field.
+  {
+    const r870a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r870a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r870a.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r870a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r870a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the conflict's threads dangling for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r870a.longestRun}-scene stretch to resolve part of the conflict, so its threads keep settling throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // CONFLICT_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r870b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r870b.fires) {
+      issues.push({
+        location: `${r870b.zoneNames[r870b.maxZoneIdx]} third — ${r870b.maxZoneCount} of ${r870b.count} complicating scenes`,
+        rule: 'CONFLICT_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r870b.maxZoneCount / r870b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r870b.zoneNames[r870b.maxZoneIdx]} third. When every complication lands in the same structural window, the conflict stops deepening anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r870b.zoneNames[r870b.maxZoneIdx]} third to complicate the story so the conflict keeps deepening more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r870c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r870c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r870c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r870c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r870c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the conflict stalled for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r870c.longestRun}-scene stretch to complicate the story so the conflict keeps deepening throughout that stretch.`,
       });
     }
   }

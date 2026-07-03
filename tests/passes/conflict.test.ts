@@ -1535,6 +1535,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 870 — conflictPass: conflict resolution drought run, conflict complicate zone cluster, conflict complicate drought run', async () => {
+    const makeRec870 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF870 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs870a = Array.from({ length: 10 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runCF870(recs870a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_DROUGHT_RUN'), 'CONFLICT_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs870an = Array.from({ length: 10 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'development' }),
+      );
+      const res = await runCF870(recs870an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RESOLUTION_DROUGHT_RUN'), 'CONFLICT_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('CONFLICT_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs870b = Array.from({ length: 9 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runCF870(recs870b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_ZONE_CLUSTER'), 'CONFLICT_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs870bn = Array.from({ length: 9 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runCF870(recs870bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_ZONE_CLUSTER'), 'CONFLICT_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CONFLICT_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs870c = Array.from({ length: 10 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runCF870(recs870c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_DROUGHT_RUN'), 'CONFLICT_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs870cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec870(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'development' }),
+      );
+      const res = await runCF870(recs870cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_COMPLICATE_DROUGHT_RUN'), 'CONFLICT_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 856 — conflictPass: conflict climax drought run, conflict establish world drought run, conflict resolution zone cluster', async () => {
     const makeRec856 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
