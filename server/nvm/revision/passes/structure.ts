@@ -342,6 +342,16 @@
 // — this purpose value has only ever appeared inside the SETUP_RESOLUTION_IMBALANCE composite set
 // [union with 'establish_world']; it has never been audited as its own standalone signal by any
 // of the three shared-library trio modes).
+// Wave 821 additions: STRUCTURE_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose ===
+// 'character_moment' absence — completing 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 807; peak mode conventionally skipped for this categorical
+// field), STRUCTURE_TURNING_POINT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'turning_point' × structural thirds — this purpose value has only ever appeared inside the
+// payoffPurposes composite set [union with 'climax', 'resolution']; it has never been audited
+// as its own standalone signal by any of the three shared-library trio modes),
+// STRUCTURE_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
+// completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+// same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4518,6 +4528,73 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r807c.maxZoneCount / r807c.count) * 100)}% of the story's character-moment scenes cluster in the ${r807c.zoneNames[r807c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the story's architecture has no room for the protagonist's inner life anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r807c.zoneNames[r807c.maxZoneIdx]} third as a character moment so the structure keeps room for interior reflection more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 821: STRUCTURE_CHARACTER_MOMENT_DROUGHT_RUN, STRUCTURE_TURNING_POINT_ZONE_CLUSTER,
+  //              STRUCTURE_TURNING_POINT_DROUGHT_RUN ──────────────────────────────────────
+
+  // STRUCTURE_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment
+  // scenes overall, fires when the longest consecutive run of scenes with no character-moment
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 807 (peak mode conventionally skipped for this categorical field).
+  {
+    const r821a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r821a.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r821a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r821a.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r821a.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with nothing but plot mechanics leaves the story's architecture without room for the protagonist's inner life for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r821a.longestRun}-scene stretch as a character moment so the structure keeps room for interior reflection throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has only ever appeared inside the payoffPurposes composite set (union
+  // with 'climax', 'resolution'); it has never been audited as its own standalone signal by any
+  // of the three shared-library trio modes.
+  {
+    const r821b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r821b.fires) {
+      issues.push({
+        location: `${r821b.zoneNames[r821b.maxZoneIdx]} third — ${r821b.maxZoneCount} of ${r821b.count} turning-point scenes`,
+        rule: 'STRUCTURE_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r821b.maxZoneCount / r821b.count) * 100)}% of the story's turning-point scenes cluster in the ${r821b.zoneNames[r821b.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the story's architecture has no redirection anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r821b.zoneNames[r821b.maxZoneIdx]} third as a turning point so the structure keeps redirecting the story more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall,
+  // fires when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r821c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r821c.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r821c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r821c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r821c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the story's architecture coasting without a pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r821c.longestRun}-scene stretch as a turning point so the structure keeps redirecting the story throughout that stretch.`,
       });
     }
   }
