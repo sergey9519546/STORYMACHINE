@@ -307,6 +307,18 @@
 // INTENTION_STAKES_ZONE_CLUSTER (distribution/timing × purpose === 'raise_stakes' × structural
 // thirds — INTENTION_STAKES_DROUGHT_RUN applied the run-based drought mode to this signal; the
 // zone-cluster mode has never been applied to it).
+// Wave 773 additions: INTENTION_SUSPENSE_ZONE_CLUSTER (distribution/timing × suspenseDelta>0
+// presence × structural thirds — existing suspense checks in this pass are all co-occurrence-at-
+// peak or co-occurrence-decoupling against proactivity [PROACTIVE_SUSPENSE_DECOUPLED,
+// PROACTIVE_SUSPENSE_PEAK_DECOUPLED, PROACTIVE_SUSPENSE_AFTERMATH_ABSENT]; none of the three
+// shared-library trio modes has ever been applied to suspenseDelta as a primary signal),
+// INTENTION_CURIOSITY_DROUGHT_RUN (run-based × curiosityDelta>0 absence — existing curiosity
+// checks are likewise all co-occurrence against proactivity [PROACTIVE_CURIOSITY_DECOUPLED,
+// PROACTIVE_CURIOSITY_PEAK_DECOUPLED, CURIOSITY_WITHOUT_AGENCY]; none of the three shared-library
+// trio modes has ever been applied to curiosityDelta), INTENTION_TURN_DROUGHT_RUN (run-based ×
+// dramaticTurn !== 'nothing' absence — the existing TURNS_UNDRIVEN audits co-occurrence with
+// proactivity, not run-length absence; none of the three shared-library trio modes has ever been
+// applied to dramaticTurn as a primary signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4406,6 +4418,73 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r759c.maxZoneCount / r759c.count) * 100)}% of the story's stakes-raising scenes cluster in the ${r759c.zoneNames[r759c.maxZoneIdx]} third. When every escalation lands in the same structural window, the character's pursuit of their goal loses mounting pressure everywhere else in the story.`,
         suggestedFix: `Raise the stakes in at least one scene outside the ${r759c.zoneNames[r759c.maxZoneIdx]} third so the character's intention keeps facing mounting pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 773: INTENTION_SUSPENSE_ZONE_CLUSTER, INTENTION_CURIOSITY_DROUGHT_RUN,
+  //              INTENTION_TURN_DROUGHT_RUN ──────────────────────────────────────
+
+  // INTENTION_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 suspense-positive
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Existing suspense
+  // checks in this pass are all co-occurrence-at-peak or co-occurrence-decoupling against
+  // proactivity; none of the three shared-library trio modes has ever been applied to
+  // suspenseDelta as a primary signal.
+  {
+    const r773a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r773a.fires) {
+      issues.push({
+        location: `${r773a.zoneNames[r773a.maxZoneIdx]} third — ${r773a.maxZoneCount} of ${r773a.count} suspense-positive scenes`,
+        rule: 'INTENTION_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r773a.maxZoneCount / r773a.count) * 100)}% of the scenes where tension rises cluster in the ${r773a.zoneNames[r773a.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the character's pursuit of their goal loses rising danger testing it everywhere else in the story.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r773a.zoneNames[r773a.maxZoneIdx]} third so the character's intention keeps facing rising danger more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6. Existing
+  // curiosity checks are likewise all co-occurrence against proactivity; none of the three
+  // shared-library trio modes has ever been applied to curiosityDelta.
+  {
+    const r773b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r773b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r773b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r773b.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r773b.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the character's pursuit of their goal without a driving question for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r773b.longestRun}-scene stretch so the character's intention keeps a live question driving it throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. The existing TURNS_UNDRIVEN
+  // audits co-occurrence with proactivity, not run-length absence; none of the three
+  // shared-library trio modes has ever been applied to dramaticTurn as a primary signal.
+  {
+    const r773c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r773c.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r773c.longestRun} consecutive scenes`,
+        rule: 'INTENTION_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r773c.longestRun} consecutive scenes with no dramatic turn at all, even though ${r773c.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the character's pursuit of their goal without a structural pivot to react to for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r773c.longestRun}-scene stretch so the character's intention keeps a structural pivot to react to throughout that stretch.`,
       });
     }
   }

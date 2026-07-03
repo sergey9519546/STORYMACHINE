@@ -1352,6 +1352,83 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 773 — intentionPass: intention suspense zone cluster, intention curiosity drought run, intention turn drought run', async () => {
+    const makeRec773 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN773 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('INTENTION_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs773a = Array.from({ length: 9 }, (_, i) =>
+        makeRec773(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runIN773(recs773a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SUSPENSE_ZONE_CLUSTER'), 'INTENTION_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('INTENTION_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs773an = Array.from({ length: 9 }, (_, i) =>
+        makeRec773(i, { suspenseDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runIN773(recs773an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SUSPENSE_ZONE_CLUSTER'), 'INTENTION_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; curiosityDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_CURIOSITY_DROUGHT_RUN fires when a long run has no rising curiosity', async () => {
+      const recs773b = Array.from({ length: 10 }, (_, i) =>
+        makeRec773(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runIN773(recs773b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CURIOSITY_DROUGHT_RUN'), 'INTENTION_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are evenly spread', async () => {
+      const recs773bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec773(i, { curiosityDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runIN773(recs773bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CURIOSITY_DROUGHT_RUN'), 'INTENTION_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_TURN_DROUGHT_RUN fire:
+    // n=10; dramaticTurn present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_TURN_DROUGHT_RUN fires when a long run has no dramatic turn', async () => {
+      const recs773c = Array.from({ length: 10 }, (_, i) =>
+        makeRec773(i, { dramaticTurn: [0, 1, 2].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runIN773(recs773c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_DROUGHT_RUN'), 'INTENTION_TURN_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_TURN_DROUGHT_RUN does not fire when dramatic turns are evenly spread', async () => {
+      const recs773cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec773(i, { dramaticTurn: [0, 3, 6, 9].includes(i) ? 'reversal' : 'nothing' }),
+      );
+      const res = await runIN773(recs773cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_DROUGHT_RUN'), 'INTENTION_TURN_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 759 — intentionPass: intention clock delta zone cluster, intention revelation peak uncaused, intention stakes zone cluster', async () => {
     const makeRec759 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
