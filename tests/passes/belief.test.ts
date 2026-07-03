@@ -1204,6 +1204,79 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 628 — beliefPass: belief payoff seed decoupled, clock delta peak uncaused, belief character moment zone imbalance', async () => {
+    const runBF628 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_PAYOFF_SEED_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no seed); seeds at 4,5 (no payoff) → zero overlap → fires
+    it('BELIEF_PAYOFF_SEED_DECOUPLED fires when payoff scenes and seed scenes never overlap', async () => {
+      const recs628a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs628a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs628a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs628a[4] = makeSharedRecord(4, { seededClueIds: ['clue-a'] });
+      recs628a[5] = makeSharedRecord(5, { seededClueIds: ['clue-b'] });
+      const res = await runBF628(recs628a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_SEED_DECOUPLED'), 'BELIEF_PAYOFF_SEED_DECOUPLED should fire');
+    });
+
+    // BELIEF_PAYOFF_SEED_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and a seed → overlap exists
+    it('BELIEF_PAYOFF_SEED_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs628an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs628an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'], seededClueIds: ['clue-a'] });
+      recs628an[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs628an[5] = makeSharedRecord(5, { seededClueIds: ['clue-b'] });
+      const res = await runBF628(recs628an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_SEED_DECOUPLED'), 'BELIEF_PAYOFF_SEED_DECOUPLED should not fire');
+    });
+
+    // CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta>0 at 2 (val=1) and 6 (val=5, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clockDelta scene has no dramatic turn or revelation nearby', async () => {
+      const recs628b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs628b[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs628b[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runBF628(recs628b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_PEAK_UNCAUSED'), 'CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs628bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs628bn[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs628bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs628bn[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runBF628(recs628bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_PEAK_UNCAUSED'), 'CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); character-moment scenes at 6,7,8,9; zone 2 (6-8)=3,
+    // zone 3 (9)=1, total=4; zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty of character-moment scenes while another is bloated', async () => {
+      const recs628c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i, {
+        purpose: (i === 6 || i === 7 || i === 8 || i === 9) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runBF628(recs628c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    // BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE no-fire:
+    // one character-moment scene per zone (1,4,7,10) → no zone is empty
+    it('BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when every zone has a character-moment scene', async () => {
+      const recs628cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i, {
+        purpose: (i === 1 || i === 4 || i === 7 || i === 10) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runBF628(recs628cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 614 — beliefPass: belief staging zone imbalance, clock signal flatline, visual beat belief decoupled', async () => {
     const runBF614 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

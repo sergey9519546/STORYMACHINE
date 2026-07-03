@@ -224,10 +224,17 @@
 // — first use of clockDelta anywhere in this pass), VISUAL_BEAT_BELIEF_DECOUPLED
 // (co-occurrence/decoupling × visualBeats × dialogueHighlights-present belief-assertion — pairs
 // this wave's other new field with the file's existing belief-assertion proxy).
+// Wave 628 additions (built on the shared checks library, audit M2.2): BELIEF_PAYOFF_SEED_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × seededClueIds — both fields had
+// previously only ever been paired with revelation in this 108-rule pass, never with each other),
+// CLOCK_DELTA_PEAK_UNCAUSED (backward-cause × clockDelta-magnitude peak × dramaticTurn/revelation
+// cause — first backward-cause check in this pass), BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE
+// (underweight/bloat × purpose === 'character_moment' × four structural zones — first genuine use
+// of the purpose field, whose only prior appearance was the word "purpose" inside prose).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function beliefPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3460,6 +3467,82 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The script has ${r614c.aCount} scene(s) leaning heavily on physical staging and ${r614c.bCount} scene(s) where a character asserts a belief, but the two never coincide. A scene rich in physical action is a natural place to test a stated belief against what a character actually does — the gap between claim and action is where deception most visibly lives. When the two layers never share a scene, belief is only ever tracked through words, never checked against behavior.`,
         suggestedFix: `Let at least one heavily staged scene also include a character stating a belief — then let their physical action either confirm or quietly contradict it. Showing the gap (or alignment) between what a character claims and what they do gives the belief-tracking layer a behavioral anchor.`,
+      });
+    }
+  }
+
+  // ── Wave 628: BELIEF_PAYOFF_SEED_DECOUPLED, CLOCK_DELTA_PEAK_UNCAUSED,
+  //              BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE ─────────────────────────────────────
+
+  // BELIEF_PAYOFF_SEED_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × seededClueIds.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // seed scenes. Zero overlap → fire. Both fields had previously only ever been paired with
+  // revelation in this 108-rule pass, never with each other. A scene that plants a new clue while
+  // simultaneously resolving another is a natural moment for compounding narrative debt — a
+  // character learns one truth just as another mystery opens — but that overlap never occurs.
+  {
+    const r628a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r628a.fires) {
+      issues.push({
+        location: `${r628a.aCount} payoff scene(s), ${r628a.bCount} seed scene(s) — zero overlap`,
+        rule: 'BELIEF_PAYOFF_SEED_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r628a.aCount} scenes where a thread resolves never coincide with the ${r628a.bCount} scenes where a new clue is planted — the story's payoff and seed channels run on entirely separate tracks. A scene that resolves one mystery while quietly opening another compounds narrative debt at exactly the moment relief would otherwise settle in, but that overlap never happens here.`,
+        suggestedFix: `Let at least one payoff scene also plant a new clue — a resolution that immediately raises a fresh question, so the audience's relief at one answer is undercut by a new uncertainty in the same beat.`,
+      });
+    }
+  }
+
+  // CLOCK_DELTA_PEAK_UNCAUSED — Backward-cause × clockDelta-magnitude peak × dramaticTurn/
+  // revelation cause. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes
+  // with clockDelta>0, a 2-scene lookback. Finds the single scene with the highest clockDelta and
+  // fires when neither that scene nor either of the 2 scenes before it contains a dramatic turn or
+  // a revelation. First backward-cause check in this pass. The story's sharpest deadline
+  // compression should be motivated by a pivot or disclosure, not arrive as an unexplained
+  // mechanical spike.
+  {
+    const r628b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => r.clockDelta ?? 0,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r628b.fires) {
+      issues.push({
+        location: `Scene at position ${r628b.peakIdx + 1} — peak clockDelta (${r628b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single highest clockDelta (${r628b.peakMagnitude}, out of ${r628b.qualifyingCount} scenes that raise the clock at all) has no dramatic turn and no revelation in itself or in either of the 2 scenes before it. The moment time pressure compresses most sharply arrives with no pivot or disclosure explaining why the deadline suddenly tightens this hard.`,
+        suggestedFix: `Add a dramatic turn or a revelation in the scene that raises the clock most sharply, or in one of the two scenes before it — the audience should understand why the deadline is compressing this much, not just observe that a countdown got shorter.`,
+      });
+    }
+  }
+
+  // BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // character-moment scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. First genuine use of the
+  // purpose field in this pass — its only prior appearance was the word "purpose" inside a
+  // suggestedFix prose string, never an accessed field. Dedicated character-development beats —
+  // where belief and self-deception most often surface — clustering into one quarter while
+  // another has none rations the belief-tracking layer's reflective opportunities unevenly.
+  {
+    const r628c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r628c.fires) {
+      const emptyNames628c = r628c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName628c = FOUR_ZONE_NAMES[r628c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames628c} empty; ${bloatName628c} has ${r628c.counts[r628c.bloatZoneIdx]}/${r628c.totalCount} character-moment scenes`,
+        rule: 'BELIEF_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r628c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName628c} contains ${r628c.counts[r628c.bloatZoneIdx]} of them (${Math.round((r628c.counts[r628c.bloatZoneIdx] / r628c.totalCount) * 100)}%) while ${emptyNames628c} contains none. Dedicated reflection beats — where a character's stated belief is most likely to be tested or revealed — bloat in one structural quarter and vanish from another.`,
+        suggestedFix: `Redistribute character-development beats: move at least one character-moment scene into the empty zone(s) — ${emptyNames628c} — so every structural quarter carries some opportunity for belief and self-deception to surface.`,
       });
     }
   }
