@@ -260,6 +260,16 @@
 // drought-audited), PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift
 // === 'negative' × structural thirds — emotionalShift anchors PAYOFF_EMOTIONAL_VALENCE_UNIFORM
 // and several decoupled checks, but has never been cluster-audited).
+// Wave 692 additions (built on the shared checks library): PAYOFF_SEED_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × seededClueIds magnitude — Wave 594's SEED_STAGING_ZONE_IMBALANCE
+// already four-zone-audits this channel's bloat/empty distribution; the backward-cause peak mode
+// has never been applied to it), PAYOFF_SETUP_PEAK_UNCAUSED (single-peak isolation/backward-cause
+// × payoffSetupIds magnitude — this pass's most heavily used field [37 accesses] anchors the
+// hand-rolled PAYOFF_TEMPORAL_CLUSTER [distribution/timing] and PAYOFF_DROUGHT_RUN [run-based],
+// but the backward-cause peak mode has never been applied to it), PAYOFF_STAKES_ZONE_CLUSTER
+// (distribution/timing × purpose === 'raise_stakes' × structural thirds — `purpose` has only ever
+// been used to tally counts inside unrelated aggregate checks [Waves 594a/594b]; never the
+// standalone subject of its own check).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3763,6 +3773,77 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r678c.maxZoneCount} of the story's ${r678c.count} negative-emotion scenes (${Math.round((r678c.maxZoneCount / r678c.count) * 100)}%) cluster in the ${zoneName678c} third. Emotional pain concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no sense of cost weighing against the resolutions landing there.`,
         suggestedFix: `Let at least one scene outside the ${zoneName678c} third carry a negative emotional shift — spreading emotional cost across the story keeps every structural third's resolutions honestly weighted.`,
+      });
+    }
+  }
+
+  // ── Wave 692: PAYOFF_SEED_PEAK_UNCAUSED, PAYOFF_SETUP_PEAK_UNCAUSED, PAYOFF_STAKES_ZONE_CLUSTER ──
+
+  // PAYOFF_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Wave 594's
+  // SEED_STAGING_ZONE_IMBALANCE already four-zone-audits this channel's bloat/empty distribution;
+  // the backward-cause peak mode has never been applied to it.
+  {
+    const r692a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r692a.fires) {
+      issues.push({
+        location: `scene ${r692a.peakIdx + 1} — peak seed density (${r692a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r692a.peakIdx + 1}, with ${r692a.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that the payoff engine's setups are causally earned.`,
+        suggestedFix: `Give scene ${r692a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_SETUP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // This pass's most heavily used field anchors the hand-rolled PAYOFF_TEMPORAL_CLUSTER
+  // (distribution/timing) and PAYOFF_DROUGHT_RUN (run-based), but the backward-cause peak mode
+  // has never been applied to it.
+  {
+    const r692b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r692b.fires) {
+      issues.push({
+        location: `scene ${r692b.peakIdx + 1} — peak payoff density (${r692b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PAYOFF_SETUP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r692b.peakIdx + 1}, with ${r692b.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r692b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_ZONE_CLUSTER — Distribution/timing × purpose === 'raise_stakes' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 stakes-raising
+  // scenes, fires when >75% of them fall in a single structural third. `purpose` has only ever
+  // been used to tally counts inside unrelated aggregate checks; never the standalone subject of
+  // its own check.
+  {
+    const r692c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r692c.fires) {
+      const zoneName692c = r692c.zoneNames[r692c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName692c} third — ${r692c.maxZoneCount}/${r692c.count} stakes-raising scenes`,
+        rule: 'PAYOFF_STAKES_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r692c.maxZoneCount} of the story's ${r692c.count} scenes purposed to raise stakes (${Math.round((r692c.maxZoneCount / r692c.count) * 100)}%) cluster in the ${zoneName692c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no mounting pressure feeding the payoff engine.`,
+        suggestedFix: `Purpose at least one scene outside the ${zoneName692c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of pressure toward eventual resolution.`,
       });
     }
   }

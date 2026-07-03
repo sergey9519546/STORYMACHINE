@@ -1365,6 +1365,83 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 692 — payoffPass: payoff seed peak uncaused, payoff setup peak uncaused, payoff stakes zone cluster', async () => {
+    const runPY692 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PAYOFF_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs692a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs692a[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs692a[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY692(recs692a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_PEAK_UNCAUSED'), 'PAYOFF_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PAYOFF_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs692an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs692an[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs692an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs692an[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY692(recs692an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_PEAK_UNCAUSED'), 'PAYOFF_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_SETUP_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PAYOFF_SETUP_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs692b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs692b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs692b[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY692(recs692b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SETUP_PEAK_UNCAUSED'), 'PAYOFF_SETUP_PEAK_UNCAUSED should fire');
+    });
+
+    // PAYOFF_SETUP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PAYOFF_SETUP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs692bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs692bn[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-a'] });
+      recs692bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs692bn[6] = makeSharedRecord(6, { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runPY692(recs692bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SETUP_PEAK_UNCAUSED'), 'PAYOFF_SETUP_PEAK_UNCAUSED should not fire');
+    });
+
+    // PAYOFF_STAKES_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; stakes-raising scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_STAKES_ZONE_CLUSTER fires when >75% of stakes-raising scenes cluster in one third', async () => {
+      const recs692c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs692c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs692c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs692c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      const res = await runPY692(recs692c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_ZONE_CLUSTER'), 'PAYOFF_STAKES_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_STAKES_ZONE_CLUSTER no-fire:
+    // stakes-raising scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_STAKES_ZONE_CLUSTER does not fire when stakes-raising scenes are distributed across thirds', async () => {
+      const recs692cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs692cn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs692cn[4] = makeSharedRecord(4, { purpose: 'raise_stakes' });
+      recs692cn[7] = makeSharedRecord(7, { purpose: 'raise_stakes' });
+      const res = await runPY692(recs692cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_ZONE_CLUSTER'), 'PAYOFF_STAKES_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 678 — payoffPass: payoff clock delta peak uncaused, payoff turn drought run, payoff negative emotion zone cluster', async () => {
     const runPY678 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
