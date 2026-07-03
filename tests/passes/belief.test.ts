@@ -1204,6 +1204,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 838 — beliefPass: belief introduce conflict drought run, belief positive emotion drought run, belief establish world zone cluster', async () => {
+    const runBF838 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs838a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runBF838(recs838a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs838an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runBF838(recs838an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'BELIEF_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('BELIEF_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs838b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runBF838(recs838b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_POSITIVE_EMOTION_DROUGHT_RUN'), 'BELIEF_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('BELIEF_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs838bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runBF838(recs838bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_POSITIVE_EMOTION_DROUGHT_RUN'), 'BELIEF_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs838c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runBF838(recs838c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER'), 'BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs838cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runBF838(recs838cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER'), 'BELIEF_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 824 — beliefPass: belief turning point drought run, belief introduce conflict zone cluster, belief positive emotion zone cluster', async () => {
     const runBF824 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
