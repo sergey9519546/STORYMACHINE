@@ -934,6 +934,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 691 — pacingPass: pacing seed peak uncaused, pacing clock drought run, pacing turn zone cluster', async () => {
+    const runP691 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('PACING_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs691a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs691a[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs691a[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP691(recs691a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SEED_PEAK_UNCAUSED'), 'PACING_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // PACING_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PACING_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs691an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs691an[2] = makeSharedRecord(2, { seededClueIds: ['clue-a'] });
+      recs691an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs691an[6] = makeSharedRecord(6, { seededClueIds: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runP691(recs691an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SEED_PEAK_UNCAUSED'), 'PACING_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // PACING_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clock raised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('PACING_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs691b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs691b[0] = makeSharedRecord(0, { clockRaised: true });
+      recs691b[1] = makeSharedRecord(1, { clockRaised: true });
+      recs691b[2] = makeSharedRecord(2, { clockRaised: true });
+      recs691b[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runP691(recs691b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DROUGHT_RUN'), 'PACING_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // PACING_CLOCK_DROUGHT_RUN no-fire:
+    // clock raised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('PACING_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs691bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs691bn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs691bn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs691bn[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runP691(recs691bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DROUGHT_RUN'), 'PACING_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('PACING_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs691c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs691c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs691c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs691c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runP691(recs691c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_TURN_ZONE_CLUSTER'), 'PACING_TURN_ZONE_CLUSTER should fire');
+    });
+
+    // PACING_TURN_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PACING_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs691cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs691cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs691cn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs691cn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runP691(recs691cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_TURN_ZONE_CLUSTER'), 'PACING_TURN_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 677 — pacingPass: pacing clock delta peak uncaused, pacing turn drought run, pacing stakes zone cluster', async () => {
     const runP677 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

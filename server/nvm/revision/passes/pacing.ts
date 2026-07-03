@@ -258,6 +258,14 @@
 // the first time), PACING_STAKES_ZONE_CLUSTER (distribution/timing × purpose === 'raise_stakes'
 // × structural thirds — `purpose` has only ever anchored a single aftermath-flat trigger
 // [STAKES_AFTERMATH_EMOTION_FLAT]; the zone-cluster mode applied to it for the first time).
+// Wave 691 additions (built on the shared checks library): PACING_SEED_PEAK_UNCAUSED (single-peak
+// isolation/backward-cause × seededClueIds magnitude — Wave 663 applied the drought-run mode to
+// seededClueIds; the backward-cause peak mode has never been applied to this channel),
+// PACING_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — this pass's Wave 579 hand-rolled
+// CLOCK_ZONE_CLUSTER already audits clockRaised distributionally; the shared-library drought-run
+// mode has never been applied to it), PACING_TURN_ZONE_CLUSTER (distribution/timing ×
+// dramaticTurn presence × structural thirds — Wave 677 applied the drought-run mode to
+// dramaticTurn; the zone-cluster mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3915,6 +3923,73 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r677c.maxZoneCount} of the story's ${r677c.count} scenes purposed to raise stakes (${Math.round((r677c.maxZoneCount / r677c.count) * 100)}%) cluster in the ${zoneName677c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds paced without any mounting pressure.`,
         suggestedFix: `Purpose at least one scene outside the ${zoneName677c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting pressure.`,
+      });
+    }
+  }
+
+  // ── Wave 691: PACING_SEED_PEAK_UNCAUSED, PACING_CLOCK_DROUGHT_RUN, PACING_TURN_ZONE_CLUSTER ──
+
+  // PACING_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Wave 663
+  // applied the drought-run mode to seededClueIds; the backward-cause peak mode has never been
+  // applied to this channel.
+  {
+    const r691a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r691a.fires) {
+      issues.push({
+        location: `scene ${r691a.peakIdx + 1} — peak seed density (${r691a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'PACING_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r691a.peakIdx + 1}, with ${r691a.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's pacing to spend its most seed-dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r691a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. This pass's Wave 579 hand-rolled
+  // CLOCK_ZONE_CLUSTER already audits clockRaised distributionally; the shared-library drought-run
+  // mode has never been applied to it.
+  {
+    const r691b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r691b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r691b.longestRun} consecutive scenes`,
+        rule: 'PACING_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r691b.longestRun} consecutive scenes with no clock raised at all, even though ${r691b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the story's pacing without any urgency to modulate against for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r691b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the pacing has some time pressure to work against throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 dramatic-turn scenes, fires
+  // when >75% of them fall in a single structural third. Wave 677 applied the drought-run mode to
+  // dramaticTurn; the zone-cluster mode has never been applied to this channel.
+  {
+    const r691c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r691c.fires) {
+      const zoneName691c = r691c.zoneNames[r691c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName691c} third — ${r691c.maxZoneCount}/${r691c.count} dramatic-turn scenes`,
+        rule: 'PACING_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r691c.maxZoneCount} of the story's ${r691c.count} dramatic-turn scenes (${Math.round((r691c.maxZoneCount / r691c.count) * 100)}%) cluster in the ${zoneName691c} third. Structural pivots concentrate almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds paced without a reversal to punctuate them.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName691c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry its own punctuating reversal.`,
       });
     }
   }
