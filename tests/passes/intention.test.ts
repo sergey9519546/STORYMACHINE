@@ -1352,6 +1352,95 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 661 — intentionPass: intention relationship peak uncaused, intention clock drought run, intention payoff zone cluster', async () => {
+    const makeRec661 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN661 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('INTENTION_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs661a = Array.from({ length: 8 }, (_, i) => makeRec661(i));
+      recs661a[2] = makeRec661(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs661a[6] = makeRec661(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runIN661(recs661a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_PEAK_UNCAUSED'), 'INTENTION_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // INTENTION_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('INTENTION_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs661an = Array.from({ length: 8 }, (_, i) => makeRec661(i));
+      recs661an[2] = makeRec661(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs661an[5] = makeRec661(5, { dramaticTurn: 'reversal' });
+      recs661an[6] = makeRec661(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runIN661(recs661an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_PEAK_UNCAUSED'), 'INTENTION_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clock raised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs661b = Array.from({ length: 10 }, (_, i) => makeRec661(i));
+      recs661b[0] = makeRec661(0, { clockRaised: true });
+      recs661b[1] = makeRec661(1, { clockRaised: true });
+      recs661b[2] = makeRec661(2, { clockRaised: true });
+      recs661b[9] = makeRec661(9, { clockRaised: true });
+      const res = await runIN661(recs661b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DROUGHT_RUN'), 'INTENTION_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_CLOCK_DROUGHT_RUN no-fire:
+    // clock raised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs661bn = Array.from({ length: 10 }, (_, i) => makeRec661(i));
+      recs661bn[0] = makeRec661(0, { clockRaised: true });
+      recs661bn[4] = makeRec661(4, { clockRaised: true });
+      recs661bn[9] = makeRec661(9, { clockRaised: true });
+      const res = await runIN661(recs661bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DROUGHT_RUN'), 'INTENTION_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('INTENTION_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs661c = Array.from({ length: 9 }, (_, i) => makeRec661(i));
+      recs661c[0] = makeRec661(0, { payoffSetupIds: ['thread-a'] });
+      recs661c[1] = makeRec661(1, { payoffSetupIds: ['thread-b'] });
+      recs661c[2] = makeRec661(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runIN661(recs661c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_ZONE_CLUSTER'), 'INTENTION_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs661cn = Array.from({ length: 9 }, (_, i) => makeRec661(i));
+      recs661cn[0] = makeRec661(0, { payoffSetupIds: ['thread-a'] });
+      recs661cn[4] = makeRec661(4, { payoffSetupIds: ['thread-b'] });
+      recs661cn[7] = makeRec661(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runIN661(recs661cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_ZONE_CLUSTER'), 'INTENTION_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 647 — intentionPass: intention highlight drought run, intention open thread zone cluster, intention staging curiosity decoupled', async () => {
     const makeRec647 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

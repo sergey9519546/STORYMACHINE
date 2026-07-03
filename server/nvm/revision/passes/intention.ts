@@ -233,6 +233,17 @@
 // — zero overlap between visually-staged scenes and scenes where curiosity is actively rising;
 // visualBeats had only ever been paired with payoffSetupIds, seededClueIds, dramaticTurn,
 // revelation, and clockRaised in this file, never with the curiosity channel).
+// Wave 661 additions (built on the shared checks library, audit M2.2): INTENTION_RELATIONSHIP_
+// PEAK_UNCAUSED (single-peak isolation/backward-cause × relationshipShifts magnitude — the scene
+// with the most simultaneous bond changes has no dramatic turn or revelation in itself or the
+// two scenes before it; distinct from PROACTIVE_RELATIONSHIP_PEAK_ABSENT [Wave 395], which anchors
+// on the same peak scene but checks whether it is a PROACTIVE scene, not whether it is
+// backward-caused), INTENTION_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — this pass
+// already hand-rolls drought-run logic for proactive-desert, seed-isolation, and revelation
+// channels; clockRaised itself has never been drought-audited), INTENTION_PAYOFF_ZONE_CLUSTER
+// (distribution/timing × payoffSetupIds × structural thirds — this pass already applies the
+// zone-cluster template to revelation, seed, and open-thread; payoffSetupIds itself has never
+// been cluster-audited despite anchoring two existing peak-decoupled checks).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3784,6 +3795,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The ${r647c.aCount} scenes leaning on physical staging never coincide with the ${r647c.bCount} scenes where curiosity is actively rising — the story's most visible physical action and its moments of climbing intrigue run on separate tracks. A scene rich in staged action is a natural place for a new question to surface, but that pairing never occurs here.`,
         suggestedFix: `Let at least one heavily staged scene also raise curiosity — a physical action that provokes a new question, giving the story's staging a causal tie to its rising intrigue.`,
+      });
+    }
+  }
+
+  // ── Wave 661: INTENTION_RELATIONSHIP_PEAK_UNCAUSED, INTENTION_CLOCK_DROUGHT_RUN,
+  //              INTENTION_PAYOFF_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // INTENTION_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause ×
+  // relationshipShifts magnitude. Built on checkPeakUncaused from the shared checks library.
+  // n≥8, ≥2 scenes carrying a relationship shift, a 2-scene lookback. Finds the single scene with
+  // the most simultaneous bond changes; fires when neither that scene nor either of the two
+  // before it contains a dramatic turn or revelation. Distinct from PROACTIVE_RELATIONSHIP_PEAK_
+  // ABSENT (Wave 395), which anchors on the same peak scene but checks whether it is a PROACTIVE
+  // scene, not whether it is backward-caused.
+  {
+    const r661a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r661a.fires) {
+      issues.push({
+        location: `scene ${r661a.peakIdx + 1} — peak relationship-shift density (${r661a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'INTENTION_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r661a.peakIdx + 1}, with ${r661a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the sense that initiative drives consequence.`,
+        suggestedFix: `Give scene ${r661a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. This pass already hand-rolls
+  // drought-run logic for proactive-desert, seed-isolation, and revelation channels; clockRaised
+  // itself has never been drought-audited.
+  {
+    const r661b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r661b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r661b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r661b.longestRun} consecutive scenes with no clock raised at all, even though ${r661b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the protagonist's initiative unpressured for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r661b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the protagonist's initiative stays under some time pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // >75% of them fall in a single structural third. This pass already applies the zone-cluster
+  // template to revelation, seed, and open-thread; payoffSetupIds itself has never been
+  // cluster-audited despite anchoring two existing peak-decoupled checks.
+  {
+    const r661c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r661c.fires) {
+      const zoneName661c = r661c.zoneNames[r661c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName661c} third — ${r661c.maxZoneCount}/${r661c.count} payoff scenes`,
+        rule: 'INTENTION_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r661c.maxZoneCount} of the story's ${r661c.count} thread-resolution scenes (${Math.round((r661c.maxZoneCount / r661c.count) * 100)}%) cluster in the ${zoneName661c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no sense of the protagonist's initiative paying off.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName661c} third — spreading resolutions across the story lets the protagonist's initiative pay off gradually instead of arriving all at once.`,
       });
     }
   }
