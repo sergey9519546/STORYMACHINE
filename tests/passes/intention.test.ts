@@ -1352,6 +1352,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 913 — intentionPass: intention resolution zone imbalance, intention turning point zone imbalance, intention introduce conflict zone imbalance', async () => {
+    const makeRec913 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN913 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Default filler purpose 'establish_world' is not one of the tested values.
+    it('INTENTION_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs913a = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'resolution' } : {}));
+      const res = await runIN913(recs913a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RESOLUTION_ZONE_IMBALANCE'), 'INTENTION_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs913an = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 3, 5, 8].includes(i) ? { purpose: 'resolution' } : {}));
+      const res = await runIN913(recs913an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RESOLUTION_ZONE_IMBALANCE'), 'INTENTION_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs913b = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'turning_point' } : {}));
+      const res = await runIN913(recs913b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURNING_POINT_ZONE_IMBALANCE'), 'INTENTION_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs913bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 3, 5, 8].includes(i) ? { purpose: 'turning_point' } : {}));
+      const res = await runIN913(recs913bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURNING_POINT_ZONE_IMBALANCE'), 'INTENTION_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs913c = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'introduce_conflict' } : {}));
+      const res = await runIN913(recs913c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs913cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec913(i, [0, 3, 5, 8].includes(i) ? { purpose: 'introduce_conflict' } : {}));
+      const res = await runIN913(recs913cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 899 — intentionPass: intention revelation purpose zone cluster, intention revelation purpose drought run, intention complicate zone imbalance', async () => {
     const makeRec899 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

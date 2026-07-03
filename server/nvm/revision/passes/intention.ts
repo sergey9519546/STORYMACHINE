@@ -409,6 +409,13 @@
 // this categorical field), plus INTENTION_COMPLICATE_ZONE_IMBALANCE, continuing the
 // checkZoneImbalance rollout begun in Wave 885: purpose === 'complicate' already has a complete
 // 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 913 additions: continuing the checkZoneImbalance rollout begun in Wave 885, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: INTENTION_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
+// INTENTION_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'), and
+// INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5187,6 +5194,81 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r899c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName899c} contains ${r899c.counts[r899c.bloatZoneIdx]} of them (${Math.round((r899c.counts[r899c.bloatZoneIdx] / r899c.totalCount) * 100)}%) while ${emptyNames899c} contains none. Complications bloat in one structural quarter and vanish from another, giving the character's pursuit of their goal an uneven structural rhythm of fresh trouble to react to.`,
         suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames899c} — so every structural quarter carries some fresh trouble for the character's intention to react to, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 885. n≥10, ≥4 resolution-purposed scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone INTENTION_RESOLUTION_ZONE_CLUSTER and run-based
+  // INTENTION_RESOLUTION_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r913a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r913a.fires) {
+      const emptyNames913a = r913a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName913a = FOUR_ZONE_NAMES[r913a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames913a} empty; ${bloatName913a} has ${r913a.counts[r913a.bloatZoneIdx]}/${r913a.totalCount} resolution-purposed scenes`,
+        rule: 'INTENTION_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r913a.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName913a} contains ${r913a.counts[r913a.bloatZoneIdx]} of them (${Math.round((r913a.counts[r913a.bloatZoneIdx] / r913a.totalCount) * 100)}%) while ${emptyNames913a} contains none. Settling beats bloat in one structural quarter and vanish from another, so the character's pursuit of their goal settles in only part of the story.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames913a} — so the character's intention settles more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 885. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone INTENTION_TURNING_POINT_ZONE_CLUSTER and run-based
+  // INTENTION_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r913b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r913b.fires) {
+      const emptyNames913b = r913b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName913b = FOUR_ZONE_NAMES[r913b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames913b} empty; ${bloatName913b} has ${r913b.counts[r913b.bloatZoneIdx]}/${r913b.totalCount} turning-point scenes`,
+        rule: 'INTENTION_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r913b.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName913b} contains ${r913b.counts[r913b.bloatZoneIdx]} of them (${Math.round((r913b.counts[r913b.bloatZoneIdx] / r913b.totalCount) * 100)}%) while ${emptyNames913b} contains none. Pivots bloat in one structural quarter and vanish from another, so the character's pursuit of their goal changes course in only part of the story.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames913b} — so the character's intention changes course more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'introduce_conflict' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library, continuing the rollout begun in Wave 885. n≥10, ≥4 conflict-introducing scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone INTENTION_
+  // INTRODUCE_CONFLICT_ZONE_CLUSTER and run-based INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r913c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r913c.fires) {
+      const emptyNames913c = r913c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName913c = FOUR_ZONE_NAMES[r913c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames913c} empty; ${bloatName913c} has ${r913c.counts[r913c.bloatZoneIdx]}/${r913c.totalCount} conflict-introducing scenes`,
+        rule: 'INTENTION_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r913c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName913c} contains ${r913c.counts[r913c.bloatZoneIdx]} of them (${Math.round((r913c.counts[r913c.bloatZoneIdx] / r913c.totalCount) * 100)}%) while ${emptyNames913c} contains none. New conflicts bloat in one structural quarter and vanish from another, so the character's pursuit of their goal meets fresh opposition in only part of the story.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames913c} — so the character's intention keeps meeting fresh opposition across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
