@@ -168,6 +168,26 @@
 // globally, every revelation followed by 2 scenes with no clockRaised; disclosure never tightens the
 // deadline in its wake; the revelation-trigger sibling of PROACTIVE_CLOCK_AFTERMATH_ABSENT, distinct
 // from REVELATION_CAUSE_VOID [backward-cause, what precedes] and PAYOFF_CLOCK_DECOUPLED [same-scene]).
+// Wave 591 additions: payoff relationship decoupled (co-occurrence/decoupling × payoff ×
+// relationshipShifts — n≥8, ≥3 payoff scenes, ≥2 relational-shift scenes, zero overlap;
+// thread resolutions never coincide with a relational shift; completes the payoff co-occurrence
+// family — which already pairs payoff with dramatic turn, seed, clock, and emotionalShift — by
+// adding the one signal it had never touched; distinct from PAYOFF_EMOTION_DECOUPLED [categorical
+// emotionalShift, not relational structure] and from PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT
+// [sequence/aftermath on the proactive channel, checks the 2 FOLLOWING scenes, not same-scene
+// payoff co-occurrence]), revelation relationship decoupled (co-occurrence/decoupling ×
+// revelation × relationshipShifts — n≥8, ≥3 revelation scenes, ≥2 relational-shift scenes, zero
+// overlap; disclosures never coincide with a relational shift — truths surface without moving any
+// bond; distinct from REVELATION_EMOTION_DECOUPLED [emotionalShift not relationshipShifts] and
+// REVELATION_CAUSE_VOID [backward-cause, what precedes a revelation, not what co-occurs with it];
+// first check pairing the revelation channel with relationshipShifts in this pass), payoff zone
+// imbalance (underweight/bloat × payoff × four structural zones — n≥10, ≥4 payoff scenes; at
+// least one zone has zero payoffs while another holds ≥50% of the total; resolutions simultaneously
+// vanish from one structural quarter and bloat in another; mirrors PROACTIVE_ZONE_IMBALANCE [Wave
+// 437: same 4-zone void+bloat co-presence test, but on the initiative channel] applied here to the
+// payoff channel for the first time; distinct from PAYOFF_BACK_LOADED [binary half-partition ratio,
+// not 4-zone void+bloat] and PAYOFF_FINAL_ZONE_VOID [single fixed zone absence, no bloat
+// requirement]).
 // Wave 521 additions: seed peak uncaused (backward-cause × single-peak × seed — n≥8, ≥2 seed
 // scenes, the single scene planting the most clues has no revelation, dramatic turn, suspense rise,
 // or clockRaise in either of the 2 preceding scenes; foreshadowing peaks without preparation; first
@@ -3309,6 +3329,121 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
             suggestedFix: `In at least one seed scene, let the planted clue also raise a question (positive curiosityDelta) — the detail is embedded in a way that makes the audience feel something strange or significant without understanding why. A clue-plant that generates its own mystery is most effective: the audience notices something and wonders about it, which primes them to be interested in the eventual payoff even before they know what's coming. A seed that feels mysterious in the moment creates the double value of a planted thread AND an active question.`,
           });
         }
+      }
+    }
+  }
+
+  // ── Wave 591: PAYOFF_RELATIONSHIP_DECOUPLED, REVELATION_RELATIONSHIP_DECOUPLED,
+  //              PAYOFF_ZONE_IMBALANCE ──────────────────────────────────────────────────────
+
+  // PAYOFF_RELATIONSHIP_DECOUPLED — Co-occurrence/decoupling × payoff × relationshipShifts.
+  // n≥8, ≥3 payoff scenes (payoffSetupIds non-empty), ≥2 relational-shift scenes globally.
+  // No payoff scene has any relationshipShifts → fire. Resolutions never coincide with a bond
+  // moving — the scene that closes a planted thread is always relationally inert, even though
+  // relational shifts happen elsewhere in the story. The most resonant payoffs land on a
+  // relationship at the same time they resolve a plot thread — the return of an object, the
+  // fulfillment of a promise, or the answer to a question also changes how two characters stand
+  // with each other. When every payoff is relationally flat, thread-closure and relationship
+  // movement are fully decoupled channels.
+  // Distinct from: PAYOFF_EMOTION_DECOUPLED (Wave 521: payoff × emotionalShift — a categorical
+  // valence signal, not relational structure between characters), PAYOFF_DRAMA_DECOUPLED (Wave
+  // 465: payoff × dramatic turn), PAYOFF_SEED_DECOUPLED (Wave 507: payoff × seed), PAYOFF_CLOCK_
+  // DECOUPLED (Wave 535: payoff × clockRaised — this completes the payoff co-occurrence family by
+  // adding the one signal, relationshipShifts, none of the existing payoff co-occurrence checks
+  // use), PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT (Wave 451: sequence/aftermath mode — checks the
+  // 2 scenes FOLLOWING a proactive act, not same-scene payoff co-occurrence).
+  if (n >= 8) {
+    const payoffRecs591a = (records as any[]).filter(r => ((r.payoffSetupIds ?? []) as string[]).length > 0);
+    const relRecs591a = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    if (payoffRecs591a.length >= 3 && relRecs591a.length >= 2) {
+      const anyPayoffWithRel591a = payoffRecs591a.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anyPayoffWithRel591a) {
+        issues.push({
+          location: `${payoffRecs591a.length} payoff scene(s) — none with a relationship shift`,
+          rule: 'PAYOFF_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `Every one of the story's ${payoffRecs591a.length} payoff scenes has zero relationship shifts, while ${relRecs591a.length} scene(s) elsewhere carry a relational shift with no payoff attached. Thread-closure and relational movement are entirely decoupled: resolving a planted setup never coincides with a bond changing. The most resonant payoffs do double duty — resolving a plot thread while also shifting how two characters stand with each other, so the audience feels the closure both narratively and relationally. When every payoff is relationally inert, resolutions read as mechanical bookkeeping rather than moments that also move the story's human relationships.`,
+          suggestedFix: `Let at least one payoff scene also carry a relationship shift — the returned object also repairs (or further damages) a bond, the answered question also changes how two characters see each other, or the resolved thread coincides with a reconciliation or rupture. A payoff that lands on a relationship at the same moment it closes a plot thread is doing more dramatic work per beat than one that only closes the thread.`,
+        });
+      }
+    }
+  }
+
+  // REVELATION_RELATIONSHIP_DECOUPLED — Co-occurrence/decoupling × revelation × relationshipShifts.
+  // n≥8, ≥3 revelation scenes (revelation not null/empty), ≥2 relational-shift scenes globally.
+  // No revelation scene has any relationshipShifts → fire. Disclosures never coincide with a bond
+  // moving — truths surface without ever shifting how two characters stand with each other, even
+  // though relational shifts happen elsewhere. Revelations are the single most natural catalyst for
+  // relational change: learning a hidden truth can repair a misunderstanding, confirm a betrayal, or
+  // transform an ally into an adversary. When disclosure and relational movement never coincide, the
+  // story's truths land in a social vacuum.
+  // Distinct from: REVELATION_EMOTION_DECOUPLED (Wave 549: revelation × emotionalShift — a
+  // categorical valence signal, not relational structure), REVELATION_CAUSE_VOID (Wave 549:
+  // backward-cause — what precedes a revelation, not what co-occurs with it), REVELATION_CLOCK_
+  // AFTERMATH_VOID / CLOCK_REVELATION_AFTERMATH_VOID (Wave 563/577: sequence/aftermath mode on the
+  // clock channel, checking the 2 scenes following, not same-scene relational co-occurrence), SEED_
+  // EMOTIONAL_DECOUPLED (Wave 451: seed channel, not revelation). First check in this pass pairing
+  // the revelation channel with relationshipShifts in co-occurrence mode.
+  if (n >= 8) {
+    const revRecs591b = (records as any[]).filter(
+      r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+    );
+    const relRecs591b = (records as any[]).filter(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+    if (revRecs591b.length >= 3 && relRecs591b.length >= 2) {
+      const anyRevWithRel591b = revRecs591b.some(r => ((r.relationshipShifts ?? []) as any[]).length > 0);
+      if (!anyRevWithRel591b) {
+        issues.push({
+          location: `${revRecs591b.length} revelation scene(s) — none with a relationship shift`,
+          rule: 'REVELATION_RELATIONSHIP_DECOUPLED',
+          severity: 'minor',
+          description: `Every one of the story's ${revRecs591b.length} revelation scenes has zero relationship shifts, while ${relRecs591b.length} scene(s) elsewhere carry a relational shift with no disclosure attached. Truths surface without ever moving a bond: disclosure and relational change are entirely separate channels. A revelation is the most natural catalyst for relational movement — a hidden truth can dissolve a misunderstanding, confirm a betrayal, or turn an ally into an adversary in the same beat it comes to light. When every disclosure lands in relationally flat scenes, the story's truths land in a social vacuum: information changes but no relationship does.`,
+          suggestedFix: `Let at least one revelation scene also carry a relationship shift — the truth that comes to light also repairs, ruptures, or realigns a bond between two characters in the same scene. Revelation-plus-relational-shift scenes are among the most efficient structural beats available: the audience receives new information and feels its relational consequence at the same moment.`,
+        });
+      }
+    }
+  }
+
+  // PAYOFF_ZONE_IMBALANCE — Underweight/bloat × payoff × four structural zones.
+  // n≥10, ≥4 payoff scenes (payoffSetupIds non-empty) total. Divides the story into four
+  // equal-length zones (Act 1: 0–25%, Act 2a: 25–50%, Act 2b: 50–75%, Act 3: 75–100%). At least
+  // one zone has zero payoffs while another zone holds ≥50% of the total → fire. Thread-closure is
+  // simultaneously absent from one structural quarter and concentrated in another — the payoff
+  // engine runs in bursts rather than distributing resolution weight across the story's structure.
+  // Mirrors PROACTIVE_ZONE_IMBALANCE's exact void+bloat co-presence test, applied here to the
+  // payoff channel for the first time.
+  // Distinct from: PAYOFF_BACK_LOADED (Wave 535: binary front/back half ratio >70% — a two-zone
+  // hemispheric partition, not a four-zone void+bloat co-presence test), PAYOFF_FINAL_ZONE_VOID
+  // (Wave 479: audits only whether the fixed final quarter is empty — no bloat requirement and no
+  // audit of the other three zones), PAYOFF_RUN (Wave 493: run-based — consecutive payoff scenes,
+  // not a structural-zone distribution), PROACTIVE_ZONE_IMBALANCE (Wave 437: the same underweight/
+  // bloat test on the initiative channel, not payoff). First four-zone void+bloat audit on the
+  // payoff channel.
+  if (n >= 10) {
+    const payoffZoneCounts591c = [0, 0, 0, 0];
+    for (let i = 0; i < n; i++) {
+      if (((records as any[])[i].payoffSetupIds ?? []).length > 0) {
+        const zoneIdx = Math.min(3, Math.floor((i / n) * 4));
+        payoffZoneCounts591c[zoneIdx]++;
+      }
+    }
+    const totalPayoff591c = payoffZoneCounts591c.reduce((a, b) => a + b, 0);
+    if (totalPayoff591c >= 4) {
+      const maxZoneCount591c = Math.max(...payoffZoneCounts591c);
+      const hasEmptyZone591c = payoffZoneCounts591c.some(c => c === 0);
+      if (hasEmptyZone591c && maxZoneCount591c / totalPayoff591c >= 0.50) {
+        const zoneNames591c = ['Act 1 (0–25%)', 'Act 2a (25–50%)', 'Act 2b (50–75%)', 'Act 3 (75–100%)'];
+        const bloatZone591c = payoffZoneCounts591c.indexOf(maxZoneCount591c);
+        const emptyZones591c = payoffZoneCounts591c
+          .map((c, i) => c === 0 ? zoneNames591c[i] : null)
+          .filter(Boolean)
+          .join(', ');
+        issues.push({
+          location: `${emptyZones591c} empty; ${zoneNames591c[bloatZone591c]} has ${maxZoneCount591c}/${totalPayoff591c} payoffs`,
+          rule: 'PAYOFF_ZONE_IMBALANCE',
+          severity: 'minor',
+          description: `The story's ${totalPayoff591c} payoffs are unevenly distributed across its four structural zones: ${zoneNames591c[bloatZone591c]} contains ${maxZoneCount591c} of them (${Math.round((maxZoneCount591c / totalPayoff591c) * 100)}%) while ${emptyZones591c} contains none. Thread-closure simultaneously bloats in one zone and vanishes from another: the audience receives a concentrated burst of resolutions in one structural quarter while another quarter passes with no planted thread paying off at all. The zone(s) with no payoffs will feel structurally unresolved in isolation, while the bloated zone will feel like a resolution dump.`,
+          suggestedFix: `Redistribute payoffs: move at least one resolution from ${zoneNames591c[bloatZone591c]} into the empty zone(s) — ${emptyZones591c} — so every structural quarter carries some evidence of a planted thread paying off. The goal is not perfect uniformity, but that no zone is completely payoff-free while another carries more than half the total load.`,
+        });
       }
     }
   }

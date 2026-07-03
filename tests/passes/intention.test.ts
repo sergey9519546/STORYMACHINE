@@ -1352,6 +1352,97 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 591 — intentionPass: payoff relationship decoupled, revelation relationship decoupled, payoff zone imbalance', async () => {
+    const makeRec591 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN591 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('PAYOFF_RELATIONSHIP_DECOUPLED fires when no payoff scene has a relationship shift', async () => {
+      // 8 scenes; payoffs at 1,3,5 (no relationship shifts); relational shifts at 6,7 (no payoffs)
+      const recs591a = Array.from({ length: 8 }, (_, i) => makeRec591(i));
+      recs591a[1] = makeRec591(1, { payoffSetupIds: ['clue-a'] });
+      recs591a[3] = makeRec591(3, { payoffSetupIds: ['clue-b'] });
+      recs591a[5] = makeRec591(5, { payoffSetupIds: ['clue-c'] });
+      recs591a[6] = makeRec591(6, { relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] });
+      recs591a[7] = makeRec591(7, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.4 }] });
+      const res = await runIN591(recs591a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DECOUPLED'), 'PAYOFF_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('PAYOFF_RELATIONSHIP_DECOUPLED does not fire when a payoff scene also has a relationship shift', async () => {
+      // payoff at 1 also carries a relationship shift → overlap → no fire
+      const recs591a = Array.from({ length: 8 }, (_, i) => makeRec591(i));
+      recs591a[1] = makeRec591(1, { payoffSetupIds: ['clue-a'], relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] });
+      recs591a[3] = makeRec591(3, { payoffSetupIds: ['clue-b'] });
+      recs591a[5] = makeRec591(5, { payoffSetupIds: ['clue-c'] });
+      recs591a[6] = makeRec591(6, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.4 }] });
+      const res = await runIN591(recs591a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RELATIONSHIP_DECOUPLED'), 'PAYOFF_RELATIONSHIP_DECOUPLED should not fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_DECOUPLED fires when no revelation scene has a relationship shift', async () => {
+      // 8 scenes; revelations at 1,3,5 (no relationship shifts); relational shifts at 6,7 (no revelations)
+      const recs591b = Array.from({ length: 8 }, (_, i) => makeRec591(i));
+      recs591b[1] = makeRec591(1, { revelation: 'She was lying.' });
+      recs591b[3] = makeRec591(3, { revelation: 'He knew all along.' });
+      recs591b[5] = makeRec591(5, { revelation: 'The letter was a forgery.' });
+      recs591b[6] = makeRec591(6, { relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] });
+      recs591b[7] = makeRec591(7, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.4 }] });
+      const res = await runIN591(recs591b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_DECOUPLED'), 'REVELATION_RELATIONSHIP_DECOUPLED should fire');
+    });
+
+    it('REVELATION_RELATIONSHIP_DECOUPLED does not fire when a revelation scene also has a relationship shift', async () => {
+      // revelation at 1 also carries a relationship shift → overlap → no fire
+      const recs591b = Array.from({ length: 8 }, (_, i) => makeRec591(i));
+      recs591b[1] = makeRec591(1, { revelation: 'She was lying.', relationshipShifts: [{ pairKey: 'alice|bob', amount: 0.5 }] });
+      recs591b[3] = makeRec591(3, { revelation: 'He knew all along.' });
+      recs591b[5] = makeRec591(5, { revelation: 'The letter was a forgery.' });
+      recs591b[6] = makeRec591(6, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.4 }] });
+      const res = await runIN591(recs591b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_RELATIONSHIP_DECOUPLED'), 'REVELATION_RELATIONSHIP_DECOUPLED should not fire');
+    });
+
+    it('PAYOFF_ZONE_IMBALANCE fires when one zone has zero payoffs and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3 each: [0-2]=Act1 [3-5]=Act2a [6-8]=Act2b [9-11]=Act3
+      // payoffs at 6,7,8,9 (4 total): Act2b has 3/4=75%, Act1 has 0 → imbalance
+      const recs591c = Array.from({ length: 12 }, (_, i) => makeRec591(i));
+      recs591c[6] = makeRec591(6, { payoffSetupIds: ['a'] });
+      recs591c[7] = makeRec591(7, { payoffSetupIds: ['b'] });
+      recs591c[8] = makeRec591(8, { payoffSetupIds: ['c'] });
+      recs591c[9] = makeRec591(9, { payoffSetupIds: ['d'] });
+      const res = await runIN591(recs591c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_ZONE_IMBALANCE'), 'PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_ZONE_IMBALANCE does not fire when payoffs are spread across all zones', async () => {
+      // one payoff per zone (12 scenes, zones of 3): 1,4,7,10 → no empty zone
+      const recs591c = Array.from({ length: 12 }, (_, i) => makeRec591(i));
+      recs591c[1] = makeRec591(1, { payoffSetupIds: ['a'] });
+      recs591c[4] = makeRec591(4, { payoffSetupIds: ['b'] });
+      recs591c[7] = makeRec591(7, { payoffSetupIds: ['c'] });
+      recs591c[10] = makeRec591(10, { payoffSetupIds: ['d'] });
+      const res = await runIN591(recs591c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_ZONE_IMBALANCE'), 'PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 577 — intentionPass: seed zone cluster, clock revelation aftermath void, seed curiosity decoupled', async () => {
     const makeRec577 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
