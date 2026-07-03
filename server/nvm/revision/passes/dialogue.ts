@@ -219,6 +219,12 @@
 // trigger → dialogueHighlights absence — a two-scene window, distinguishing it mechanically from
 // this pass's other seven aftermath checks which all use a one-scene "next scene" window keyed to
 // event-type triggers rather than accumulated-debt magnitude).
+// Wave 616 additions (built on the shared checks library, audit M2.2): PURPOSE_DIALOGUE_HIGHLIGHT_
+// DECOUPLED, CHARACTER_MOMENT_ZONE_IMBALANCE, RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID —
+// first genuine use of the `purpose` field anywhere in this 114-rule pass. Its only earlier
+// appearance was the word "purpose" inside a suggestedFix prose string (Wave 504), never an
+// accessed field — despite `purpose` being a real ScenePurpose enum this pass never once
+// consulted, even as nearly every other record field was covered across Waves 434-602.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3659,6 +3665,88 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r602c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no highlighted dialogue moment, even though ${r602c.aftermathCount} scenes elsewhere in the story do contain one. The heaviest concentrations of open mystery pass without any line of dialogue rising to a memorable register in their immediate aftermath — the pressure of stacked unanswered questions never finds verbal release.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line worth remembering — pressing on what's unresolved, voicing frustration at how much is still open, or naming the stakes of not knowing. Let the density of open threads surface as a spoken pressure point rather than passing in silence.`,
+      });
+    }
+  }
+
+  // ── Wave 616: PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED, CHARACTER_MOMENT_ZONE_IMBALANCE,
+  //              RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ───────────────────────────────
+
+  // PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED — Co-occurrence/decoupling × pivotal-purpose ×
+  // dialogueHighlights. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 scenes whose purpose is 'climax' or 'turning_point' (the story's structurally pivotal
+  // beats), ≥2 scenes carrying a curated dialogue highlight. Zero overlap → fire. The scenes the
+  // story itself marks as structurally pivotal never coincide with a line worth remembering — a
+  // climax or turning point lands with no standout dialogue, and every memorable line lands in a
+  // structurally ordinary beat. First genuine use of the `purpose` field anywhere in this
+  // 114-rule pass — its only earlier appearance was the word "purpose" inside prose (Wave 504),
+  // never an accessed field.
+  {
+    const r616a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => r.purpose === 'climax' || r.purpose === 'turning_point',
+      isB: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r616a.fires) {
+      issues.push({
+        location: `${r616a.aCount} pivotal-purpose scene(s), ${r616a.bCount} dialogue-highlight scene(s) — zero overlap`,
+        rule: 'PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r616a.aCount} scenes whose purpose is a climax or turning point never coincide with the ${r616a.bCount} scenes flagged as containing a standout line of dialogue — the story's structurally pivotal beats and its most memorable dialogue run on entirely separate tracks. A climax or turning point often lands hardest through the line that names what just changed; when the two never combine, the story's biggest structural moments happen in verbal silence.`,
+        suggestedFix: `Let at least one climax or turning-point scene also carry a line worth remembering — a character naming the cost of what just happened, or a piece of dialogue whose weight comes precisely from the pivot occurring. Tying the story's most memorable lines to its structurally pivotal beats gives each a voice.`,
+      });
+    }
+  }
+
+  // CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // character-moment scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Character-moment scenes
+  // — beats whose explicit function is character development, typically carried through dialogue
+  // — clustering entirely in one structural quarter while another quarter has none means the
+  // opportunity for a character's voice to develop is itself unevenly rationed across the story.
+  {
+    const r616b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r616b.fires) {
+      const emptyNames616b = r616b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName616b = FOUR_ZONE_NAMES[r616b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames616b} empty; ${bloatName616b} has ${r616b.counts[r616b.bloatZoneIdx]}/${r616b.totalCount} character-moment scenes`,
+        rule: 'CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r616b.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName616b} contains ${r616b.counts[r616b.bloatZoneIdx]} of them (${Math.round((r616b.counts[r616b.bloatZoneIdx] / r616b.totalCount) * 100)}%) while ${emptyNames616b} contains none. Dedicated character-development beats bloat in one structural quarter and vanish from another, giving the story's opportunities for a character's voice to deepen an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character-development beats: move at least one character-moment scene into the empty zone(s) — ${emptyNames616b} — so every structural quarter carries some opportunity for a character's voice to develop, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × purpose ===
+  // 'raise_stakes' trigger → dialogueHighlights absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying stakes-raise scenes (pos<n-2), ≥3 scenes anywhere
+  // with a dialogue highlight, a 2-scene lookahead window. Fires when every stakes-raise's
+  // two-scene aftermath contains no highlighted dialogue, while highlighted dialogue does occur
+  // elsewhere in the story. A scene whose explicit function is to raise what's at risk should
+  // give a character something worth saying about the new cost soon after; when that aftermath is
+  // always verbally unremarkable, the escalation is structural bookkeeping without a voice
+  // registering it. Distinct from PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED above (same-scene
+  // co-occurrence with a different purpose bucket — climax/turning_point, not raise_stakes — and
+  // no windowed component).
+  {
+    const r616c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r616c.fires) {
+      issues.push({
+        location: `${r616c.triggerCount} stakes-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r616c.triggerCount} scenes whose purpose is to raise the stakes is followed by two scenes with no highlighted dialogue, even though ${r616c.aftermathCount} such scenes exist elsewhere in the script. Escalating what's at risk should give a character something worth saying about the new cost soon after; when that aftermath is always verbally unremarkable, the raised stakes register structurally but no voice confirms what they mean.`,
+        suggestedFix: `After at least one stakes-raising scene, let one of the following two scenes carry a line worth remembering — a character naming what the higher cost means to them, or voicing what they now stand to lose. Give the escalation a voice, not just a structural marker.`,
       });
     }
   }

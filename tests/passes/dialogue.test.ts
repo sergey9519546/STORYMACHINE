@@ -1598,6 +1598,99 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 616 — dialoguePass: purpose dialogue highlight decoupled, character moment zone imbalance, raise stakes dialogue highlight aftermath void', async () => {
+    const makeRec616 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: 'complicate', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD616 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes616 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+
+    // PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED fire:
+    // n=6; pivotal purposes at 0,1 (no highlight); highlights at 4,5 (non-pivotal purpose) → zero overlap
+    it('PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED fires when pivotal-purpose scenes and dialogue highlights never overlap', async () => {
+      const recs616a = Array.from({ length: 6 }, (_, i) => makeRec616(i,
+        i === 0 ? { purpose: 'climax' }
+        : i === 1 ? { purpose: 'turning_point' }
+        : i === 4 || i === 5 ? { dialogueHighlights: ['a memorable line'] }
+        : {}
+      ));
+      const res = await runD616(buildScenes616(6), recs616a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED should fire');
+    });
+
+    // PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED no-fire:
+    // scene 0 carries BOTH a pivotal purpose and a dialogue highlight → overlap exists
+    it('PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs616an = Array.from({ length: 6 }, (_, i) => makeRec616(i,
+        i === 0 ? { purpose: 'climax', dialogueHighlights: ['a memorable line'] }
+        : i === 1 ? { purpose: 'turning_point' }
+        : i === 5 ? { dialogueHighlights: ['another line'] }
+        : {}
+      ));
+      const res = await runD616(buildScenes616(6), recs616an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED'), 'PURPOSE_DIALOGUE_HIGHLIGHT_DECOUPLED should not fire');
+    });
+
+    // CHARACTER_MOMENT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); character-moment scenes at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty of character-moment scenes while another is bloated', async () => {
+      const recs616b = Array.from({ length: 12 }, (_, i) => makeRec616(i, {
+        purpose: (i === 6 || i === 9 || i === 10 || i === 11) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runD616(buildScenes616(12), recs616b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'CHARACTER_MOMENT_ZONE_IMBALANCE'), 'CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    // CHARACTER_MOMENT_ZONE_IMBALANCE no-fire:
+    // one character-moment scene per zone (1,4,7,10) → no zone is empty
+    it('CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when every zone has a character-moment scene', async () => {
+      const recs616bn = Array.from({ length: 12 }, (_, i) => makeRec616(i, {
+        purpose: (i === 1 || i === 4 || i === 7 || i === 10) ? 'character_moment' : 'complicate',
+      }));
+      const res = await runD616(buildScenes616(12), recs616bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'CHARACTER_MOMENT_ZONE_IMBALANCE'), 'CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+
+    // RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; stakes-raise triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // dialogue highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no stakes-raise is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs616c = Array.from({ length: 8 }, (_, i) => makeRec616(i,
+        i === 0 || i === 1 ? { purpose: 'raise_stakes' }
+        : i === 5 || i === 6 || i === 7 ? { dialogueHighlights: ['a memorable line'] }
+        : {}
+      ));
+      const res = await runD616(buildScenes616(8), recs616c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs616cn = Array.from({ length: 8 }, (_, i) => makeRec616(i,
+        i === 0 || i === 1 ? { purpose: 'raise_stakes' }
+        : i === 3 || i === 5 || i === 6 || i === 7 ? { dialogueHighlights: ['a memorable line'] }
+        : {}
+      ));
+      const res = await runD616(buildScenes616(8), recs616cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 602 — dialoguePass: dialogue highlight/open thread decoupled, visual beat zone imbalance, open thread aftermath void', async () => {
     const makeRec602 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
