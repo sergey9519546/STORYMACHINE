@@ -1352,6 +1352,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 899 — intentionPass: intention revelation purpose zone cluster, intention revelation purpose drought run, intention complicate zone imbalance', async () => {
+    const makeRec899 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN899 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes
+    // at 0,1,2 (all in opening third) → 3/3 = 100% > 75%.
+    it('INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs899a = Array.from({ length: 9 }, (_, i) =>
+        makeRec899(i, [0, 1, 2].includes(i) ? { purpose: 'revelation' } : {}),
+      );
+      const res = await runIN899(recs899a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER'), 'INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs899an = Array.from({ length: 9 }, (_, i) =>
+        makeRec899(i, [0, 4, 8].includes(i) ? { purpose: 'revelation' } : {}),
+      );
+      const res = await runIN899(recs899an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER'), 'INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3 satisfied), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('INTENTION_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs899b = Array.from({ length: 10 }, (_, i) =>
+        makeRec899(i, [0, 8, 9].includes(i) ? { purpose: 'revelation' } : {}),
+      );
+      const res = await runIN899(recs899b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PURPOSE_DROUGHT_RUN'), 'INTENTION_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs899bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec899(i, [0, 3, 6, 9].includes(i) ? { purpose: 'revelation' } : {}),
+      );
+      const res = await runIN899(recs899bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_PURPOSE_DROUGHT_RUN'), 'INTENTION_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_COMPLICATE_ZONE_IMBALANCE fire: n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7},
+    // Z3={8,9}); complicate at 0,1,2,8,9 → Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('INTENTION_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs899c = Array.from({ length: 10 }, (_, i) =>
+        makeRec899(i, [0, 1, 2, 8, 9].includes(i) ? { purpose: 'complicate' } : { purpose: 'establish_world' }),
+      );
+      const res = await runIN899(recs899c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_COMPLICATE_ZONE_IMBALANCE'), 'INTENTION_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs899cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec899(i, [0, 3, 5, 8].includes(i) ? { purpose: 'complicate' } : { purpose: 'establish_world' }),
+      );
+      const res = await runIN899(recs899cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_COMPLICATE_ZONE_IMBALANCE'), 'INTENTION_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 885 — intentionPass: intention complicate drought run, intention climax zone imbalance, intention establish world zone imbalance', async () => {
     const makeRec885 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

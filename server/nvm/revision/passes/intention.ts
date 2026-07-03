@@ -401,6 +401,14 @@
 // pass (only visualBeats and unresolvedClues had); this wave applies it to two purpose values
 // with complete 3-zone/run-based trios: INTENTION_CLIMAX_ZONE_IMBALANCE (purpose === 'climax')
 // and INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world').
+//
+// Wave 899 additions: purpose === 'revelation' has never been isolated as its own standalone
+// signal in this pass (only referenced inside the dramaticPurposes composite set and an
+// explanatory comment) -- a genuinely virgin field. This wave adds INTENTION_REVELATION_PURPOSE_
+// ZONE_CLUSTER and INTENTION_REVELATION_PURPOSE_DROUGHT_RUN (peak mode conventionally skipped for
+// this categorical field), plus INTENTION_COMPLICATE_ZONE_IMBALANCE, continuing the
+// checkZoneImbalance rollout begun in Wave 885: purpose === 'complicate' already has a complete
+// 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5112,6 +5120,73 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r885c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName885c} contains ${r885c.counts[r885c.bloatZoneIdx]} of them (${Math.round((r885c.counts[r885c.bloatZoneIdx] / r885c.totalCount) * 100)}%) while ${emptyNames885c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the character's pursuit of their goal an uneven structural rhythm to act against.`,
         suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames885c} — so every structural quarter carries some fresh ground for the character's intention to act against, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // purpose === 'revelation' has never been isolated as its own standalone signal in this pass —
+  // only referenced inside the dramaticPurposes composite set and an explanatory comment.
+  {
+    const r899a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r899a.fires) {
+      issues.push({
+        location: `${r899a.zoneNames[r899a.maxZoneIdx]} third — ${r899a.maxZoneCount} of ${r899a.count} revelation-purposed scenes`,
+        rule: 'INTENTION_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r899a.maxZoneCount / r899a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r899a.zoneNames[r899a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the character's pursuit of their goal gets no fresh information reshaping it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r899a.zoneNames[r899a.maxZoneIdx]} third as a revelation so the character's intention keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes
+  // overall, fires when the longest consecutive run of scenes purposed otherwise reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r899b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r899b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r899b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r899b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r899b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the character's pursuit of their goal without fresh information reshaping it for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r899b.longestRun}-scene stretch as a revelation so the character's intention keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 885. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone INTENTION_COMPLICATE_ZONE_CLUSTER and run-based
+  // INTENTION_COMPLICATE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r899c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r899c.fires) {
+      const emptyNames899c = r899c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName899c = FOUR_ZONE_NAMES[r899c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames899c} empty; ${bloatName899c} has ${r899c.counts[r899c.bloatZoneIdx]}/${r899c.totalCount} complicating scenes`,
+        rule: 'INTENTION_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r899c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName899c} contains ${r899c.counts[r899c.bloatZoneIdx]} of them (${Math.round((r899c.counts[r899c.bloatZoneIdx] / r899c.totalCount) * 100)}%) while ${emptyNames899c} contains none. Complications bloat in one structural quarter and vanish from another, giving the character's pursuit of their goal an uneven structural rhythm of fresh trouble to react to.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames899c} — so every structural quarter carries some fresh trouble for the character's intention to react to, not only the quarter currently carrying most of them.`,
       });
     }
   }
