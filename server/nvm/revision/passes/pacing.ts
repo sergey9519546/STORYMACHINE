@@ -364,6 +364,16 @@
 // peak mode conventionally skipped for this categorical field), PACING_ESTABLISH_WORLD_ZONE_
 // CLUSTER (distribution/timing × purpose === 'establish_world' × structural thirds — this
 // purpose value has never been referenced anywhere in this pass; a virgin field).
+//
+// Wave 859 additions: PACING_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose ===
+// 'establish_world' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 845; peak mode conventionally skipped for this categorical
+// field), PACING_CLIMAX_ZONE_CLUSTER (distribution/timing × purpose === 'climax' × structural
+// thirds — this purpose value has never been referenced anywhere in this pass; a virgin field),
+// PACING_RESOLUTION_ZONE_CLUSTER (distribution/timing × purpose === 'resolution' × structural
+// thirds — distinct from an incidental last-record disjunction check elsewhere in this pass;
+// none of the three shared-library trio modes has ever isolated this purpose value as a
+// standalone distributional signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4825,6 +4835,73 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r845c.maxZoneCount / r845c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r845c.zoneNames[r845c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, pacing has no fresh ground to build from anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r845c.zoneNames[r845c.maxZoneIdx]} third to establish the world so pacing keeps fresh ground to build from more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 859: PACING_ESTABLISH_WORLD_DROUGHT_RUN, PACING_CLIMAX_ZONE_CLUSTER,
+  //              PACING_RESOLUTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_ESTABLISH_WORLD_DROUGHT_RUN — Run-based × purpose === 'establish_world' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 world-establishing scenes
+  // overall, fires when the longest consecutive run of scenes with no world-establishing purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 845 (peak mode conventionally skipped for this categorical field).
+  {
+    const r859a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r859a.fires) {
+      issues.push({
+        location: `longest stretch with no world-building: ${r859a.longestRun} consecutive scenes`,
+        rule: 'PACING_ESTABLISH_WORLD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r859a.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r859a.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves pacing without fresh ground to build from for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r859a.longestRun}-scene stretch to establish the world so pacing keeps fresh ground to build from throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_CLIMAX_ZONE_CLUSTER — Distribution/timing × purpose === 'climax' × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 climax-purposed scenes,
+  // fires when more than 75% of them fall in a single structural third. This purpose value has
+  // never been referenced anywhere in this pass — a virgin field for all three shared-library
+  // trio modes.
+  {
+    const r859b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r859b.fires) {
+      issues.push({
+        location: `${r859b.zoneNames[r859b.maxZoneIdx]} third — ${r859b.maxZoneCount} of ${r859b.count} climax-purposed scenes`,
+        rule: 'PACING_CLIMAX_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r859b.maxZoneCount / r859b.count) * 100)}% of the scenes purposed as the climax cluster in the ${r859b.zoneNames[r859b.maxZoneIdx]} third. When every peak moment concentrates in one structural window, pacing builds toward its payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r859b.zoneNames[r859b.maxZoneIdx]} third so pacing builds toward its payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_RESOLUTION_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 resolution-purposed
+  // scenes, fires when more than 75% of them fall in a single structural third. Distinct from an
+  // incidental last-record disjunction check elsewhere in this pass; none of the three
+  // shared-library trio modes has ever isolated this purpose value as a standalone
+  // distributional signal.
+  {
+    const r859c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r859c.fires) {
+      issues.push({
+        location: `${r859c.zoneNames[r859c.maxZoneIdx]} third — ${r859c.maxZoneCount} of ${r859c.count} resolution-purposed scenes`,
+        rule: 'PACING_RESOLUTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r859c.maxZoneCount / r859c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r859c.zoneNames[r859c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, pacing settles its threads in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r859c.zoneNames[r859c.maxZoneIdx]} third so pacing settles its threads more evenly across the story.`,
       });
     }
   }
