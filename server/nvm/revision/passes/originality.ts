@@ -438,6 +438,13 @@
 // by it: ORIGINALITY_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution'),
 // ORIGINALITY_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate', whose trio was completed in
 // Wave 900), and ORIGINALITY_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
+//
+// Wave 928 additions: continuing the checkZoneImbalance rollout, this wave applies the 4-zone
+// bloat+empty-zone mode to three more signals that each already have a complete 3-zone/run-based
+// trio but had never been audited by it: ORIGINALITY_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose ===
+// 'character_moment'), ORIGINALITY_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes'), and
+// ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence signal with
+// a complete 3-zone/run trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5612,6 +5619,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r914c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName914c} contains ${r914c.counts[r914c.bloatZoneIdx]} of them (${Math.round((r914c.counts[r914c.bloatZoneIdx] / r914c.totalCount) * 100)}%) while ${emptyNames914c} contains none — a predictable concentration the audience can learn to anticipate rather than fresh opposition distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames914c} — so fresh opposition stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 886. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone ORIGINALITY_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based ORIGINALITY_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r928a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r928a.fires) {
+      const emptyNames928a = r928a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName928a = FOUR_ZONE_NAMES[r928a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames928a} empty; ${bloatName928a} has ${r928a.counts[r928a.bloatZoneIdx]}/${r928a.totalCount} character-moment scenes`,
+        rule: 'ORIGINALITY_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r928a.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName928a} contains ${r928a.counts[r928a.bloatZoneIdx]} of them (${Math.round((r928a.counts[r928a.bloatZoneIdx] / r928a.totalCount) * 100)}%) while ${emptyNames928a} contains none — a predictable concentration the audience can learn to anticipate rather than quiet beats distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames928a} — so quiet moments stay less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 886. n≥10, ≥4 stakes-raising scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone ORIGINALITY_STAKES_ZONE_CLUSTER and run-based
+  // ORIGINALITY_STAKES_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to
+  // this purpose value.
+  {
+    const r928b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r928b.fires) {
+      const emptyNames928b = r928b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName928b = FOUR_ZONE_NAMES[r928b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames928b} empty; ${bloatName928b} has ${r928b.counts[r928b.bloatZoneIdx]}/${r928b.totalCount} stakes-raising scenes`,
+        rule: 'ORIGINALITY_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r928b.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName928b} contains ${r928b.counts[r928b.bloatZoneIdx]} of them (${Math.round((r928b.counts[r928b.bloatZoneIdx] / r928b.totalCount) * 100)}%) while ${emptyNames928b} contains none — a predictable concentration the audience can learn to anticipate rather than escalation distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames928b} — so escalation stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone ORIGINALITY_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based ORIGINALITY_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r928c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r928c.fires) {
+      const emptyNames928c = r928c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName928c = FOUR_ZONE_NAMES[r928c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames928c} empty; ${bloatName928c} has ${r928c.counts[r928c.bloatZoneIdx]}/${r928c.totalCount} negative-shift scenes`,
+        rule: 'ORIGINALITY_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r928c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName928c} contains ${r928c.counts[r928c.bloatZoneIdx]} of them (${Math.round((r928c.counts[r928c.bloatZoneIdx] / r928c.totalCount) * 100)}%) while ${emptyNames928c} contains none — a predictable emotional shape the audience can learn to anticipate rather than downturns distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames928c} — so the story's emotional low points stay less predictable across its whole shape.`,
       });
     }
   }
