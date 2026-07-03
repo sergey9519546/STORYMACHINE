@@ -1352,6 +1352,93 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 717 — intentionPass: intention highlight zone cluster, intention open thread peak uncaused, intention payoff drought run', async () => {
+    const makeRec717 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN717 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlighted-dialogue scenes at 0,1,2 → 100% opening third
+    it('INTENTION_HIGHLIGHT_ZONE_CLUSTER fires when >75% of highlighted-dialogue scenes cluster in one third', async () => {
+      const recs717a = Array.from({ length: 9 }, (_, i) => makeRec717(i,
+        (i === 0 || i === 1 || i === 2) ? { dialogueHighlights: ['line-a'] } : {}
+      ));
+      const res = await runIN717(recs717a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_HIGHLIGHT_ZONE_CLUSTER'), 'INTENTION_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlighted-dialogue scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_HIGHLIGHT_ZONE_CLUSTER does not fire when highlighted-dialogue scenes are distributed across thirds', async () => {
+      const recs717an = Array.from({ length: 9 }, (_, i) => makeRec717(i,
+        (i === 0 || i === 4 || i === 7) ? { dialogueHighlights: ['line-a'] } : {}
+      ));
+      const res = await runIN717(recs717an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_HIGHLIGHT_ZONE_CLUSTER'), 'INTENTION_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('INTENTION_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs717b = Array.from({ length: 8 }, (_, i) => makeRec717(i,
+        i === 2 ? { unresolvedClues: ['a'] }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runIN717(recs717b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_OPEN_THREAD_PEAK_UNCAUSED'), 'INTENTION_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // INTENTION_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('INTENTION_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs717bn = Array.from({ length: 8 }, (_, i) => makeRec717(i,
+        i === 2 ? { unresolvedClues: ['a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runIN717(recs717bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_OPEN_THREAD_PEAK_UNCAUSED'), 'INTENTION_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs717c = Array.from({ length: 10 }, (_, i) => makeRec717(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runIN717(recs717c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_PAYOFF_DROUGHT_RUN'), 'INTENTION_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs717cn = Array.from({ length: 10 }, (_, i) => makeRec717(i,
+        (i === 0 || i === 4 || i === 9) ? { payoffSetupIds: ['thread-a'] } : {}
+      ));
+      const res = await runIN717(recs717cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_PAYOFF_DROUGHT_RUN'), 'INTENTION_PAYOFF_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 703 — intentionPass: intention highlight peak uncaused, intention payoff peak uncaused, intention open thread drought run', async () => {
     const makeRec703 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

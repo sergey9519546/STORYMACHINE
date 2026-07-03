@@ -271,6 +271,15 @@
 // backward-cause peak mode has never been applied to this channel), INTENTION_OPEN_THREAD_
 // DROUGHT_RUN (run-based × unresolvedClues absence — Wave 647 applied the zone-cluster mode to
 // unresolvedClues; the drought-run mode has never been applied to this channel).
+// Wave 717 additions (built on the shared checks library): INTENTION_HIGHLIGHT_ZONE_CLUSTER
+// (distribution/timing × dialogueHighlights × structural thirds — Waves 647/703 applied the
+// drought-run and backward-cause peak modes to dialogueHighlights; the zone-cluster mode has
+// never been applied to it, completing the trio), INTENTION_OPEN_THREAD_PEAK_UNCAUSED (single-
+// peak isolation/backward-cause × unresolvedClues magnitude — Waves 647/703 applied the zone-
+// cluster and drought-run modes to unresolvedClues; the backward-cause peak mode has never been
+// applied to it, completing the trio), INTENTION_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds
+// absence — Waves 661/703 applied the zone-cluster and backward-cause peak modes to
+// payoffSetupIds; the drought-run mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4099,6 +4108,76 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r703c.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r703c.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved leaves the protagonist's initiative without an unanswered question to press against for an extended run.`,
         suggestedFix: `Seed a new thread somewhere within the ${r703c.longestRun}-scene stretch so the protagonist's intentions stay sharpened by unanswered questions throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 717: INTENTION_HIGHLIGHT_ZONE_CLUSTER, INTENTION_OPEN_THREAD_PEAK_UNCAUSED,
+  //              INTENTION_PAYOFF_DROUGHT_RUN ────────────────────────────────────────────────
+
+  // INTENTION_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-
+  // dialogue scenes, fires when >75% of them fall in a single structural third. Waves 647/703
+  // applied the drought-run and backward-cause peak modes to dialogueHighlights; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r717a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r717a.fires) {
+      const zoneName717a = r717a.zoneNames[r717a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName717a} third — ${r717a.maxZoneCount}/${r717a.count} highlighted-dialogue scenes`,
+        rule: 'INTENTION_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r717a.maxZoneCount} of the story's ${r717a.count} scenes carrying a standout line of dialogue (${Math.round((r717a.maxZoneCount / r717a.count) * 100)}%) cluster in the ${zoneName717a} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to voice the protagonist's intentions.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName717a} third a standout line of dialogue — spreading memorable dialogue across the story lets the protagonist's intentions surface verbally in every structural third.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 647/703 applied the zone-cluster and drought-run modes to
+  // unresolvedClues; the backward-cause peak mode has never been applied to it, completing the
+  // trio.
+  {
+    const r717b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r717b.fires) {
+      issues.push({
+        location: `scene ${r717b.peakIdx + 1} — peak open-thread density (${r717b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'INTENTION_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r717b.peakIdx + 1}, with ${r717b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r717b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. Waves 661/703 applied the
+  // zone-cluster and backward-cause peak modes to payoffSetupIds; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r717c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r717c.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r717c.longestRun} consecutive scenes`,
+        rule: 'INTENTION_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r717c.longestRun} consecutive scenes with no thread resolving at all, even though ${r717c.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the protagonist's initiative without any sense of accumulating payoff for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r717c.longestRun}-scene stretch so the protagonist's initiative keeps building toward payoff throughout that stretch.`,
       });
     }
   }
