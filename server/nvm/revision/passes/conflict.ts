@@ -266,6 +266,15 @@
 // channel), CONFLICT_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues × structural
 // thirds — Wave 646 applied the drought-run mode to unresolvedClues; the zone-cluster mode has
 // never been applied to this channel).
+// Wave 688 additions (built on the shared checks library): CONFLICT_HIGHLIGHT_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × dialogueHighlights magnitude — Wave 646 applied the
+// zone-cluster mode and Wave 674 applied the drought-run mode to this channel; the backward-cause
+// peak mode has never been applied to it), CONFLICT_SEED_ZONE_CLUSTER (distribution/timing ×
+// seededClueIds × structural thirds — Wave 660 applied the drought-run mode to seededClueIds; the
+// zone-cluster mode has never been applied to this channel despite extensive decoupling/aftermath/
+// peak-absent hand-rolled coverage), CONFLICT_STAGING_DROUGHT_RUN (run-based × visualBeats
+// absence — Wave 646 applied the peak-uncaused mode and Wave 660 applied the zone-cluster mode
+// to this channel; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4032,6 +4041,75 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r674c.maxZoneCount} of the story's ${r674c.count} scenes carrying outstanding clue-debt (${Math.round((r674c.maxZoneCount / r674c.count) * 100)}%) cluster in the ${zoneName674c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery pressing on the conflict.`,
         suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName674c} third — spreading open threads across the story gives every structural third some unresolved pressure bearing on the conflict.`,
+      });
+    }
+  }
+
+  // ── Wave 688: CONFLICT_HIGHLIGHT_PEAK_UNCAUSED, CONFLICT_SEED_ZONE_CLUSTER,
+  //              CONFLICT_STAGING_DROUGHT_RUN ──────────────────────────────────────────────────
+
+  // CONFLICT_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. Waves 646/674 applied the zone-cluster and drought-run modes to this channel;
+  // the backward-cause peak mode has never been applied to it.
+  {
+    const r688a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r688a.fires) {
+      issues.push({
+        location: `scene ${r688a.peakIdx + 1} — peak highlighted-dialogue density (${r688a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r688a.peakIdx + 1}, with ${r688a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of narrative causality never coincide.`,
+        suggestedFix: `Give scene ${r688a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable confrontation is earned by a shift in the conflict rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Wave 660 applied the drought-run mode to seededClueIds; the
+  // zone-cluster mode has never been applied to this channel despite extensive decoupling/
+  // aftermath/peak-absent hand-rolled coverage.
+  {
+    const r688b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r688b.fires) {
+      const zoneName688b = r688b.zoneNames[r688b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName688b} third — ${r688b.maxZoneCount}/${r688b.count} seed scenes`,
+        rule: 'CONFLICT_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r688b.maxZoneCount} of the story's ${r688b.count} clue-planting scenes (${Math.round((r688b.maxZoneCount / r688b.count) * 100)}%) cluster in the ${zoneName688b} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the conflict's causal engine an uneven structural rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName688b} third — spreading foreshadowing across the story lets the conflict's causal pressure build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero visual beats reaches 6. Wave 646 applied the peak-uncaused
+  // mode and Wave 660 applied the zone-cluster mode to this channel; the drought-run mode has never
+  // been applied to it.
+  {
+    const r688c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r688c.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r688c.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r688c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r688c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the conflict without any staged action to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r688c.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the conflict stays physically grounded throughout.`,
       });
     }
   }
