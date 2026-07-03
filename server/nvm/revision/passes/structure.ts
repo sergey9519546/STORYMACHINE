@@ -210,10 +210,16 @@
 // fields, despite dramaticTurn already being paired with clockDelta/clockRaised/emotionalShift/
 // payoffSetupIds), STRUCTURAL_STAGING_PEAK_UNCAUSED (backward-cause × visualBeats-density peak ×
 // revelation/dramaticTurn cause — first backward-cause check in this file).
+// Wave 639 additions (built on the shared checks library, audit M2.2): STRUCTURE_DIALOGUE_
+// HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural thirds — first
+// zone-cluster mode applied to records in this 116-rule pass), STRUCTURE_HIGHLIGHT_OPEN_THREAD_
+// DECOUPLED (co-occurrence/decoupling × dialogueHighlights × unresolvedClues — first pairing of
+// these two fields), STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × heavy
+// unresolvedClues debt trigger → dialogueHighlights absence — first pairing of these two fields).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
@@ -3488,6 +3494,78 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The scene with the story's single densest physical staging (${r625c.peakMagnitude} visual beats, out of ${r625c.qualifyingCount} scenes with any staging at all) has no revelation and no dramatic turn in itself or in either of the 2 scenes before it. The moment the macro-structure invests most heavily in physical description arrives with no disclosure or pivot explaining why.`,
         suggestedFix: `Add a revelation or a dramatic turn in the scene with the densest physical staging, or in one of the two scenes before it, so the audience understands why this particular moment earns such heavy physical attention.`,
+      });
+    }
+  }
+
+  // ── Wave 639: STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER, STRUCTURE_HIGHLIGHT_OPEN_THREAD_
+  //              DECOUPLED, STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID ──────────────────
+
+  // STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // dialogue-highlight scenes, more than 75% falling in a single structural third → fire. First
+  // use of the zone-cluster mode applied to any record field in this 116-rule pass — every prior
+  // distribution-style check here used the four-zone imbalance template instead. Memorable
+  // dialogue clustered overwhelmingly in one third of the macro-structure means the audience
+  // learns which stretch of the script carries the story's verbal high points.
+  {
+    const r639a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r639a.fires) {
+      const zoneName639a = r639a.zoneNames[r639a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName639a} third — ${r639a.maxZoneCount}/${r639a.count} dialogue-highlight scenes`,
+        rule: 'STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r639a.maxZoneCount} of the story's ${r639a.count} dialogue-highlight scenes (${Math.round((r639a.maxZoneCount / r639a.count) * 100)}%) cluster in the ${zoneName639a} third. Memorable dialogue concentrates almost exclusively in that stretch of the macro-structure, leaving the other thirds without a comparable verbal high point.`,
+        suggestedFix: `Let at least one standout line of dialogue land outside the ${zoneName639a} third, spreading the story's verbal high points more evenly across its macro-structure.`,
+      });
+    }
+  }
+
+  // STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // unresolvedClues. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a dialogue highlight, ≥2 scenes carrying outstanding clue-debt. Zero overlap
+  // → fire. First pairing of these two fields in this pass. A line the story flags as memorable
+  // never lands while a mystery sits open at the macro-structural level.
+  {
+    const r639b = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r639b.fires) {
+      issues.push({
+        location: `${r639b.aCount} dialogue-highlight scene(s), ${r639b.bCount} open-thread scene(s) — zero overlap`,
+        rule: 'STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r639b.aCount} scenes flagged as containing a standout line of dialogue never coincide with the ${r639b.bCount} scenes carrying outstanding clue-debt — the story's most memorable dialogue and its open setups run on separate macro-structural tracks.`,
+        suggestedFix: `Let at least one standout line of dialogue land in a scene that is also carrying open clue-debt — a character voicing suspicion or naming what's still unresolved.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-
+  // clue-debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥3
+  // scenes anywhere with a dialogue highlight, a 2-scene lookahead window. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such scenes do
+  // occur elsewhere. First pairing of these two fields in this pass.
+  {
+    const r639c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r639c.fires) {
+      issues.push({
+        location: `${r639c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r639c.triggerCount} instances) is followed by two full scenes with no highlighted dialogue, even though ${r639c.aftermathCount} such scenes occur elsewhere in the story. The heaviest concentrations of open mystery never earn a memorable line nearby at the macro-structural level.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line worth remembering — pressing on what's unresolved or voicing the stakes of not knowing.`,
       });
     }
   }

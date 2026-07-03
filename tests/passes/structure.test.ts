@@ -1006,6 +1006,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 639 — structurePass: structure dialogue highlight zone cluster, structure highlight open thread decoupled, structure open thread highlight aftermath void', async () => {
+    const runST639 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; highlights at 0,1,2 → 100% in opening third
+    it('STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER fires when >75% of dialogue-highlight scenes cluster in one third', async () => {
+      const recs639a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs639a[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs639a[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs639a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      const res = await runST639(recs639a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER'), 'STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER should fire');
+    });
+
+    // STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER no-fire:
+    // highlights at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER does not fire when dialogue highlights are distributed across thirds', async () => {
+      const recs639an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs639an[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs639an[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs639an[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runST639(recs639an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER'), 'STRUCTURE_DIALOGUE_HIGHLIGHT_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED fire:
+    // n=6; highlights at 0,1 (no debt); debt at 4,5 (no highlight) → zero overlap → fires
+    it('STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED fires when dialogue-highlight scenes and open-thread scenes never overlap', async () => {
+      const recs639b = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs639b[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs639b[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs639b[4] = makeSharedRecord(4, { unresolvedClues: ['unpaid-clue'] });
+      recs639b[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runST639(recs639b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED should fire');
+    });
+
+    // STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED no-fire:
+    // scene 0 carries BOTH a highlight and open debt → overlap exists
+    it('STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs639bn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs639bn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'], unresolvedClues: ['unpaid-clue'] });
+      recs639bn[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs639bn[5] = makeSharedRecord(5, { unresolvedClues: ['unpaid-clue'] });
+      const res = await runST639(recs639bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED'), 'STRUCTURE_HIGHLIGHT_OPEN_THREAD_DECOUPLED should not fire');
+    });
+
+    // STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // dialogue highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a dialogue highlight', async () => {
+      const recs639c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs639c[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs639c[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs639c[5] = makeSharedRecord(5, { dialogueHighlights: ['line-a'] });
+      recs639c[6] = makeSharedRecord(6, { dialogueHighlights: ['line-b'] });
+      recs639c[7] = makeSharedRecord(7, { dialogueHighlights: ['line-c'] });
+      const res = await runST639(recs639c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs639cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs639cn[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs639cn[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs639cn[3] = makeSharedRecord(3, { dialogueHighlights: ['line-a'] });
+      recs639cn[5] = makeSharedRecord(5, { dialogueHighlights: ['line-b'] });
+      recs639cn[6] = makeSharedRecord(6, { dialogueHighlights: ['line-c'] });
+      recs639cn[7] = makeSharedRecord(7, { dialogueHighlights: ['line-d'] });
+      const res = await runST639(recs639cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 625 — structurePass: structural staging open thread decoupled, dramatic turn staging aftermath void, structural staging peak uncaused', async () => {
     const runST625 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
