@@ -217,6 +217,17 @@
 // unresolvedClues × dialogueHighlights — first use of unresolvedClues in this pass),
 // DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID (sequence/aftermath × dramaticTurn trigger →
 // payoffSetupIds absence — first pairing of these two fields).
+// Wave 652 additions: this 110-rule pass already imports all six shared-checks-library templates,
+// so distinctness comes from applying each template to a channel it has never touched.
+// EMOTIONAL_SIGNAL_ZONE_CLUSTER (distribution/timing × emotionalShift-positive × structural
+// thirds — the zone-cluster mode had only been applied to payoffSetupIds; positive-emotion scenes
+// concentrating in one third is a distinct rhythm imbalance), STAGING_SIGNAL_DROUGHT_RUN
+// (run-based × visualBeats absence — the drought-run mode had only been applied to
+// relationshipShifts and clockRaised; a long unbroken stretch of zero physical staging is a
+// distinct rhythm gap), OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED (co-occurrence/decoupling ×
+// unresolvedClues × curiosityDelta>0 — Wave 638's OPEN_THREAD_SIGNAL_DECOUPLED paired
+// unresolvedClues with dialogueHighlights; this crosses the same open-thread signal with the
+// curiosity channel instead, a pairing never tried in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3147,6 +3158,78 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r638c.triggerCount} dramatic-turn scenes is followed by two scenes with no payoff, even though ${r638c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, structural pivots read as predictably consequence-free in their immediate aftermath — the turn happens, but nothing resolves nearby.`,
         suggestedFix: `After at least one dramatic turn, let one of the following two scenes resolve a thread — tying the pivot to a concrete consequence rather than letting turns and payoffs run on separate, disconnected rhythms.`,
+      });
+    }
+  }
+
+  // ── Wave 652: EMOTIONAL_SIGNAL_ZONE_CLUSTER, STAGING_SIGNAL_DROUGHT_RUN,
+  //              OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED ─────────────────────────────────────
+
+  // EMOTIONAL_SIGNAL_ZONE_CLUSTER — Distribution/timing × emotionalShift-positive × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 positive-emotion
+  // scenes, more than 75% falling in a single structural third → fire. Wave 638 applied the
+  // zone-cluster mode to payoffSetupIds only; positive-emotion scenes concentrating overwhelmingly
+  // in one third is a distinct rhythm imbalance — the story's emotional lift has a learnable
+  // window rather than a distributed rhythm.
+  {
+    const r652a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r652a.fires) {
+      const zoneName652a = r652a.zoneNames[r652a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName652a} third — ${r652a.maxZoneCount}/${r652a.count} positive-emotion scenes`,
+        rule: 'EMOTIONAL_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r652a.maxZoneCount} of the story's ${r652a.count} positive-emotion scenes (${Math.round((r652a.maxZoneCount / r652a.count) * 100)}%) cluster in the ${zoneName652a} third. Emotional lift concentrates almost exclusively in that stretch of the story — once the audience notices the pattern, they learn which third to expect relief in rather than experiencing it as an unpredictable rhythm.`,
+        suggestedFix: `Let at least one scene outside the ${zoneName652a} third carry a positive emotional shift — spreading moments of relief across the story keeps the emotional rhythm structurally unpredictable rather than confined to a single learned stretch.`,
+      });
+    }
+  }
+
+  // STAGING_SIGNAL_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 visually-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero physical staging reaches 6. The drought-run mode had only
+  // been applied to relationshipShifts (Wave 610) and clockRaised (Wave 624); a long unbroken
+  // stretch of zero physical staging is a distinct rhythm gap — the story leans entirely on
+  // dialogue and interiority for an extended run with nothing physically shown.
+  {
+    const r652b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r652b.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r652b.longestRun} consecutive scenes`,
+        rule: 'STAGING_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r652b.longestRun} consecutive scenes with no visual staging beats at all, even though ${r652b.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves the story's rhythm running on pure dialogue and interiority for an extended stretch.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r652b.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the story's rhythm stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // curiosityDelta>0. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6,
+  // ≥2 open-thread scenes, ≥2 rising-curiosity scenes. Zero overlap → fire. Wave 638's
+  // OPEN_THREAD_SIGNAL_DECOUPLED crossed unresolvedClues with dialogueHighlights; this crosses
+  // the same open-thread signal with the curiosity channel instead — a pairing never tried in
+  // this pass. A scene where a mystery sits open is a natural place for curiosity to spike
+  // further, but that pairing never occurs here.
+  {
+    const r652c = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r652c.fires) {
+      issues.push({
+        location: `${r652c.aCount} open-thread scene(s), ${r652c.bCount} rising-curiosity scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r652c.aCount} scenes carrying outstanding clue-debt never coincide with the ${r652c.bCount} scenes where curiosity is actively rising — the story's open mysteries and its moments of climbing intrigue run on separate rhythmic tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, so the story's open threads and its rising intrigue occasionally converge.`,
       });
     }
   }

@@ -1136,6 +1136,86 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 652 — rhythmPass: emotional signal zone cluster, staging signal drought run, open thread curiosity signal decoupled', async () => {
+    const runR652 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // EMOTIONAL_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% in opening third
+    it('EMOTIONAL_SIGNAL_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs652a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs652a[0] = makeSharedRecord(0, { emotionalShift: 'positive' });
+      recs652a[1] = makeSharedRecord(1, { emotionalShift: 'positive' });
+      recs652a[2] = makeSharedRecord(2, { emotionalShift: 'positive' });
+      const res = await runR652(recs652a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'EMOTIONAL_SIGNAL_ZONE_CLUSTER'), 'EMOTIONAL_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // EMOTIONAL_SIGNAL_ZONE_CLUSTER no-fire:
+    // positive-emotion scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('EMOTIONAL_SIGNAL_ZONE_CLUSTER does not fire when positive-emotion scenes are distributed across thirds', async () => {
+      const recs652an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs652an[0] = makeSharedRecord(0, { emotionalShift: 'positive' });
+      recs652an[4] = makeSharedRecord(4, { emotionalShift: 'positive' });
+      recs652an[7] = makeSharedRecord(7, { emotionalShift: 'positive' });
+      const res = await runR652(recs652an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'EMOTIONAL_SIGNAL_ZONE_CLUSTER'), 'EMOTIONAL_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+
+    // STAGING_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; staged at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('STAGING_SIGNAL_DROUGHT_RUN fires when the longest no-staging run is ≥6', async () => {
+      const recs652b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs652b[0] = makeSharedRecord(0, { visualBeats: ['a'] });
+      recs652b[1] = makeSharedRecord(1, { visualBeats: ['b'] });
+      recs652b[2] = makeSharedRecord(2, { visualBeats: ['c'] });
+      recs652b[9] = makeSharedRecord(9, { visualBeats: ['d'] });
+      const res = await runR652(recs652b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STAGING_SIGNAL_DROUGHT_RUN'), 'STAGING_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // STAGING_SIGNAL_DROUGHT_RUN no-fire:
+    // staged at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('STAGING_SIGNAL_DROUGHT_RUN does not fire when staging is distributed without a long drought', async () => {
+      const recs652bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs652bn[0] = makeSharedRecord(0, { visualBeats: ['a'] });
+      recs652bn[4] = makeSharedRecord(4, { visualBeats: ['b'] });
+      recs652bn[9] = makeSharedRecord(9, { visualBeats: ['c'] });
+      const res = await runR652(recs652bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STAGING_SIGNAL_DROUGHT_RUN'), 'STAGING_SIGNAL_DROUGHT_RUN should not fire');
+    });
+
+    // OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED fire:
+    // n=6; open threads at 0,1 (no curiosity rise); curiosity rises at 4,5 (no open thread) →
+    // zero overlap → fires
+    it('OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED fires when open-thread scenes and rising-curiosity scenes never overlap', async () => {
+      const recs652c = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs652c[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs652c[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs652c[4] = makeSharedRecord(4, { curiosityDelta: 1 });
+      recs652c[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runR652(recs652c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED'), 'OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED no-fire:
+    // scene 0 carries BOTH an open thread and a curiosity rise → overlap exists
+    it('OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs652cn = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs652cn[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'], curiosityDelta: 1 });
+      recs652cn[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs652cn[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runR652(recs652cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED'), 'OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 638 — rhythmPass: payoff signal zone cluster, open thread signal decoupled, dramatic turn payoff aftermath void', async () => {
     const runR638 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
