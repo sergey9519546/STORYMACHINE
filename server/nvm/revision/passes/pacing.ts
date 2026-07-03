@@ -218,6 +218,12 @@
 // visualBeats — first use of visualBeats anywhere in this pass), REVELATION_AFTERMATH_STAGING_
 // FLAT (sequence/aftermath × visualBeats × revelation trigger — a 4th channel added to the
 // revelation row of the trigger×channel aftermath matrix, alongside suspense/curiosity/emotion).
+// Wave 635 additions: PACING_OPEN_THREAD_STAGING_DECOUPLED (co-occurrence/decoupling ×
+// unresolvedClues × visualBeats — first pairing of these two fields in this 109-rule pass),
+// PACING_SEED_STAGING_AFTERMATH_VOID (sequence/aftermath × seededClueIds trigger → visualBeats
+// absence — first pairing of these two fields), PACING_OPEN_THREAD_ZONE_IMBALANCE
+// (underweight/bloat × unresolvedClues × four structural zones — unresolvedClues had only ever
+// been used as an aftermath trigger [Wave 607's 7th-row extension], never zone-audited).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3590,6 +3596,80 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r621c.triggerCount} revelation scenes is followed by two scenes with no substantial physical staging, even though ${r621c.aftermathCount} such scenes exist elsewhere in the script. A disclosed truth often changes how a character moves through the world — what they now handle differently, avoid, or seek out — and when that physical aftermath consistently stays unstaged, the revelation's consequences are only ever discussed, never shown.`,
         suggestedFix: `After at least one revelation, let one of the following two scenes carry substantial physical staging — a character's changed behavior made visible through action, object, or space, not only through what they say about it.`,
+      });
+    }
+  }
+
+  // ── Wave 635: PACING_OPEN_THREAD_STAGING_DECOUPLED, PACING_SEED_STAGING_AFTERMATH_VOID,
+  //              PACING_OPEN_THREAD_ZONE_IMBALANCE ─────────────────────────────────────────
+
+  // PACING_OPEN_THREAD_STAGING_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // visualBeats. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying outstanding clue-debt, ≥2 visually-staged scenes (visualBeats.length≥2). Zero
+  // overlap → fire. First pairing of these two fields in this 109-rule pass — unresolvedClues had
+  // only ever been used as an aftermath trigger (Wave 607), never paired with a second field in
+  // same-scene co-occurrence.
+  {
+    const r635a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r635a.fires) {
+      issues.push({
+        location: `${r635a.aCount} open-thread scene(s), ${r635a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'PACING_OPEN_THREAD_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r635a.aCount} scenes carrying outstanding clue-debt never coincide with the ${r635a.bCount} scenes leaning heavily on physical staging — unresolved mystery and physical presence run on separate tracks. A scene rich in staging is a natural place to give an open thread a physical anchor, but that pairing never occurs here.`,
+        suggestedFix: `Let at least one heavily staged scene also carry open clue-debt — physical details tied to what's still unresolved, giving the mystery a tangible presence rather than existing only as a narrative tally.`,
+      });
+    }
+  }
+
+  // PACING_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a
+  // 2-scene lookahead window. Fires when every seed's two-scene aftermath contains no visually
+  // dense scene, while such scenes do occur elsewhere. First pairing of these two fields in this
+  // pass — every planted clue passes into an aftermath with no physical presence giving the
+  // material texture.
+  {
+    const r635b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r635b.fires) {
+      issues.push({
+        location: `${r635b.triggerCount} seed scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'PACING_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r635b.triggerCount} clue-planting scenes is followed by two scenes with no substantial physical staging, even though ${r635b.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when the world around them briefly holds physical attention, but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry substantial physical staging — the planted material or its surroundings given some visible presence before the pacing moves on.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-carrying
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. unresolvedClues had only ever been used as
+  // an aftermath trigger (Wave 607's 7th-row extension); its own structural distribution had never
+  // been audited in this file.
+  {
+    const r635c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r635c.fires) {
+      const emptyNames635c = r635c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName635c = FOUR_ZONE_NAMES[r635c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames635c} empty; ${bloatName635c} has ${r635c.counts[r635c.bloatZoneIdx]}/${r635c.totalCount} debt-carrying scenes`,
+        rule: 'PACING_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r635c.totalCount} scenes carrying outstanding clue-debt are unevenly distributed across its four structural zones: ${bloatName635c} contains ${r635c.counts[r635c.bloatZoneIdx]} of them (${Math.round((r635c.counts[r635c.bloatZoneIdx] / r635c.totalCount) * 100)}%) while ${emptyNames635c} contains none. Outstanding narrative debt bloats in one structural quarter and vanishes from another, giving the story's pacing of active mystery an uneven structural rhythm.`,
+        suggestedFix: `Redistribute open threads: let at least one clue remain unresolved into the empty zone(s) — ${emptyNames635c} — so every structural quarter carries some sense of active, unanswered mystery.`,
       });
     }
   }

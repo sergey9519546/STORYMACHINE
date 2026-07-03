@@ -934,6 +934,96 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 635 — pacingPass: pacing open thread staging decoupled, pacing seed staging aftermath void, pacing open thread zone imbalance', async () => {
+    const runP635 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_OPEN_THREAD_STAGING_DECOUPLED fire:
+    // n=6; debt at 0,1 (no staging); staged at 4,5 (no debt) → zero overlap → fires
+    it('PACING_OPEN_THREAD_STAGING_DECOUPLED fires when open-thread scenes and visually-staged scenes never overlap', async () => {
+      const recs635a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs635a[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs635a[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs635a[4] = makeSharedRecord(4, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635a[5] = makeSharedRecord(5, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      const res = await runP635(recs635a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_STAGING_DECOUPLED'), 'PACING_OPEN_THREAD_STAGING_DECOUPLED should fire');
+    });
+
+    // PACING_OPEN_THREAD_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH open debt and visual staging → overlap exists
+    it('PACING_OPEN_THREAD_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs635an = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs635an[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'], visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635an[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs635an[5] = makeSharedRecord(5, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      const res = await runP635(recs635an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_STAGING_DECOUPLED'), 'PACING_OPEN_THREAD_STAGING_DECOUPLED should not fire');
+    });
+
+    // PACING_SEED_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no visually
+    // dense scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('PACING_SEED_STAGING_AFTERMATH_VOID fires when no seed is followed by a visually dense scene within 2 scenes', async () => {
+      const recs635b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs635b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs635b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs635b[5] = makeSharedRecord(5, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635b[6] = makeSharedRecord(6, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635b[7] = makeSharedRecord(7, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      const res = await runP635(recs635b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SEED_STAGING_AFTERMATH_VOID'), 'PACING_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // PACING_SEED_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('PACING_SEED_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs635bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs635bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs635bn[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs635bn[3] = makeSharedRecord(3, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635bn[5] = makeSharedRecord(5, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635bn[6] = makeSharedRecord(6, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      recs635bn[7] = makeSharedRecord(7, { visualBeats: ['checks the mailbox', 'reads the postmark'] });
+      const res = await runP635(recs635bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SEED_STAGING_AFTERMATH_VOID'), 'PACING_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // PACING_OPEN_THREAD_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); debt at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('PACING_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty of open-thread scenes while another is bloated', async () => {
+      const recs635c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs635c[6] = makeSharedRecord(6, { unresolvedClues: ['a'] });
+      recs635c[7] = makeSharedRecord(7, { unresolvedClues: ['b'] });
+      recs635c[8] = makeSharedRecord(8, { unresolvedClues: ['c'] });
+      recs635c[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runP635(recs635c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_ZONE_IMBALANCE'), 'PACING_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    // PACING_OPEN_THREAD_ZONE_IMBALANCE no-fire:
+    // one open-thread scene per zone (1,4,7,10) → no zone is empty
+    it('PACING_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes are spread across all zones', async () => {
+      const recs635cn = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs635cn[1] = makeSharedRecord(1, { unresolvedClues: ['a'] });
+      recs635cn[4] = makeSharedRecord(4, { unresolvedClues: ['b'] });
+      recs635cn[7] = makeSharedRecord(7, { unresolvedClues: ['c'] });
+      recs635cn[10] = makeSharedRecord(10, { unresolvedClues: ['d'] });
+      const res = await runP635(recs635cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_ZONE_IMBALANCE'), 'PACING_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 621 — pacingPass: pacing dialogue highlight zone imbalance, pacing payoff staging decoupled, revelation aftermath staging flat', async () => {
     const runP621 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
