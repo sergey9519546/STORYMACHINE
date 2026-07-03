@@ -305,6 +305,14 @@
 // the zone-cluster mode has never been applied to it), PAYOFF_STAKES_DROUGHT_RUN (run-based ×
 // purpose === 'raise_stakes' absence — Wave 692 applied the zone-cluster mode to this signal
 // [PAYOFF_STAKES_ZONE_CLUSTER]; the drought-run mode has never been applied to it).
+// Wave 762 additions: PAYOFF_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaised === true ×
+// structural thirds — Wave 664 applied the run-based drought mode to clockRaised
+// [PAYOFF_CLOCK_DROUGHT_RUN]; the zone-cluster mode has never been applied to it),
+// PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative' absence — Wave
+// 678 applied the zone-cluster mode to this signal [PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER]; the
+// drought-run mode has never been applied to it), PAYOFF_CURIOSITY_DROUGHT_RUN (run-based ×
+// curiosityDelta>0 absence — curiosityDelta has never anchored any of the three shared-library
+// modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4149,6 +4157,71 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r748c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r748c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the payoff engine resolving threads that were never re-tensioned for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r748c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the payoff engine resolving threads that still matter throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 762: PAYOFF_CLOCK_ZONE_CLUSTER, PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              PAYOFF_CURIOSITY_DROUGHT_RUN ───────────────────────────────────────────────
+
+  // PAYOFF_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised === true × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clockRaised scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Wave 664 applied the run-based
+  // drought mode to clockRaised (PAYOFF_CLOCK_DROUGHT_RUN); the zone-cluster mode has never been
+  // applied to it.
+  {
+    const r762a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r762a.fires) {
+      issues.push({
+        location: `${r762a.zoneNames[r762a.maxZoneIdx]} third — ${r762a.maxZoneCount} of ${r762a.count} clockRaised scenes`,
+        rule: 'PAYOFF_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r762a.maxZoneCount / r762a.count) * 100)}% of the story's clockRaised scenes cluster in the ${r762a.zoneNames[r762a.maxZoneIdx]} third. When every ticking-clock beat lands in the same structural window, the payoff engine has no accompanying urgency to draw on when resolving threads elsewhere in the story.`,
+        suggestedFix: `Raise the clock in at least one scene outside the ${r762a.zoneNames[r762a.maxZoneIdx]} third so the payoff engine keeps urgency available more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative shift reaches 6.
+  // Wave 678 applied the zone-cluster mode to this signal (PAYOFF_NEGATIVE_EMOTION_ZONE_CLUSTER);
+  // the drought-run mode has never been applied to it.
+  {
+    const r762b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r762b.fires) {
+      issues.push({
+        location: `longest stretch with no negative emotional shift: ${r762b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r762b.longestRun} consecutive scenes with no negative emotional shift at all, even though ${r762b.presentCount} scenes elsewhere do carry a downturn. A long unbroken stretch with nothing costing the protagonist anything leaves the payoff engine resolving threads without a setback recently making the stakes feel real.`,
+        suggestedFix: `Give at least one scene within the ${r762b.longestRun}-scene stretch a negative emotional beat so the payoff engine keeps resolving threads whose cost the audience can still feel.`,
+      });
+    }
+  }
+
+  // PAYOFF_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 curiosity-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no curiosity rise reaches 6.
+  // curiosityDelta has never anchored any of the three shared-library modes in this pass.
+  {
+    const r762c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r762c.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r762c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r762c.longestRun} consecutive scenes with no rise in curiosity at all, even though ${r762c.presentCount} scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the payoff engine resolving old questions without planting new ones for an extended run.`,
+        suggestedFix: `Raise curiosity somewhere within the ${r762c.longestRun}-scene stretch so the payoff engine keeps planting fresh questions alongside its resolutions throughout that stretch.`,
       });
     }
   }

@@ -1365,6 +1365,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 762 — payoffPass: payoff clock zone cluster, payoff negative emotion drought run, payoff curiosity drought run', async () => {
+    const runPY762 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_CLOCK_ZONE_CLUSTER fires when >75% of clockRaised scenes cluster in one third', async () => {
+      const recs762a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs762a[0] = makeSharedRecord(0, { clockRaised: true });
+      recs762a[1] = makeSharedRecord(1, { clockRaised: true });
+      recs762a[2] = makeSharedRecord(2, { clockRaised: true });
+      const res = await runPY762(recs762a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_ZONE_CLUSTER'), 'PAYOFF_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_CLOCK_ZONE_CLUSTER no-fire:
+    // clockRaised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_CLOCK_ZONE_CLUSTER does not fire when clockRaised scenes are distributed across thirds', async () => {
+      const recs762an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs762an[0] = makeSharedRecord(0, { clockRaised: true });
+      recs762an[4] = makeSharedRecord(4, { clockRaised: true });
+      recs762an[7] = makeSharedRecord(7, { clockRaised: true });
+      const res = await runPY762(recs762an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_ZONE_CLUSTER'), 'PAYOFF_CLOCK_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a negative shift (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN fires when the longest no-negative-emotion run reaches 6', async () => {
+      const recs762b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs762b[0] = makeSharedRecord(0, { emotionalShift: 'negative' });
+      recs762b[1] = makeSharedRecord(1, { emotionalShift: 'negative' });
+      recs762b[2] = makeSharedRecord(2, { emotionalShift: 'negative' });
+      const res = await runPY762(recs762b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN'), 'PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN no-fire:
+    // negative-emotion scenes spread out so no gap reaches 6 consecutive scenes
+    it('PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative emotion is spread through the story', async () => {
+      const recs762bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs762bn[0] = makeSharedRecord(0, { emotionalShift: 'negative' });
+      recs762bn[3] = makeSharedRecord(3, { emotionalShift: 'negative' });
+      recs762bn[6] = makeSharedRecord(6, { emotionalShift: 'negative' });
+      recs762bn[9] = makeSharedRecord(9, { emotionalShift: 'negative' });
+      const res = await runPY762(recs762bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN'), 'PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_CURIOSITY_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 have rising curiosity (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('PAYOFF_CURIOSITY_DROUGHT_RUN fires when the longest no-rising-curiosity run reaches 6', async () => {
+      const recs762c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs762c[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs762c[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs762c[2] = makeSharedRecord(2, { curiosityDelta: 1 });
+      const res = await runPY762(recs762c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_DROUGHT_RUN'), 'PAYOFF_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_CURIOSITY_DROUGHT_RUN no-fire:
+    // rising-curiosity scenes spread out so no gap reaches 6 consecutive scenes
+    it('PAYOFF_CURIOSITY_DROUGHT_RUN does not fire when rising curiosity is spread through the story', async () => {
+      const recs762cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs762cn[0] = makeSharedRecord(0, { curiosityDelta: 1 });
+      recs762cn[3] = makeSharedRecord(3, { curiosityDelta: 1 });
+      recs762cn[6] = makeSharedRecord(6, { curiosityDelta: 1 });
+      recs762cn[9] = makeSharedRecord(9, { curiosityDelta: 1 });
+      const res = await runPY762(recs762cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CURIOSITY_DROUGHT_RUN'), 'PAYOFF_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 748 — payoffPass: payoff clock delta zone cluster, payoff turn zone cluster, payoff stakes drought run', async () => {
     const runPY748 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
