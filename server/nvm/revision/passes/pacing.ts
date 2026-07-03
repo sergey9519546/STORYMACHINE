@@ -374,6 +374,16 @@
 // thirds — distinct from an incidental last-record disjunction check elsewhere in this pass;
 // none of the three shared-library trio modes has ever isolated this purpose value as a
 // standalone distributional signal).
+//
+// Wave 873 additions: PACING_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 859; peak mode conventionally skipped for this categorical field), PACING_RESOLUTION_
+// DROUGHT_RUN (run-based x purpose === 'resolution' absence -- completes 2 of 3 slots for this
+// purpose value alongside the zone-cluster mode added in Wave 859; distinct from the incidental
+// last-record disjunctions elsewhere in this pass; peak mode conventionally skipped for this
+// categorical field), PACING_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'complicate' x structural thirds -- this purpose value has never been referenced anywhere in
+// this pass; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4902,6 +4912,73 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r859c.maxZoneCount / r859c.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r859c.zoneNames[r859c.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, pacing settles its threads in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r859c.zoneNames[r859c.maxZoneIdx]} third so pacing settles its threads more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 873: PACING_CLIMAX_DROUGHT_RUN, PACING_RESOLUTION_DROUGHT_RUN,
+  //              PACING_COMPLICATE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 859 (peak mode conventionally skipped for this categorical field).
+  {
+    const r873a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r873a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r873a.longestRun} consecutive scenes`,
+        rule: 'PACING_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r873a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r873a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves pacing without a structural high point to build toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r873a.longestRun}-scene stretch as the climax, or restructure so pacing's peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // PACING_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes
+  // overall, fires when the longest consecutive run of scenes with no resolution purpose
+  // reaches 6. Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in Wave 859. Distinct from the incidental last-record disjunctions elsewhere in this
+  // pass; peak mode conventionally skipped for this categorical field.
+  {
+    const r873b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r873b.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r873b.longestRun} consecutive scenes`,
+        rule: 'PACING_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r873b.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r873b.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves pacing's threads dangling for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r873b.longestRun}-scene stretch to resolve part of the story, so pacing keeps settling its threads throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // PACING_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r873c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r873c.fires) {
+      issues.push({
+        location: `${r873c.zoneNames[r873c.maxZoneIdx]} third — ${r873c.maxZoneCount} of ${r873c.count} complicating scenes`,
+        rule: 'PACING_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r873c.maxZoneCount / r873c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r873c.zoneNames[r873c.maxZoneIdx]} third. When every complication lands in the same structural window, pacing stops deepening the trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r873c.zoneNames[r873c.maxZoneIdx]} third to complicate the story so pacing keeps deepening the trouble more evenly across the story.`,
       });
     }
   }
