@@ -1204,6 +1204,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 950 — beliefPass: belief payoff zone imbalance, belief open thread zone imbalance, belief seed zone imbalance', async () => {
+    const runBF950 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('BELIEF_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs950a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 1, 2, 8, 9].includes(i) ? ['s1'] : [] }));
+      const res = await runBF950(recs950a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_ZONE_IMBALANCE'), 'BELIEF_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs950an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 3, 5, 8].includes(i) ? ['s1'] : [] }));
+      const res = await runBF950(recs950an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_ZONE_IMBALANCE'), 'BELIEF_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs950b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 1, 2, 8, 9].includes(i) ? ['q1'] : [] }));
+      const res = await runBF950(recs950b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_ZONE_IMBALANCE'), 'BELIEF_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs950bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 3, 5, 8].includes(i) ? ['q1'] : [] }));
+      const res = await runBF950(recs950bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_ZONE_IMBALANCE'), 'BELIEF_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+
+    it('BELIEF_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs950c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runBF950(recs950c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_ZONE_IMBALANCE'), 'BELIEF_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('BELIEF_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs950cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runBF950(recs950cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_ZONE_IMBALANCE'), 'BELIEF_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 936 — beliefPass: belief positive emotion zone imbalance, belief suspense zone imbalance, belief curiosity zone imbalance', async () => {
     const runBF936 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

@@ -427,6 +427,11 @@
 // audited by it: BELIEF_POSITIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'positive'), BELIEF_
 // SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0), and BELIEF_CURIOSITY_ZONE_IMBALANCE (curiosityDelta
 // > 0).
+// Wave 950 additions: with belief's valence and delta signals now saturated by the 4-zone mode, this
+// wave audits three distinct array-field signals whose 3-zone/run trios were long complete but never
+// 4-zone-audited: BELIEF_PAYOFF_ZONE_IMBALANCE (payoffSetupIds), BELIEF_OPEN_THREAD_ZONE_IMBALANCE
+// (unresolvedClues), and BELIEF_SEED_ZONE_IMBALANCE (seededClueIds) — three genuinely different arrays
+// (setups-paid, questions-open, clues-planted), all distinct from the visualBeats BELIEF_STAGING one.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5260,6 +5265,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r936c.totalCount} curiosity-raising scenes are unevenly distributed across its four structural zones: ${bloatName936c} contains ${r936c.counts[r936c.bloatZoneIdx]} of them (${Math.round((r936c.counts[r936c.bloatZoneIdx] / r936c.totalCount) * 100)}%) while ${emptyNames936c} contains none. New questions bloat in one structural quarter and vanish from another, so the belief-tracking layer's open questions cluster in only part of the story.`,
         suggestedFix: `Redistribute curiosity beats: raise a fresh question in at least one scene inside the empty zone(s) — ${emptyNames936c} — so the belief-tracking layer's open questions span every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_ZONE_IMBALANCE — Underweight/bloat × (payoffSetupIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone BELIEF_PAYOFF_ZONE_CLUSTER
+  // and run-based BELIEF_PAYOFF_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to the payoffSetupIds array field, and distinct from the already-audited BELIEF_STAGING_
+  // ZONE_IMBALANCE (visualBeats), keying on a genuinely different array.
+  {
+    const r950a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r950a.fires) {
+      const emptyNames950a = r950a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName950a = FOUR_ZONE_NAMES[r950a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames950a} empty; ${bloatName950a} has ${r950a.counts[r950a.bloatZoneIdx]}/${r950a.totalCount} payoff scenes`,
+        rule: 'BELIEF_PAYOFF_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r950a.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName950a} contains ${r950a.counts[r950a.bloatZoneIdx]} of them (${Math.round((r950a.counts[r950a.bloatZoneIdx] / r950a.totalCount) * 100)}%) while ${emptyNames950a} contains none. Payoffs bloat in one structural quarter and never occur in another, so the belief-tracking layer's confirmed expectations resolve in only part of the story.`,
+        suggestedFix: `Redistribute payoffs: pay off an earlier setup (non-empty payoffSetupIds) in at least one scene inside the empty zone(s) — ${emptyNames950a} — so the belief-tracking layer confirms expectations across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × (unresolvedClues.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // leaving an open thread total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone BELIEF_OPEN_THREAD_ZONE_CLUSTER and run-based BELIEF_OPEN_THREAD_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the unresolvedClues array field, keying on
+  // unresolved-expectation density rather than the payoffSetupIds field audited just above.
+  {
+    const r950b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r950b.fires) {
+      const emptyNames950b = r950b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName950b = FOUR_ZONE_NAMES[r950b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames950b} empty; ${bloatName950b} has ${r950b.counts[r950b.bloatZoneIdx]}/${r950b.totalCount} open-thread scenes`,
+        rule: 'BELIEF_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r950b.totalCount} scenes leaving an open thread are unevenly distributed across its four structural zones: ${bloatName950b} contains ${r950b.counts[r950b.bloatZoneIdx]} of them (${Math.round((r950b.counts[r950b.bloatZoneIdx] / r950b.totalCount) * 100)}%) while ${emptyNames950b} contains none. Unresolved threads bloat in one structural quarter and never open in another, so the belief-tracking layer's open expectations accumulate in only part of the story.`,
+        suggestedFix: `Redistribute open threads: leave an unresolved question (non-empty unresolvedClues) in at least one scene inside the empty zone(s) — ${emptyNames950b} — so the belief-tracking layer keeps expectations alive across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone BELIEF_SEED_ZONE_
+  // CLUSTER and run-based BELIEF_SEED_DROUGHT_RUN — the first application of the 4-zone bloat+empty-
+  // zone mode to the seededClueIds array field, keying on belief-forming plants, distinct from both
+  // the payoffSetupIds and unresolvedClues array fields audited just above.
+  {
+    const r950c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r950c.fires) {
+      const emptyNames950c = r950c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName950c = FOUR_ZONE_NAMES[r950c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames950c} empty; ${bloatName950c} has ${r950c.counts[r950c.bloatZoneIdx]}/${r950c.totalCount} seeding scenes`,
+        rule: 'BELIEF_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r950c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName950c} contains ${r950c.counts[r950c.bloatZoneIdx]} of them (${Math.round((r950c.counts[r950c.bloatZoneIdx] / r950c.totalCount) * 100)}%) while ${emptyNames950c} contains none. Seeds bloat in one structural quarter and never get planted in another, so the beliefs the audience is invited to form are seeded in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames950c} — so the belief-tracking layer keeps forming new expectations across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
