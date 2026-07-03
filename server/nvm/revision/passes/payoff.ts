@@ -297,6 +297,14 @@
 // ever anchored single-peak-isolation checks [PAYOFF_CLOCK_PEAK_DECOUPLED, Wave 566;
 // PAYOFF_CLOCK_DELTA_PEAK_UNCAUSED, Wave 678]; the run-based drought mode has never been applied
 // to it).
+// Wave 748 additions: PAYOFF_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 678/734 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), PAYOFF_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn !== 'nothing' × structural
+// thirds — Wave 678 applied the run-based drought mode to this signal [PAYOFF_TURN_DROUGHT_RUN];
+// the zone-cluster mode has never been applied to it), PAYOFF_STAKES_DROUGHT_RUN (run-based ×
+// purpose === 'raise_stakes' absence — Wave 692 applied the zone-cluster mode to this signal
+// [PAYOFF_STAKES_ZONE_CLUSTER]; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4075,6 +4083,72 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r734c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r734c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves payoffs landing without any accompanying pressure change for an extended run.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r734c.longestRun}-scene stretch so the payoff engine keeps a mechanical pressure acting alongside resolutions throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 748: PAYOFF_CLOCK_DELTA_ZONE_CLUSTER, PAYOFF_TURN_ZONE_CLUSTER,
+  //              PAYOFF_STAKES_DROUGHT_RUN ─────────────────────────────────────────────────
+
+  // PAYOFF_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-shifting
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 678/734
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r748a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r748a.fires) {
+      issues.push({
+        location: `${r748a.zoneNames[r748a.maxZoneIdx]} third — ${r748a.maxZoneCount} of ${r748a.count} clock-shifting scenes`,
+        rule: 'PAYOFF_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r748a.maxZoneCount / r748a.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r748a.zoneNames[r748a.maxZoneIdx]} third. When every clock movement lands in the same structural window, the payoff engine has no accompanying pressure change to draw on when resolving threads elsewhere in the story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r748a.zoneNames[r748a.maxZoneIdx]} third so payoffs keep landing alongside changing pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 turn scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Wave 678 applied the run-based
+  // drought mode to this signal (PAYOFF_TURN_DROUGHT_RUN); the zone-cluster mode has never been
+  // applied to it.
+  {
+    const r748b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r748b.fires) {
+      issues.push({
+        location: `${r748b.zoneNames[r748b.maxZoneIdx]} third — ${r748b.maxZoneCount} of ${r748b.count} dramatic-turn scenes`,
+        rule: 'PAYOFF_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r748b.maxZoneCount / r748b.count) * 100)}% of the story's dramatic turns cluster in the ${r748b.zoneNames[r748b.maxZoneIdx]} third. When every structural pivot lands in the same window, the payoff engine has no fresh reversal to draw on when resolving threads elsewhere in the story.`,
+        suggestedFix: `Move at least one dramatic turn outside the ${r748b.zoneNames[r748b.maxZoneIdx]} third so the payoff engine keeps fresh reversals to resolve against more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. Wave 692 applied the
+  // zone-cluster mode to this signal (PAYOFF_STAKES_ZONE_CLUSTER); the drought-run mode has never
+  // been applied to it.
+  {
+    const r748c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r748c.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r748c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r748c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r748c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the payoff engine resolving threads that were never re-tensioned for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r748c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the payoff engine resolving threads that still matter throughout that stretch.`,
       });
     }
   }

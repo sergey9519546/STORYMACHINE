@@ -1365,6 +1365,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 748 — payoffPass: payoff clock delta zone cluster, payoff turn zone cluster, payoff stakes drought run', async () => {
+    const runPY748 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs748a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs748a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs748a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs748a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runPY748(recs748a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_ZONE_CLUSTER'), 'PAYOFF_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-shifting scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock movement is distributed across thirds', async () => {
+      const recs748an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs748an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs748an[4] = makeSharedRecord(4, { clockDelta: -1 });
+      recs748an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runPY748(recs748an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_ZONE_CLUSTER'), 'PAYOFF_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs748b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs748b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs748b[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs748b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runPY748(recs748b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_ZONE_CLUSTER'), 'PAYOFF_TURN_ZONE_CLUSTER should fire');
+    });
+
+    // PAYOFF_TURN_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('PAYOFF_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs748bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs748bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs748bn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs748bn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runPY748(recs748bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_ZONE_CLUSTER'), 'PAYOFF_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_STAKES_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 purposed to raise stakes (>=3 present overall); scenes 3-9 (7 scenes) purposed otherwise
+    it('PAYOFF_STAKES_DROUGHT_RUN fires when the longest no-stakes-raise run reaches 6', async () => {
+      const recs748c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs748c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs748c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs748c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      const res = await runPY748(recs748c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_DROUGHT_RUN'), 'PAYOFF_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // PAYOFF_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising scenes spread out so no gap reaches 6 consecutive scenes
+    it('PAYOFF_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are spread through the story', async () => {
+      const recs748cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs748cn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs748cn[3] = makeSharedRecord(3, { purpose: 'raise_stakes' });
+      recs748cn[6] = makeSharedRecord(6, { purpose: 'raise_stakes' });
+      recs748cn[9] = makeSharedRecord(9, { purpose: 'raise_stakes' });
+      const res = await runPY748(recs748cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_DROUGHT_RUN'), 'PAYOFF_STAKES_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 734 — payoffPass: payoff relationship zone cluster, payoff seed zone cluster, payoff clock delta drought run', async () => {
     const runPY734 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
