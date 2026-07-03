@@ -1080,6 +1080,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 785 — characterArcPass: arc revelation drought run, arc revelation peak uncaused, arc negative emotion zone cluster', async () => {
+    const makeRec785 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc785 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('ARC_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs785a = Array.from({ length: 10 }, (_, i) => makeRec785(i,
+        (i === 0 || i === 1 || i === 2) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runArc785(recs785a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_DROUGHT_RUN'), 'ARC_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('ARC_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs785an = Array.from({ length: 10 }, (_, i) => makeRec785(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runArc785(recs785an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_DROUGHT_RUN'), 'ARC_REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelations at 2 (peak, earliest) and 5; no dramaticTurn at 0 or 1 (2-scene
+    // lookback of the peak at index 2).
+    it('ARC_REVELATION_PEAK_UNCAUSED fires when the peak revelation scene has no dramatic turn nearby', async () => {
+      const recs785b = Array.from({ length: 8 }, (_, i) => makeRec785(i));
+      recs785b[2] = makeRec785(2, { revelation: 'truth revealed' });
+      recs785b[5] = makeRec785(5, { revelation: 'second truth revealed' });
+      const res = await runArc785(recs785b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PEAK_UNCAUSED'), 'ARC_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('ARC_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak revelation', async () => {
+      const recs785bn = Array.from({ length: 8 }, (_, i) => makeRec785(i));
+      recs785bn[2] = makeRec785(2, { revelation: 'truth revealed' });
+      recs785bn[5] = makeRec785(5, { revelation: 'second truth revealed' });
+      recs785bn[1] = makeRec785(1, { dramaticTurn: 'reversal' });
+      const res = await runArc785(recs785bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_PEAK_UNCAUSED'), 'ARC_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // ARC_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-shift scenes at 0,1,2 → 100% opening third
+    it('ARC_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-shift scenes cluster in one third', async () => {
+      const recs785c = Array.from({ length: 9 }, (_, i) => makeRec785(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runArc785(recs785c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'ARC_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('ARC_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-shift scenes spread across thirds', async () => {
+      const recs785cn = Array.from({ length: 9 }, (_, i) => makeRec785(i,
+        (i === 0 || i === 4 || i === 8) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runArc785(recs785cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'ARC_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 771 — characterArcPass: arc suspense peak uncaused, arc stakes zone cluster, arc revelation zone cluster', async () => {
     const makeRec771 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

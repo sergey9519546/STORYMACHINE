@@ -351,6 +351,15 @@
 // fixed final-quarter window [>60% of revelations in the last 25%]; the general thirds-ratio
 // zone-cluster mode — a disjoint-third majority test at a lower 75% threshold with no fixed
 // zone — has never been applied to revelation).
+// Wave 785 additions: ARC_REVELATION_DROUGHT_RUN (run-based × revelation absence — Wave 771
+// applied the zone-cluster mode to revelation; the run-based drought mode has never been applied
+// to it, completing 2 of 3 slots), ARC_REVELATION_PEAK_UNCAUSED (backward-cause ×
+// revelation-as-magnitude × 2-scene lookback — completing the trio; hasCause references only
+// dramaticTurn, never revelation, to avoid a circular/self-referential audit), ARC_NEGATIVE_
+// EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift === 'negative' presence × structural
+// thirds — the existing ARC_NEGATIVE_EMOTION_RUN audits consecutive-presence [run-based], a
+// distinct claim from where negative beats concentrate structurally; the general thirds-ratio
+// zone-cluster mode has never been applied to this specific valence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4410,6 +4419,73 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r771c.maxZoneCount / r771c.count) * 100)}% of the story's revelation scenes cluster in the ${r771c.zoneNames[r771c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the character's arc has no fresh truth reshaping them anywhere else in the story.`,
         suggestedFix: `Let a revelation land in at least one scene outside the ${r771c.zoneNames[r771c.maxZoneIdx]} third so the character's arc keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 785: ARC_REVELATION_DROUGHT_RUN, ARC_REVELATION_PEAK_UNCAUSED,
+  //              ARC_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ARC_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Wave 771 applied the zone-cluster
+  // mode to revelation; the run-based drought mode has never been applied to it.
+  {
+    const r785a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r785a.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r785a.longestRun} consecutive scenes`,
+        rule: 'ARC_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r785a.longestRun} consecutive scenes with no revelation at all, even though ${r785a.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the character's arc with no fresh disclosure reshaping it for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r785a.longestRun}-scene stretch so the character's arc keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude × 2-scene lookback.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation scenes, fires
+  // when the peak (earliest, on magnitude ties) revelation scene has no dramatic turn in the 2
+  // scenes preceding it. Completing the trio; hasCause references only dramaticTurn, never
+  // revelation, to avoid a circular/self-referential audit.
+  {
+    const r785b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r785b.fires) {
+      issues.push({
+        location: `scene ${r785b.peakIdx + 1} — the story's peak revelation scene`,
+        rule: 'ARC_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r785b.peakIdx + 1} is the earliest of ${r785b.qualifyingCount} revelation scenes, yet none of the 2 scenes leading into it carry a dramatic turn. A disclosure this significant lands without any structural pivot building toward it, leaving the character's arc slack right before the reveal.`,
+        suggestedFix: `Add a dramatic turn in one of the 2 scenes before scene ${r785b.peakIdx + 1} so the character's arc builds pressure into the revelation instead of arriving flat.`,
+      });
+    }
+  }
+
+  // ARC_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative'
+  // presence × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9,
+  // ≥3 negative-shift scenes, fires when more than 75% of those scenes cluster in a single third.
+  // The existing ARC_NEGATIVE_EMOTION_RUN audits consecutive-presence (run-based), a distinct
+  // claim from where negative beats concentrate structurally; the general thirds-ratio
+  // zone-cluster mode has never been applied to this specific valence.
+  {
+    const r785c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r785c.fires) {
+      issues.push({
+        location: `${r785c.zoneNames[r785c.maxZoneIdx]} third — ${r785c.maxZoneCount} of ${r785c.count} negative-shift scenes`,
+        rule: 'ARC_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r785c.maxZoneCount / r785c.count) * 100)}% of the story's negative emotional shifts cluster in the ${r785c.zoneNames[r785c.maxZoneIdx]} third. When every setback lands in the same structural window, the character's arc has no low point testing them anywhere else in the story.`,
+        suggestedFix: `Give the character a setback in at least one scene outside the ${r785c.zoneNames[r785c.maxZoneIdx]} third so the arc keeps testing them with adversity more evenly across the story.`,
       });
     }
   }
