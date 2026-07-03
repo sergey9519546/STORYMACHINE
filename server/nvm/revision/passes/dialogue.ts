@@ -249,6 +249,15 @@
 // distinct from this file's existing unresolvedClues checks, which are co-occurrence [paired with
 // dialogueHighlights] and sequence/aftermath [as a ≥3-debt trigger] — this is the first purely
 // distributional measure on the signal here).
+// Wave 658 additions (built on the shared checks library, audit M2.2): DIALOGUE_STAGING_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × visualBeats magnitude — every prior peak check
+// in this 123-rule pass anchors on raw dialogue density [DIALOGUE_VERBAL_PEAK_UNCAUSED] or the
+// dialogueHighlights channel [Wave 644]; this is the first application to physical staging),
+// DIALOGUE_SEED_DROUGHT_RUN (run-based × seededClueIds absence — Wave 644 applied the drought-run
+// mode to curiosityDelta; seededClueIds itself has never been drought-audited here), DIALOGUE_
+// PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds — distinct from
+// the existing DIALOGUE_PAYOFF_ZONE_IMBALANCE [Wave 630 — four-zone bloat/empty check]; this is a
+// three-zone concentration measure on the same field, firing on skew even when no zone is empty).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3922,6 +3931,75 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r644c.maxZoneCount} of the story's ${r644c.count} scenes carrying outstanding clue-debt (${Math.round((r644c.maxZoneCount / r644c.count) * 100)}%) cluster in the ${zoneName644c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery for dialogue to press against.`,
         suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName644c} third — spreading open threads across the story gives dialogue in every structural third something unresolved to push against.`,
+      });
+    }
+  }
+
+  // ── Wave 658: DIALOGUE_STAGING_PEAK_UNCAUSED, DIALOGUE_SEED_DROUGHT_RUN,
+  //              DIALOGUE_PAYOFF_ZONE_CLUSTER ────────────────────────────────────────────────
+
+  // DIALOGUE_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged scenes, a
+  // 2-scene lookback. Finds the single scene with the densest physical staging; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Every prior peak check in this pass anchors on raw dialogue density (DIALOGUE_VERBAL_PEAK_
+  // UNCAUSED) or the dialogueHighlights channel (Wave 644); this is the first application to
+  // physical staging.
+  {
+    const r658a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r658a.fires) {
+      issues.push({
+        location: `scene ${r658a.peakIdx + 1} — peak physical-staging density (${r658a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r658a.peakIdx + 1}, with ${r658a.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of staged action carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r658a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. Wave 644 applied the drought-run mode to
+  // curiosityDelta; seededClueIds itself has never been drought-audited here.
+  {
+    const r658b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r658b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r658b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r658b.longestRun} consecutive scenes with no clue seeded at all, even though ${r658b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the dialogue coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r658b.longestRun}-scene stretch so the story keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // DIALOGUE_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // >75% of them fall in a single structural third. Distinct from DIALOGUE_PAYOFF_ZONE_IMBALANCE
+  // (Wave 630 — four-zone bloat/empty check); this is a three-zone concentration measure on the
+  // same field, firing on skew even when no zone is empty.
+  {
+    const r658c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r658c.fires) {
+      const zoneName658c = r658c.zoneNames[r658c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName658c} third — ${r658c.maxZoneCount}/${r658c.count} payoff scenes`,
+        rule: 'DIALOGUE_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r658c.maxZoneCount} of the story's ${r658c.count} thread-resolution scenes (${Math.round((r658c.maxZoneCount / r658c.count) * 100)}%) cluster in the ${zoneName658c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout, leaving other structural thirds with no verbal sense of a question being answered.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName658c} third — spreading resolutions across the story lets each structural third carry its own verbal sense of an answer arriving.`,
       });
     }
   }
