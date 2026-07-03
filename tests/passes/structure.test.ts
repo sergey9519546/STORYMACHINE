@@ -1006,6 +1006,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 877 — structurePass: structure resolution drought run, structure complicate zone cluster, structure complicate drought run', async () => {
+    const runST877 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('STRUCTURE_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs877a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runST877(recs877a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_RESOLUTION_DROUGHT_RUN'), 'STRUCTURE_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs877an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runST877(recs877an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_RESOLUTION_DROUGHT_RUN'), 'STRUCTURE_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs877b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST877(recs877b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_ZONE_CLUSTER'), 'STRUCTURE_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('STRUCTURE_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs877bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST877(recs877bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_ZONE_CLUSTER'), 'STRUCTURE_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('STRUCTURE_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs877c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST877(recs877c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_DROUGHT_RUN'), 'STRUCTURE_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('STRUCTURE_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs877cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST877(recs877cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_DROUGHT_RUN'), 'STRUCTURE_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 863 — structurePass: structure climax drought run, structure establish world drought run, structure resolution zone cluster', async () => {
     const runST863 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

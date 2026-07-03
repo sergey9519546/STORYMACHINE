@@ -386,6 +386,15 @@
 // composite set [union with 'climax', 'turning_point'] and two incidental last-record
 // disjunctions (`purpose !== 'resolution'`); it has never been audited as its own standalone
 // signal by any of the three shared-library trio modes).
+//
+// Wave 877 additions: STRUCTURE_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 863; peak mode conventionally skipped for this categorical field),
+// STRUCTURE_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose === 'complicate' x
+// structural thirds -- this purpose value has never been referenced anywhere in this pass; a
+// virgin field), STRUCTURE_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in this same wave; peak mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4833,6 +4842,72 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r863c.maxZoneCount / r863c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r863c.zoneNames[r863c.maxZoneIdx]} third. When every resolution beat concentrates in one structural window, the story's architecture has no room to let threads settle gradually before the ending absorbs them all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r863c.zoneNames[r863c.maxZoneIdx]} third so the structure's closure is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 877: STRUCTURE_RESOLUTION_DROUGHT_RUN, STRUCTURE_COMPLICATE_ZONE_CLUSTER,
+  //              STRUCTURE_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // STRUCTURE_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 863 (peak mode conventionally skipped for this categorical field).
+  {
+    const r877a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r877a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r877a.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r877a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r877a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the story's architecture with no wind-down beat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r877a.longestRun}-scene stretch to resolve part of the story, so the structure keeps winding down throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // STRUCTURE_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r877b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r877b.fires) {
+      issues.push({
+        location: `${r877b.zoneNames[r877b.maxZoneIdx]} third — ${r877b.maxZoneCount} of ${r877b.count} complicating scenes`,
+        rule: 'STRUCTURE_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r877b.maxZoneCount / r877b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r877b.zoneNames[r877b.maxZoneIdx]} third. When every complication lands in the same structural window, the story's architecture stops deepening its trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r877b.zoneNames[r877b.maxZoneIdx]} third to complicate the story so the structure keeps deepening its trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r877c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r877c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r877c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r877c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r877c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the story's architecture stalled for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r877c.longestRun}-scene stretch to complicate the story so the structure keeps deepening its trouble throughout that stretch.`,
       });
     }
   }
