@@ -934,6 +934,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 817 — pacingPass: pacing character moment zone cluster, pacing character moment drought run, pacing turning point zone cluster', async () => {
+    const runP817 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('PACING_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs817a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runP817(recs817a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_ZONE_CLUSTER'), 'PACING_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs817an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runP817(recs817an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_ZONE_CLUSTER'), 'PACING_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // PACING_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; character_moment at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_CHARACTER_MOMENT_DROUGHT_RUN fires when a long run has no character moment', async () => {
+      const recs817b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runP817(recs817b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_DROUGHT_RUN'), 'PACING_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are evenly spread', async () => {
+      const recs817bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runP817(recs817bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CHARACTER_MOMENT_DROUGHT_RUN'), 'PACING_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('PACING_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs817c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runP817(recs817c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_TURNING_POINT_ZONE_CLUSTER'), 'PACING_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs817cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runP817(recs817cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_TURNING_POINT_ZONE_CLUSTER'), 'PACING_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 803 — pacingPass: pacing revelation peak uncaused, pacing negative emotion zone cluster, pacing negative emotion drought run', async () => {
     const runP803 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

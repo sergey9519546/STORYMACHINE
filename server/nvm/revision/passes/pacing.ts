@@ -337,6 +337,15 @@
 // isolated on its own), PACING_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift ===
 // 'negative' absence — completing 2 of 3 slots for this valence alongside the zone-cluster mode
 // added in this same wave; peak mode conventionally skipped for this categorical field).
+// Wave 817 additions: PACING_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — this purpose value has never been referenced anywhere
+// in this pass; none of the three shared-library trio modes has ever been applied to it),
+// PACING_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence —
+// completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+// same wave; peak mode conventionally skipped for this categorical field),
+// PACING_TURNING_POINT_ZONE_CLUSTER (distribution/timing × purpose === 'turning_point' ×
+// structural thirds — this purpose value has never been referenced anywhere in this pass
+// either; none of the three shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4600,6 +4609,72 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r803c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r803c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves pacing without any adversity testing momentum for an extended run.`,
         suggestedFix: `Give the story a setback within the ${r803c.longestRun}-scene stretch so pacing keeps testing momentum with adversity throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 817: PACING_CHARACTER_MOMENT_ZONE_CLUSTER, PACING_CHARACTER_MOMENT_DROUGHT_RUN,
+  //              PACING_TURNING_POINT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // character-moment scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass; none of the
+  // three shared-library trio modes has ever been applied to it.
+  {
+    const r817a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r817a.fires) {
+      issues.push({
+        location: `${r817a.zoneNames[r817a.maxZoneIdx]} third — ${r817a.maxZoneCount} of ${r817a.count} character-moment scenes`,
+        rule: 'PACING_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r817a.maxZoneCount / r817a.count) * 100)}% of the story's character-moment scenes cluster in the ${r817a.zoneNames[r817a.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, pacing has no room to breathe anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r817a.zoneNames[r817a.maxZoneIdx]} third as a character moment so pacing keeps room to breathe more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes with no character-moment purpose
+  // reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
+  // added in this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r817b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r817b.fires) {
+      issues.push({
+        location: `longest stretch with no character moment: ${r817b.longestRun} consecutive scenes`,
+        rule: 'PACING_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r817b.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r817b.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with nothing but momentum leaves pacing without a beat to breathe for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r817b.longestRun}-scene stretch as a character moment so pacing keeps a beat to breathe throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass either; none of the
+  // three shared-library trio modes has ever been applied to it.
+  {
+    const r817c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r817c.fires) {
+      issues.push({
+        location: `${r817c.zoneNames[r817c.maxZoneIdx]} third — ${r817c.maxZoneCount} of ${r817c.count} turning-point scenes`,
+        rule: 'PACING_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r817c.maxZoneCount / r817c.count) * 100)}% of the story's turning-point scenes cluster in the ${r817c.zoneNames[r817c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, pacing has no structural pivot to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r817c.zoneNames[r817c.maxZoneIdx]} third as a turning point so pacing keeps a pivot to react to more evenly across the story.`,
       });
     }
   }
