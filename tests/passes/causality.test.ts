@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 811 — causalityPass: causality turning point zone cluster, causality turning point drought run, causality introduce conflict zone cluster', async () => {
+    const runCA811 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_TURNING_POINT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; turning_point scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_TURNING_POINT_ZONE_CLUSTER fires when >75% of turning-point scenes cluster in one third', async () => {
+      const recs811a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runCA811(recs811a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_ZONE_CLUSTER'), 'CAUSALITY_TURNING_POINT_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_TURNING_POINT_ZONE_CLUSTER does not fire when turning-point scenes spread across thirds', async () => {
+      const recs811an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runCA811(recs811an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_ZONE_CLUSTER'), 'CAUSALITY_TURNING_POINT_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_TURNING_POINT_DROUGHT_RUN fire:
+    // n=10; turning_point at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_TURNING_POINT_DROUGHT_RUN fires when a long run has no turning point', async () => {
+      const recs811b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runCA811(recs811b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_DROUGHT_RUN'), 'CAUSALITY_TURNING_POINT_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_TURNING_POINT_DROUGHT_RUN does not fire when turning points are evenly spread', async () => {
+      const recs811bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'turning_point' : 'complicate' }),
+      );
+      const res = await runCA811(recs811bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURNING_POINT_DROUGHT_RUN'), 'CAUSALITY_TURNING_POINT_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; introduce_conflict scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER fires when >75% of conflict-introducing scenes cluster in one third', async () => {
+      const recs811c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runCA811(recs811c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER does not fire when conflict-introducing scenes spread across thirds', async () => {
+      const recs811cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runCA811(recs811cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER'), 'CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 797 — causalityPass: causality character moment drought run, causality negative emotion zone cluster, causality negative emotion drought run', async () => {
     const runCA797 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

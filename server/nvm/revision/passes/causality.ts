@@ -365,6 +365,18 @@
 // distinct from the pre-existing EMOTIONAL_NEUTRAL_RUN (Wave 324), which fires on a run of
 // ALL-neutral scenes; this fires on a run absent of negative charge specifically, which a run
 // mixing neutral and positive scenes would satisfy but EMOTIONAL_NEUTRAL_RUN would not).
+// Wave 811 additions (closes the sixteenth rotation cycle, 798-811): CAUSALITY_TURNING_
+// POINT_ZONE_CLUSTER (distribution/timing × purpose === 'turning_point' × structural thirds —
+// this purpose value has only ever appeared inside the tensionReleasingPurposes composite set
+// [union with 'resolution', 'climax', 'revelation']; it has never been audited as its own
+// standalone signal by any of the three shared-library trio modes), CAUSALITY_TURNING_
+// POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence — completing 2 of 3 slots
+// for this purpose value alongside the zone-cluster mode added in this same wave; peak mode
+// conventionally skipped for this categorical field), CAUSALITY_INTRODUCE_CONFLICT_
+// ZONE_CLUSTER (distribution/timing × purpose === 'introduce_conflict' × structural thirds —
+// this purpose value has never been referenced anywhere in this pass despite being thematically
+// central to a causality analysis; none of the three shared-library trio modes has ever been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4714,6 +4726,74 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r797c.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r797c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no darkness leaves the causal chain with nothing testing its stakes under emotional cost for an extended run.`,
         suggestedFix: `Give at least one scene within the ${r797c.longestRun}-scene stretch a negative emotional charge so the causal chain keeps testing its stakes against cost throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 811: CAUSALITY_TURNING_POINT_ZONE_CLUSTER, CAUSALITY_TURNING_POINT_DROUGHT_RUN,
+  //              CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CAUSALITY_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has only ever appeared inside the tensionReleasingPurposes composite set
+  // (union with 'resolution', 'climax', 'revelation'); it has never been audited as its own
+  // standalone signal by any of the three shared-library trio modes.
+  {
+    const r811a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r811a.fires) {
+      issues.push({
+        location: `${r811a.zoneNames[r811a.maxZoneIdx]} third — ${r811a.maxZoneCount} of ${r811a.count} turning-point scenes`,
+        rule: 'CAUSALITY_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r811a.maxZoneCount / r811a.count) * 100)}% of the story's turning-point scenes cluster in the ${r811a.zoneNames[r811a.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the causal chain has no redirection anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r811a.zoneNames[r811a.maxZoneIdx]} third as a turning point so the causal chain keeps redirecting events more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall,
+  // fires when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r811b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r811b.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r811b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r811b.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r811b.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the causal chain coasting without a pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r811b.longestRun}-scene stretch as a turning point so the causal chain keeps redirecting events throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass
+  // despite being thematically central to a causality analysis; none of the three shared-library
+  // trio modes has ever been applied to it.
+  {
+    const r811c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r811c.fires) {
+      issues.push({
+        location: `${r811c.zoneNames[r811c.maxZoneIdx]} third — ${r811c.maxZoneCount} of ${r811c.count} conflict-introducing scenes`,
+        rule: 'CAUSALITY_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r811c.maxZoneCount / r811c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r811c.zoneNames[r811c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the causal chain stops introducing fresh sources of friction anywhere else across its full shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r811c.zoneNames[r811c.maxZoneIdx]} third to introduce conflict so the causal chain keeps opening fresh friction more evenly across its full shape.`,
       });
     }
   }
