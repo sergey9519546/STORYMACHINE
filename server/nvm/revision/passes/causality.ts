@@ -270,6 +270,16 @@
 // purpose === 'raise_stakes' × structural thirds — `purpose` has only ever appeared inside
 // incidental threshold conditions [e.g. purpose === 'climax'/'resolution' guards] in this
 // 120-rule pass, never as the standalone subject of its own check).
+// Wave 685 additions (closes the seventh rotation cycle, 671-685): CAUSALITY_CLOCK_DELTA_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × clockDelta magnitude — clockDelta anchors
+// several hand-rolled aggregate and threshold checks in this pass [e.g. the Wave 324/489b
+// no-delta and clock-delta-array logic] but has never been backward-cause peak-audited via the
+// shared library), CAUSALITY_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absence —
+// payoffSetupIds anchors extensive hand-rolled aggregate/peak logic [Waves 268, 335, 433c, 461a,
+// 517a] but has never been drought-audited), CAUSALITY_SEED_ZONE_CLUSTER (distribution/timing ×
+// seededClueIds × structural thirds — seededClueIds anchors extensive hand-rolled aggregate/
+// front-loading logic [Waves 335, 461b, 489b] but has never been zone-cluster-audited via the
+// shared library).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4004,6 +4014,74 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r671c.maxZoneCount} of the story's ${r671c.count} scenes purposed to raise stakes (${Math.round((r671c.maxZoneCount / r671c.count) * 100)}%) cluster in the ${zoneName671c} third. Escalation concentrates almost exclusively in that stretch of the story rather than compounding throughout, leaving other structural thirds with no causal pressure pushing the stakes higher.`,
         suggestedFix: `Purpose at least one scene outside the ${zoneName671c} third to raise stakes — spreading escalation across the story lets every structural third carry its own share of mounting causal pressure.`,
+      });
+    }
+  }
+
+  // ── Wave 685: CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED, CAUSALITY_PAYOFF_DROUGHT_RUN,
+  //              CAUSALITY_SEED_ZONE_CLUSTER ───────────────────────────────────────────────────
+
+  // CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED — Single-peak isolation/backward-cause × clockDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a
+  // nonzero clock delta, a 2-scene lookback. Finds the single scene where the clock advances the
+  // most; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. clockDelta anchors several hand-rolled aggregate/threshold checks in this pass
+  // but has never been backward-cause peak-audited via the shared library.
+  {
+    const r685a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.abs(r.clockDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r685a.fires) {
+      issues.push({
+        location: `scene ${r685a.peakIdx + 1} — peak clock delta (${r685a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single largest clock swing (scene ${r685a.peakIdx + 1}, delta magnitude ${r685a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where time pressure shifts most sharply arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
+        suggestedFix: `Give scene ${r685a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest clock swing is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. payoffSetupIds anchors
+  // extensive hand-rolled aggregate/peak logic in this pass but has never been drought-audited.
+  {
+    const r685b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r685b.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r685b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r685b.longestRun} consecutive scenes with no thread resolving at all, even though ${r685b.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the causal chain of cause-and-effect dormant for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r685b.longestRun}-scene stretch so the causal chain's sense of accumulating consequence keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of
+  // them fall in a single structural third. seededClueIds anchors extensive hand-rolled aggregate/
+  // front-loading logic in this pass but has never been zone-cluster-audited via the shared
+  // library.
+  {
+    const r685c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r685c.fires) {
+      const zoneName685c = r685c.zoneNames[r685c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName685c} third — ${r685c.maxZoneCount}/${r685c.count} seed scenes`,
+        rule: 'CAUSALITY_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r685c.maxZoneCount} of the story's ${r685c.count} clue-planting scenes (${Math.round((r685c.maxZoneCount / r685c.count) * 100)}%) cluster in the ${zoneName685c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the causal chain of setups an uneven structural rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName685c} third — spreading foreshadowing across the story lets the causal chain of setups build gradually instead of arriving all at once.`,
       });
     }
   }

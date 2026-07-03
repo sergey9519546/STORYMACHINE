@@ -1247,6 +1247,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 685 — causalityPass: causality clock delta peak uncaused, causality payoff drought run, causality seed zone cluster', async () => {
+    const runCA685 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta at 2 (delta 1) and 6 (delta 5, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clock-delta scene has no dramatic turn or revelation nearby', async () => {
+      const recs685a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs685a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs685a[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runCA685(recs685a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED'), 'CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    // CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED no-fire:
+    // revelation at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a revelation precedes the peak within the lookback', async () => {
+      const recs685an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs685an[2] = makeSharedRecord(2, { clockDelta: 1 });
+      recs685an[5] = makeSharedRecord(5, { revelation: 'the deadline was moved up' });
+      recs685an[6] = makeSharedRecord(6, { clockDelta: 5 });
+      const res = await runCA685(recs685an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED'), 'CAUSALITY_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // CAUSALITY_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CAUSALITY_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs685b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs685b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs685b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs685b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs685b[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runCA685(recs685b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_DROUGHT_RUN'), 'CAUSALITY_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CAUSALITY_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs685bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs685bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs685bn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs685bn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runCA685(recs685bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_DROUGHT_RUN'), 'CAUSALITY_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs685c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs685c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs685c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs685c[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runCA685(recs685c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_ZONE_CLUSTER'), 'CAUSALITY_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSALITY_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSALITY_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs685cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs685cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs685cn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs685cn[7] = makeSharedRecord(7, { seededClueIds: ['clue-c'] });
+      const res = await runCA685(recs685cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_ZONE_CLUSTER'), 'CAUSALITY_SEED_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 671 — causalityPass: causality highlight drought run, causality open thread peak uncaused, causality stakes zone cluster', async () => {
     const runCA671 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
