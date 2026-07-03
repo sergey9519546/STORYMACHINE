@@ -377,6 +377,17 @@
 // this purpose value has never been referenced anywhere in this pass despite being thematically
 // central to a causality analysis; none of the three shared-library trio modes has ever been
 // applied to it).
+//
+// Wave 825 additions (closes the seventeenth rotation cycle, 812-825): CAUSALITY_INTRODUCE_
+// CONFLICT_DROUGHT_RUN (run-based × purpose === 'introduce_conflict' absence — completes 2 of 3
+// slots for this purpose value alongside the zone-cluster mode added in Wave 811; peak mode
+// conventionally skipped for this categorical field), CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'positive' × structural thirds — the positive valence
+// has never been isolated by any of the three shared-library trio modes in this pass, mirroring
+// the negative-valence trio completed earlier), CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN (run-based
+// × emotionalShift === 'positive' absence — completes 2 of 3 slots for this valence alongside the
+// zone-cluster mode added in this same wave; peak mode conventionally skipped for this categorical
+// field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4794,6 +4805,73 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r811c.maxZoneCount / r811c.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r811c.zoneNames[r811c.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the causal chain stops introducing fresh sources of friction anywhere else across its full shape.`,
         suggestedFix: `Purpose at least one scene outside the ${r811c.zoneNames[r811c.maxZoneIdx]} third to introduce conflict so the causal chain keeps opening fresh friction more evenly across its full shape.`,
+      });
+    }
+  }
+
+  // ── Wave 825: CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN, CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER,
+  //              CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 811 (peak mode conventionally skipped for this
+  // categorical field).
+  {
+    const r825a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r825a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r825a.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r825a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r825a.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the causal chain coasting on old conflict for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r825a.longestRun}-scene stretch to introduce conflict so the causal chain keeps opening fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // The positive valence has never been isolated by any of the three shared-library trio modes in
+  // this pass, mirroring the negative-valence trio completed earlier.
+  {
+    const r825b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r825b.fires) {
+      issues.push({
+        location: `${r825b.zoneNames[r825b.maxZoneIdx]} third — ${r825b.maxZoneCount} of ${r825b.count} positive-emotion scenes`,
+        rule: 'CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r825b.maxZoneCount / r825b.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r825b.zoneNames[r825b.maxZoneIdx]} third. When all the relief concentrates in one structural window, the causal chain delivers its emotional payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r825b.zoneNames[r825b.maxZoneIdx]} third so the causal chain delivers its emotional payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r825c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r825c.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r825c.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r825c.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r825c.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves the causal chain without an emotional payoff to deliver for an extended run.`,
+        suggestedFix: `Give the story a moment of relief within the ${r825c.longestRun}-scene stretch so the causal chain keeps an emotional payoff to deliver throughout that stretch.`,
       });
     }
   }

@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 825 — causalityPass: causality introduce conflict drought run, causality positive emotion zone cluster, causality positive emotion drought run', async () => {
+    const runCA825 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs825a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runCA825(recs825a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs825an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runCA825(recs825an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'CAUSALITY_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; positive-emotion scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER fires when >75% of positive-emotion scenes cluster in one third', async () => {
+      const recs825b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runCA825(recs825b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER'), 'CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER does not fire when positive-emotion scenes spread across thirds', async () => {
+      const recs825bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runCA825(recs825bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER'), 'CAUSALITY_POSITIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs825c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runCA825(recs825c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN'), 'CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs825cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runCA825(recs825cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN'), 'CAUSALITY_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 811 — causalityPass: causality turning point zone cluster, causality turning point drought run, causality introduce conflict zone cluster', async () => {
     const runCA811 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
