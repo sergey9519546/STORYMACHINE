@@ -1210,6 +1210,109 @@ He sits at his desk.
   });
 
 
+  describe('Wave 676 — originalityPass: originality open thread drought run, originality staging zone cluster, originality payoff peak uncaused', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662 above — every fixture cycles
+    // purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated 'major'
+    // rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_676 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_676 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_676 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor676 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec676 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor676(idx),
+      emotionalShift: EMOTION_POOL_676[idx % EMOTION_POOL_676.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_676[idx % PURPOSE_POOL_676.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain676 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor676(i)}\n\n${SENTENCE_POOL_676[i % SENTENCE_POOL_676.length]}`).join('\n\n');
+    const runO676 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain676(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; debt at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ORIGINALITY_OPEN_THREAD_DROUGHT_RUN fires when the longest no-debt run is ≥6', async () => {
+      const recs676a = Array.from({ length: 10 }, (_, i) => makeRec676(i, {
+        unresolvedClues: (i === 0 || i === 1 || i === 2 || i === 9) ? ['a'] : [],
+      }));
+      const res = await runO676(recs676a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_DROUGHT_RUN'), 'ORIGINALITY_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // ORIGINALITY_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // debt at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ORIGINALITY_OPEN_THREAD_DROUGHT_RUN does not fire when debt is distributed without a long drought', async () => {
+      const recs676an = Array.from({ length: 10 }, (_, i) => makeRec676(i, {
+        unresolvedClues: (i === 0 || i === 4 || i === 9) ? ['a'] : [],
+      }));
+      const res = await runO676(recs676an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_DROUGHT_RUN'), 'ORIGINALITY_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // ORIGINALITY_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes (visualBeats≥2) at 0,1,2 → 100% opening
+    // third
+    it('ORIGINALITY_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs676b = Array.from({ length: 9 }, (_, i) => makeRec676(i, {
+        visualBeats: (i === 0 || i === 1 || i === 2) ? ['a', 'b'] : [],
+      }));
+      const res = await runO676(recs676b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAGING_ZONE_CLUSTER'), 'ORIGINALITY_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // ORIGINALITY_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ORIGINALITY_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs676bn = Array.from({ length: 9 }, (_, i) => makeRec676(i, {
+        visualBeats: (i === 0 || i === 4 || i === 7) ? ['a', 'b'] : [],
+      }));
+      const res = await runO676(recs676bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAGING_ZONE_CLUSTER'), 'ORIGINALITY_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_PAYOFF_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1 thread) and 6 (5 threads, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('ORIGINALITY_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs676c = Array.from({ length: 8 }, (_, i) => makeRec676(i, {
+        payoffSetupIds: i === 2 ? ['thread-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+      }));
+      const res = await runO676(recs676c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_PEAK_UNCAUSED'), 'ORIGINALITY_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // ORIGINALITY_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('ORIGINALITY_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs676cn = Array.from({ length: 8 }, (_, i) => makeRec676(i, {
+        payoffSetupIds: i === 2 ? ['thread-a'] : i === 6 ? ['a', 'b', 'c', 'd', 'e'] : [],
+        dramaticTurn: i === 5 ? 'reversal' : 'nothing',
+      }));
+      const res = await runO676(recs676cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_PEAK_UNCAUSED'), 'ORIGINALITY_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 662 — originalityPass: originality highlight peak uncaused, originality seed drought run, originality payoff zone cluster', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648 above — every fixture cycles
     // purpose/emotion/dialogue/slug/sentence per scene to avoid tripping unrelated 'major'

@@ -247,6 +247,16 @@
 // this pass already applies the zone-cluster template to dramaticTurn and clockRaised;
 // payoffSetupIds itself has never been cluster-audited here — a predictable, front- or
 // back-loaded resolution rhythm is itself a learnable pattern).
+// Wave 676 additions (built on the shared checks library, audit M2.2): ORIGINALITY_OPEN_THREAD_
+// DROUGHT_RUN (run-based × unresolvedClues absence — unresolvedClues has only ever anchored
+// OPEN_THREAD_CURIOSITY_DECOUPLED; the drought-run mode applied to this channel for the first
+// time — a long, predictable stretch where no mystery is ever left dangling), ORIGINALITY_
+// STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural thirds — Wave 606's
+// SCENE_STAGING_ZONE_IMBALANCE uses the four-zone bloat/empty template; this is a three-zone
+// concentration measure on the same field, catching skew even when no zone is empty),
+// ORIGINALITY_PAYOFF_PEAK_UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds
+// magnitude — Wave 662 applied the zone-cluster mode to payoffSetupIds; this applies the
+// backward-cause peak mode to the same channel, a genuinely different question).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4163,6 +4173,76 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r662c.maxZoneCount} of the story's ${r662c.count} thread-resolution scenes (${Math.round((r662c.maxZoneCount / r662c.count) * 100)}%) cluster in the ${zoneName662c} third. Resolution concentrates almost exclusively in that stretch of the story rather than landing throughout — once the audience notices the pattern, they learn which third to expect answers in rather than experiencing a genuinely unpredictable rhythm.`,
         suggestedFix: `Resolve at least one thread outside the ${zoneName662c} third — spreading payoffs across the story keeps the timing of resolutions unpredictable rather than confined to a single learnable stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 676: ORIGINALITY_OPEN_THREAD_DROUGHT_RUN, ORIGINALITY_STAGING_ZONE_CLUSTER,
+  //              ORIGINALITY_PAYOFF_PEAK_UNCAUSED ───────────────────────────────────────────
+
+  // ORIGINALITY_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with zero outstanding clue-debt reaches 6.
+  // unresolvedClues has only ever anchored OPEN_THREAD_CURIOSITY_DECOUPLED; the drought-run mode
+  // applied to this channel for the first time — a long, predictable stretch where no mystery is
+  // ever left dangling is itself a learnable rhythm.
+  {
+    const r676a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r676a.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r676a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r676a.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r676a.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved is itself a learnable pattern — the audience can predict that no lingering question will surface for an extended stretch.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r676a.longestRun}-scene stretch so the audience can't predict a long, mystery-free lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes,
+  // fires when >75% of them fall in a single structural third. Wave 606's SCENE_STAGING_ZONE_
+  // IMBALANCE uses the four-zone bloat/empty template; this is a three-zone concentration measure
+  // on the same field, catching skew even when no zone is empty.
+  {
+    const r676b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r676b.fires) {
+      const zoneName676b = r676b.zoneNames[r676b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName676b} third — ${r676b.maxZoneCount}/${r676b.count} visually dense scenes`,
+        rule: 'ORIGINALITY_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r676b.maxZoneCount} of the story's ${r676b.count} visually dense scenes (${Math.round((r676b.maxZoneCount / r676b.count) * 100)}%) cluster in the ${zoneName676b} third. Physical staging concentrates almost exclusively in that stretch rather than surfacing throughout, creating a learnable rhythm where staged scenes only ever appear in one predictable stretch of the script.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName676b} third substantial physical staging — spreading staged action across the story keeps its placement genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous thread resolutions;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Wave 662 applied the zone-cluster mode to payoffSetupIds; this applies the
+  // backward-cause peak mode to the same channel, a genuinely different question.
+  {
+    const r676c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r676c.fires) {
+      issues.push({
+        location: `scene ${r676c.peakIdx + 1} — peak payoff density (${r676c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r676c.peakIdx + 1}, with ${r676c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated convenience rather than an earned convergence.`,
+        suggestedFix: `Give scene ${r676c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a structural shift rather than arriving in a causal vacuum.`,
       });
     }
   }
