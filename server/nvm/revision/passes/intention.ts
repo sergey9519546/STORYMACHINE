@@ -361,6 +361,17 @@
 // (distribution/timing × emotionalShift === 'negative' × structural thirds — mirrors the
 // completed positive-valence trio; the negative valence has never been isolated by any of the
 // three shared-library trio modes in this pass).
+//
+// Wave 843 additions: INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 829; peak mode conventionally skipped for this categorical
+// field), INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative'
+// absence — completes 2 of 3 slots for this valence alongside the zone-cluster mode added in
+// Wave 829; peak mode conventionally skipped for this categorical field),
+// INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER (distribution/timing × purpose === 'establish_world' ×
+// structural thirds — this purpose value has only ever appeared inside a composite low-momentum
+// purposes set; none of the three shared-library trio modes has ever isolated it as its own
+// standalone signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4798,6 +4809,74 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r829c.maxZoneCount / r829c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r829c.zoneNames[r829c.maxZoneIdx]} third. When all the setbacks concentrate in one structural window, the character's pursuit of their goal carries its emotional cost in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a negative-emotion scene outside the ${r829c.zoneNames[r829c.maxZoneIdx]} third so the character's intention registers its emotional cost more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 843: INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN, INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER ──────────────────────────────────────
+
+  // INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict'
+  // absence. Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-
+  // introducing scenes overall, fires when the longest consecutive run of scenes with no
+  // conflict-introducing purpose reaches 6. Completing 2 of 3 slots for this purpose value
+  // alongside the zone-cluster mode added in Wave 829 (peak mode conventionally skipped for this
+  // categorical field).
+  {
+    const r843a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r843a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r843a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r843a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r843a.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the character's pursuit of their goal untested for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r843a.longestRun}-scene stretch to introduce conflict so the character's intention keeps facing fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 829 (peak mode conventionally skipped for this categorical field).
+  {
+    const r843b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r843b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r843b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r843b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r843b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the character's pursuit of their goal without an emotional cost for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r843b.longestRun}-scene stretch so the character's intention keeps registering its emotional cost throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has only ever appeared inside a composite low-momentum purposes
+  // set; none of the three shared-library trio modes has ever isolated it as its own standalone
+  // signal.
+  {
+    const r843c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r843c.fires) {
+      issues.push({
+        location: `${r843c.zoneNames[r843c.maxZoneIdx]} third — ${r843c.maxZoneCount} of ${r843c.count} world-establishing scenes`,
+        rule: 'INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r843c.maxZoneCount / r843c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r843c.zoneNames[r843c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, the character's pursuit of their goal loses fresh ground to act against anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r843c.zoneNames[r843c.maxZoneIdx]} third to establish the world so the character's intention keeps fresh ground to act against more evenly across the story.`,
       });
     }
   }

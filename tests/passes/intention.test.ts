@@ -1352,6 +1352,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 843 — intentionPass: intention introduce conflict drought run, intention negative emotion drought run, intention establish world zone cluster', async () => {
+    const makeRec843 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN843 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs843a = Array.from({ length: 10 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runIN843(recs843a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs843an = Array.from({ length: 10 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'introduce_conflict' } : {}
+      ));
+      const res = await runIN843(recs843an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'INTENTION_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs843b = Array.from({ length: 10 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runIN843(recs843b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN'), 'INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs843bn = Array.from({ length: 10 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runIN843(recs843bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN'), 'INTENTION_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs843c = Array.from({ length: 9 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runIN843(recs843c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER'), 'INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs843cn = Array.from({ length: 9 }, (_, i) => makeRec843(i,
+        (i === 0 || i === 4 || i === 8) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runIN843(recs843cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER'), 'INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 829 — intentionPass: intention turning point drought run, intention introduce conflict zone cluster, intention negative emotion zone cluster', async () => {
     const makeRec829 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
