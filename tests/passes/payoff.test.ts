@@ -1365,6 +1365,74 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 790 — payoffPass: payoff suspense drought run, payoff revelation zone cluster, payoff revelation drought run', async () => {
+    const runPY790 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PAYOFF_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs790a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY790(recs790a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_DROUGHT_RUN'), 'PAYOFF_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs790an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runPY790(recs790an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_DROUGHT_RUN'), 'PAYOFF_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs790b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runPY790(recs790b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_ZONE_CLUSTER'), 'PAYOFF_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs790bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 4, 8].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runPY790(recs790bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_ZONE_CLUSTER'), 'PAYOFF_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PAYOFF_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs790c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runPY790(recs790c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DROUGHT_RUN'), 'PAYOFF_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs790cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runPY790(recs790cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DROUGHT_RUN'), 'PAYOFF_REVELATION_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 776 — payoffPass: payoff curiosity peak uncaused, payoff curiosity zone cluster, payoff suspense zone cluster', async () => {
     const runPY776 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

@@ -325,6 +325,14 @@
 // PAYOFF_SUSPENSE_PEAK_DECOUPLED, PAYOFF_SUSPENSE_RECOIL_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT];
 // none of the three shared-library trio modes has ever been applied to suspenseDelta as a
 // primary signal).
+// Wave 790 additions: PAYOFF_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 776
+// applied the zone-cluster mode to suspenseDelta; the run-based drought mode has never been
+// applied to it, completing 2 of 3 slots), PAYOFF_REVELATION_ZONE_CLUSTER (distribution/timing ×
+// revelation × structural thirds — existing revelation checks are co-occurrence/decoupling and
+// aftermath [PAYOFF_REVELATION_DISCONNECT, PAYOFF_REVELATION_AFTERMATH_ABSENT]; none of the three
+// shared-library trio modes has ever been applied to it), PAYOFF_REVELATION_DROUGHT_RUN
+// (run-based × revelation absence — completing 2 of 3 slots for revelation alongside the
+// zone-cluster mode added in this same wave).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4301,6 +4309,71 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r776c.maxZoneCount / r776c.count) * 100)}% of the scenes where tension rises cluster in the ${r776c.zoneNames[r776c.maxZoneIdx]} third. When every suspense spike lands in the same structural window, the payoff engine has no rising danger testing the audience's investment anywhere else across the story.`,
         suggestedFix: `Raise suspense in at least one scene outside the ${r776c.zoneNames[r776c.maxZoneIdx]} third so the payoff engine keeps rising danger testing the audience's investment more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 790: PAYOFF_SUSPENSE_DROUGHT_RUN, PAYOFF_REVELATION_ZONE_CLUSTER,
+  //              PAYOFF_REVELATION_DROUGHT_RUN ──────────────────────────────────────
+
+  // PAYOFF_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 suspense-positive scenes overall, fires when the
+  // longest consecutive run of scenes with no rising tension reaches 6. Wave 776 applied the
+  // zone-cluster mode to suspenseDelta; the run-based drought mode has never been applied to it,
+  // completing 2 of 3 slots.
+  {
+    const r790a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r790a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r790a.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r790a.longestRun} consecutive scenes with no rise in suspense at all, even though ${r790a.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the payoff engine without rising pressure testing the audience's investment for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r790a.longestRun}-scene stretch so the payoff engine keeps rising pressure testing the audience's investment throughout that stretch.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Existing revelation checks are
+  // co-occurrence/decoupling and aftermath; none of the three shared-library trio modes has ever
+  // been applied to it.
+  {
+    const r790b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r790b.fires) {
+      issues.push({
+        location: `${r790b.zoneNames[r790b.maxZoneIdx]} third — ${r790b.maxZoneCount} of ${r790b.count} revelation scenes`,
+        rule: 'PAYOFF_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r790b.maxZoneCount / r790b.count) * 100)}% of the story's revelation scenes cluster in the ${r790b.zoneNames[r790b.maxZoneIdx]} third. When every disclosure lands in the same structural window, the payoff engine has no fresh truth to resolve anywhere else across the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r790b.zoneNames[r790b.maxZoneIdx]} third so the payoff engine keeps resolving new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Completing 2 of 3 slots for
+  // revelation alongside the zone-cluster mode added in this same wave.
+  {
+    const r790c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r790c.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r790c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r790c.longestRun} consecutive scenes with no revelation at all, even though ${r790c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the payoff engine with no fresh disclosure to resolve for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r790c.longestRun}-scene stretch so the payoff engine keeps resolving new disclosures throughout that stretch.`,
       });
     }
   }
