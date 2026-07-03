@@ -267,6 +267,17 @@
 // thirds — Wave 662 applied the backward-cause peak mode to dialogueHighlights; the zone-cluster
 // mode has never been applied to this channel — a predictable, front- or back-loaded distribution
 // of the story's most memorable dialogue is itself a learnable pattern).
+// Wave 704 additions (built on the shared checks library): ORIGINALITY_HIGHLIGHT_DROUGHT_RUN
+// (run-based × dialogueHighlights absence — Wave 662 applied the backward-cause peak mode and
+// Wave 690 applied the zone-cluster mode to this channel; the drought-run mode has never been
+// applied to it, completing the field's coverage), ORIGINALITY_SEED_ZONE_CLUSTER (distribution/
+// timing × seededClueIds × structural thirds — Wave 662 applied the drought-run mode to
+// seededClueIds; the zone-cluster mode has never been applied to this channel — a predictable,
+// front- or back-loaded distribution of foreshadowing is itself a learnable pattern),
+// ORIGINALITY_STAGING_PEAK_UNCAUSED (single-peak isolation/backward-cause × visualBeats magnitude
+// — Wave 676 applied the zone-cluster mode to visualBeats; the backward-cause peak mode has never
+// been applied to it — a learnable, causally unmotivated spike in the story's most heavily staged
+// scene is itself a predictable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4322,6 +4333,74 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r690c.maxZoneCount} of the story's ${r690c.count} scenes carrying a standout line of dialogue (${Math.round((r690c.maxZoneCount / r690c.count) * 100)}%) cluster in the ${zoneName690c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout — once the audience notices the pattern, they learn which third to expect a quotable line in rather than experiencing genuinely unpredictable placement.`,
         suggestedFix: `Give at least one scene outside the ${zoneName690c} third a standout line of dialogue — spreading memorable dialogue across the story keeps its placement genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ── Wave 704: ORIGINALITY_HIGHLIGHT_DROUGHT_RUN, ORIGINALITY_SEED_ZONE_CLUSTER,
+  //              ORIGINALITY_STAGING_PEAK_UNCAUSED ─────────────────────────────────────────────
+
+  // ORIGINALITY_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Wave 662 applied the backward-cause peak mode and Wave 690 applied the zone-cluster mode to
+  // this channel; the drought-run mode has never been applied to it.
+  {
+    const r704a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r704a.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r704a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r704a.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r704a.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable is itself a learnable pattern — the audience can predict that no quotable line will arrive for an extended stretch.`,
+        suggestedFix: `Give at least one scene within the ${r704a.longestRun}-scene stretch a standout line of dialogue so the audience can't predict a long, unremarkable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when
+  // >75% of them fall in a single structural third. Wave 662 applied the drought-run mode to
+  // seededClueIds; the zone-cluster mode has never been applied to this channel.
+  {
+    const r704b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r704b.fires) {
+      const zoneName704b = r704b.zoneNames[r704b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName704b} third — ${r704b.maxZoneCount}/${r704b.count} seed scenes`,
+        rule: 'ORIGINALITY_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r704b.maxZoneCount} of the story's ${r704b.count} clue-planting scenes (${Math.round((r704b.maxZoneCount / r704b.count) * 100)}%) cluster in the ${zoneName704b} third. Foreshadowing concentrates almost exclusively in that stretch — once the audience notices the pattern, they learn which third to expect new clues in rather than experiencing a genuinely unpredictable rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName704b} third — spreading foreshadowing across the story keeps its placement genuinely unpredictable.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAGING_PEAK_UNCAUSED — Single-peak isolation/backward-cause × visualBeats
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 visually-staged
+  // scenes, a 2-scene lookback. Finds the single scene with the densest physical staging; fires
+  // when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Wave 676 applied the zone-cluster mode to visualBeats; the backward-cause peak
+  // mode has never been applied to it.
+  {
+    const r704c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r704c.fires) {
+      issues.push({
+        location: `scene ${r704c.peakIdx + 1} — peak physical-staging density (${r704c.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'ORIGINALITY_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for physical staging (scene ${r704c.peakIdx + 1}, with ${r704c.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated spike that reads as a convenient peak rather than an earned one.`,
+        suggestedFix: `Give scene ${r704c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a structural shift rather than arriving in a causal vacuum.`,
       });
     }
   }
