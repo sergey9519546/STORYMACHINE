@@ -20,14 +20,17 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { logger } from '../lib/logger.ts';
+import { verifyCollabToken } from '../lib/collab-auth.ts';
 
 // y-protocols message type tags (wire constants).
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
 
 const MAX_ROOMS = Number(process.env.COLLAB_MAX_ROOMS ?? 200);
-// A room id must be a safe, bounded token (it comes from the URL).
-const ROOM_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+// A room id must be a safe, bounded token (it comes from the URL). Exported so
+// the token-issuing route (server/routes/collab.ts) validates against the
+// exact same pattern rather than a hand-duplicated copy that could drift.
+export const ROOM_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 interface Room {
   doc: Y.Doc;
@@ -179,9 +182,31 @@ export function parseRoomId(url: string | undefined): string | null {
   return ROOM_RE.test(room) ? room : null;
 }
 
+/** Extract the `token` query parameter from a /collab/<room>?token=... URL. */
+function parseToken(url: string | undefined): string | null {
+  if (!url) return null;
+  const qIdx = url.indexOf('?');
+  if (qIdx === -1) return null;
+  return new URLSearchParams(url.slice(qIdx + 1)).get('token');
+}
+
 /** Current number of live collaboration rooms (for /health and tests). */
 export function collabRoomCount(): number {
   return rooms.size;
+}
+
+/**
+ * Destroy every live room. Production code never calls this — rooms are kept
+ * alive across disconnects by design ("evicted lazily under load") so quick
+ * reconnects don't lose in-memory state. But each room's y-protocols Awareness
+ * instance starts an un-unref'd `setInterval` (its outdated-state sweep), so a
+ * process that creates a room and never destroys it — e.g. a test — hangs
+ * after all tests complete instead of exiting. Test suites that open a real
+ * WebSocket connection must call this in an `after()` hook before closing the
+ * HTTP server.
+ */
+export function destroyAllRoomsForTesting(): void {
+  for (const name of [...rooms.keys()]) destroyRoom(name);
 }
 
 /**
@@ -200,6 +225,15 @@ export function attachCollabServer(server: HttpServer): WebSocketServer {
     if (roomId === null) {
       // Not a collab path (or invalid) — let other upgrade handlers (e.g. Vite HMR)
       // deal with it. We must not destroy the socket here.
+      return;
+    }
+    // Require a token minted by POST /api/collab/token for this exact room.
+    // Without this, any client that can reach the port could join and read/
+    // write any room's shared document — see server/lib/collab-auth.ts.
+    if (!verifyCollabToken(roomId, parseToken(req.url))) {
+      logger.warn('collab_auth_rejected', { room: roomId });
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
       return;
     }
     const room = getRoom(roomId);

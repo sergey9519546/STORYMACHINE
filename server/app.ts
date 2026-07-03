@@ -7,6 +7,7 @@ import gameRouter      from './routes/game.ts';
 import scriptideRouter from './routes/scriptide.ts';
 import nvmRouter       from './routes/nvm.ts';
 import exportRouter    from './routes/export.ts';
+import collabRouter    from './routes/collab.ts';
 
 export interface CreateAppOptions {
   /**
@@ -56,6 +57,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   app.use(scriptideRouter);
   app.use(nvmRouter);
   app.use(exportRouter);
+  app.use(collabRouter);
 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.

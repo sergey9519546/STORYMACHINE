@@ -117,6 +117,11 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     // ── Compartments allow hot-swapping extensions without rebuilding state ────
     const themeCompartment = useRef(new Compartment());
     const completionCompartment = useRef(new Compartment());
+    // P4: joining a collab room now requires fetching an auth token first
+    // (see collab.ts), so the extension can't be included synchronously at
+    // EditorState.create() time — this compartment starts empty and is
+    // hot-swapped in once the async session resolves, below.
+    const collabCompartment = useRef(new Compartment());
     // P4: live for the editor's lifetime when a collab room is set at mount.
     const collabRef = useRef<CollabSession | null>(null);
 
@@ -165,26 +170,14 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         },
       });
 
-      // P4: in collaboration mode, Yjs owns the document. Create the session and
-      // seed the shared doc from `value` only if it is empty (handled inside).
-      // The editor starts blank; yCollab populates it from the synced Y.Text.
-      let collabExtensions: typeof completionExt[] = [];
-      if (collabRoom) {
-        const session = createCollabSession({
-          room: collabRoom,
-          userName: collabUserName,
-          initialText: value,
-        });
-        collabRef.current = session;
-        collabExtensions = [session.extension];
-      }
-
       const state = EditorState.create({
         // When collaborating, start empty — Yjs is the source of truth.
         doc: collabRoom ? '' : value,
         extensions: [
-          // ── Collaboration (Yjs) — must precede history for proper undo scoping ─
-          ...collabExtensions,
+          // ── Collaboration (Yjs) — must precede history for proper undo scoping.
+          // Starts empty; createCollabSession() below is async (it fetches a room
+          // token first), so the real extension is hot-swapped in once ready. ──
+          collabCompartment.current.of([]),
           // ── History (undo/redo) ─────────────────────────────────────────────
           history(),
           // ── Standard editing keybindings ───────────────────────────────────
@@ -220,7 +213,29 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
 
       viewRef.current = view;
 
+      // P4: in collaboration mode, Yjs owns the document. Join is async (it
+      // fetches a room auth token before opening the socket — see collab.ts) —
+      // guarded by `torndown` so a fast unmount can't create/dispatch to a
+      // socket after teardown, and so a component that unmounts before the
+      // fetch resolves still tears down the session rather than leaking it.
+      let torndown = false;
+      if (collabRoom) {
+        createCollabSession({
+          room: collabRoom,
+          userName: collabUserName,
+          initialText: value,
+        }).then((session) => {
+          if (torndown) { session.destroy(); return; }
+          collabRef.current = session;
+          view.dispatch({ effects: collabCompartment.current.reconfigure(session.extension) });
+        }).catch((err) => {
+          // Non-fatal: the editor keeps working locally without live collaboration.
+          console.error('Failed to join collaboration session:', err);
+        });
+      }
+
       return () => {
+        torndown = true;
         view.destroy();
         viewRef.current = null;
         // Release the collaboration socket + shared doc on unmount.

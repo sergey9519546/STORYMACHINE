@@ -14,6 +14,10 @@ const sessionIdField = z
   .regex(/^[a-zA-Z0-9_-]{1,64}$/)
   .optional();
 
+// Same shape as sessionIdField and server/collab/yjs-server.ts's ROOM_RE —
+// collab room ids are a safe, bounded token used to build a WebSocket URL path.
+const roomIdField = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
+
 const LocationItemSchema = z
   .object({
     location_id: z.string().min(1).max(64),
@@ -109,6 +113,10 @@ export const OutlineBeatSchema = z.object({
 
 export const OutlineBodySchema = z.object({
   beats: z.array(OutlineBeatSchema).max(50),
+});
+
+export const CollabTokenBodySchema = z.object({
+  room: roomIdField,
 });
 
 // ── Middleware factory ───────────────────────────────────────────────────────

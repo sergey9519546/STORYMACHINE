@@ -58,15 +58,40 @@ export function collabWsBase(): string {
 }
 
 /**
+ * Fetch a short-lived token authorizing a join to this room (server/collab/
+ * yjs-server.ts rejects any /collab/<room> WebSocket upgrade without one —
+ * see server/lib/collab-auth.ts). Throws if the server rejects the request.
+ */
+async function fetchCollabToken(room: string): Promise<string> {
+  const res = await fetch('/api/collab/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ room }),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch collab token: ${res.status}`);
+  const { token } = await res.json() as { token: string };
+  return token;
+}
+
+/**
  * Create a collaboration session for a room. Returns the CM6 extension plus a
  * destroy() to release the socket and shared doc.
+ *
+ * Async because it fetches a room-scoped auth token before opening the socket
+ * (see fetchCollabToken above) — callers can no longer construct the session
+ * synchronously inline with the rest of editor setup; see FountainEditor.tsx's
+ * use of a Compartment to hot-swap the extension in once this resolves.
  */
-export function createCollabSession(opts: CollabOptions): CollabSession {
+export async function createCollabSession(opts: CollabOptions): Promise<CollabSession> {
   const doc = new Y.Doc();
   const ytext = doc.getText('script');
 
+  const token = await fetchCollabToken(opts.room);
   // y-websocket appends `/<room>` to the base url; our server parses /collab/<room>.
-  const provider = new WebsocketProvider(collabWsBase(), opts.room, doc);
+  // `params` is serialized as a query string by y-websocket, landing after the
+  // room segment (…/collab/<room>?token=…), which the server parses separately
+  // from the room path — see parseRoomId/parseToken in yjs-server.ts.
+  const provider = new WebsocketProvider(collabWsBase(), opts.room, doc, { params: { token } });
 
   const name = opts.userName ?? 'Writer';
   provider.awareness.setLocalStateField('user', {
