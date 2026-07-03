@@ -288,6 +288,14 @@
 // applied to it), INTENTION_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts absence —
 // Wave 661 applied the backward-cause peak mode to relationshipShifts; the drought-run mode has
 // never been applied to it).
+// Wave 745 additions: INTENTION_RELATIONSHIP_ZONE_CLUSTER (distribution/timing ×
+// relationshipShifts × structural thirds — Waves 661/731 applied the backward-cause peak and
+// run-based drought modes to relationshipShifts; the zone-cluster mode has never been applied to
+// it, completing the trio), INTENTION_SEED_DROUGHT_RUN (run-based × seededClueIds absence — Waves
+// 689/731 applied the backward-cause peak and zone-cluster modes to seededClueIds; the drought-run
+// mode has never been applied to it, completing the trio), INTENTION_CLOCK_DELTA_DROUGHT_RUN
+// (run-based × clockDelta≠0 absence — Wave 675 applied the backward-cause peak mode to
+// clockDelta; the drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4251,6 +4259,72 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r731c.longestRun} consecutive scenes with no relationship shift at all, even though ${r731c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch where nothing changes between characters leaves intention operating in a social vacuum for an extended run.`,
         suggestedFix: `Shift at least one relationship — however slightly — within the ${r731c.longestRun}-scene stretch so the character's pursuit of their goal keeps testing their bonds throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 745: INTENTION_RELATIONSHIP_ZONE_CLUSTER, INTENTION_SEED_DROUGHT_RUN,
+  //              INTENTION_CLOCK_DELTA_DROUGHT_RUN ─────────────────────────────────────────
+
+  // INTENTION_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 661/731
+  // applied the backward-cause peak and run-based drought modes to relationshipShifts; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r745a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r745a.fires) {
+      issues.push({
+        location: `${r745a.zoneNames[r745a.maxZoneIdx]} third — ${r745a.maxZoneCount} of ${r745a.count} relationship-shift scenes`,
+        rule: 'INTENTION_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r745a.maxZoneCount / r745a.count) * 100)}% of the story's relationship-shift scenes cluster in the ${r745a.zoneNames[r745a.maxZoneIdx]} third. When every bond change lands in the same structural window, the character's intention has no relational testing ground anywhere else in the story.`,
+        suggestedFix: `Move at least one relationship shift outside the ${r745a.zoneNames[r745a.maxZoneIdx]} third so the character's pursuit of their goal keeps testing their bonds more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with no new clues planted reaches 6. Waves 689/731 applied the backward-cause
+  // peak and zone-cluster modes to seededClueIds; the drought-run mode has never been applied to
+  // it, completing the trio.
+  {
+    const r745b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r745b.fires) {
+      issues.push({
+        location: `longest stretch with no new clues planted: ${r745b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r745b.longestRun} consecutive scenes with no new clues planted at all, even though ${r745b.presentCount} scenes elsewhere do seed foreshadowing. A long unbroken stretch with nothing new laid down leaves the character's intention running on old setups for an extended run.`,
+        suggestedFix: `Plant at least one new clue within the ${r745b.longestRun}-scene stretch so the character's pursuit of their goal keeps feeding fresh foreshadowing throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires
+  // when the longest consecutive run of scenes with zero clock movement reaches 6. Wave 675
+  // applied the backward-cause peak mode to clockDelta; the drought-run mode has never been
+  // applied to it.
+  {
+    const r745c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r745c.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r745c.longestRun} consecutive scenes`,
+        rule: 'INTENTION_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r745c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r745c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the character's intention without any external pressure driving it for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r745c.longestRun}-scene stretch so the character's pursuit of their goal keeps facing mounting pressure throughout that stretch.`,
       });
     }
   }

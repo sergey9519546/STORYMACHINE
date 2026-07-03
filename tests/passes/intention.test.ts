@@ -1352,6 +1352,88 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 745 — intentionPass: intention relationship zone cluster, intention seed drought run, intention clock delta drought run', async () => {
+    const makeRec745 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN745 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_RELATIONSHIP_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; relationship-shift scenes at 0,1,2 → 100% opening third
+    it('INTENTION_RELATIONSHIP_ZONE_CLUSTER fires when >75% of relationship-shift scenes cluster in one third', async () => {
+      const recs745a = Array.from({ length: 9 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 1 || i === 2) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runIN745(recs745a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_ZONE_CLUSTER'), 'INTENTION_RELATIONSHIP_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_RELATIONSHIP_ZONE_CLUSTER no-fire:
+    // relationship-shift scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_RELATIONSHIP_ZONE_CLUSTER does not fire when relationship-shift scenes are distributed across thirds', async () => {
+      const recs745an = Array.from({ length: 9 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 4 || i === 7) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runIN745(recs745an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_ZONE_CLUSTER'), 'INTENTION_RELATIONSHIP_ZONE_CLUSTER should not fire');
+    });
+
+    // INTENTION_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seed scenes at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_SEED_DROUGHT_RUN fires when the longest no-new-clues run is ≥6', async () => {
+      const recs745b = Array.from({ length: 10 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runIN745(recs745b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SEED_DROUGHT_RUN'), 'INTENTION_SEED_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_SEED_DROUGHT_RUN no-fire:
+    // seed scenes at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_SEED_DROUGHT_RUN does not fire when new clues are seeded without a long drought', async () => {
+      const recs745bn = Array.from({ length: 10 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 4 || i === 9) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runIN745(recs745bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SEED_DROUGHT_RUN'), 'INTENTION_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('INTENTION_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs745c = Array.from({ length: 10 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 1 || i === 2) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runIN745(recs745c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_DROUGHT_RUN'), 'INTENTION_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('INTENTION_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs745cn = Array.from({ length: 10 }, (_, i) => makeRec745(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runIN745(recs745cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_DROUGHT_RUN'), 'INTENTION_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 731 — intentionPass: intention staging zone cluster, intention seed zone cluster, intention relationship drought run', async () => {
     const makeRec731 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
