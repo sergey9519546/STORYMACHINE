@@ -1210,6 +1210,103 @@ He sits at his desk.
   });
 
 
+  describe('Wave 774 — originalityPass: originality clock delta peak uncaused, originality clock delta zone cluster, originality suspense zone cluster', async () => {
+    // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746/760 above —
+    // every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping
+    // unrelated 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_774 = ['establish_world', 'introduce_conflict', 'complicate', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_774 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_774 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor774 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec774 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor774(idx),
+      emotionalShift: EMOTION_POOL_774[idx % EMOTION_POOL_774.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_774[idx % PURPOSE_POOL_774.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain774 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor774(i)}\n\n${SENTENCE_POOL_774[i % SENTENCE_POOL_774.length]}`).join('\n\n');
+    const runO774 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain774(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED fire:
+    // 8 scenes; clockDelta magnitude qualifying (!==0) at 2 and 5 (tie on |magnitude|=3, peak
+    // resolves to the first occurrence — scene 2); no dramaticTurn/revelation at 2, 1, or 0.
+    it('ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED fires when the peak clock-delta scene has no preparing cause nearby', async () => {
+      const recs774a = Array.from({ length: 8 }, (_, i) => makeRec774(i, {
+        clockDelta: (i === 2 || i === 5) ? 3 : 0,
+      }));
+      const res = await runO774(recs774a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED'), 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED should fire');
+    });
+
+    it('ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak clock-delta scene within the lookback', async () => {
+      const recs774an = Array.from({ length: 8 }, (_, i) => makeRec774(i, {
+        clockDelta: (i === 2 || i === 5) ? 3 : 0,
+        dramaticTurn: i === 1 ? 'reversal' : 'nothing',
+      }));
+      const res = await runO774(recs774an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED'), 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED should not fire');
+    });
+
+    // ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs774b = Array.from({ length: 9 }, (_, i) => makeRec774(i, {
+        clockDelta: (i === 0 || i === 1 || i === 2) ? 1 : 0,
+      }));
+      const res = await runO774(recs774b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER'), 'ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-shifting scenes spread across thirds', async () => {
+      const recs774bn = Array.from({ length: 9 }, (_, i) => makeRec774(i, {
+        clockDelta: (i === 0 || i === 4 || i === 8) ? 1 : 0,
+      }));
+      const res = await runO774(recs774bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER'), 'ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // ORIGINALITY_SUSPENSE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; suspense-positive scenes at 0,1,2 → 100% opening third
+    it('ORIGINALITY_SUSPENSE_ZONE_CLUSTER fires when >75% of suspense-positive scenes cluster in one third', async () => {
+      const recs774c = Array.from({ length: 9 }, (_, i) => makeRec774(i, {
+        suspenseDelta: (i === 0 || i === 1 || i === 2) ? 2 : 0,
+      }));
+      const res = await runO774(recs774c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_ZONE_CLUSTER'), 'ORIGINALITY_SUSPENSE_ZONE_CLUSTER should fire');
+    });
+
+    it('ORIGINALITY_SUSPENSE_ZONE_CLUSTER does not fire when suspense-positive scenes spread across thirds', async () => {
+      const recs774cn = Array.from({ length: 9 }, (_, i) => makeRec774(i, {
+        suspenseDelta: (i === 0 || i === 4 || i === 8) ? 2 : 0,
+      }));
+      const res = await runO774(recs774cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_ZONE_CLUSTER'), 'ORIGINALITY_SUSPENSE_ZONE_CLUSTER should not fire');
+    });
+  });
+
+
   describe('Wave 760 — originalityPass: originality revelation peak uncaused, originality stakes drought run, originality clock delta drought run', async () => {
     // Same truncation pitfall as Waves 592/606/620/634/648/662/676/690/704/718/732/746 above —
     // every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid tripping

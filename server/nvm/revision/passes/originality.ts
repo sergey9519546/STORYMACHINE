@@ -325,6 +325,20 @@
 // ever anchored an average/aggregate variety check [CLOCK_DELTA_FLATLINE]; the run-based drought
 // mode has never been applied to it — a long unbroken stretch with the clock never moving is
 // itself a predictable pattern).
+// Wave 774 additions: ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED (backward-cause ×
+// clockDelta-as-magnitude × 2-scene lookback — Wave 760 applied the run-based drought mode to
+// clockDelta; the backward-cause peak mode has never been applied to it — a clock's single
+// sharpest tightening arriving with no dramatic turn or revelation preparing it is itself a
+// predictable, uncaused pattern), ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing ×
+// clockDelta≠0 presence × structural thirds — completing the trio started by CLOCK_DELTA_FLATLINE
+// [average/aggregate] and ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN [Wave 760, run-based]; the
+// zone-cluster mode has never been applied to it — every clock movement concentrated in one
+// structural third is itself a predictable pattern), ORIGINALITY_SUSPENSE_ZONE_CLUSTER
+// (distribution/timing × suspenseDelta>0 presence × structural thirds — suspenseDelta has only
+// ever served as one component of the SCENE_SHAPE_TEMPLATING structural-signature check and as a
+// secondary "isB" in co-occurrence-decoupling checks in this pass; none of the three
+// shared-library trio modes has ever been applied to it as a primary signal — every suspense
+// spike concentrated in one structural third is itself a predictable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4735,6 +4749,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r760c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r760c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline is itself a learnable pattern — the audience can predict that no clock movement will arrive for an extended stretch.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r760c.longestRun}-scene stretch so the audience can't predict a long, deadline-frozen lull.`,
+      });
+    }
+  }
+
+  // ── Wave 774: ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED, ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER,
+  //              ORIGINALITY_SUSPENSE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED — Backward-cause × clockDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 clock-shifting
+  // scenes, fires when the peak clock-delta magnitude scene has no dramatic turn or revelation in
+  // the 2 scenes preceding it. Wave 760 applied the run-based drought mode to clockDelta; the
+  // backward-cause peak mode has never been applied to it — a clock's single sharpest tightening
+  // arriving with no dramatic turn or revelation preparing it is itself a predictable, uncaused
+  // pattern.
+  {
+    const r774a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.abs(r.clockDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r774a.fires) {
+      issues.push({
+        location: `scene ${r774a.peakIdx} (peak clockDelta magnitude ${r774a.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'ORIGINALITY_CLOCK_DELTA_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single sharpest clock movement (Scene ${r774a.peakIdx}, |clockDelta| ${r774a.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r774a.qualifyingCount} scenes elsewhere shift the clock. An uncaused tightening of the deadline is itself a predictable pattern — the audience learns the clock moves for no dramatized reason.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r774a.peakIdx} so the story's sharpest clock movement reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-shifting scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Completing the trio started by CLOCK_DELTA_FLATLINE (average/aggregate) and
+  // ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN (Wave 760, run-based); the zone-cluster mode has never
+  // been applied to it — every clock movement concentrated in one structural third is itself a
+  // predictable pattern.
+  {
+    const r774b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r774b.fires) {
+      issues.push({
+        location: `${r774b.zoneNames[r774b.maxZoneIdx]} third — ${r774b.maxZoneCount} of ${r774b.count} clock-shifting scenes`,
+        rule: 'ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r774b.maxZoneCount / r774b.count) * 100)}% of the scenes where the clock shifts cluster in the ${r774b.zoneNames[r774b.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than a deadline that keeps tightening its grip throughout the story.`,
+        suggestedFix: `Shift the clock in at least one scene outside the ${r774b.zoneNames[r774b.maxZoneIdx]} third so its movement stays unpredictable across the whole story rather than confined to one learnable window.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SUSPENSE_ZONE_CLUSTER — Distribution/timing × suspenseDelta>0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // suspense-positive scenes, fires when more than 75% of those scenes cluster in a single third.
+  // suspenseDelta has only ever served as one component of the SCENE_SHAPE_TEMPLATING structural-
+  // signature check and as a secondary "isB" in co-occurrence-decoupling checks in this pass;
+  // none of the three shared-library trio modes has ever been applied to it as a primary signal —
+  // every suspense spike concentrated in one structural third is itself a predictable pattern.
+  {
+    const r774c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r774c.fires) {
+      issues.push({
+        location: `${r774c.zoneNames[r774c.maxZoneIdx]} third — ${r774c.maxZoneCount} of ${r774c.count} suspense-positive scenes`,
+        rule: 'ORIGINALITY_SUSPENSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r774c.maxZoneCount / r774c.count) * 100)}% of the scenes where tension rises cluster in the ${r774c.zoneNames[r774c.maxZoneIdx]} third — a predictable concentration the audience can learn to anticipate rather than tension that keeps testing the story unevenly across its full length.`,
+        suggestedFix: `Raise suspense in at least one scene outside the ${r774c.zoneNames[r774c.maxZoneIdx]} third so tension stays unpredictable across the whole story rather than confined to one learnable window.`,
       });
     }
   }
