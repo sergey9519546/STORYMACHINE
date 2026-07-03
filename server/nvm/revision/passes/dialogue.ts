@@ -294,6 +294,14 @@
 // UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds magnitude — Waves 658/700
 // applied the zone-cluster and drought-run modes to payoffSetupIds; the backward-cause peak mode
 // has never been applied to it, completing the trio).
+// Wave 728 additions (opens the eleventh rotation cycle): DIALOGUE_CURIOSITY_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × curiosityDelta magnitude — Wave 644 applied the
+// drought-run mode to curiosityDelta; the backward-cause peak mode has never been applied to it),
+// DIALOGUE_OPEN_THREAD_DROUGHT_RUN (run-based × unresolvedClues absence — Wave 644 applied the
+// zone-cluster mode to unresolvedClues; the drought-run mode has never been applied to it),
+// DIALOGUE_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural thirds — Wave 658
+// applied the backward-cause peak mode to visualBeats; the zone-cluster mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4314,6 +4322,73 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for thread resolution (scene ${r714c.peakIdx + 1}, with ${r714c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — dialogue in that scene has no causal ground to stand on.`,
         suggestedFix: `Give scene ${r714c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 728: DIALOGUE_CURIOSITY_PEAK_UNCAUSED, DIALOGUE_OPEN_THREAD_DROUGHT_RUN,
+  //              DIALOGUE_STAGING_ZONE_CLUSTER ──────────────────────────────────────────
+
+  // DIALOGUE_CURIOSITY_PEAK_UNCAUSED — Single-peak isolation/backward-cause × curiosityDelta
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes with a
+  // positive curiosity spike, a 2-scene lookback. Finds the single scene with the sharpest
+  // curiosity rise; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Wave 644 applied the drought-run mode to curiosityDelta; the
+  // backward-cause peak mode has never been applied to it.
+  {
+    const r728a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r728a.fires) {
+      issues.push({
+        location: `scene ${r728a.peakIdx + 1} — peak curiosity spike (${r728a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single sharpest curiosity spike (scene ${r728a.peakIdx + 1}, a rise of ${r728a.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the audience's hunger to know more peaks hardest arrives without any structural pivot or disclosure driving it — dialogue in that scene has nothing causal to hook the curiosity to.`,
+        suggestedFix: `Give scene ${r728a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's sharpest curiosity spike is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 open-thread scenes overall, fires
+  // when the longest consecutive run of scenes with no outstanding clue-debt reaches 6. Wave 644
+  // applied the zone-cluster mode to unresolvedClues; the drought-run mode has never been applied
+  // to it.
+  {
+    const r728b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r728b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r728b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_OPEN_THREAD_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r728b.longestRun} consecutive scenes with no outstanding clue-debt at all, even though ${r728b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved gives dialogue nothing unanswered to circle or probe for an extended run.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r728b.longestRun}-scene stretch so dialogue keeps some outstanding mystery to press against throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 visually dense scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Wave 658 applied the backward-cause
+  // peak mode to visualBeats; the zone-cluster mode has never been applied to it.
+  {
+    const r728c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r728c.fires) {
+      issues.push({
+        location: `${r728c.zoneNames[r728c.maxZoneIdx]} third — ${r728c.maxZoneCount} of ${r728c.count} visually dense scenes`,
+        rule: 'DIALOGUE_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r728c.maxZoneCount / r728c.count) * 100)}% of the story's visually dense scenes cluster in the ${r728c.zoneNames[r728c.maxZoneIdx]} third. When staging carries the scene almost everywhere in one window, dialogue elsewhere is left to do the work alone without a visual counterweight.`,
+        suggestedFix: `Move at least one visually dense beat outside the ${r728c.zoneNames[r728c.maxZoneIdx]} third so staging shares the load with dialogue more evenly across the story.`,
       });
     }
   }

@@ -1598,6 +1598,94 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 728 — dialoguePass: dialogue curiosity peak uncaused, dialogue open thread drought run, dialogue staging zone cluster', async () => {
+    const makeRec728 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes728 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD728 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_CURIOSITY_PEAK_UNCAUSED fire:
+    // n=8; curiosity spikes at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('DIALOGUE_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity-spike scene has no dramatic turn or revelation nearby', async () => {
+      const recs728a = Array.from({ length: 8 }, (_, i) => makeRec728(i,
+        i === 2 ? { curiosityDelta: 1 }
+        : i === 6 ? { curiosityDelta: 5 }
+        : {}
+      ));
+      const res = await runD728(buildScenes728(8), recs728a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_PEAK_UNCAUSED'), 'DIALOGUE_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_CURIOSITY_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_CURIOSITY_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs728an = Array.from({ length: 8 }, (_, i) => makeRec728(i,
+        i === 2 ? { curiosityDelta: 1 }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { curiosityDelta: 5 }
+        : {}
+      ));
+      const res = await runD728(buildScenes728(8), recs728an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_PEAK_UNCAUSED'), 'DIALOGUE_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_DROUGHT_RUN fire:
+    // 10 scenes; open threads at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_OPEN_THREAD_DROUGHT_RUN fires when the longest no-outstanding-clue run is ≥6', async () => {
+      const recs728b = Array.from({ length: 10 }, (_, i) => makeRec728(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { unresolvedClues: ['clue-a'] } : {}
+      ));
+      const res = await runD728(buildScenes728(10), recs728b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_DROUGHT_RUN'), 'DIALOGUE_OPEN_THREAD_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_DROUGHT_RUN no-fire:
+    // open threads at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_OPEN_THREAD_DROUGHT_RUN does not fire when open threads are distributed without a long drought', async () => {
+      const recs728bn = Array.from({ length: 10 }, (_, i) => makeRec728(i,
+        (i === 0 || i === 4 || i === 9) ? { unresolvedClues: ['clue-a'] } : {}
+      ));
+      const res = await runD728(buildScenes728(10), recs728bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_DROUGHT_RUN'), 'DIALOGUE_OPEN_THREAD_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs728c = Array.from({ length: 9 }, (_, i) => makeRec728(i,
+        (i === 0 || i === 1 || i === 2) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runD728(buildScenes728(9), recs728c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_STAGING_ZONE_CLUSTER'), 'DIALOGUE_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs728cn = Array.from({ length: 9 }, (_, i) => makeRec728(i,
+        (i === 0 || i === 4 || i === 7) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runD728(buildScenes728(9), recs728cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_STAGING_ZONE_CLUSTER'), 'DIALOGUE_STAGING_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 714 — dialoguePass: highlighted dialogue drought run, dialogue seed zone cluster, dialogue payoff peak uncaused', async () => {
     const makeRec714 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
