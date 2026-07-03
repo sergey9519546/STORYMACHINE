@@ -1376,6 +1376,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 959 — relationshipArcPass: relational suspense zone imbalance, relational revelation zone imbalance, relational seed zone imbalance', async () => {
+    const runRA959 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('RELATIONAL_SUSPENSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of suspense-raising scenes', async () => {
+      const recs959a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runRA959(recs959a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_ZONE_IMBALANCE'), 'RELATIONAL_SUSPENSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_SUSPENSE_ZONE_IMBALANCE does not fire when suspense-raising scenes touch every zone', async () => {
+      const recs959an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runRA959(recs959an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_ZONE_IMBALANCE'), 'RELATIONAL_SUSPENSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONAL_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs959b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runRA959(recs959b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_ZONE_IMBALANCE'), 'RELATIONAL_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs959bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runRA959(recs959bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_ZONE_IMBALANCE'), 'RELATIONAL_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONAL_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs959c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runRA959(recs959c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_ZONE_IMBALANCE'), 'RELATIONAL_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs959cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runRA959(recs959cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_ZONE_IMBALANCE'), 'RELATIONAL_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 945 — relationshipArcPass: relational positive emotion zone imbalance, relational curiosity zone imbalance, relational payoff zone imbalance', async () => {
     const runRA945 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

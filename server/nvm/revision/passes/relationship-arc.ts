@@ -434,6 +434,11 @@
 // === 'positive', the positive-valence mirror of Wave 931's negative one), RELATIONAL_CURIOSITY_ZONE_
 // IMBALANCE (curiosityDelta > 0 — question-raising delta magnitude), and RELATIONAL_PAYOFF_ZONE_
 // IMBALANCE (payoffSetupIds.length > 0 — setup-payoff array field).
+// Wave 959 additions: continuing the non-purpose 4-zone rollout with three more trio-complete signals
+// spanning three distinct classes: RELATIONAL_SUSPENSE_ZONE_IMBALANCE (suspenseDelta > 0 — the tension
+// delta beside Wave 945's curiosity one), RELATIONAL_REVELATION_ZONE_IMBALANCE (revelation != null —
+// the revelation string field, distinct from the purpose-enum RELATIONAL_REVELATION_PURPOSE one), and
+// RELATIONAL_SEED_ZONE_IMBALANCE (seededClueIds.length > 0 — the seed array beside 945's payoff one).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5514,6 +5519,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r945c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName945c} contains ${r945c.counts[r945c.bloatZoneIdx]} of them (${Math.round((r945c.counts[r945c.bloatZoneIdx] / r945c.totalCount) * 100)}%) while ${emptyNames945c} contains none. Setups get paid off in a bloated cluster in one structural quarter and nowhere in another, so the relationship only closes prior threads in part of the story.`,
         suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames945c} — so the relationship keeps resolving planted threads across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SUSPENSE_ZONE_IMBALANCE — Underweight/bloat × (suspenseDelta > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 suspense-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_
+  // SUSPENSE_ZONE_CLUSTER and run-based RELATIONAL_SUSPENSE_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to the suspense-delta magnitude signal in this pass, keying on
+  // tension change rather than the curiosity delta audited in Wave 945.
+  {
+    const r959a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r959a.fires) {
+      const emptyNames959a = r959a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName959a = FOUR_ZONE_NAMES[r959a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames959a} empty; ${bloatName959a} has ${r959a.counts[r959a.bloatZoneIdx]}/${r959a.totalCount} suspense-raising scenes`,
+        rule: 'RELATIONAL_SUSPENSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r959a.totalCount} suspense-raising scenes are unevenly distributed across its four structural zones: ${bloatName959a} contains ${r959a.counts[r959a.bloatZoneIdx]} of them (${Math.round((r959a.counts[r959a.bloatZoneIdx] / r959a.totalCount) * 100)}%) while ${emptyNames959a} contains none. Tension bloats in one structural quarter and flatlines in another, so the uncertainty that tests the relationship is confined to part of the story.`,
+        suggestedFix: `Redistribute suspense: move or add a scene that raises suspense (suspenseDelta > 0) into the empty zone(s) — ${emptyNames959a} — so the relationship stays under pressure across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // RELATIONAL_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_REVELATION_
+  // ZONE_CLUSTER and run-based RELATIONAL_REVELATION_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the revelation STRING field (revelation != null), and distinct from
+  // RELATIONAL_REVELATION_PURPOSE_ZONE_IMBALANCE, which audits the separate purpose === 'revelation'
+  // enum value.
+  {
+    const r959b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r959b.fires) {
+      const emptyNames959b = r959b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName959b = FOUR_ZONE_NAMES[r959b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames959b} empty; ${bloatName959b} has ${r959b.counts[r959b.bloatZoneIdx]}/${r959b.totalCount} revelation scenes`,
+        rule: 'RELATIONAL_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r959b.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName959b} contains ${r959b.counts[r959b.bloatZoneIdx]} of them (${Math.round((r959b.counts[r959b.bloatZoneIdx] / r959b.totalCount) * 100)}%) while ${emptyNames959b} contains none. Disclosures bloat in one structural quarter and never land in another, so new truth reframes the relationship in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames959b} — so new truth keeps reframing the relationship across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone RELATIONAL_SEED_ZONE_CLUSTER
+  // and run-based RELATIONAL_SEED_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone
+  // mode to the seededClueIds array field, distinct from the payoffSetupIds field audited in Wave 945.
+  {
+    const r959c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r959c.fires) {
+      const emptyNames959c = r959c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName959c = FOUR_ZONE_NAMES[r959c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames959c} empty; ${bloatName959c} has ${r959c.counts[r959c.bloatZoneIdx]}/${r959c.totalCount} seeding scenes`,
+        rule: 'RELATIONAL_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r959c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName959c} contains ${r959c.counts[r959c.bloatZoneIdx]} of them (${Math.round((r959c.counts[r959c.bloatZoneIdx] / r959c.totalCount) * 100)}%) while ${emptyNames959c} contains none. Setups bloat in one structural quarter and never get planted in another, so the relationship lays groundwork for its later turns in only part of the story.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames959c} — so the relationship keeps laying groundwork across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
