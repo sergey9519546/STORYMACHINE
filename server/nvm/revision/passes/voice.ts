@@ -253,6 +253,14 @@
 // structural thirds — Wave 641's VOICE_SUSPENSE_FLATLINE checks average/aggregate variety across
 // the whole story; this instead asks where positive suspense spikes concentrate structurally,
 // the first zone-cluster application to this channel).
+// Wave 697 additions: VOICE_SEED_ZONE_CLUSTER (distribution/timing × seededClueIds × structural
+// thirds — Wave 655's VOICE_SEED_DROUGHT_RUN applied the drought-run mode to seededClueIds; the
+// zone-cluster mode has never been applied to this channel), VOICE_PAYOFF_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × payoffSetupIds magnitude — Wave 669's VOICE_PAYOFF_
+// DROUGHT_RUN applied the drought-run mode to payoffSetupIds; the backward-cause peak mode has
+// never been applied to this channel), VOICE_STAGING_DROUGHT_RUN (run-based × visualBeats absence
+// — Wave 655's VOICE_STAGING_PEAK_UNCAUSED applied the backward-cause peak mode to visualBeats;
+// the drought-run mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4281,6 +4289,73 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r683c.maxZoneCount} of the story's ${r683c.count} rising-suspense scenes (${Math.round((r683c.maxZoneCount / r683c.count) * 100)}%) cluster in the ${zoneName683c} third. Tension spikes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no rising dread to carry the voice.`,
         suggestedFix: `Let suspense rise in at least one scene outside the ${zoneName683c} third — spreading tension spikes across the story lets each structural third carry its own sense of mounting dread.`,
+      });
+    }
+  }
+
+  // ── Wave 697: VOICE_SEED_ZONE_CLUSTER, VOICE_PAYOFF_PEAK_UNCAUSED, VOICE_STAGING_DROUGHT_RUN ──
+
+  // VOICE_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Wave 655's VOICE_SEED_DROUGHT_RUN applied the drought-run
+  // mode to seededClueIds; the zone-cluster mode has never been applied to this channel.
+  {
+    const r697a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r697a.fires) {
+      const zoneName697a = r697a.zoneNames[r697a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName697a} third — ${r697a.maxZoneCount}/${r697a.count} seed scenes`,
+        rule: 'VOICE_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r697a.maxZoneCount} of the story's ${r697a.count} clue-planting scenes (${Math.round((r697a.maxZoneCount / r697a.count) * 100)}%) cluster in the ${zoneName697a} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the story's voice an uneven structural rhythm of promises made.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName697a} third — spreading foreshadowing across the story lets the voice's sense of accumulating mystery build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous thread resolutions; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // Wave 669's VOICE_PAYOFF_DROUGHT_RUN applied the drought-run mode to payoffSetupIds; the
+  // backward-cause peak mode has never been applied to this channel.
+  {
+    const r697b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r697b.fires) {
+      issues.push({
+        location: `scene ${r697b.peakIdx + 1} — peak payoff density (${r697b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r697b.peakIdx + 1}, with ${r697b.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r697b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from the
+  // shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero visual beats reaches 6. Wave 655's VOICE_STAGING_PEAK_
+  // UNCAUSED applied the backward-cause peak mode to visualBeats; the drought-run mode has never
+  // been applied to this channel.
+  {
+    const r697c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r697c.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r697c.longestRun} consecutive scenes`,
+        rule: 'VOICE_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r697c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r697c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the story's voice without any staged action to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r697c.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the story's voice stays visually grounded throughout.`,
       });
     }
   }
