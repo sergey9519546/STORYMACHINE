@@ -1080,6 +1080,103 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 617 — characterArcPass: payoff visual beat decoupled, arc character moment zone imbalance, arc seed dialogue highlight aftermath void', async () => {
+    const makeRec617 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc617 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_VISUAL_BEAT_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('PAYOFF_VISUAL_BEAT_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs617a = Array.from({ length: 6 }, (_, i) =>
+        makeRec617(i, {
+          payoffSetupIds: i === 0 || i === 1 ? ['thread-a'] : [],
+          visualBeats: i === 4 || i === 5 ? ['grips the railing', 'stares at the water'] : [],
+        })
+      );
+      const res = await runArc617(recs617a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'PAYOFF_VISUAL_BEAT_DECOUPLED'), 'PAYOFF_VISUAL_BEAT_DECOUPLED should fire');
+    });
+
+    // PAYOFF_VISUAL_BEAT_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('PAYOFF_VISUAL_BEAT_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs617an = Array.from({ length: 6 }, (_, i) =>
+        makeRec617(i, {
+          payoffSetupIds: i === 0 || i === 1 ? ['thread-a'] : [],
+          visualBeats: i === 0 || i === 5 ? ['grips the railing', 'stares at the water'] : [],
+        })
+      );
+      const res = await runArc617(recs617an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'PAYOFF_VISUAL_BEAT_DECOUPLED'), 'PAYOFF_VISUAL_BEAT_DECOUPLED should not fire');
+    });
+
+    // ARC_CHARACTER_MOMENT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); character-moment scenes at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('ARC_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty of character-moment scenes while another is bloated', async () => {
+      const recs617b = Array.from({ length: 12 }, (_, i) =>
+        makeRec617(i, { purpose: (i === 6 || i === 9 || i === 10 || i === 11) ? 'character_moment' : 'complicate' })
+      );
+      const res = await runArc617(recs617b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'ARC_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    // ARC_CHARACTER_MOMENT_ZONE_IMBALANCE no-fire:
+    // one character-moment scene per zone (1,4,7,10) → no zone is empty
+    it('ARC_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when every zone has a character-moment scene', async () => {
+      const recs617bn = Array.from({ length: 12 }, (_, i) =>
+        makeRec617(i, { purpose: (i === 1 || i === 4 || i === 7 || i === 10) ? 'character_moment' : 'complicate' })
+      );
+      const res = await runArc617(recs617bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'ARC_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+
+    // ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no dialogue
+    // highlight; highlights exist elsewhere at 5,6,7 → fires
+    it('ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when no seed is followed by a dialogue highlight within 2 scenes', async () => {
+      const recs617c = Array.from({ length: 8 }, (_, i) =>
+        makeRec617(i, {
+          seededClueIds: i === 0 || i === 1 ? ['clue-a'] : [],
+          dialogueHighlights: i === 5 || i === 6 || i === 7 ? ['a memorable line'] : [],
+        })
+      );
+      const res = await runArc617(recs617c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    // ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a highlight → that trigger's
+    // aftermath is no longer void
+    it('ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a trigger window contains a dialogue highlight', async () => {
+      const recs617cn = Array.from({ length: 8 }, (_, i) =>
+        makeRec617(i, {
+          seededClueIds: i === 0 || i === 1 ? ['clue-a'] : [],
+          dialogueHighlights: i === 3 || i === 5 || i === 6 || i === 7 ? ['a memorable line'] : [],
+        })
+      );
+      const res = await runArc617(recs617cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 603 — characterArcPass: relationship shift/dialogue highlight decoupled, visual staging emotional flatness cluster, open thread emotional aftermath void', async () => {
     const makeRec603 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

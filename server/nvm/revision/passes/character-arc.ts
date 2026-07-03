@@ -225,10 +225,16 @@
 // — first use of visualBeats anywhere in this pass), OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID
 // (sequence/aftermath × heavy unresolvedClues debt → emotional beat absence — first use of
 // unresolvedClues anywhere in this pass).
+// Wave 617 additions (built on the shared checks library, audit M2.2): PAYOFF_VISUAL_BEAT_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — first pairing of these two
+// lightly-used fields in this 102-rule pass), ARC_CHARACTER_MOMENT_ZONE_IMBALANCE
+// (underweight/bloat × purpose === 'character_moment' × four structural zones — first zone-based
+// check on the purpose channel), ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath ×
+// seededClueIds trigger → dialogueHighlights absence — first pairing of these two fields).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function characterArcPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, annotations, approvedSpans } = input;
@@ -3431,6 +3437,86 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r603c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no emotional shift, even though ${r603c.aftermathCount} emotional beats occur elsewhere in the story. The heaviest concentrations of open mystery never register on the protagonist's felt experience in their immediate aftermath — the weight of everything left unanswered passes without being felt.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give the protagonist an emotional beat shaped by the unresolved pressure — anxiety at not knowing, a flash of hope that an answer is close, or frustration at how much is still open. Let the accumulated mystery register as something felt, not only something tracked.`,
+      });
+    }
+  }
+
+  // ── Wave 617: PAYOFF_VISUAL_BEAT_DECOUPLED, ARC_CHARACTER_MOMENT_ZONE_IMBALANCE,
+  //              ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ─────────────────────────────────
+
+  // PAYOFF_VISUAL_BEAT_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats. Built
+  // on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. A thread resolving and a
+  // scene rich in physical staging never happen together — every payoff lands in a scene that
+  // leans on dialogue or interiority, and every heavily staged scene resolves nothing. First
+  // pairing of these two fields in this 102-rule pass — payoffSetupIds (Wave 505/533 aftermath
+  // triggers) and visualBeats (Wave 603, distribution mode only) have each been used but never
+  // together.
+  {
+    const r617a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r617a.fires) {
+      issues.push({
+        location: `${r617a.aCount} payoff scene(s), ${r617a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'PAYOFF_VISUAL_BEAT_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r617a.aCount} scenes where a planted thread resolves never coincide with the ${r617a.bCount} scenes leaning heavily on physical staging — thread resolution and physical presence run on separate tracks. A payoff often lands with more weight when a character's physical action embodies what the resolution means, rather than the moment being carried entirely by dialogue or interior reflection.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an action or object a character handles that embodies what just resolved, giving the payoff a physical anchor alongside whatever is said.`,
+      });
+    }
+  }
+
+  // ARC_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // character-moment scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. First zone-based check
+  // on the purpose channel in this pass — purpose has only ever been read for a fixed 'climax'
+  // lookup (line ~638) and a dramaticPurposes set-membership check, never audited for structural
+  // distribution. Dedicated character-development beats clustering into one quarter while another
+  // has none means the arc's opportunities for reflection are themselves unevenly rationed.
+  {
+    const r617b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r617b.fires) {
+      const emptyNames617b = r617b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName617b = FOUR_ZONE_NAMES[r617b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames617b} empty; ${bloatName617b} has ${r617b.counts[r617b.bloatZoneIdx]}/${r617b.totalCount} character-moment scenes`,
+        rule: 'ARC_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r617b.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName617b} contains ${r617b.counts[r617b.bloatZoneIdx]} of them (${Math.round((r617b.counts[r617b.bloatZoneIdx] / r617b.totalCount) * 100)}%) while ${emptyNames617b} contains none. Dedicated character-development beats bloat in one structural quarter and vanish from another, giving the arc's opportunities for reflection an uneven structural rhythm.`,
+        suggestedFix: `Redistribute character-development beats: move at least one character-moment scene into the empty zone(s) — ${emptyNames617b} — so every structural quarter carries some space for the protagonist to reflect, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a 2-scene
+  // lookahead window. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while highlighted dialogue does occur elsewhere in the story. First pairing of
+  // seededClueIds with dialogueHighlights in this pass — every planted clue passes into an
+  // aftermath with no memorable verbal moment giving the planted material texture. Distinct from
+  // ARC_SEED_EMOTIONAL_AFTERMATH_VOID (Wave 505: same seed trigger, but the aftermath channel
+  // there is emotionalShift, not dialogueHighlights).
+  {
+    const r617c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r617c.fires) {
+      issues.push({
+        location: `${r617c.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r617c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r617c.aftermathCount} such scenes exist elsewhere in the script. Seeds are the arc's long-horizon deposits; when their immediate aftermath never carries a memorable line, the planted material gets no verbal texture nearby, living purely as structural bookkeeping until its eventual payoff.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, or a reaction that gives it emotional presence before the payoff arrives.`,
       });
     }
   }
