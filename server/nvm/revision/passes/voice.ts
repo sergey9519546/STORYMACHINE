@@ -367,6 +367,15 @@
 // thirds -- this purpose value has never been referenced anywhere in this file; a virgin
 // field), VOICE_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
 // structural thirds -- likewise a virgin field, never referenced in this file before).
+//
+// Wave 879 additions: VOICE_CLIMAX_DROUGHT_RUN (run-based x purpose === 'climax' absence --
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 865; peak mode conventionally skipped for this categorical field), VOICE_RESOLUTION_
+// DROUGHT_RUN (run-based x purpose === 'resolution' absence -- completes 2 of 3 slots for this
+// purpose value alongside the zone-cluster mode added in Wave 865; peak mode conventionally
+// skipped for this categorical field), VOICE_COMPLICATE_ZONE_CLUSTER (distribution/timing x
+// purpose === 'complicate' x structural thirds -- this purpose value has never been referenced
+// anywhere in this file; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5265,6 +5274,72 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r865c.maxZoneCount / r865c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r865c.zoneNames[r865c.maxZoneIdx]} third. When every settling beat concentrates in one structural window, the story's voice has no room to soften gradually before the ending absorbs it all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r865c.zoneNames[r865c.maxZoneIdx]} third so the voice's wind-down is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 879: VOICE_CLIMAX_DROUGHT_RUN, VOICE_RESOLUTION_DROUGHT_RUN,
+  //              VOICE_COMPLICATE_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 climax-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no climax purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 865 (peak mode conventionally skipped for this categorical field).
+  {
+    const r879a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r879a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r879a.longestRun} consecutive scenes`,
+        rule: 'VOICE_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r879a.longestRun} consecutive scenes with no scene purposed as the climax, even though ${r879a.presentCount} scenes elsewhere are. A long unbroken stretch between peak moments leaves the story's voice without a structural high point to raise its register toward for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r879a.longestRun}-scene stretch as the climax, or restructure so the voice's peak moments recur rather than clustering into a single distant point.`,
+      });
+    }
+  }
+
+  // VOICE_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 865 (peak mode conventionally skipped for this categorical field).
+  {
+    const r879b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r879b.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r879b.longestRun} consecutive scenes`,
+        rule: 'VOICE_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r879b.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r879b.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the story's voice with no wind-down beat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r879b.longestRun}-scene stretch to resolve part of the story, so the voice keeps softening throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // VOICE_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this file — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r879c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r879c.fires) {
+      issues.push({
+        location: `${r879c.zoneNames[r879c.maxZoneIdx]} third — ${r879c.maxZoneCount} of ${r879c.count} complicating scenes`,
+        rule: 'VOICE_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r879c.maxZoneCount / r879c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r879c.zoneNames[r879c.maxZoneIdx]} third. When every complication lands in the same structural window, the story's voice stops reacting to fresh trouble anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r879c.zoneNames[r879c.maxZoneIdx]} third to complicate the story so the voice keeps reacting to fresh trouble more evenly across the story.`,
       });
     }
   }

@@ -1438,6 +1438,71 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 879 — voicePass: voice climax drought run, voice resolution drought run, voice complicate zone cluster', async () => {
+    const runV879 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_CLIMAX_DROUGHT_RUN fire:
+    // n=10; climax at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_CLIMAX_DROUGHT_RUN fires when a long run has no climax-purposed scene', async () => {
+      const recs879a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'climax' : 'establish_world' }),
+      );
+      const res = await runV879(recs879a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLIMAX_DROUGHT_RUN'), 'VOICE_CLIMAX_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_CLIMAX_DROUGHT_RUN does not fire when climax-purposed scenes are evenly spread', async () => {
+      const recs879an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'climax' : 'establish_world' }),
+      );
+      const res = await runV879(recs879an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLIMAX_DROUGHT_RUN'), 'VOICE_CLIMAX_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs879b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runV879(recs879b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_DROUGHT_RUN'), 'VOICE_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs879bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runV879(recs879bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RESOLUTION_DROUGHT_RUN'), 'VOICE_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('VOICE_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs879c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runV879(recs879c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_COMPLICATE_ZONE_CLUSTER'), 'VOICE_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs879cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runV879(recs879cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_COMPLICATE_ZONE_CLUSTER'), 'VOICE_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 865 — voicePass: voice establish world drought run, voice climax zone cluster, voice resolution zone cluster', async () => {
     const runV865 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
