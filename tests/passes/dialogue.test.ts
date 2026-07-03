@@ -1598,6 +1598,84 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 784 — dialoguePass: dialogue revelation zone cluster, dialogue clock raised zone cluster, dialogue emotion drought run', async () => {
+    const makeRec784 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes784 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD784 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_REVELATION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; revelation scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_REVELATION_ZONE_CLUSTER fires when >75% of revelation scenes cluster in one third', async () => {
+      const recs784a = Array.from({ length: 9 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 1 || i === 2) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD784(buildScenes784(9), recs784a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_ZONE_CLUSTER'), 'DIALOGUE_REVELATION_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_REVELATION_ZONE_CLUSTER does not fire when revelation scenes spread across thirds', async () => {
+      const recs784an = Array.from({ length: 9 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 4 || i === 8) ? { revelation: 'truth revealed' } : {}
+      ));
+      const res = await runD784(buildScenes784(9), recs784an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_REVELATION_ZONE_CLUSTER'), 'DIALOGUE_REVELATION_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER fires when >75% of clock-raising scenes cluster in one third', async () => {
+      const recs784b = Array.from({ length: 9 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 1 || i === 2) ? { clockRaised: true } : {}
+      ));
+      const res = await runD784(buildScenes784(9), recs784b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER'), 'DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER does not fire when clock-raising scenes spread across thirds', async () => {
+      const recs784bn = Array.from({ length: 9 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 4 || i === 8) ? { clockRaised: true } : {}
+      ));
+      const res = await runD784(buildScenes784(9), recs784bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER'), 'DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_EMOTION_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry an emotional charge (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('DIALOGUE_EMOTION_DROUGHT_RUN fires when the longest no-emotional-charge run reaches 6', async () => {
+      const recs784c = Array.from({ length: 10 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runD784(buildScenes784(10), recs784c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_EMOTION_DROUGHT_RUN does not fire when emotional charges are evenly spread', async () => {
+      const recs784cn = Array.from({ length: 10 }, (_, i) => makeRec784(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runD784(buildScenes784(10), recs784cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_EMOTION_DROUGHT_RUN'), 'DIALOGUE_EMOTION_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 770 — dialoguePass: dialogue clock delta zone cluster, dialogue suspense peak uncaused, dialogue relationship drought run', async () => {
     const makeRec770 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

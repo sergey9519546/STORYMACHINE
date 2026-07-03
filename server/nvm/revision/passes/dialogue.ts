@@ -327,6 +327,16 @@
 // DIALOGUE_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts presence absence — Waves
 // 686/756 applied the backward-cause peak and zone-cluster modes to relationshipShifts; the
 // drought-run mode has never been applied to it, completing the trio).
+// Wave 784 additions (opens the fifteenth rotation cycle): DIALOGUE_REVELATION_ZONE_CLUSTER
+// (distribution/timing × revelation × structural thirds — revelation as a primary signal has only
+// ever anchored co-occurrence [DIALOGUE_REVELATION_SCENE_VOID] and aftermath
+// [DIALOGUE_REVELATION_AFTERMATH_SILENT] checks in this pass; none of the three shared-library
+// trio modes has ever been applied to it), DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER
+// (distribution/timing × clockRaised === true presence × structural thirds — the run-based drought
+// mode has already been applied to clockRaised; the zone-cluster mode has never been applied to
+// it), DIALOGUE_EMOTION_DROUGHT_RUN (run-based × emotionalShift !== 'neutral' absence —
+// DIALOGUE_EMOTION_ZONE_CLUSTER already applied the zone-cluster mode to this signal; the
+// drought-run mode has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4615,6 +4625,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r770c.longestRun} consecutive scenes with no relationship shift at all, even though ${r770c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch with nothing changing between characters leaves dialogue with no relational movement to voice for an extended run.`,
         suggestedFix: `Shift a relationship somewhere within the ${r770c.longestRun}-scene stretch so dialogue keeps a live bond to voice throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 784: DIALOGUE_REVELATION_ZONE_CLUSTER, DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER,
+  //              DIALOGUE_EMOTION_DROUGHT_RUN ──────────────────────────────────────
+
+  // DIALOGUE_REVELATION_ZONE_CLUSTER — Distribution/timing × revelation × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 revelation scenes, fires
+  // when more than 75% of those scenes cluster in a single third. revelation as a primary signal
+  // has only ever anchored co-occurrence and aftermath checks in this pass; none of the three
+  // shared-library trio modes has ever been applied to it.
+  {
+    const r784a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.revelation != null,
+    });
+    if (r784a.fires) {
+      issues.push({
+        location: `${r784a.zoneNames[r784a.maxZoneIdx]} third — ${r784a.maxZoneCount} of ${r784a.count} revelation scenes`,
+        rule: 'DIALOGUE_REVELATION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r784a.maxZoneCount / r784a.count) * 100)}% of the story's revelation scenes cluster in the ${r784a.zoneNames[r784a.maxZoneIdx]} third. When every disclosure lands in the same structural window, dialogue has no fresh truth to voice reactions to anywhere else in the story.`,
+        suggestedFix: `Let a revelation land in at least one scene outside the ${r784a.zoneNames[r784a.maxZoneIdx]} third so dialogue keeps reacting to new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER — Distribution/timing × clockRaised === true presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-raising scenes, fires when more than 75% of those scenes cluster in a single third. The
+  // run-based drought mode has already been applied to clockRaised; the zone-cluster mode has
+  // never been applied to it.
+  {
+    const r784b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r784b.fires) {
+      issues.push({
+        location: `${r784b.zoneNames[r784b.maxZoneIdx]} third — ${r784b.maxZoneCount} of ${r784b.count} clock-raising scenes`,
+        rule: 'DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r784b.maxZoneCount / r784b.count) * 100)}% of the story's clock-raising scenes cluster in the ${r784b.zoneNames[r784b.maxZoneIdx]} third. When every deadline arrives in the same structural window, dialogue has no sustained urgency to voice pressure through anywhere else in the story.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${r784b.zoneNames[r784b.maxZoneIdx]} third so dialogue keeps urgency to voice pressure through more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift !== 'neutral' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 emotionally charged scenes overall,
+  // fires when the longest consecutive run of scenes with no emotional charge reaches 6.
+  // DIALOGUE_EMOTION_ZONE_CLUSTER already applied the zone-cluster mode to this signal; the
+  // drought-run mode has never been applied to it.
+  {
+    const r784c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r784c.fires) {
+      issues.push({
+        location: `longest stretch with no emotional charge: ${r784c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r784c.longestRun} consecutive scenes with no emotional charge at all, even though ${r784c.presentCount} scenes elsewhere carry one. A long unbroken stretch with nothing felt leaves dialogue with no emotional register to voice for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r784c.longestRun}-scene stretch an emotional charge so dialogue keeps a felt register to voice throughout that stretch.`,
       });
     }
   }
