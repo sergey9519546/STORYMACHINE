@@ -407,6 +407,13 @@
 // with complete 3-zone/run-based trios: RELATIONAL_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
 // RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and RELATIONAL_
 // RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
+//
+// Wave 903 additions: continuing the checkZoneImbalance rollout begun in Wave 889, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: RELATIONAL_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
+// RELATIONAL_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate'), and
+// RELATIONAL_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5194,6 +5201,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r889c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName889c} contains ${r889c.counts[r889c.bloatZoneIdx]} of them (${Math.round((r889c.counts[r889c.bloatZoneIdx] / r889c.totalCount) * 100)}%) while ${emptyNames889c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the relationship's closure an uneven structural rhythm.`,
         suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames889c} — so relationship closure is distributed more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 889. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone RELATIONAL_TURNING_POINT_ZONE_CLUSTER and
+  // run-based RELATIONAL_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r903a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r903a.fires) {
+      const emptyNames903a = r903a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName903a = FOUR_ZONE_NAMES[r903a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames903a} empty; ${bloatName903a} has ${r903a.counts[r903a.bloatZoneIdx]}/${r903a.totalCount} turning-point scenes`,
+        rule: 'RELATIONAL_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r903a.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName903a} contains ${r903a.counts[r903a.bloatZoneIdx]} of them (${Math.round((r903a.counts[r903a.bloatZoneIdx] / r903a.totalCount) * 100)}%) while ${emptyNames903a} contains none. Pivots bloat in one structural quarter and vanish from another, giving the relationship's turning points an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames903a} — so the relationship pivots more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_COMPLICATE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'complicate' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 889. n≥10, ≥4 complicating scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone RELATIONAL_COMPLICATE_ZONE_CLUSTER and run-based
+  // RELATIONAL_COMPLICATE_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r903b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r903b.fires) {
+      const emptyNames903b = r903b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName903b = FOUR_ZONE_NAMES[r903b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames903b} empty; ${bloatName903b} has ${r903b.counts[r903b.bloatZoneIdx]}/${r903b.totalCount} complicating scenes`,
+        rule: 'RELATIONAL_COMPLICATE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r903b.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName903b} contains ${r903b.counts[r903b.bloatZoneIdx]} of them (${Math.round((r903b.counts[r903b.bloatZoneIdx] / r903b.totalCount) * 100)}%) while ${emptyNames903b} contains none. Complications bloat in one structural quarter and vanish from another, giving the relationship's fresh strain an uneven structural rhythm.`,
+        suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames903b} — so the relationship keeps meeting fresh strain more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'introduce_conflict' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library, continuing the rollout begun in Wave 889. n≥10, ≥4 conflict-introducing
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // RELATIONAL_INTRODUCE_CONFLICT_ZONE_CLUSTER and run-based RELATIONAL_INTRODUCE_CONFLICT_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r903c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r903c.fires) {
+      const emptyNames903c = r903c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName903c = FOUR_ZONE_NAMES[r903c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames903c} empty; ${bloatName903c} has ${r903c.counts[r903c.bloatZoneIdx]}/${r903c.totalCount} conflict-introducing scenes`,
+        rule: 'RELATIONAL_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r903c.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName903c} contains ${r903c.counts[r903c.bloatZoneIdx]} of them (${Math.round((r903c.counts[r903c.bloatZoneIdx] / r903c.totalCount) * 100)}%) while ${emptyNames903c} contains none. New conflicts bloat in one structural quarter and vanish from another, giving the relationship's fresh friction an uneven structural rhythm.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames903c} — so the relationship keeps facing fresh friction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
