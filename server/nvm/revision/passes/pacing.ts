@@ -208,6 +208,10 @@
 // [minAftermathCount], a slightly stronger guard than the existing seed/clock/payoff/turn/revelation
 // aftermath checks use — it protects against firing when the channel is trivially absent everywhere,
 // not just decoupled from the stakes-raise trigger specifically).
+// Wave 607 additions: OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT, OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT,
+// OPEN_THREAD_AFTERMATH_EMOTION_FLAT (sequence/aftermath × suspense/curiosity/emotion × heavy
+// unresolved-clue-debt trigger — a 7th trigger row added to the aftermath matrix Wave 593 called
+// complete at 6 triggers; first use of the unresolvedClues field anywhere in this 103-rule pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -3415,6 +3419,93 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
           severity: 'minor',
           description: `Every one of the story's ${r593c.triggerCount} stakes-raising scenes is followed by two emotionally neutral scenes, even though ${r593c.aftermathCount} emotionally-charged scene(s) exist elsewhere in the script. Raising the stakes should register on the characters who now stand to lose more — dread, resolve, or hope — and when every stakes-raise's aftermath is affectively flat, the escalation is announced to the audience but not felt by anyone inside the story.`,
           suggestedFix: `After at least one stakes-raising scene, let the following scene carry a non-neutral emotional beat from a character who now has more to lose — a flicker of fear, a hardened resolve, or a flare of hope that the higher cost is worth it. The audience should feel the weight of the raised stakes through a character's reaction, not just infer it from the premise.`,
+        });
+      }
+    }
+  }
+
+  // ── Wave 607: OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT, OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT,
+  //              OPEN_THREAD_AFTERMATH_EMOTION_FLAT ─────────────────────────────────────────
+  // Wave 593 called this pass's aftermath matrix complete at 6 triggers (revelation, clock,
+  // payoff, dramatic-turn, seed, stakes-raise) × 3 channels (suspense, curiosity, emotion). The
+  // unresolvedClues field — outstanding, unpaid clue-debt — was never used anywhere in this
+  // 103-rule pass despite being exactly the kind of accumulating pressure this pass's aftermath
+  // family exists to track: a 7th trigger row, keyed to a magnitude threshold (heavy debt,
+  // unresolvedClues.length≥3) rather than a discrete event like the other six triggers.
+
+  {
+    const isHeavyDebt607 = (r: ScreenplaySceneRecord) => (r.unresolvedClues ?? []).length >= 3;
+
+    // OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT — sequence/aftermath × suspense × heavy clue-debt
+    // trigger. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2), ≥2 suspense-rise scenes existing
+    // elsewhere. Every heavy-debt scene is followed by 2 scenes with no suspenseDelta>0 → fire.
+    // A story carrying substantial unresolved debt should feel that weight as tension in what
+    // follows; when the aftermath of every debt-heavy scene is suspense-flat, the accumulated
+    // pressure of open threads never converts into felt tension downstream. Distinct from
+    // STAKES_AFTERMATH_SUSPENSE_FLAT and every other trigger in the suspense-aftermath family
+    // (different trigger channel entirely), and from REVELATION_DROUGHT/CURIOSITY_FLATLINE_RUN
+    // (global runs, not tied to a specific trigger's aftermath).
+    {
+      const r607a = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+        isTrigger: isHeavyDebt607, isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+      });
+      if (r607a.fires) {
+        issues.push({
+          location: `${r607a.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+          rule: 'OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r607a.triggerCount} heavy clue-debt scenes (3 or more open threads at once) is followed by two scenes with no suspense rise, even though ${r607a.aftermathCount} suspense-rise scene(s) exist elsewhere in the script. Carrying substantial unresolved debt is itself a source of pressure — the audience is holding several open questions at once — and when that pressure never converts into rising tension downstream, the accumulated debt sits inert rather than compounding into felt stakes.`,
+          suggestedFix: `After at least one heavy clue-debt scene, let the following scene or the one after carry a suspense rise — a complication that makes the accumulated open threads feel more urgent, or a new pressure that forces at least one of them toward a head. The weight of unresolved debt should be felt as tightening tension, not just tracked as an open tally.`,
+        });
+      }
+    }
+
+    // OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT — sequence/aftermath × curiosity × heavy clue-debt
+    // trigger. Same guards; fires when no heavy-debt scene is followed by a curiosityDelta>0
+    // within 2 scenes. Heavy accumulated debt should itself provoke wondering — which thread
+    // resolves first, how they connect, what the cost of leaving them open will be — and a
+    // debt-heavy aftermath that raises no further curiosity treats the pile of open questions as
+    // static rather than as fuel for more. Distinct from the other seven aftermath×curiosity
+    // triggers and from OPEN_THREAD_CURIOSITY_DECOUPLED (originality.ts: same-scene co-occurrence
+    // in a different pass, not a windowed aftermath check in this one).
+    {
+      const r607b = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+        isTrigger: isHeavyDebt607, isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+      });
+      if (r607b.fires) {
+        issues.push({
+          location: `${r607b.triggerCount} heavy clue-debt scene(s) — no curiosity rise within 2 scenes of any`,
+          rule: 'OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r607b.triggerCount} heavy clue-debt scenes is followed by two scenes with no curiosity rise, even though ${r607b.aftermathCount} curiosity-rise scene(s) exist elsewhere in the script. A pile of unresolved threads should itself be generative — prompting new wondering about how they connect or which resolves first — and when the aftermath of every debt-heavy scene raises no further curiosity, the accumulated questions read as inert bookkeeping rather than a live engine for more.`,
+          suggestedFix: `After at least one heavy clue-debt scene, let the following scene introduce a new wrinkle tied to the open threads — a detail that makes the audience wonder how two of the unresolved questions might connect, or a hint that one of them is about to break open. Let accumulated debt actively generate more curiosity instead of sitting static.`,
+        });
+      }
+    }
+
+    // OPEN_THREAD_AFTERMATH_EMOTION_FLAT — sequence/aftermath × emotion × heavy clue-debt
+    // trigger. Same guards; fires when no heavy-debt scene is followed by a non-neutral
+    // emotionalShift within 2 scenes. Carrying several open threads at once should weigh on a
+    // character — frustration, anxiety, or a flicker of hope that answers are close — and an
+    // aftermath that registers nothing emotionally treats the accumulated debt as a purely
+    // structural tally rather than something anyone in the story actually feels. Distinct from
+    // the other seven aftermath×emotion triggers and from EMOTIONAL_FLATLINE_RUN (global
+    // consecutive-neutral run, not tied to the debt trigger specifically). Completes the newly
+    // added 7th row across all three channels.
+    {
+      const r607c = checkAftermathVoid({
+        records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+        isTrigger: isHeavyDebt607, isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      });
+      if (r607c.fires) {
+        issues.push({
+          location: `${r607c.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+          rule: 'OPEN_THREAD_AFTERMATH_EMOTION_FLAT',
+          severity: 'minor',
+          description: `Every one of the story's ${r607c.triggerCount} heavy clue-debt scenes is followed by two emotionally neutral scenes, even though ${r607c.aftermathCount} emotionally-charged scene(s) exist elsewhere in the script. Carrying several open threads at once should register on a character — frustration at not knowing, anxiety about what's still unresolved, or hope that an answer is close — and when the aftermath of every debt-heavy scene is affectively flat, the accumulated pressure exists only as a structural tally, never as something felt.`,
+          suggestedFix: `After at least one heavy clue-debt scene, let the following scene carry a non-neutral emotional beat rooted in the unresolved pressure — a character's visible frustration, a flash of anxiety, or a moment of hope that the open threads are about to close. The weight of accumulated debt should be felt, not only tracked.`,
         });
       }
     }

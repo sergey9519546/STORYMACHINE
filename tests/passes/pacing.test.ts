@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 607 — pacingPass: open thread aftermath suspense flat, open thread aftermath curiosity flat, open thread aftermath emotion flat', async () => {
+    const runP607 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT fires when no heavy clue-debt scene is followed by a suspense rise', async () => {
+      // 8 scenes; heavy-debt triggers at 0,1 (windows reach at most scene 3); suspense rises at
+      // 5,6,7 (well outside every trigger's 2-scene window)
+      const recs607a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607a[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607a[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607a[5] = makeSharedRecord(5, { suspenseDelta: 1 });
+      recs607a[6] = makeSharedRecord(6, { suspenseDelta: 1 });
+      const res = await runP607(recs607a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT'), 'OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT should fire');
+    });
+
+    it('OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT does not fire when a heavy clue-debt scene is followed by a suspense rise within 2 scenes', async () => {
+      const recs607a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607a[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607a[1] = makeSharedRecord(1, { suspenseDelta: 1 });
+      recs607a[2] = makeSharedRecord(2, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607a[5] = makeSharedRecord(5, { suspenseDelta: 1 });
+      const res = await runP607(recs607a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT'), 'OPEN_THREAD_AFTERMATH_SUSPENSE_FLAT should not fire');
+    });
+
+    it('OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT fires when no heavy clue-debt scene is followed by a curiosity rise', async () => {
+      const recs607b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607b[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607b[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607b[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      recs607b[6] = makeSharedRecord(6, { curiosityDelta: 1 });
+      const res = await runP607(recs607b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT'), 'OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT should fire');
+    });
+
+    it('OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT does not fire when a heavy clue-debt scene is followed by a curiosity rise within 2 scenes', async () => {
+      const recs607b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607b[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607b[1] = makeSharedRecord(1, { curiosityDelta: 1 });
+      recs607b[2] = makeSharedRecord(2, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607b[5] = makeSharedRecord(5, { curiosityDelta: 1 });
+      const res = await runP607(recs607b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT'), 'OPEN_THREAD_AFTERMATH_CURIOSITY_FLAT should not fire');
+    });
+
+    it('OPEN_THREAD_AFTERMATH_EMOTION_FLAT fires when no heavy clue-debt scene is followed by a non-neutral emotional shift', async () => {
+      const recs607c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607c[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607c[1] = makeSharedRecord(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607c[5] = makeSharedRecord(5, { emotionalShift: 'negative' });
+      recs607c[6] = makeSharedRecord(6, { emotionalShift: 'positive' });
+      const res = await runP607(recs607c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_EMOTION_FLAT'), 'OPEN_THREAD_AFTERMATH_EMOTION_FLAT should fire');
+    });
+
+    it('OPEN_THREAD_AFTERMATH_EMOTION_FLAT does not fire when a heavy clue-debt scene is followed by a non-neutral emotional shift within 2 scenes', async () => {
+      const recs607c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs607c[0] = makeSharedRecord(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607c[1] = makeSharedRecord(1, { emotionalShift: 'negative' });
+      recs607c[2] = makeSharedRecord(2, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs607c[5] = makeSharedRecord(5, { emotionalShift: 'positive' });
+      const res = await runP607(recs607c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_AFTERMATH_EMOTION_FLAT'), 'OPEN_THREAD_AFTERMATH_EMOTION_FLAT should not fire');
+    });
+  });
+
+
   describe('Wave 593 — pacingPass: stakes aftermath suspense flat, stakes aftermath curiosity flat, stakes aftermath emotion flat', async () => {
     // Uses the shared tests/passes/helpers.ts factories (audit M2.2) instead of a local
     // makeRecNNN clone — makeSharedRecord() defaults purpose to the real 'complicate'
