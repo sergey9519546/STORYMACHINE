@@ -1438,6 +1438,84 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 669 — voicePass: voice highlight peak uncaused, voice payoff drought run, voice relationship zone cluster', async () => {
+    const runV669 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('VOICE_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs669a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs669a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs669a[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV669(recs669a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_PEAK_UNCAUSED'), 'VOICE_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // VOICE_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VOICE_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs669an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs669an[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs669an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs669an[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runV669(recs669an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_PEAK_UNCAUSED'), 'VOICE_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('VOICE_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs669b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs669b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs669b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs669b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs669b[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runV669(recs669b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_DROUGHT_RUN'), 'VOICE_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // VOICE_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('VOICE_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs669bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs669bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs669bn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs669bn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runV669(recs669bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_DROUGHT_RUN'), 'VOICE_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_RELATIONSHIP_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; relationship-shift scenes at 0,1,2 → 100% opening third
+    it('VOICE_RELATIONSHIP_ZONE_CLUSTER fires when >75% of relationship-shift scenes cluster in one third', async () => {
+      const recs669c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs669c[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs669c[1] = makeSharedRecord(1, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs669c[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runV669(recs669c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_ZONE_CLUSTER'), 'VOICE_RELATIONSHIP_ZONE_CLUSTER should fire');
+    });
+
+    // VOICE_RELATIONSHIP_ZONE_CLUSTER no-fire:
+    // relationship-shift scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('VOICE_RELATIONSHIP_ZONE_CLUSTER does not fire when relationship-shift scenes are distributed across thirds', async () => {
+      const recs669cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs669cn[0] = makeSharedRecord(0, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs669cn[4] = makeSharedRecord(4, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs669cn[7] = makeSharedRecord(7, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      const res = await runV669(recs669cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_RELATIONSHIP_ZONE_CLUSTER'), 'VOICE_RELATIONSHIP_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 655 — voicePass: voice character moment zone cluster, voice staging peak uncaused, voice seed drought run', async () => {
     const runV655 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

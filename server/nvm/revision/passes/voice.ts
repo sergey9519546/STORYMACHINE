@@ -232,6 +232,16 @@
 // itself has never been peak-audited here), VOICE_SEED_DROUGHT_RUN (run-based × seededClueIds
 // absence — this pass already has UNRESOLVED_CLUE_DROUGHT_RUN on the unresolvedClues channel;
 // seededClueIds itself has never been drought-audited here).
+// Wave 669 additions: VOICE_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// dialogueHighlights magnitude — dialogueHighlights already anchors two decoupled checks and two
+// aftermath-void checks in this pass, but has never been backward-cause peak-audited; the scene
+// with the most highlighted lines has no dramatic turn or revelation in itself or the two scenes
+// before it), VOICE_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absence — payoffSetupIds has
+// only ever anchored a single co-occurrence/decoupling check here; the drought-run mode applied
+// to this channel for the first time), VOICE_RELATIONSHIP_ZONE_CLUSTER (distribution/timing ×
+// relationshipShifts × structural thirds — relationshipShifts has only been zone-IMBALANCE-
+// audited [four-zone bloat/empty]; this is the first application of the thirds-based
+// zone-cluster mode to the relational channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4122,6 +4132,75 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r655c.longestRun} consecutive scenes with no clue seeded at all, even though ${r655c.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the story's voice coasting on prior setups with nothing fresh to draw on.`,
         suggestedFix: `Seed a new clue or thread somewhere within the ${r655c.longestRun}-scene stretch so the story keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // ── Wave 669: VOICE_HIGHLIGHT_PEAK_UNCAUSED, VOICE_PAYOFF_DROUGHT_RUN,
+  //              VOICE_RELATIONSHIP_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // VOICE_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. dialogueHighlights already anchors two decoupled checks and two aftermath-void
+  // checks here, but has never been backward-cause peak-audited.
+  {
+    const r669a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r669a.fires) {
+      issues.push({
+        location: `scene ${r669a.peakIdx + 1} — peak highlighted-dialogue density (${r669a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'VOICE_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r669a.peakIdx + 1}, with ${r669a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r669a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest consecutive
+  // run of scenes with zero thread resolution reaches 6. payoffSetupIds has only ever anchored a
+  // single co-occurrence/decoupling check here; the drought-run mode applied to this channel for
+  // the first time.
+  {
+    const r669b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r669b.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r669b.longestRun} consecutive scenes`,
+        rule: 'VOICE_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r669b.longestRun} consecutive scenes with no thread resolving at all, even though ${r669b.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the story's voice running on unresolved momentum for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r669b.longestRun}-scene stretch so the voice's sense of accumulating satisfaction keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_RELATIONSHIP_ZONE_CLUSTER — Distribution/timing × relationshipShifts × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 relationship-shift
+  // scenes, fires when >75% of them fall in a single structural third. relationshipShifts has
+  // only been zone-IMBALANCE-audited (four-zone bloat/empty); this is the first application of
+  // the thirds-based zone-cluster mode to the relational channel.
+  {
+    const r669c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r669c.fires) {
+      const zoneName669c = r669c.zoneNames[r669c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName669c} third — ${r669c.maxZoneCount}/${r669c.count} relationship-shift scenes`,
+        rule: 'VOICE_RELATIONSHIP_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r669c.maxZoneCount} of the story's ${r669c.count} relationship-shift scenes (${Math.round((r669c.maxZoneCount / r669c.count) * 100)}%) cluster in the ${zoneName669c} third. Bond changes concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no relational movement carrying the voice.`,
+        suggestedFix: `Let a bond shift in at least one scene outside the ${zoneName669c} third — spreading relational movement across the story lets each structural third carry its own sense of changing dynamics.`,
       });
     }
   }
