@@ -1136,6 +1136,65 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 932 — rhythmPass: rhythm revelation purpose zone cluster, rhythm revelation purpose drought run, rhythm complicate zone imbalance', async () => {
+    const runR932 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs932a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR932(recs932a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER'), 'RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs932an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR932(recs932an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER'), 'RHYTHM_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs932b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR932(recs932b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN'), 'RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs932bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runR932(recs932bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN'), 'RHYTHM_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_COMPLICATE_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // complicate at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('RHYTHM_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs932c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR932(recs932c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_ZONE_IMBALANCE'), 'RHYTHM_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('RHYTHM_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs932cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }));
+      const res = await runR932(recs932cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_COMPLICATE_ZONE_IMBALANCE'), 'RHYTHM_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 918 — rhythmPass: rhythm complicate zone cluster, rhythm complicate drought run, rhythm negative emotion zone imbalance', async () => {
     const runR918 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
