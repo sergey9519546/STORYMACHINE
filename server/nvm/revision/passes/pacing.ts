@@ -355,6 +355,15 @@
 // virgin field), PACING_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift ===
 // 'positive' × structural thirds — mirrors the completed negative-valence trio; the positive
 // valence has never been isolated by any of the three shared-library trio modes in this pass).
+//
+// Wave 845 additions: PACING_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based × purpose ===
+// 'introduce_conflict' absence — completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in Wave 831; peak mode conventionally skipped for this categorical
+// field), PACING_POSITIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'positive' absence
+// — completes 2 of 3 slots for this valence alongside the zone-cluster mode added in Wave 831;
+// peak mode conventionally skipped for this categorical field), PACING_ESTABLISH_WORLD_ZONE_
+// CLUSTER (distribution/timing × purpose === 'establish_world' × structural thirds — this
+// purpose value has never been referenced anywhere in this pass; a virgin field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -4750,6 +4759,72 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r831c.maxZoneCount / r831c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r831c.zoneNames[r831c.maxZoneIdx]} third. When all the relief concentrates in one structural window, pacing delivers its emotional payoff in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Introduce a positive-emotion scene outside the ${r831c.zoneNames[r831c.maxZoneIdx]} third so pacing delivers its emotional payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 845: PACING_INTRODUCE_CONFLICT_DROUGHT_RUN, PACING_POSITIVE_EMOTION_DROUGHT_RUN,
+  //              PACING_ESTABLISH_WORLD_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PACING_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-introducing scenes
+  // overall, fires when the longest consecutive run of scenes with no conflict-introducing
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in Wave 831 (peak mode conventionally skipped for this categorical field).
+  {
+    const r845a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r845a.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r845a.longestRun} consecutive scenes`,
+        rule: 'PACING_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r845a.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r845a.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves pacing coasting on old conflict for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r845a.longestRun}-scene stretch to introduce conflict so pacing keeps facing fresh friction throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_POSITIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'positive' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 positive-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no positive-emotion charge
+  // reaches 6. Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in
+  // Wave 831 (peak mode conventionally skipped for this categorical field).
+  {
+    const r845b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r845b.fires) {
+      issues.push({
+        location: `longest stretch with no positive-emotion charge: ${r845b.longestRun} consecutive scenes`,
+        rule: 'PACING_POSITIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r845b.longestRun} consecutive scenes with no positive-emotion charge at all, even though ${r845b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no relief leaves pacing without an emotional payoff for an extended run.`,
+        suggestedFix: `Give the story a moment of relief within the ${r845b.longestRun}-scene stretch so pacing keeps delivering an emotional payoff throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_ESTABLISH_WORLD_ZONE_CLUSTER — Distribution/timing × purpose === 'establish_world' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // world-establishing scenes, fires when more than 75% of them fall in a single structural
+  // third. This purpose value has never been referenced anywhere in this pass — a virgin field
+  // for all three shared-library trio modes.
+  {
+    const r845c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r845c.fires) {
+      issues.push({
+        location: `${r845c.zoneNames[r845c.maxZoneIdx]} third — ${r845c.maxZoneCount} of ${r845c.count} world-establishing scenes`,
+        rule: 'PACING_ESTABLISH_WORLD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r845c.maxZoneCount / r845c.count) * 100)}% of the scenes purposed to establish the world cluster in the ${r845c.zoneNames[r845c.maxZoneIdx]} third. When every act of world-building concentrates in one structural window, pacing has no fresh ground to build from anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r845c.zoneNames[r845c.maxZoneIdx]} third to establish the world so pacing keeps fresh ground to build from more evenly across the story.`,
       });
     }
   }

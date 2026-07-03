@@ -934,6 +934,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 845 — pacingPass: pacing introduce conflict drought run, pacing positive emotion drought run, pacing establish world zone cluster', async () => {
+    const runP845 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PACING_INTRODUCE_CONFLICT_DROUGHT_RUN fire:
+    // n=10; introduce_conflict at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_INTRODUCE_CONFLICT_DROUGHT_RUN fires when a long run has no new conflict', async () => {
+      const recs845a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runP845(recs845a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'PACING_INTRODUCE_CONFLICT_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_INTRODUCE_CONFLICT_DROUGHT_RUN does not fire when conflict-introducing scenes are evenly spread', async () => {
+      const recs845an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'introduce_conflict' : 'complicate' }),
+      );
+      const res = await runP845(recs845an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_INTRODUCE_CONFLICT_DROUGHT_RUN'), 'PACING_INTRODUCE_CONFLICT_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_POSITIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; positive-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PACING_POSITIVE_EMOTION_DROUGHT_RUN fires when a long run has no positive-emotion charge', async () => {
+      const recs845b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runP845(recs845b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_POSITIVE_EMOTION_DROUGHT_RUN'), 'PACING_POSITIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('PACING_POSITIVE_EMOTION_DROUGHT_RUN does not fire when positive-emotion scenes are evenly spread', async () => {
+      const recs845bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'positive' : 'neutral' }),
+      );
+      const res = await runP845(recs845bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_POSITIVE_EMOTION_DROUGHT_RUN'), 'PACING_POSITIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // PACING_ESTABLISH_WORLD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; establish_world scenes at 0,1,2 → 100% opening third
+    it('PACING_ESTABLISH_WORLD_ZONE_CLUSTER fires when >75% of world-establishing scenes cluster in one third', async () => {
+      const recs845c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runP845(recs845c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_ESTABLISH_WORLD_ZONE_CLUSTER'), 'PACING_ESTABLISH_WORLD_ZONE_CLUSTER should fire');
+    });
+
+    it('PACING_ESTABLISH_WORLD_ZONE_CLUSTER does not fire when world-establishing scenes spread across thirds', async () => {
+      const recs845cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runP845(recs845cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_ESTABLISH_WORLD_ZONE_CLUSTER'), 'PACING_ESTABLISH_WORLD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 831 — pacingPass: pacing turning point drought run, pacing introduce conflict zone cluster, pacing positive emotion zone cluster', async () => {
     const runP831 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
