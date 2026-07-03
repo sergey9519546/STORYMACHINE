@@ -355,6 +355,16 @@
 // PAYOFF_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point' absence —
 // completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
 // same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 832 additions: PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; a virgin field), PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN (run-based ×
+// purpose === 'introduce_conflict' absence — completing 2 of 3 slots for this purpose value
+// alongside the zone-cluster mode added in this same wave; peak mode conventionally skipped for
+// this categorical field), PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'positive' × structural thirds — mirrors the completed negative-valence
+// trio; the positive valence has never been isolated by any of the three shared-library trio
+// modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4531,6 +4541,72 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r818c.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r818c.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the payoff engine without a pivot to resolve threads against for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r818c.longestRun}-scene stretch as a turning point so the payoff engine keeps a pivot to resolve threads against throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 832: PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER, PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN,
+  //              PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r832a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r832a.fires) {
+      issues.push({
+        location: `${r832a.zoneNames[r832a.maxZoneIdx]} third — ${r832a.maxZoneCount} of ${r832a.count} conflict-introducing scenes`,
+        rule: 'PAYOFF_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r832a.maxZoneCount / r832a.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r832a.zoneNames[r832a.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the payoff engine loses fresh setups to resolve anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r832a.zoneNames[r832a.maxZoneIdx]} third to introduce conflict so the payoff engine keeps fresh setups to resolve more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN — Run-based × purpose === 'introduce_conflict' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 conflict-introducing scenes
+  // overall, fires when the longest consecutive run of scenes with no conflict-introducing
+  // purpose reaches 6. Completing 2 of 3 slots for this purpose value alongside the zone-cluster
+  // mode added in this same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r832b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r832b.fires) {
+      issues.push({
+        location: `longest stretch with no new conflict: ${r832b.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_INTRODUCE_CONFLICT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r832b.longestRun} consecutive scenes with no conflict-introducing purpose at all, even though ${r832b.presentCount} scenes elsewhere open a new front. A long unbroken stretch with no fresh friction leaves the payoff engine with nothing new to resolve for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r832b.longestRun}-scene stretch to introduce conflict so the payoff engine keeps fresh setups to resolve throughout that stretch.`,
+      });
+    }
+  }
+
+  // PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed negative-valence trio; the positive valence has never been isolated by
+  // any of the three shared-library trio modes in this pass.
+  {
+    const r832c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r832c.fires) {
+      issues.push({
+        location: `${r832c.zoneNames[r832c.maxZoneIdx]} third — ${r832c.maxZoneCount} of ${r832c.count} positive-emotion scenes`,
+        rule: 'PAYOFF_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r832c.maxZoneCount / r832c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r832c.zoneNames[r832c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the payoff engine delivers its emotional reward in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r832c.zoneNames[r832c.maxZoneIdx]} third so the payoff engine delivers its emotional reward more evenly across the story.`,
       });
     }
   }
