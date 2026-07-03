@@ -351,6 +351,16 @@
 // === 'turning_point' × structural thirds — likewise only ever touched by the generic
 // REPEATED_PURPOSE check [which does not even flag 'turning_point' as low-momentum]; none of the
 // three shared-library trio modes has ever been applied to it).
+//
+// Wave 829 additions: INTENTION_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 815; peak mode conventionally skipped for this categorical field),
+// INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'introduce_conflict' × structural thirds — this purpose value has never been referenced
+// anywhere in this pass; a virgin field), INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'negative' × structural thirds — mirrors the
+// completed positive-valence trio; the negative valence has never been isolated by any of the
+// three shared-library trio modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4722,6 +4732,72 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r815c.maxZoneCount / r815c.count) * 100)}% of the story's turning-point scenes cluster in the ${r815c.zoneNames[r815c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the character's pursuit of their goal loses a structural pivot to react to everywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r815c.zoneNames[r815c.maxZoneIdx]} third as a turning point so the character's intention keeps a pivot to react to more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 829: INTENTION_TURNING_POINT_DROUGHT_RUN, INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // INTENTION_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall,
+  // fires when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 815 (peak mode conventionally skipped for this categorical field).
+  {
+    const r829a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r829a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r829a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r829a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r829a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the character's pursuit of their goal without a pivot to react to for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r829a.longestRun}-scene stretch as a turning point so the character's intention keeps a pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r829b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r829b.fires) {
+      issues.push({
+        location: `${r829b.zoneNames[r829b.maxZoneIdx]} third — ${r829b.maxZoneCount} of ${r829b.count} conflict-introducing scenes`,
+        rule: 'INTENTION_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r829b.maxZoneCount / r829b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r829b.zoneNames[r829b.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, the character's pursuit of their goal loses fresh friction to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r829b.zoneNames[r829b.maxZoneIdx]} third to introduce conflict so the character's intention keeps facing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the completed positive-valence trio; the negative valence has never been isolated by
+  // any of the three shared-library trio modes in this pass.
+  {
+    const r829c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r829c.fires) {
+      issues.push({
+        location: `${r829c.zoneNames[r829c.maxZoneIdx]} third — ${r829c.maxZoneCount} of ${r829c.count} negative-emotion scenes`,
+        rule: 'INTENTION_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r829c.maxZoneCount / r829c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r829c.zoneNames[r829c.maxZoneIdx]} third. When all the setbacks concentrate in one structural window, the character's pursuit of their goal carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r829c.zoneNames[r829c.maxZoneIdx]} third so the character's intention registers its emotional cost more evenly across the story.`,
       });
     }
   }
