@@ -931,6 +931,65 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 920 — themePass: theme revelation purpose zone cluster, theme revelation purpose drought run, theme character moment zone imbalance', async () => {
+    const runT920 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes at
+    // 0,1,2 (opening third) → 3/3 = 100% > 75%. Filler 'establish_world'.
+    it('THEME_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs920a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT920(recs920a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_ZONE_CLUSTER'), 'THEME_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('THEME_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs920an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT920(recs920an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_ZONE_CLUSTER'), 'THEME_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('THEME_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs920b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT920(recs920b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_DROUGHT_RUN'), 'THEME_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('THEME_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs920bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT920(recs920bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_DROUGHT_RUN'), 'THEME_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_CHARACTER_MOMENT_ZONE_IMBALANCE fire: n=10, Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9};
+    // character_moment at 0,1,2,8,9 → Z0 3/5=60% (bloat), Z1 and Z2 empty.
+    it('THEME_CHARACTER_MOMENT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of character-moment scenes', async () => {
+      const recs920c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runT920(recs920c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'THEME_CHARACTER_MOMENT_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_CHARACTER_MOMENT_ZONE_IMBALANCE does not fire when character-moment scenes touch every zone', async () => {
+      const recs920cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'character_moment' : 'establish_world' }));
+      const res = await runT920(recs920cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_ZONE_IMBALANCE'), 'THEME_CHARACTER_MOMENT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 906 — themePass: theme turning point zone imbalance, theme introduce conflict zone imbalance, theme complicate zone imbalance', async () => {
     const runT906 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

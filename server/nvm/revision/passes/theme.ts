@@ -408,6 +408,14 @@
 // by it: THEME_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
 // THEME_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict'), and
 // THEME_COMPLICATE_ZONE_IMBALANCE (purpose === 'complicate').
+//
+// Wave 920 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing THEME_REVELATION_ZONE_CLUSTER/DROUGHT_RUN and related rules audit the separate
+// revelation string|null field, not this purpose enum value) -- a genuinely virgin field. This
+// wave adds THEME_REVELATION_PURPOSE_ZONE_CLUSTER and THEME_REVELATION_PURPOSE_DROUGHT_RUN (peak
+// mode conventionally skipped for this categorical field), plus THEME_CHARACTER_MOMENT_ZONE_
+// IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
+// a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5210,6 +5218,74 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r906c.totalCount} complicating scenes are unevenly distributed across its four structural zones: ${bloatName906c} contains ${r906c.counts[r906c.bloatZoneIdx]} of them (${Math.round((r906c.counts[r906c.bloatZoneIdx] / r906c.totalCount) * 100)}%) while ${emptyNames906c} contains none. Complications bloat in one structural quarter and vanish from another, so the theme is pressured in only part of the story rather than across its whole shape.`,
         suggestedFix: `Redistribute complications: move at least one complicate-purposed scene into the empty zone(s) — ${emptyNames906c} — so the theme keeps being pressured across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from THEME_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r920a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r920a.fires) {
+      issues.push({
+        location: `${r920a.zoneNames[r920a.maxZoneIdx]} third — ${r920a.maxZoneCount} of ${r920a.count} revelation-purposed scenes`,
+        rule: 'THEME_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r920a.maxZoneCount / r920a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r920a.zoneNames[r920a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the theme is illuminated by new truth in only one part of the story instead of across its whole shape.`,
+        suggestedFix: `Purpose at least one scene outside the ${r920a.zoneNames[r920a.maxZoneIdx]} third as a revelation so the theme keeps being illuminated by new truth more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r920b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r920b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r920b.longestRun} consecutive scenes`,
+        rule: 'THEME_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r920b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r920b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the theme un-illuminated by fresh truth for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r920b.longestRun}-scene stretch as a revelation so the theme keeps being illuminated by new truth throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 892. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone THEME_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based THEME_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r920c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r920c.fires) {
+      const emptyNames920c = r920c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName920c = FOUR_ZONE_NAMES[r920c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames920c} empty; ${bloatName920c} has ${r920c.counts[r920c.bloatZoneIdx]}/${r920c.totalCount} character-moment scenes`,
+        rule: 'THEME_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r920c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName920c} contains ${r920c.counts[r920c.bloatZoneIdx]} of them (${Math.round((r920c.counts[r920c.bloatZoneIdx] / r920c.totalCount) * 100)}%) while ${emptyNames920c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, so the theme is voiced through character in only part of the story rather than across its whole shape.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames920c} — so the theme keeps being voiced through character across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
