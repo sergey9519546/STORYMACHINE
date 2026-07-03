@@ -283,6 +283,15 @@
 // relationshipShifts; the backward-cause peak mode has never been applied to it, completing the
 // trio), STRUCTURE_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 681 applied
 // the backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
+// Wave 751 additions: STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 681/737 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), STRUCTURE_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — dramaticTurn
+// is this pass's second most heavily used field [59 accesses] and has never anchored any of the
+// three shared-library modes as a primary signal; the run-based drought mode has never been
+// applied to it), STRUCTURE_STAKES_DROUGHT_RUN (run-based × purpose === 'raise_stakes' absence —
+// Wave 681 applied the zone-cluster mode to this signal; the drought-run mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4114,6 +4123,71 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r737c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r737c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the story's structure without any mechanical pressure driving events forward for an extended run.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r737c.longestRun}-scene stretch so the structure keeps a mechanical pressure acting on events throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 751: STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER, STRUCTURE_TURN_DROUGHT_RUN,
+  //              STRUCTURE_STAKES_DROUGHT_RUN ────────────────────────────────────────────
+
+  // STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // clock-shifting scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Waves 681/737 applied the backward-cause peak and run-based drought modes to clockDelta; the
+  // zone-cluster mode has never been applied to it, completing the trio.
+  {
+    const r751a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r751a.fires) {
+      issues.push({
+        location: `${r751a.zoneNames[r751a.maxZoneIdx]} third — ${r751a.maxZoneCount} of ${r751a.count} clock-shifting scenes`,
+        rule: 'STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r751a.maxZoneCount / r751a.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r751a.zoneNames[r751a.maxZoneIdx]} third. When every clock movement lands in the same structural window, the story's structure loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r751a.zoneNames[r751a.maxZoneIdx]} third so the structure keeps mounting time pressure more evenly across the story.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. dramaticTurn is this
+  // pass's second most heavily used field and has never anchored any of the three shared-library
+  // modes as a primary signal; the run-based drought mode has never been applied to it.
+  {
+    const r751b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r751b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r751b.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r751b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r751b.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the story's structure coasting without a pivot to organize around for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r751b.longestRun}-scene stretch so the structure keeps a pivot to organize around throughout that stretch.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_DROUGHT_RUN — Run-based × purpose === 'raise_stakes' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 stakes-raising scenes overall, fires
+  // when the longest consecutive run of scenes purposed otherwise reaches 6. Wave 681 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r751c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r751c.fires) {
+      issues.push({
+        location: `longest stretch with no scene raising stakes: ${r751c.longestRun} consecutive scenes`,
+        rule: 'STRUCTURE_STAKES_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r751c.longestRun} consecutive scenes with no scene purposed to raise stakes, even though ${r751c.presentCount} scenes elsewhere do escalate. A long unbroken stretch with nothing pushing the stakes higher leaves the story's structure flat without mounting pressure for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r751c.longestRun}-scene stretch to raise stakes — even a small escalation keeps the structure under mounting pressure throughout that stretch.`,
       });
     }
   }

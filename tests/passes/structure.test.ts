@@ -1006,6 +1006,85 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 751 — structurePass: structure clock delta zone cluster, structure turn drought run, structure stakes drought run', async () => {
+    const runST751 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs751a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs751a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs751a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs751a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runST751(recs751a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER'), 'STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-shifting scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock movement is distributed across thirds', async () => {
+      const recs751an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs751an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs751an[4] = makeSharedRecord(4, { clockDelta: -1 });
+      recs751an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runST751(recs751an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER'), 'STRUCTURE_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // STRUCTURE_TURN_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a dramatic turn (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('STRUCTURE_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run reaches 6', async () => {
+      const recs751b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs751b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs751b[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs751b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runST751(recs751b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_DROUGHT_RUN'), 'STRUCTURE_TURN_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_TURN_DROUGHT_RUN no-fire:
+    // dramatic-turn scenes spread out so no gap reaches 6 consecutive scenes
+    it('STRUCTURE_TURN_DROUGHT_RUN does not fire when dramatic turns are spread through the story', async () => {
+      const recs751bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs751bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs751bn[3] = makeSharedRecord(3, { dramaticTurn: 'reversal' });
+      recs751bn[6] = makeSharedRecord(6, { dramaticTurn: 'reversal' });
+      recs751bn[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runST751(recs751bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_DROUGHT_RUN'), 'STRUCTURE_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // STRUCTURE_STAKES_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 purposed to raise stakes (>=3 present overall); scenes 3-9 (7 scenes) purposed otherwise
+    it('STRUCTURE_STAKES_DROUGHT_RUN fires when the longest no-stakes-raise run reaches 6', async () => {
+      const recs751c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs751c[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs751c[1] = makeSharedRecord(1, { purpose: 'raise_stakes' });
+      recs751c[2] = makeSharedRecord(2, { purpose: 'raise_stakes' });
+      const res = await runST751(recs751c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_DROUGHT_RUN'), 'STRUCTURE_STAKES_DROUGHT_RUN should fire');
+    });
+
+    // STRUCTURE_STAKES_DROUGHT_RUN no-fire:
+    // stakes-raising scenes spread out so no gap reaches 6 consecutive scenes
+    it('STRUCTURE_STAKES_DROUGHT_RUN does not fire when stakes-raising scenes are spread through the story', async () => {
+      const recs751cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs751cn[0] = makeSharedRecord(0, { purpose: 'raise_stakes' });
+      recs751cn[3] = makeSharedRecord(3, { purpose: 'raise_stakes' });
+      recs751cn[6] = makeSharedRecord(6, { purpose: 'raise_stakes' });
+      recs751cn[9] = makeSharedRecord(9, { purpose: 'raise_stakes' });
+      const res = await runST751(recs751cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_DROUGHT_RUN'), 'STRUCTURE_STAKES_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 737 — structurePass: structure payoff drought run, structure relationship peak uncaused, structure clock delta drought run', async () => {
     const runST737 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
