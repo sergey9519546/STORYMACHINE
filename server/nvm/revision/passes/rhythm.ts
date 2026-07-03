@@ -228,6 +228,15 @@
 // unresolvedClues × curiosityDelta>0 — Wave 638's OPEN_THREAD_SIGNAL_DECOUPLED paired
 // unresolvedClues with dialogueHighlights; this crosses the same open-thread signal with the
 // curiosity channel instead, a pairing never tried in this pass).
+// Wave 666 additions: DIALOGUE_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// dialogueHighlights magnitude — the peak-uncaused mode had only been applied to clockDelta
+// [Wave 610]; the scene with the most highlighted lines has no dramatic turn or revelation in
+// itself or the two scenes before it), SEED_SIGNAL_DROUGHT_RUN (run-based × seededClueIds
+// absence — the drought-run mode has been applied to relationshipShifts/clockRaised/visualBeats
+// but never to the seed channel, which so far has only been zone-imbalance-audited),
+// TURN_SIGNAL_ZONE_CLUSTER (distribution/timing × dramaticTurn presence × structural thirds —
+// the zone-cluster mode had only been applied to payoffSetupIds and emotionalShift; dramaticTurn
+// itself has never been cluster-audited despite anchoring an aftermath-void check already).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3230,6 +3239,74 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The ${r652c.aCount} scenes carrying outstanding clue-debt never coincide with the ${r652c.bCount} scenes where curiosity is actively rising — the story's open mysteries and its moments of climbing intrigue run on separate rhythmic tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.`,
         suggestedFix: `Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, so the story's open threads and its rising intrigue occasionally converge.`,
+      });
+    }
+  }
+
+  // ── Wave 666: DIALOGUE_SIGNAL_PEAK_UNCAUSED, SEED_SIGNAL_DROUGHT_RUN, TURN_SIGNAL_ZONE_CLUSTER ──
+
+  // DIALOGUE_SIGNAL_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 highlighted-
+  // dialogue scenes, a 2-scene lookback. Finds the single scene with the most highlighted lines;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. The peak-uncaused mode had only been applied to clockDelta (Wave 610); this is
+  // the first application to the highlighted-dialogue channel.
+  {
+    const r666a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r666a.fires) {
+      issues.push({
+        location: `scene ${r666a.peakIdx + 1} — peak highlighted-dialogue density (${r666a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_SIGNAL_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r666a.peakIdx + 1}, with ${r666a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it, leaving the story's rhythm to spend its most verbally dense beat on causally unearned momentum.`,
+        suggestedFix: `Give scene ${r666a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // SEED_SIGNAL_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. The drought-run mode has been applied to
+  // relationshipShifts, clockRaised, and visualBeats; seededClueIds itself has only been
+  // zone-imbalance-audited (Wave 624), never drought-audited.
+  {
+    const r666b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r666b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r666b.longestRun} consecutive scenes`,
+        rule: 'SEED_SIGNAL_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r666b.longestRun} consecutive scenes with no clue seeded at all, even though ${r666b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the story's rhythm coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r666b.longestRun}-scene stretch so the rhythm keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // TURN_SIGNAL_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 dramatic-turn scenes, fires
+  // when >75% of them fall in a single structural third. The zone-cluster mode had only been
+  // applied to payoffSetupIds and emotionalShift; dramaticTurn itself has never been
+  // cluster-audited despite anchoring an aftermath-void check already (Wave 638).
+  {
+    const r666c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r666c.fires) {
+      const zoneName666c = r666c.zoneNames[r666c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName666c} third — ${r666c.maxZoneCount}/${r666c.count} dramatic-turn scenes`,
+        rule: 'TURN_SIGNAL_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r666c.maxZoneCount} of the story's ${r666c.count} dramatic-turn scenes (${Math.round((r666c.maxZoneCount / r666c.count) * 100)}%) cluster in the ${zoneName666c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds paced without a reversal to punctuate them.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName666c} third a dramatic turn — spreading structural pivots across the story lets each structural third carry its own reversal.`,
       });
     }
   }

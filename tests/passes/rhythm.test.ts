@@ -1136,6 +1136,84 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 666 — rhythmPass: dialogue signal peak uncaused, seed signal drought run, turn signal zone cluster', async () => {
+    const runR666 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // DIALOGUE_SIGNAL_PEAK_UNCAUSED fire:
+    // 8 scenes; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('DIALOGUE_SIGNAL_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs666a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs666a[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs666a[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR666(recs666a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_PEAK_UNCAUSED'), 'DIALOGUE_SIGNAL_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_SIGNAL_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_SIGNAL_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs666an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs666an[2] = makeSharedRecord(2, { dialogueHighlights: ['line-a'] });
+      recs666an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs666an[6] = makeSharedRecord(6, { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runR666(recs666an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_PEAK_UNCAUSED'), 'DIALOGUE_SIGNAL_PEAK_UNCAUSED should not fire');
+    });
+
+    // SEED_SIGNAL_DROUGHT_RUN fire:
+    // 10 scenes; seeded at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('SEED_SIGNAL_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs666b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs666b[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs666b[1] = makeSharedRecord(1, { seededClueIds: ['clue-x'] });
+      recs666b[2] = makeSharedRecord(2, { seededClueIds: ['clue-x'] });
+      recs666b[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runR666(recs666b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_DROUGHT_RUN'), 'SEED_SIGNAL_DROUGHT_RUN should fire');
+    });
+
+    // SEED_SIGNAL_DROUGHT_RUN no-fire:
+    // seeded at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('SEED_SIGNAL_DROUGHT_RUN does not fire when seeding is distributed without a long drought', async () => {
+      const recs666bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs666bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-x'] });
+      recs666bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-x'] });
+      recs666bn[9] = makeSharedRecord(9, { seededClueIds: ['clue-x'] });
+      const res = await runR666(recs666bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_SIGNAL_DROUGHT_RUN'), 'SEED_SIGNAL_DROUGHT_RUN should not fire');
+    });
+
+    // TURN_SIGNAL_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('TURN_SIGNAL_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs666c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs666c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs666c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs666c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runR666(recs666c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'TURN_SIGNAL_ZONE_CLUSTER'), 'TURN_SIGNAL_ZONE_CLUSTER should fire');
+    });
+
+    // TURN_SIGNAL_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('TURN_SIGNAL_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs666cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs666cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs666cn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs666cn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runR666(recs666cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'TURN_SIGNAL_ZONE_CLUSTER'), 'TURN_SIGNAL_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 652 — rhythmPass: emotional signal zone cluster, staging signal drought run, open thread curiosity signal decoupled', async () => {
     const runR652 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
