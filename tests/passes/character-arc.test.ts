@@ -1080,6 +1080,88 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 743 — characterArcPass: arc character moment zone cluster, arc turn drought run, arc clock zone cluster', async () => {
+    const makeRec743 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc743 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // ARC_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character-moment scenes at 0,1,2 → 100% opening third
+    it('ARC_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs743a = Array.from({ length: 9 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runArc743(recs743a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CHARACTER_MOMENT_ZONE_CLUSTER'), 'ARC_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_CHARACTER_MOMENT_ZONE_CLUSTER no-fire:
+    // character-moment scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes are distributed across thirds', async () => {
+      const recs743an = Array.from({ length: 9 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 4 || i === 7) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runArc743(recs743an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CHARACTER_MOMENT_ZONE_CLUSTER'), 'ARC_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+
+    // ARC_TURN_DROUGHT_RUN fire:
+    // 10 scenes; dramatic turns at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('ARC_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run is ≥6', async () => {
+      const recs743b = Array.from({ length: 10 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runArc743(recs743b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_DROUGHT_RUN'), 'ARC_TURN_DROUGHT_RUN should fire');
+    });
+
+    // ARC_TURN_DROUGHT_RUN no-fire:
+    // dramatic turns at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('ARC_TURN_DROUGHT_RUN does not fire when dramatic turns are distributed without a long drought', async () => {
+      const recs743bn = Array.from({ length: 10 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 4 || i === 9) ? { dramaticTurn: 'reversal' } : {}
+      ));
+      const res = await runArc743(recs743bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_DROUGHT_RUN'), 'ARC_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // ARC_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised scenes at 0,1,2 → 100% opening third
+    it('ARC_CLOCK_ZONE_CLUSTER fires when >75% of clockRaised scenes cluster in one third', async () => {
+      const recs743c = Array.from({ length: 9 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 1 || i === 2) ? { clockRaised: true } : {}
+      ));
+      const res = await runArc743(recs743c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_ZONE_CLUSTER'), 'ARC_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // ARC_CLOCK_ZONE_CLUSTER no-fire:
+    // clockRaised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('ARC_CLOCK_ZONE_CLUSTER does not fire when clockRaised scenes are distributed across thirds', async () => {
+      const recs743cn = Array.from({ length: 9 }, (_, i) => makeRec743(i,
+        (i === 0 || i === 4 || i === 7) ? { clockRaised: true } : {}
+      ));
+      const res = await runArc743(recs743cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_ZONE_CLUSTER'), 'ARC_CLOCK_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 729 — characterArcPass: arc open thread zone cluster, arc character moment drought run, arc curiosity peak uncaused', async () => {
     const makeRec729 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

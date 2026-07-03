@@ -316,6 +316,18 @@
 // Wave 533], both of which examine the peak scene's OWN state; this checks whether the peak scene
 // or either of the two PRECEDING scenes contains a dramatic turn or revelation — a genuinely
 // distinct backward-looking causal audit never applied to this channel).
+// Wave 743 additions: ARC_CHARACTER_MOMENT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'character_moment' × structural thirds — Wave 617 applied the four-zone-imbalance mode
+// [bloat/empty across four zones] and Wave 729 applied the run-based drought mode to this signal;
+// the thirds-ratio zone-cluster mode has never been applied to it — a distinct analytical shape
+// from the four-zone imbalance check, since >75%-in-one-third can fire even when no zone is
+// completely empty), ARC_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — Wave
+// 449 applied the zone-cluster mode to this channel [ARC_TURN_ZONE_CLUSTER]; the run-based
+// drought mode has never been applied to it), ARC_CLOCK_ZONE_CLUSTER (distribution/timing ×
+// clockRaised === true × structural thirds — the existing ARC_CLOCK_DROUGHT_RUN [Wave 575] audits
+// run-length absence and ARC_CLOCK_OPENING_ZONE_ABSENT audits only the opening third specifically;
+// the general thirds-ratio zone-cluster mode, which can fire on a middle- or closing-third
+// concentration that the opening-only check cannot detect, has never been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4166,6 +4178,76 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The arc's single sharpest curiosity spike (scene ${r729c.peakIdx + 1}, a rise of ${r729c.peakMagnitude}) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the audience's hunger to know more peaks hardest arrives without any structural pivot or disclosure driving it — an uncaused spike that gives the character's arc nothing to hook the wondering to.`,
         suggestedFix: `Give scene ${r729c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the arc's sharpest curiosity spike is earned by a shift in the character's circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 743: ARC_CHARACTER_MOMENT_ZONE_CLUSTER, ARC_TURN_DROUGHT_RUN,
+  //              ARC_CLOCK_ZONE_CLUSTER ───────────────────────────────────────────────────
+
+  // ARC_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose === 'character_moment' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // character-moment scenes, fires when more than 75% of those scenes cluster in a single third.
+  // Wave 617 applied the four-zone-imbalance mode and Wave 729 applied the run-based drought mode
+  // to this signal; the thirds-ratio zone-cluster mode has never been applied to it — a distinct
+  // analytical shape, since a >75%-in-one-third concentration can fire even when no zone is
+  // completely empty.
+  {
+    const r743a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r743a.fires) {
+      issues.push({
+        location: `${r743a.zoneNames[r743a.maxZoneIdx]} third — ${r743a.maxZoneCount} of ${r743a.count} character-moment scenes`,
+        rule: 'ARC_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r743a.maxZoneCount / r743a.count) * 100)}% of the story's dedicated character-moment scenes cluster in the ${r743a.zoneNames[r743a.maxZoneIdx]} third. When every beat purposed to reveal the protagonist's inner life lands in the same structural window, the arc has no interior breath anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r743a.zoneNames[r743a.maxZoneIdx]} third as a character moment so the arc's interior thread keeps breathing more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 scenes carrying a dramatic turn,
+  // fires when the longest consecutive run of scenes with no turn reaches 6. Wave 449 applied the
+  // zone-cluster mode to this channel (ARC_TURN_ZONE_CLUSTER); the run-based drought mode has
+  // never been applied to it.
+  {
+    const r743b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r743b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r743b.longestRun} consecutive scenes`,
+        rule: 'ARC_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r743b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r743b.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the character's arc coasting without a structural pivot to react to for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r743b.longestRun}-scene stretch so the arc keeps something to react to and grow from throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised === true × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clockRaised scenes, fires
+  // when more than 75% of those scenes cluster in a single third. The existing
+  // ARC_CLOCK_DROUGHT_RUN (Wave 575) audits run-length absence and ARC_CLOCK_OPENING_ZONE_ABSENT
+  // audits only the opening third specifically; the general thirds-ratio zone-cluster mode, which
+  // can fire on a middle- or closing-third concentration that the opening-only check cannot
+  // detect, has never been applied to it.
+  {
+    const r743c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r743c.fires) {
+      issues.push({
+        location: `${r743c.zoneNames[r743c.maxZoneIdx]} third — ${r743c.maxZoneCount} of ${r743c.count} clockRaised scenes`,
+        rule: 'ARC_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r743c.maxZoneCount / r743c.count) * 100)}% of the story's clockRaised scenes cluster in the ${r743c.zoneNames[r743c.maxZoneIdx]} third. When every ticking-clock beat lands in the same structural window, the character's arc loses any sense of mounting time pressure recurring across the whole story.`,
+        suggestedFix: `Raise the clock in at least one scene outside the ${r743c.zoneNames[r743c.maxZoneIdx]} third so time pressure keeps testing the character more evenly across the story.`,
       });
     }
   }
