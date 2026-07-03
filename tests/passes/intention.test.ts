@@ -1352,6 +1352,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 885 — intentionPass: intention complicate drought run, intention climax zone imbalance, intention establish world zone imbalance', async () => {
+    const makeRec885 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN885 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('INTENTION_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs885a = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        (i === 0 || i === 1 || i === 2) ? { purpose: 'complicate' } : { purpose: 'establish_world' }
+      ));
+      const res = await runIN885(recs885a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_COMPLICATE_DROUGHT_RUN'), 'INTENTION_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('INTENTION_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs885an = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { purpose: 'complicate' } : { purpose: 'establish_world' }
+      ));
+      const res = await runIN885(recs885an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_COMPLICATE_DROUGHT_RUN'), 'INTENTION_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('INTENTION_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs885b = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        [0, 1, 2, 8, 9].includes(i) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runIN885(recs885b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_CLIMAX_ZONE_IMBALANCE'), 'INTENTION_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs885bn = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        [0, 3, 5, 8].includes(i) ? { purpose: 'climax' } : {}
+      ));
+      const res = await runIN885(recs885bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_CLIMAX_ZONE_IMBALANCE'), 'INTENTION_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs885c = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        [0, 1, 2, 8, 9].includes(i) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runIN885(recs885c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs885cn = Array.from({ length: 10 }, (_, i) => makeRec885(i,
+        [0, 3, 5, 8].includes(i) ? { purpose: 'establish_world' } : {}
+      ));
+      const res = await runIN885(recs885cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 871 — intentionPass: intention climax drought run, intention resolution drought run, intention complicate zone cluster', async () => {
     const makeRec871 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

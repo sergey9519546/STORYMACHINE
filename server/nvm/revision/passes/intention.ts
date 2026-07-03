@@ -393,6 +393,14 @@
 // only ever appeared inside an explanatory comment listing "dramatic purposes expected to
 // recur"; none of the three shared-library trio modes has ever isolated it as its own
 // standalone signal).
+//
+// Wave 885 additions: INTENTION_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 871; peak mode conventionally skipped for this categorical field). Also, no
+// purpose value had ever been audited by the distinct 4-zone checkZoneImbalance mode in this
+// pass (only visualBeats and unresolvedClues had); this wave applies it to two purpose values
+// with complete 3-zone/run-based trios: INTENTION_CLIMAX_ZONE_IMBALANCE (purpose === 'climax')
+// and INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5031,6 +5039,79 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r871c.maxZoneCount / r871c.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r871c.zoneNames[r871c.maxZoneIdx]} third. When every complication lands in the same structural window, the character's pursuit of their goal stops encountering fresh obstacles anywhere else across the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r871c.zoneNames[r871c.maxZoneIdx]} third to complicate the story so the character's intention keeps meeting fresh obstacles more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 885: INTENTION_COMPLICATE_DROUGHT_RUN, INTENTION_CLIMAX_ZONE_IMBALANCE,
+  //              INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // INTENTION_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 871 (peak mode conventionally skipped for this categorical field).
+  {
+    const r885a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r885a.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r885a.longestRun} consecutive scenes`,
+        rule: 'INTENTION_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r885a.longestRun} consecutive scenes with no complicating purpose at all, even though ${r885a.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the character's pursuit of their goal without fresh obstacles for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r885a.longestRun}-scene stretch to complicate the story so the character's intention keeps meeting fresh obstacles throughout that stretch.`,
+      });
+    }
+  }
+
+  // INTENTION_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // climax-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone INTENTION_CLIMAX_ZONE_CLUSTER and run-based INTENTION_CLIMAX_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r885b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r885b.fires) {
+      const emptyNames885b = r885b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName885b = FOUR_ZONE_NAMES[r885b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames885b} empty; ${bloatName885b} has ${r885b.counts[r885b.bloatZoneIdx]}/${r885b.totalCount} climax-purposed scenes`,
+        rule: 'INTENTION_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r885b.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName885b} contains ${r885b.counts[r885b.bloatZoneIdx]} of them (${Math.round((r885b.counts[r885b.bloatZoneIdx] / r885b.totalCount) * 100)}%) while ${emptyNames885b} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the character's pursuit of their goal an uneven structural rhythm to build toward.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames885b} — so every structural quarter carries some capacity for the character's biggest test, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'establish_world' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library. n≥10, ≥4 world-establishing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone INTENTION_ESTABLISH_WORLD_ZONE_CLUSTER and
+  // run-based INTENTION_ESTABLISH_WORLD_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r885c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r885c.fires) {
+      const emptyNames885c = r885c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName885c = FOUR_ZONE_NAMES[r885c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames885c} empty; ${bloatName885c} has ${r885c.counts[r885c.bloatZoneIdx]}/${r885c.totalCount} world-establishing scenes`,
+        rule: 'INTENTION_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r885c.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName885c} contains ${r885c.counts[r885c.bloatZoneIdx]} of them (${Math.round((r885c.counts[r885c.bloatZoneIdx] / r885c.totalCount) * 100)}%) while ${emptyNames885c} contains none. World-building bloats in one structural quarter and vanishes from another, giving the character's pursuit of their goal an uneven structural rhythm to act against.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames885c} — so every structural quarter carries some fresh ground for the character's intention to act against, not only the quarter currently carrying most of them.`,
       });
     }
   }
