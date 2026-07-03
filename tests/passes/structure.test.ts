@@ -1006,6 +1006,68 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 905 — structurePass: structure turning point zone imbalance, structure complicate zone imbalance, structure introduce conflict zone imbalance', async () => {
+    const runST905 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched →
+    // no-fire. Filler is 'establish_world' (not one of the tested purpose values).
+    it('STRUCTURE_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs905a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runST905(recs905a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURNING_POINT_ZONE_IMBALANCE'), 'STRUCTURE_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs905an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'establish_world' }),
+      );
+      const res = await runST905(recs905an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURNING_POINT_ZONE_IMBALANCE'), 'STRUCTURE_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_COMPLICATE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of complicating scenes', async () => {
+      const recs905b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST905(recs905b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_ZONE_IMBALANCE'), 'STRUCTURE_COMPLICATE_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_COMPLICATE_ZONE_IMBALANCE does not fire when complicating scenes touch every zone', async () => {
+      const recs905bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runST905(recs905bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_COMPLICATE_ZONE_IMBALANCE'), 'STRUCTURE_COMPLICATE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of conflict-introducing scenes', async () => {
+      const recs905c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runST905(recs905c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE does not fire when conflict-introducing scenes touch every zone', async () => {
+      const recs905cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'introduce_conflict' : 'establish_world' }),
+      );
+      const res = await runST905(recs905cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE'), 'STRUCTURE_INTRODUCE_CONFLICT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 891 — structurePass: structure climax zone imbalance, structure establish world zone imbalance, structure resolution zone imbalance', async () => {
     const runST891 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
