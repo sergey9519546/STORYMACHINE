@@ -1136,6 +1136,84 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 736 — rhythmPass: rhythm clock delta drought run, rhythm staging zone cluster, rhythm open thread zone cluster', async () => {
+    const runR736 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('RHYTHM_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs736a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs736a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs736a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs736a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runR736(recs736a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_DELTA_DROUGHT_RUN'), 'RHYTHM_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // RHYTHM_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('RHYTHM_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs736an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs736an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs736an[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs736an[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs736an[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runR736(recs736an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_DELTA_DROUGHT_RUN'), 'RHYTHM_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs736b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs736b[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs736b[1] = makeSharedRecord(1, { visualBeats: ['a', 'b'] });
+      recs736b[2] = makeSharedRecord(2, { visualBeats: ['a', 'b'] });
+      const res = await runR736(recs736b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAGING_ZONE_CLUSTER'), 'RHYTHM_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // RHYTHM_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RHYTHM_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs736bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs736bn[0] = makeSharedRecord(0, { visualBeats: ['a', 'b'] });
+      recs736bn[4] = makeSharedRecord(4, { visualBeats: ['a', 'b'] });
+      recs736bn[7] = makeSharedRecord(7, { visualBeats: ['a', 'b'] });
+      const res = await runR736(recs736bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAGING_ZONE_CLUSTER'), 'RHYTHM_STAGING_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs736c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs736c[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs736c[1] = makeSharedRecord(1, { unresolvedClues: ['clue-b'] });
+      recs736c[2] = makeSharedRecord(2, { unresolvedClues: ['clue-c'] });
+      const res = await runR736(recs736c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_ZONE_CLUSTER'), 'RHYTHM_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // RHYTHM_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RHYTHM_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs736cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs736cn[0] = makeSharedRecord(0, { unresolvedClues: ['clue-a'] });
+      recs736cn[4] = makeSharedRecord(4, { unresolvedClues: ['clue-b'] });
+      recs736cn[7] = makeSharedRecord(7, { unresolvedClues: ['clue-c'] });
+      const res = await runR736(recs736cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_ZONE_CLUSTER'), 'RHYTHM_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 722 — rhythmPass: clock signal zone cluster, unresolved signal peak uncaused, staging signal peak uncaused', async () => {
     const runR722 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

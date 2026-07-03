@@ -273,6 +273,15 @@
 // it), STAGING_SIGNAL_PEAK_UNCAUSED (single-peak isolation/backward-cause × visualBeats magnitude
 // — Wave 652 applied the drought-run mode to visualBeats; the backward-cause peak mode has never
 // been applied to it).
+// Wave 736 additions: RHYTHM_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Waves
+// 610/722 applied the backward-cause peak and zone-cluster modes to clockDelta; the drought-run
+// mode has never been applied to it, completing the trio), RHYTHM_STAGING_ZONE_CLUSTER
+// (distribution/timing × visualBeats × structural thirds — Waves 652/722 applied the run-based
+// drought and backward-cause peak modes to visualBeats; the zone-cluster mode has never been
+// applied to it, completing the trio), RHYTHM_OPEN_THREAD_ZONE_CLUSTER (distribution/timing ×
+// unresolvedClues × structural thirds — Waves 680/722 applied the run-based drought and
+// backward-cause peak modes to unresolvedClues; the zone-cluster mode has never been applied to
+// it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3619,6 +3628,72 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for physical staging (scene ${r722c.peakIdx + 1}, with ${r722c.peakMagnitude} staged beats) has no dramatic turn or revelation in itself or the two scenes before it. The moment where physical action concentrates most heavily arrives without any structural pivot or disclosure driving it, leaving the story's rhythm to spend its most physically dense beat on causally unearned momentum.`,
         suggestedFix: `Give scene ${r722c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most physically active moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 736: RHYTHM_CLOCK_DELTA_DROUGHT_RUN, RHYTHM_STAGING_ZONE_CLUSTER,
+  //              RHYTHM_OPEN_THREAD_ZONE_CLUSTER ───────────────────────────────────────────
+
+  // RHYTHM_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Waves 610/722 applied
+  // the backward-cause peak and zone-cluster modes to clockDelta; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r736a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r736a.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r736a.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r736a.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r736a.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the story's rhythm without any mechanical pulse for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r736a.longestRun}-scene stretch so the rhythm keeps a mechanical pulse acting on momentum throughout that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 visually dense scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Waves 652/722 applied the run-based
+  // drought and backward-cause peak modes to visualBeats; the zone-cluster mode has never been
+  // applied to it, completing the trio.
+  {
+    const r736b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r736b.fires) {
+      issues.push({
+        location: `${r736b.zoneNames[r736b.maxZoneIdx]} third — ${r736b.maxZoneCount} of ${r736b.count} visually dense scenes`,
+        rule: 'RHYTHM_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r736b.maxZoneCount / r736b.count) * 100)}% of the story's visually dense scenes cluster in the ${r736b.zoneNames[r736b.maxZoneIdx]} third. When staging carries the beat almost everywhere in one window, the story's rhythm loses its visual counterweight for the rest of the story.`,
+        suggestedFix: `Move at least one visually dense beat outside the ${r736b.zoneNames[r736b.maxZoneIdx]} third so staging keeps varying the rhythm more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes, fires
+  // when more than 75% of those scenes cluster in a single third. Waves 680/722 applied the
+  // run-based drought and backward-cause peak modes to unresolvedClues; the zone-cluster mode has
+  // never been applied to it, completing the trio.
+  {
+    const r736c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r736c.fires) {
+      issues.push({
+        location: `${r736c.zoneNames[r736c.maxZoneIdx]} third — ${r736c.maxZoneCount} of ${r736c.count} open-thread scenes`,
+        rule: 'RHYTHM_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r736c.maxZoneCount / r736c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the ${r736c.zoneNames[r736c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the story's rhythm has no unresolved tension pressing on it anywhere else.`,
+        suggestedFix: `Seed or carry forward at least one open thread outside the ${r736c.zoneNames[r736c.maxZoneIdx]} third so unresolved tension keeps varying the rhythm throughout the story.`,
       });
     }
   }
