@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 644 — dialoguePass: dialogue highlight peak uncaused, dialogue curiosity drought run, dialogue open thread zone cluster', async () => {
+    const makeRec644 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: 'complicate', slug: `s${sceneIdx}`, ...extra,
+    });
+    const runD644 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+    const buildScenes644 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+
+    // DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED fire:
+    // n=8; highlights at 2 (1 line) and 6 (5 lines, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED fires when the peak highlighted-dialogue scene has no dramatic turn or revelation nearby', async () => {
+      const recs644a = Array.from({ length: 8 }, (_, i) => makeRec644(i,
+        i === 2 ? { dialogueHighlights: ['line-a'] }
+        : i === 6 ? { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD644(buildScenes644(8), recs644a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED'), 'DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs644an = Array.from({ length: 8 }, (_, i) => makeRec644(i,
+        i === 2 ? { dialogueHighlights: ['line-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { dialogueHighlights: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD644(buildScenes644(8), recs644an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED'), 'DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_CURIOSITY_DROUGHT_RUN fire:
+    // 10 scenes; curiosity rises at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_CURIOSITY_DROUGHT_RUN fires when the longest no-curiosity-rise run is ≥6', async () => {
+      const recs644b = Array.from({ length: 10 }, (_, i) => makeRec644(i,
+        i === 0 || i === 1 || i === 2 || i === 9 ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runD644(buildScenes644(10), recs644b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_DROUGHT_RUN'), 'DIALOGUE_CURIOSITY_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_CURIOSITY_DROUGHT_RUN no-fire:
+    // curiosity rises at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_CURIOSITY_DROUGHT_RUN does not fire when curiosity rises are distributed without a long drought', async () => {
+      const recs644bn = Array.from({ length: 10 }, (_, i) => makeRec644(i,
+        i === 0 || i === 4 || i === 9 ? { curiosityDelta: 1 } : {}
+      ));
+      const res = await runD644(buildScenes644(10), recs644bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CURIOSITY_DROUGHT_RUN'), 'DIALOGUE_CURIOSITY_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; open-thread scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_OPEN_THREAD_ZONE_CLUSTER fires when >75% of open-thread scenes cluster in one third', async () => {
+      const recs644c = Array.from({ length: 9 }, (_, i) => makeRec644(i,
+        i === 0 || i === 1 || i === 2 ? { unresolvedClues: ['unpaid-clue'] } : {}
+      ));
+      const res = await runD644(buildScenes644(9), recs644c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_ZONE_CLUSTER'), 'DIALOGUE_OPEN_THREAD_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_OPEN_THREAD_ZONE_CLUSTER no-fire:
+    // open-thread scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_OPEN_THREAD_ZONE_CLUSTER does not fire when open-thread scenes are distributed across thirds', async () => {
+      const recs644cn = Array.from({ length: 9 }, (_, i) => makeRec644(i,
+        i === 0 || i === 4 || i === 7 ? { unresolvedClues: ['unpaid-clue'] } : {}
+      ));
+      const res = await runD644(buildScenes644(9), recs644cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_OPEN_THREAD_ZONE_CLUSTER'), 'DIALOGUE_OPEN_THREAD_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 630 — dialoguePass: dialogue payoff staging decoupled, dialogue shift staging aftermath void, dialogue payoff zone imbalance', async () => {
     const makeRec630 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,

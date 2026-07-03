@@ -233,10 +233,26 @@
 // DIALOGUE_PAYOFF_ZONE_IMBALANCE (underweight/bloat × payoffSetupIds × four structural zones —
 // Waves 602/616 applied this template to visualBeats and purpose; payoffSetupIds itself has
 // never been zone-audited here).
+// Wave 644 additions (built on the shared checks library, audit M2.2): introduces THREE
+// previously-unused analytical modes into this 120-rule pass in one wave — checkPeakUncaused,
+// checkDroughtRun, and checkZoneCluster had never been imported here, despite all three being
+// well established elsewhere. DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED (single-peak isolation/backward-
+// cause × dialogueHighlights magnitude — the scene with the single densest count of highlighted
+// lines has no dramatic turn or revelation in itself or the two scenes before it, while such
+// causes exist elsewhere; first checkPeakUncaused use in this file), DIALOGUE_CURIOSITY_DROUGHT_
+// RUN (run-based × curiosityDelta>0 — a 6+ consecutive-scene stretch with no rising curiosity at
+// all, while curiosity spikes occur ≥3 times elsewhere; distinct from DIALOGUE_CURIOSITY_SPIKE_
+// SCENE_VOID [Wave 588 — co-occurrence: checks whether curiosity-spike scenes individually lack
+// dialogue] since this instead measures a contiguous absence of the spike signal itself over
+// time, independent of dialogue presence), DIALOGUE_OPEN_THREAD_ZONE_CLUSTER (distribution/timing
+// × unresolvedClues × structural thirds — >75% of open-thread scenes concentrate in one third;
+// distinct from this file's existing unresolvedClues checks, which are co-occurrence [paired with
+// dialogueHighlights] and sequence/aftermath [as a ≥3-debt trigger] — this is the first purely
+// distributional measure on the signal here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract dialogue lines from fountain text with speaker attribution */
 function extractDialogue(fountain: string): Array<{ speaker: string; line: string; lineNum: number }> {
@@ -3830,6 +3846,82 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r630c.totalCount} thread-resolution scenes are unevenly distributed across its four structural zones: ${bloatName630c} contains ${r630c.counts[r630c.bloatZoneIdx]} of them (${Math.round((r630c.counts[r630c.bloatZoneIdx] / r630c.totalCount) * 100)}%) while ${emptyNames630c} contains none. Resolution bloats in one structural quarter and vanishes from another, giving the story's verbal rhythm of answers arriving an uneven structural pulse.`,
         suggestedFix: `Redistribute resolutions: let at least one thread pay off in the empty zone(s) — ${emptyNames630c} — so every structural quarter carries some verbal sense of a question finally being answered.`,
+      });
+    }
+  }
+
+  // ── Wave 644: DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED, DIALOGUE_CURIOSITY_DROUGHT_RUN,
+  //              DIALOGUE_OPEN_THREAD_ZONE_CLUSTER ──────────────────────────────────────────
+
+  // DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED — Single-peak isolation/backward-cause × dialogueHighlights
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a dialogue highlight, a 2-scene lookback. Finds the single scene with the most highlighted
+  // lines; fires when neither that scene nor either of the two before it contains a dramatic turn
+  // or revelation. First checkPeakUncaused use in this pass. The story's single most quotable
+  // scene arrives with no structural pivot or disclosure driving it — the peak of memorable
+  // dialogue is causally disconnected from the story's turning points.
+  {
+    const r644a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.dialogueHighlights ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r644a.fires) {
+      issues.push({
+        location: `scene ${r644a.peakIdx + 1} — peak highlighted-dialogue density (${r644a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_HIGHLIGHT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for highlighted dialogue (scene ${r644a.peakIdx + 1}, with ${r644a.peakMagnitude} standout lines) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the script's most memorable dialogue concentrates arrives without any structural pivot or disclosure driving it — the peak of verbal craft and the peak of narrative causality never coincide.`,
+        suggestedFix: `Give scene ${r644a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most quotable moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CURIOSITY_DROUGHT_RUN — Run-based × curiosityDelta>0. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 curiosity-spike scenes overall, fires when the longest
+  // consecutive run of scenes with no curiosity rise reaches 6. First checkDroughtRun use in this
+  // pass. Distinct from DIALOGUE_CURIOSITY_SPIKE_SCENE_VOID (Wave 588 — co-occurrence: checks
+  // whether curiosity-spike scenes individually carry no dialogue) since this instead measures a
+  // contiguous absence of the curiosity-spike signal itself over time, independent of whether
+  // dialogue is present — a long verbal stretch where the audience's sense of open questions goes
+  // fully dormant.
+  {
+    const r644b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r644b.fires) {
+      issues.push({
+        location: `longest stretch with no rising curiosity: ${r644b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_CURIOSITY_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r644b.longestRun} consecutive scenes with curiosity never rising, even though ${r644b.presentCount} scenes elsewhere do spike audience wonder. A long unbroken stretch with no new questions surfacing leaves the dialogue running on momentum alone, with nothing verbal or otherwise reopening the audience's sense of mystery.`,
+        suggestedFix: `Introduce a new question or partial disclosure somewhere within the ${r644b.longestRun}-scene stretch — even a single line that opens more than it resolves keeps the audience's curiosity alive through that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_ZONE_CLUSTER — Distribution/timing × unresolvedClues × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 open-thread scenes,
+  // fires when >75% of them fall in a single structural third. First checkZoneCluster use in this
+  // pass. Distinct from this file's existing unresolvedClues checks — DIALOGUE_HIGHLIGHT_OPEN_
+  // THREAD_DECOUPLED (Wave 602, co-occurrence with dialogueHighlights) and OPEN_THREAD_DIALOGUE_
+  // AFTERMATH_VOID (Wave 602, sequence/aftermath with a ≥3-debt trigger): this is the first purely
+  // distributional measure on the raw open-thread signal, catching skew even when no zone is
+  // fully empty.
+  {
+    const r644c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r644c.fires) {
+      const zoneName644c = r644c.zoneNames[r644c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName644c} third — ${r644c.maxZoneCount}/${r644c.count} open-thread scenes`,
+        rule: 'DIALOGUE_OPEN_THREAD_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r644c.maxZoneCount} of the story's ${r644c.count} scenes carrying outstanding clue-debt (${Math.round((r644c.maxZoneCount / r644c.count) * 100)}%) cluster in the ${zoneName644c} third. Open questions concentrate almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no live mystery for dialogue to press against.`,
+        suggestedFix: `Let a clue remain unresolved into a scene outside the ${zoneName644c} third — spreading open threads across the story gives dialogue in every structural third something unresolved to push against.`,
       });
     }
   }
