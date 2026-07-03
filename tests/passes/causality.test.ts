@@ -1247,6 +1247,57 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 951 — causalityPass: causality clock delta zone imbalance, causality payoff zone imbalance, causality seed zone imbalance', async () => {
+    const runCA951 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs951a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runCA951(recs951a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE'), 'CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs951an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runCA951(recs951an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE'), 'CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_PAYOFF_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs951b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 1, 2, 8, 9].includes(i) ? ['s1'] : [] }));
+      const res = await runCA951(recs951b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_ZONE_IMBALANCE'), 'CAUSALITY_PAYOFF_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_PAYOFF_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs951bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 3, 5, 8].includes(i) ? ['s1'] : [] }));
+      const res = await runCA951(recs951bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_ZONE_IMBALANCE'), 'CAUSALITY_PAYOFF_ZONE_IMBALANCE should not fire');
+    });
+
+    it('CAUSALITY_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs951c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runCA951(recs951c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_ZONE_IMBALANCE'), 'CAUSALITY_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('CAUSALITY_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs951cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runCA951(recs951cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_ZONE_IMBALANCE'), 'CAUSALITY_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 937 — causalityPass: causality revelation purpose zone imbalance, causality positive emotion zone imbalance, causality curiosity zone imbalance', async () => {
     const runCA937 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
