@@ -11906,7 +11906,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: [makeRec(0)] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'RHETORICAL_QUESTION_FLOOD'),
         `Expected RHETORICAL_QUESTION_FLOOD; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -11937,7 +11937,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: [makeRec(0)] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'RHETORICAL_QUESTION_FLOOD'),
         'Should NOT fire when speaker mixes questions with declarative statements',
@@ -11965,7 +11965,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: records as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'DIALOGUE_DENSITY_INVERSION'),
         `Expected DIALOGUE_DENSITY_INVERSION; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -11991,7 +11991,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: records as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'DIALOGUE_DENSITY_INVERSION'),
         'Should NOT fire when setup zone has more dialogue than climax',
@@ -12011,7 +12011,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: [makeRec(0)] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'CHARACTER_VOICE_UNIFORMITY'),
         `Expected CHARACTER_VOICE_UNIFORMITY; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -12031,7 +12031,7 @@ He sits down in the chair.
       const { issues } = await dialoguePass({
         fountain, records: [makeRec(0)] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'CHARACTER_VOICE_UNIFORMITY'),
         'Should NOT fire when speakers have distinct rhythmic signatures',
@@ -12792,7 +12792,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'OPENING_WORD_REPETITION'),
         `Expected OPENING_WORD_REPETITION; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -12811,7 +12811,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'OPENING_WORD_REPETITION'),
         'Should NOT fire when action line openings are varied',
@@ -12829,7 +12829,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'SENSORY_IMBALANCE'),
         `Expected SENSORY_IMBALANCE; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -12846,7 +12846,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'SENSORY_IMBALANCE'),
         'Should NOT fire when at least one action line contains a sound descriptor',
@@ -12871,7 +12871,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         issues.some(i => i.rule === 'NEAR_WORD_REPEAT'),
         `Expected NEAR_WORD_REPEAT; got: ${issues.map(i => i.rule).join(', ')}`,
@@ -12894,7 +12894,7 @@ He sits down in the chair.
       const { issues } = await rhythmPass({
         fountain, records: [] as any, approvedSpans: [],
         storyContext: undefined as any, priorPassResults: [],
-      });
+      } as any);
       assert.ok(
         !issues.some(i => i.rule === 'NEAR_WORD_REPEAT'),
         'Should NOT fire when content words are varied across the action lines',
@@ -16352,7 +16352,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232a, original: fountain232a,
         records: records232a,
-        structure: { escalating: true, avgSuspensePerScene: 1.5, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 1.5, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PACING_SPIKE_SCENE');
@@ -16368,7 +16368,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232b, original: fountain232b,
         records: records232b,
-        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 70, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PACING_SPIKE_SCENE');
@@ -16386,7 +16386,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232c, original: fountain232c,
         records: records232c,
-        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: true },
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: true } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PEAK_LENGTH_MISPLACED');
@@ -16407,7 +16407,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232d, original: fountain232d,
         records: records232d,
-        structure: { escalating: true, avgSuspensePerScene: 2, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: true },
+        structure: { escalating: true, avgSuspensePerScene: 2, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: true } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PEAK_LENGTH_MISPLACED');
@@ -16429,7 +16429,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232e, original: fountain232e,
         records: records232e,
-        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ACT_TRANSITION_JOLT');
@@ -16446,7 +16446,7 @@ Goodnight.
       const result = await pacingPass({
         fountain: fountain232f, original: fountain232f,
         records: records232f,
-        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 0, openClues: 0, completionPercent: 80, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ACT_TRANSITION_JOLT');
@@ -16647,7 +16647,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230a, original: fountain230a,
         records: records230a,
-        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false },
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'SECONDARY_INTENTION_VACUUM');
@@ -16670,7 +16670,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230b, original: fountain230b,
         records: records230b,
-        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false },
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 60, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'SECONDARY_INTENTION_VACUUM');
@@ -16690,7 +16690,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230c, original: fountain230c,
         records: records230c,
-        structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, revelationCount: 0, completionPercent: 70, approachingClimax: false },
+        structure: { escalating: false, reversalCount: 0, actPosition: 'act2', reversalDensity: 0, revelationCount: 0, completionPercent: 70, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PROACTIVE_OVERCLUSTERING');
@@ -16707,7 +16707,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230d, original: fountain230d,
         records: records230d,
-        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 80, approachingClimax: false },
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 80, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'PROACTIVE_OVERCLUSTERING');
@@ -16729,7 +16729,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230e, original: fountain230e,
         records: records230e,
-        structure: { escalating: false, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false },
+        structure: { escalating: false, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'REACTIVE_GOAL_ADOPTION');
@@ -16751,7 +16751,7 @@ Goodnight.
       const result = await intentionPass({
         fountain: fountain230f, original: fountain230f,
         records: records230f,
-        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false },
+        structure: { escalating: true, reversalCount: 1, actPosition: 'act2', reversalDensity: 1, revelationCount: 0, completionPercent: 50, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'REACTIVE_GOAL_ADOPTION');
@@ -16782,7 +16782,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229a.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229a,
-        structure: { escalating: true, avgSuspensePerScene: 0, reversalDensity: 2, openClues: 0, completionPercent: 90, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 0, reversalDensity: 2, openClues: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'REVERSAL_TEMPO_FLATLINE');
@@ -16798,7 +16798,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229b.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229b,
-        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 4, openClues: 0, completionPercent: 90, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 1, reversalDensity: 4, openClues: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'REVERSAL_TEMPO_FLATLINE');
@@ -16820,7 +16820,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229c.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229c,
-        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ANTAGONIST_TELEGRAPHED');
@@ -16841,7 +16841,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229d.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229d,
-        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 2, openClues: 0, completionPercent: 80, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ANTAGONIST_TELEGRAPHED');
@@ -16864,7 +16864,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229e.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229e,
-        structure: { escalating: false, avgSuspensePerScene: 0, reversalDensity: 0, openClues: 0, completionPercent: 90, approachingClimax: false },
+        structure: { escalating: false, avgSuspensePerScene: 0, reversalDensity: 0, openClues: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'POSITIVE_RESOLUTION_TOO_EARLY');
@@ -16887,7 +16887,7 @@ Goodnight.
       const result = await conflictPass({
         fountain: records229f.map(r => `INT. SC${r.sceneIdx} - DAY\nAction line.`).join('\n'),
         original: '', records: records229f,
-        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: false },
+        structure: { escalating: true, avgSuspensePerScene: 0.5, reversalDensity: 1, openClues: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'POSITIVE_RESOLUTION_TOO_EARLY');
@@ -16931,7 +16931,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228a, original: fountain228a,
         records: records228a,
-        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_PROTAGONIST_UNTESTED_SOCIALLY');
@@ -16963,7 +16963,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228b, original: fountain228b,
         records: records228b,
-        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_PROTAGONIST_UNTESTED_SOCIALLY');
@@ -16987,7 +16987,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228c, original: fountain228c,
         records: records228c,
-        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 0, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_MIDPOINT_RELATIONAL_VOID');
@@ -17007,7 +17007,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228d, original: fountain228d,
         records: records228d,
-        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_MIDPOINT_RELATIONAL_VOID');
@@ -17032,7 +17032,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228e, original: fountain228e,
         records: records228e,
-        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_FINAL_ACT_CHARACTER_STATIC');
@@ -17055,7 +17055,7 @@ Goodnight.
       const result = await characterArcPass({
         fountain: fountain228f, original: fountain228f,
         records: records228f,
-        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false },
+        structure: { revelationCount: 1, completionPercent: 90, approachingClimax: false } as any,
         annotations: [], approvedSpans: [],
       });
       const match = result.issues.filter((i: any) => i.rule === 'ARC_FINAL_ACT_CHARACTER_STATIC');
@@ -25222,7 +25222,7 @@ I think we can solve this together.
         fountain: makeFountain579(records.length), original: '', records,
         structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
           approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -25306,7 +25306,7 @@ I think we can solve this together.
         fountain: makeFountain565(records.length), original: '', records,
         structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
           approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -25390,7 +25390,7 @@ I think we can solve this together.
         fountain: makeFountain551(records.length), original: '', records,
         structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
           approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -28315,7 +28315,7 @@ I always listen.
         fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
         original: '', records,
         structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -30712,7 +30712,7 @@ I always listen.
       return characterArcPass({
         fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
         original: '', records, structure: {} as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -30807,7 +30807,7 @@ I always listen.
       return characterArcPass({
         fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
         original: '', records, structure: {} as any,
-        annotations: Array.from({ length: records.length }, () => ({})),
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
         approvedSpans: [],
       });
     };
@@ -37077,7 +37077,7 @@ Maybe later then okay.`;
         escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
         approachingClimax: false, revelationCount: 0, actBreaks: [],
       } as any,
-      annotations: Array.from({ length: records.length }, () => ({})),
+      annotations: Array.from({ length: records.length }, () => ({} as any)),
       approvedSpans: [],
     });
 
@@ -37154,7 +37154,7 @@ Maybe later then okay.`;
     });
     const runC559 = async (records: any[]) => {
       const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
-      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({})), approvedSpans: [] });
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({} as any)), approvedSpans: [] });
     };
 
     // RELATIONSHIP_SHIFT_UNCAUSED fire:
@@ -37516,7 +37516,7 @@ Maybe later then okay.`;
     });
     const runC503 = async (records: any[]) => {
       const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
-      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({})), approvedSpans: [] });
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: records.map(() => ({} as any)), approvedSpans: [] });
     };
 
     it('REVELATION_AFTERMATH_SUSPENSE_VOID fires when post-revelation suspense average is <= 0', async () => {
@@ -59791,10 +59791,10 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
   it('causalityPass detects UNMOTIVATED_DECISION when major decision has no prior setup', async () => {
     const { causalityPass } = await import('./server/nvm/revision/passes/causality.ts');
     const records = [
-      mkRec({ sceneIdx: 0, purpose: 'dialogue', suspenseDelta: 0.5, relationshipShifts: [] }),
-      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.3, relationshipShifts: [] }),
+      mkRec({ sceneIdx: 0, purpose: 'dialogue', suspenseDelta: 0.5, relationshipShifts: [] } as any),
+      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.3, relationshipShifts: [] } as any),
       // Scene 2: major decision (high suspense) with NO setup in scenes 0-1
-      mkRec({ sceneIdx: 2, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] }),
+      mkRec({ sceneIdx: 2, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] } as any),
     ];
     const result = await causalityPass({
       fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
@@ -59814,7 +59814,7 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
     const records = [
       mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-revealed'] }),
       // Scene 1: decision motivated by the clue from scene 0
-      mkRec({ sceneIdx: 1, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] }),
+      mkRec({ sceneIdx: 1, purpose: 'climax', suspenseDelta: 3.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: 1 }] } as any),
     ];
     const result = await causalityPass({
       fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\n',
@@ -59833,8 +59833,8 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
     const records = [
       mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-letter'] }),
       // Scene 1: no consequence (no relationship shift, no suspense spike, no emotion)
-      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.2, emotionalShift: 'neutral' }),
-      mkRec({ sceneIdx: 2, purpose: 'dialogue', suspenseDelta: 0.3, emotionalShift: 'neutral' }),
+      mkRec({ sceneIdx: 1, purpose: 'dialogue', suspenseDelta: 0.2, emotionalShift: 'neutral' } as any),
+      mkRec({ sceneIdx: 2, purpose: 'dialogue', suspenseDelta: 0.3, emotionalShift: 'neutral' } as any),
     ];
     const result = await causalityPass({
       fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nB.\nINT. SC2 - DAY\nC.\n',
@@ -59854,7 +59854,7 @@ describe('Wave 89 — dead-condition revival, severity-aware truncation, NaN har
     const records = [
       mkRec({ sceneIdx: 0, purpose: 'establish_world', seededClueIds: ['secret-letter'] }),
       // Scene 1: DOES have consequence (relationship shift)
-      mkRec({ sceneIdx: 1, purpose: 'confrontation', suspenseDelta: 2.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: -1.5 }] }),
+      mkRec({ sceneIdx: 1, purpose: 'confrontation', suspenseDelta: 2.5, relationshipShifts: [{ pairKey: 'alice|bob', shiftMagnitude: -1.5 }] } as any),
     ];
     const result = await causalityPass({
       fountain: 'INT. SC0 - DAY\nA.\nINT. SC1 - DAY\nALICE\nYou lied.\n',

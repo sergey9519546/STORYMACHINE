@@ -4,7 +4,7 @@ import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { buildEnrichedState } from '../nvm/state/enrichedState.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
-  gameLimiter,
+  gameLimiter, aiLimiter,
 } from '../lib/session-store.ts';
 
 const router = express.Router();
@@ -296,7 +296,9 @@ router.post('/api/nvm/inject-ops', gameLimiter, asyncHandler(async (req, res) =>
 }));
 
 // POST /api/nvm/converge — run the G1 convergence loop on a scene target.
-router.post('/api/nvm/converge', gameLimiter, asyncHandler(async (req, res) => {
+// aiLimiter (not gameLimiter): each converge call fans out to multiple LLM candidate
+// generations — the loose 120/min game limit would allow a cost/quota-exhaustion DoS.
+router.post('/api/nvm/converge', aiLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
@@ -368,7 +370,8 @@ router.post('/api/nvm/converge', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // GET /api/nvm/converge-stream — SSE streaming variant of G1 convergence.
-router.get('/api/nvm/converge-stream', gameLimiter, async (req, res) => {
+// aiLimiter: SSE variant of /api/nvm/converge — same LLM fan-out per request.
+router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -526,7 +529,8 @@ router.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/selfplay — run N headless sims and persist corpus results.
-router.post('/api/nvm/selfplay', gameLimiter, asyncHandler(async (req, res) => {
+// aiLimiter: self-play runs up to 50 simulations × LLM candidate generations per request.
+router.post('/api/nvm/selfplay', aiLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runSelfPlay } = await import('../nvm/selfplay/corpus.ts');
   const { makeLLMCandidateGenerator } = await import('../nvm/generate/llm-generator.ts');
@@ -777,7 +781,8 @@ router.get('/api/nvm/arc-timeline', gameLimiter, asyncHandler(async (req, res) =
 }));
 
 // POST /api/nvm/converge-arc — multi-scene arc compiler.
-router.post('/api/nvm/converge-arc', gameLimiter, asyncHandler(async (req, res) => {
+// aiLimiter: arc convergence runs the LLM converge loop for up to 8 scenes per request.
+router.post('/api/nvm/converge-arc', aiLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { convergeScene } = await import('../nvm/converge/loop.ts');
   const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
@@ -1610,7 +1615,8 @@ router.post('/api/nvm/compile', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // POST /api/nvm/revise — 12-pass revision pipeline.
-router.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
+// aiLimiter: one revise call runs the 14-pass pipeline — up to 14 sequential LLM rewrites.
+router.post('/api/nvm/revise', aiLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { approvedSpans = [], title = 'UNTITLED' } = req.body as { approvedSpans?: unknown[]; title?: string };
 
@@ -1655,7 +1661,8 @@ router.post('/api/nvm/revise', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // GET /api/nvm/revise-stream — SSE streaming variant of the revision pipeline.
-router.get('/api/nvm/revise-stream', gameLimiter, async (req, res) => {
+// aiLimiter: SSE variant of /api/nvm/revise — same up-to-14 LLM rewrites per request.
+router.get('/api/nvm/revise-stream', aiLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
