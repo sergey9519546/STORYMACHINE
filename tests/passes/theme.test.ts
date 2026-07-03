@@ -931,6 +931,61 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 934 — themePass: theme stakes zone imbalance, theme revelation purpose zone imbalance, theme negative emotion zone imbalance', async () => {
+    const runT934 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('THEME_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs934a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runT934(recs934a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAKES_ZONE_IMBALANCE'), 'THEME_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs934an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runT934(recs934an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAKES_ZONE_IMBALANCE'), 'THEME_STAKES_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs934b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT934(recs934b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'THEME_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs934bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runT934(recs934bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'THEME_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs934c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runT934(recs934c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs934cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runT934(recs934cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 920 — themePass: theme revelation purpose zone cluster, theme revelation purpose drought run, theme character moment zone imbalance', async () => {
     const runT920 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

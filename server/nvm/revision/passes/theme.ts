@@ -416,6 +416,13 @@
 // mode conventionally skipped for this categorical field), plus THEME_CHARACTER_MOMENT_ZONE_
 // IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
 // a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 934 additions: continuing the checkZoneImbalance rollout, this wave applies the 4-zone
+// bloat+empty-zone mode to three more signals that each already have a complete 3-zone/run-based
+// trio but had never been audited by it: THEME_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes'),
+// THEME_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in
+// Wave 920), and THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence
+// signal with a complete 3-zone/run trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5286,6 +5293,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r920c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName920c} contains ${r920c.counts[r920c.bloatZoneIdx]} of them (${Math.round((r920c.counts[r920c.bloatZoneIdx] / r920c.totalCount) * 100)}%) while ${emptyNames920c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, so the theme is voiced through character in only part of the story rather than across its whole shape.`,
         suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames920c} — so the theme keeps being voiced through character across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, continuing the rollout begun
+  // in Wave 892. n≥10, ≥4 stakes-raising scenes total, divided across four equal structural zones.
+  // Fires only when one zone has zero such scenes while another holds ≥50% of the total. Distinct
+  // from the existing 3-zone THEME_STAKES_ZONE_CLUSTER and run-based THEME_STAKES_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r934a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r934a.fires) {
+      const emptyNames934a = r934a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName934a = FOUR_ZONE_NAMES[r934a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames934a} empty; ${bloatName934a} has ${r934a.counts[r934a.bloatZoneIdx]}/${r934a.totalCount} stakes-raising scenes`,
+        rule: 'THEME_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r934a.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName934a} contains ${r934a.counts[r934a.bloatZoneIdx]} of them (${Math.round((r934a.counts[r934a.bloatZoneIdx] / r934a.totalCount) * 100)}%) while ${emptyNames934a} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, so the theme is put to the test in only part of the story.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames934a} — so the theme is put to the test across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the
+  // 4-zone gap for this purpose value (its 3-zone/run trio was completed in Wave 920). n≥10, ≥4
+  // revelation-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from THEME_
+  // REVELATION_PURPOSE_ZONE_CLUSTER/DROUGHT_RUN (Wave 920) and from the revelation-string-field
+  // rules — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r934b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r934b.fires) {
+      const emptyNames934b = r934b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName934b = FOUR_ZONE_NAMES[r934b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames934b} empty; ${bloatName934b} has ${r934b.counts[r934b.bloatZoneIdx]}/${r934b.totalCount} revelation-purposed scenes`,
+        rule: 'THEME_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r934b.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName934b} contains ${r934b.counts[r934b.bloatZoneIdx]} of them (${Math.round((r934b.counts[r934b.bloatZoneIdx] / r934b.totalCount) * 100)}%) while ${emptyNames934b} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the theme is illuminated by new truth in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames934b} — so the theme keeps being illuminated by new truth across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone THEME_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based THEME_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r934c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r934c.fires) {
+      const emptyNames934c = r934c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName934c = FOUR_ZONE_NAMES[r934c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames934c} empty; ${bloatName934c} has ${r934c.counts[r934c.bloatZoneIdx]}/${r934c.totalCount} negative-shift scenes`,
+        rule: 'THEME_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r934c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName934c} contains ${r934c.counts[r934c.bloatZoneIdx]} of them (${Math.round((r934c.counts[r934c.bloatZoneIdx] / r934c.totalCount) * 100)}%) while ${emptyNames934c} contains none. Downturns bloat in one structural quarter and vanish from another, so the theme's cost is felt in only part of the story.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames934c} — so the theme's cost is felt across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
