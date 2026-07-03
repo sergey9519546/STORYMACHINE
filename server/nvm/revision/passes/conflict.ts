@@ -151,6 +151,24 @@
 // CONFLICT_CLUE_DECOUPLED [seed × rupture — the negative direction], CONFLICT_RUPTURE_SEED_AFTERMATH_VOID
 // [aftermath mode], and CONFLICT_REVELATION_REPAIR_DECOUPLED [revelation × repair — different signal pair];
 // first co-occurrence check joining seed and repair channels).
+// Wave 590 additions: seed suspense aftermath void (sequence/aftermath × seed trigger → suspense
+// aftermath — n≥8, ≥2 qualifying seed-plant scenes [seededClueIds non-empty, pos<n-1], ≥2 suspense-
+// rise scenes globally, every qualifying seed not followed by suspenseDelta>0 in next 2 scenes;
+// foreshadowing and tension engines completely disconnected; distinct from CONFLICT_RUPTURE_SEED_
+// AFTERMATH_VOID [seed is aftermath not trigger], CONFLICT_RUPTURE_SUSPENSE_VOID [rupture trigger
+// not seed], CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID [dramatic-turn trigger]; first aftermath check
+// using the seed-plant event as trigger), clock dramatic-turn aftermath void (sequence/aftermath ×
+// clock trigger → dramatic-turn aftermath — n≥8, ≥2 qualifying clock-raised scenes [pos<n-1], ≥2
+// dramatic-turn scenes globally, every clock not followed by a dramatic turn in next 2 scenes;
+// deadlines never catalyse structural pivots; distinct from CONFLICT_CLOCK_AFTERMATH_VOID [clock →
+// conflict-signal aftermath — different aftermath channel], CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID
+// [dramatic-turn trigger → suspense aftermath — different direction], CONFLICT_CLOCK_DECOUPLED [co-
+// occurrence mode]; first aftermath check using dramatic-turn as the aftermath channel for a clock
+// trigger), rupture drought run (run-based × rupture-absence — n≥10, ≥2 rupture scenes, longest
+// consecutive non-rupture run ≥7; relational fracture engine goes dark for an extended stretch;
+// distinct from CONFLICT_CALM_STRETCH [mixed non-conflict signal = rupture OR suspense drop,
+// threshold 5], CONFLICT_REPAIR_DROUGHT_RUN [repair-absence channel], CONFLICT_REVELATION_DROUGHT_
+// RUN [revelation-absence channel]; first run-based check targeting the rupture channel alone).
 // Wave 576 additions: curiosity zone cluster (distribution/timing × curiosityDelta × structural
 // thirds — n≥9, ≥3 curiosity-positive scenes, >75% in one third; wonder spikes ghettoized into
 // one zone; finer-grained than binary half checks; distinct from CONFLICT_CURIOSITY_CLOSING_ZONE_
@@ -3366,6 +3384,145 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
             severity: 'minor',
             description: `The conflict arc contains a run of ${longestDrought576c} consecutive scenes with no revelation — an extended disclosure drought — even though ${revealScenes576c.length} revelation scenes exist elsewhere. Revelations are the mechanism by which hidden truths emerge under pressure: they reframe the conflict, expose hidden motivations, and generate the irrevocable knowledge that forces characters into new positions. An unbroken stretch of ${longestDrought576c} revelation-free scenes means the conflict advances through action and reaction for an extended run without any new hidden truth coming to light — the audience watches the situation escalate without their understanding of it deepening. The conflict's epistemic dimension flatlines: no cause surfaces, no motivation is exposed, no misunderstood fact becomes clear during the drought.`,
             suggestedFix: `Break up the ${longestDrought576c}-scene revelation drought by surfacing at least one hidden truth within the run — a motivation exposed, a cause disclosed, a previously misunderstood fact clarified. The revelation doesn't need to be dramatic: a small disclosure that recontextualizes even one detail deepens the audience's understanding of the conflict and prevents the extended run from feeling like pure event-and-reaction without epistemic dimension. A conflict that periodically reveals something new keeps the audience's understanding evolving alongside the escalating situation.`,
+          });
+        }
+      }
+    }
+  }
+
+  // ── Wave 590: CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID,
+  //              CONFLICT_CLOCK_TURN_AFTERMATH_VOID,
+  //              CONFLICT_RUPTURE_DROUGHT_RUN ──────────────────────────────────────────────────────
+
+  // CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seed trigger → suspense aftermath.
+  // n≥8, ≥2 qualifying seed-plant scenes (seededClueIds non-empty, pos<n-1), ≥2 suspense-rise
+  // scenes globally (suspenseDelta > 0). Every qualifying seed scene is NOT followed by
+  // suspenseDelta > 0 in the next 2 scenes → fire. When a clue is planted, the scenes immediately
+  // following should carry escalating tension — the implied threat of the planted thread should
+  // start pressing on the atmosphere. Seeds that are always followed by flat or declining suspense
+  // mean the foreshadowing engine and the tension engine run in complete isolation: clues surface
+  // but they never tighten the air around them.
+  // Distinct from: CONFLICT_RUPTURE_SEED_AFTERMATH_VOID (Wave 506: rupture → seed aftermath —
+  // rupture is the trigger, seed is the aftermath; this is the reverse direction), CONFLICT_
+  // RUPTURE_SUSPENSE_VOID (Wave 436: rupture trigger → suspense aftermath — different trigger
+  // channel), CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID (Wave 576: dramatic-turn trigger → suspense
+  // aftermath — different trigger), CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: clock trigger →
+  // conflict-signal aftermath — different trigger and different aftermath channel). First aftermath
+  // check in this pass using the seed-plant event as the trigger.
+  {
+    const n590a = records.length;
+    if (n590a >= 8) {
+      const seedRecs590a = (records as any[]).filter(
+        (r, i) => i < n590a - 1 && ((r.seededClueIds ?? []) as any[]).length > 0,
+      );
+      const suspScenes590a = (records as any[]).filter(r => (r.suspenseDelta ?? 0) > 0);
+      if (seedRecs590a.length >= 2 && suspScenes590a.length >= 2) {
+        const allNoSusp590a = seedRecs590a.every((r: any) => {
+          const idx = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            if (idx + off >= n590a) continue;
+            if (((records as any[])[idx + off].suspenseDelta ?? 0) > 0) return false;
+          }
+          return true;
+        });
+        if (allNoSusp590a) {
+          issues.push({
+            location: `All ${seedRecs590a.length} clue-seeding aftermath window(s) — suspense flat`,
+            rule: 'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every clue-seeding scene (${seedRecs590a.length} scene(s)) is followed by two scenes with no suspense rise — planted clues never escalate tension in the scenes that follow them. When a story embeds a foreshadowing thread, the natural expectation is that the implied threat or promise tightens the atmosphere in the scenes immediately after: the planted clue should make the world feel slightly more dangerous or urgent, not quieter. When ${suspScenes590a.length} suspense-rise scenes exist elsewhere in the script but never follow a seed, the foreshadowing engine and the tension engine run on completely separate tracks — clues surface and then the story momentarily exhales, robbing the planted thread of its immediate atmospheric payload.`,
+            suggestedFix: `After at least one clue-seeding scene, let the following scene carry an escalating suspense beat — a complication the planted thread implies, a character who notices something they shouldn't, or a reveal of partial information that raises stakes. The scene immediately after a clue is planted is the optimal moment to tighten tension because the audience is already primed with the question the clue raised.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_CLOCK_TURN_AFTERMATH_VOID — Sequence/aftermath × clock trigger → dramatic-turn aftermath.
+  // n≥8, ≥2 qualifying clock-raised scenes (clockRaised true, pos<n-1), ≥2 dramatic-turn scenes
+  // globally (dramaticTurn !== 'nothing'). Every qualifying clock scene is NOT followed by a dramatic
+  // turn in the next 2 scenes → fire. When the story raises a clock — a deadline, a countdown, a
+  // ticking constraint — the scenes immediately following should contain at least one structural pivot:
+  // the deadline should force a decision, a reversal, or a revelation. When every clock scene is
+  // followed by structural stasis, the deadline operates as atmosphere rather than engine.
+  // Distinct from: CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: clock → conflict-signal aftermath —
+  // aftermath channel is a conflict escalation signal [reversal/neg shift], not a dramatic turn;
+  // different aftermath channel), CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID (Wave 576: dramatic-turn
+  // trigger → suspense aftermath — different trigger; this uses clock as trigger and turn as
+  // aftermath, the reverse direction), CONFLICT_CLOCK_DECOUPLED (Wave 338: co-occurrence × clock ×
+  // rupture — same-scene mode not aftermath), CONFLICT_WITHOUT_DEADLINE (no clock at all). First
+  // aftermath check in this pass using the dramatic-turn as the aftermath channel for a clock trigger.
+  {
+    const n590b = records.length;
+    if (n590b >= 8) {
+      const clockRecs590b = (records as any[]).filter(
+        (r, i) => i < n590b - 1 && r.clockRaised === true,
+      );
+      const turnScenes590b = (records as any[]).filter(
+        r => (r.dramaticTurn ?? 'nothing') !== 'nothing' && r.dramaticTurn !== '',
+      );
+      if (clockRecs590b.length >= 2 && turnScenes590b.length >= 2) {
+        const allNoTurn590b = clockRecs590b.every((r: any) => {
+          const idx = (records as any[]).indexOf(r);
+          for (let off = 1; off <= 2; off++) {
+            if (idx + off >= n590b) continue;
+            const nxt = (records as any[])[idx + off];
+            if ((nxt.dramaticTurn ?? 'nothing') !== 'nothing' && nxt.dramaticTurn !== '') return false;
+          }
+          return true;
+        });
+        if (allNoTurn590b) {
+          issues.push({
+            location: `All ${clockRecs590b.length} clock aftermath window(s) — no dramatic turn within 2 scenes`,
+            rule: 'CONFLICT_CLOCK_TURN_AFTERMATH_VOID',
+            severity: 'minor',
+            description: `Every scene that raises a deadline clock (${clockRecs590b.length} scene(s)) is followed by two structurally flat scenes — the ticking constraint never catalyses a dramatic turn in the scenes that immediately follow it. Clocks are the most primal mechanism for forcing structural pivots: when time is running out, characters must act, plans must change, allegiances must shift. When ${turnScenes590b.length} dramatic turns exist elsewhere in the script but none arrive in the wake of a clock raise, the deadline operates as atmosphere rather than engine — the audience registers the urgency but the story never lets the clock actually force a structural pivot.`,
+            suggestedFix: `After at least one clock-raising scene, place a dramatic turn in the following scene or the one after — a reversal, an unexpected decision, or a revelation the time pressure makes unavoidable. Deadlines are structurally most powerful not just when they are introduced but when they are shown to change things: the turn is the evidence that the clock is real.`,
+          });
+        }
+      }
+    }
+  }
+
+  // CONFLICT_RUPTURE_DROUGHT_RUN — Run-based × rupture-absence.
+  // n≥10, ≥2 rupture scenes (negative shift ≤ -0.3). Longest consecutive run of non-rupture scenes
+  // ≥7 → fire. A sustained relational calm of 7+ scenes — where no bond breaks and no negative
+  // shift registers — signals that the conflict engine's relational dimension has gone dark.
+  // Unlike CONFLICT_CALM_STRETCH (Wave 492), which audits the absence of any conflict signal
+  // (rupture OR reversal with suspenseDelta<-1) with a threshold of 5, this targets the rupture
+  // channel alone with a higher threshold of 7, catching scripts where non-rupture conflict
+  // (suspense drops, reversals) continues but the relational-fracture engine specifically flatlines.
+  // Distinct from: CONFLICT_CALM_STRETCH (Wave 492: run-based × non-conflict = rupture OR
+  // suspenseDelta<-1 — mixed signal channel, threshold 5; this is pure rupture-absence, threshold 7),
+  // CONFLICT_REPAIR_DROUGHT_RUN (Wave 562: run-based × repair-absence — positive shift channel),
+  // CONFLICT_REVELATION_DROUGHT_RUN (Wave 576: run-based × revelation-absence — information channel),
+  // CONFLICT_BREATHING_ROOM_ABSENT (Wave 436: inter-rupture max gap ≤1 — fires when ruptures are too
+  // CLOSE; this fires when the drought run is too LONG). First run-based check targeting the rupture
+  // channel specifically.
+  {
+    const n590c = records.length;
+    if (n590c >= 10) {
+      const ruptureScenes590c = (records as any[]).filter(r =>
+        ((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3),
+      );
+      if (ruptureScenes590c.length >= 2) {
+        let longestDrought590c = 0;
+        let currentDrought590c = 0;
+        for (const r of records as any[]) {
+          if (((r.relationshipShifts ?? []) as Array<{ amount: number }>).some(s => s.amount <= -0.3)) {
+            currentDrought590c = 0;
+          } else {
+            currentDrought590c++;
+            if (currentDrought590c > longestDrought590c) longestDrought590c = currentDrought590c;
+          }
+        }
+        if (longestDrought590c >= 7) {
+          issues.push({
+            location: `Longest rupture drought: ${longestDrought590c} consecutive non-rupture scenes`,
+            rule: 'CONFLICT_RUPTURE_DROUGHT_RUN',
+            severity: 'minor',
+            description: `The conflict arc contains a run of ${longestDrought590c} consecutive scenes with no relationship rupture — an extended relational drought — even though ${ruptureScenes590c.length} rupture scenes exist elsewhere. Ruptures are the mechanism by which conflict is felt at the relational level: they crack bonds, expose fractures, and force characters into adversarial positions. An unbroken stretch of ${longestDrought590c} rupture-free scenes means the conflict advances through suspense and reversals for an extended run without any bond breaking — the relational dimension of the conflict goes quiet and no damage accumulates in the relationship layer during the drought.`,
+            suggestedFix: `Break up the ${longestDrought590c}-scene rupture drought by introducing at least one relational fracture within the run — a betrayal, a confrontation that damages a bond, or a revelation that forces two characters apart. The fracture doesn't need to be the story's most dramatic rupture: even a small crack in a secondary relationship keeps the conflict's relational dimension alive during a long stretch and prevents the audience from forgetting that the story's bonds are under pressure.`,
           });
         }
       }

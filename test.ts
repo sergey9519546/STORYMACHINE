@@ -29446,6 +29446,90 @@ I always listen.
     });
   });
 
+  describe('Wave 590 — conflictPass: seed suspense aftermath void, clock turn aftermath void, rupture drought run', async () => {
+    const makeRec590 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF590 = async (records: any[]) => {
+      const { conflictPass } = await import('./server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID fires when no seed is followed by suspense within 2 scenes', async () => {
+      // 9 scenes; seeds at 1,4 (qualifying pos<8); suspense at 7,8 (beyond windows [2,3] and [5,6])
+      const recs590a = Array.from({ length: 9 }, (_, i) => makeRec590(i));
+      recs590a[1] = makeRec590(1, { seededClueIds: ['clue1'] });
+      recs590a[4] = makeRec590(4, { seededClueIds: ['clue2'] });
+      recs590a[7] = makeRec590(7, { suspenseDelta: 1 });
+      recs590a[8] = makeRec590(8, { suspenseDelta: 1 });
+      const res = await runCF590(recs590a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID does not fire when a seed is followed by suspense within 2 scenes', async () => {
+      // seed at 1 with suspense at 2 (off=1, within window) → every() fails → no fire
+      const recs590a = Array.from({ length: 9 }, (_, i) => makeRec590(i));
+      recs590a[1] = makeRec590(1, { seededClueIds: ['clue1'] });
+      recs590a[2] = makeRec590(2, { suspenseDelta: 1 });
+      recs590a[4] = makeRec590(4, { seededClueIds: ['clue2'] });
+      recs590a[7] = makeRec590(7, { suspenseDelta: 1 });
+      const res = await runCF590(recs590a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_CLOCK_TURN_AFTERMATH_VOID fires when no clock is followed by a dramatic turn within 2 scenes', async () => {
+      // clocks at 1,4 (windows: [2,3] and [5,6]); turns at 7,8 — outside both windows
+      const recs590b = Array.from({ length: 9 }, (_, i) => makeRec590(i));
+      recs590b[1] = makeRec590(1, { clockRaised: true });
+      recs590b[4] = makeRec590(4, { clockRaised: true });
+      recs590b[7] = makeRec590(7, { dramaticTurn: 'reversal' });
+      recs590b[8] = makeRec590(8, { dramaticTurn: 'revelation' });
+      const res = await runCF590(recs590b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_TURN_AFTERMATH_VOID'), 'CONFLICT_CLOCK_TURN_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_CLOCK_TURN_AFTERMATH_VOID does not fire when a clock is followed by a dramatic turn within 2 scenes', async () => {
+      // clock at 1 with turn at 2 (off=1, within window) → every() fails → no fire
+      const recs590b = Array.from({ length: 9 }, (_, i) => makeRec590(i));
+      recs590b[1] = makeRec590(1, { clockRaised: true });
+      recs590b[2] = makeRec590(2, { dramaticTurn: 'reversal' });
+      recs590b[4] = makeRec590(4, { clockRaised: true });
+      recs590b[7] = makeRec590(7, { dramaticTurn: 'revelation' });
+      const res = await runCF590(recs590b);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_TURN_AFTERMATH_VOID'), 'CONFLICT_CLOCK_TURN_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_RUPTURE_DROUGHT_RUN fires when ≥7 consecutive scenes have no rupture', async () => {
+      // 10 scenes; ruptures at 0 and 8; non-rupture run 1-7 = 7 consecutive scenes
+      const recs590c = Array.from({ length: 10 }, (_, i) => makeRec590(i));
+      recs590c[0] = makeRec590(0, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] });
+      recs590c[8] = makeRec590(8, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] });
+      const res = await runCF590(recs590c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_DROUGHT_RUN'), 'CONFLICT_RUPTURE_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_RUPTURE_DROUGHT_RUN does not fire when ruptures are distributed without a long drought', async () => {
+      // ruptures at 0,4,9 → max non-rupture run = 4 scenes (scenes 5-8) < 7
+      const recs590c = Array.from({ length: 10 }, (_, i) => makeRec590(i));
+      recs590c[0] = makeRec590(0, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] });
+      recs590c[4] = makeRec590(4, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] });
+      recs590c[9] = makeRec590(9, { relationshipShifts: [{ pairKey: 'alice|bob', amount: -0.5 }] });
+      const res = await runCF590(recs590c);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_RUPTURE_DROUGHT_RUN'), 'CONFLICT_RUPTURE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 576 — conflictPass: curiosity zone cluster, turn aftermath suspense void, revelation drought run', async () => {
     const makeRec576 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
