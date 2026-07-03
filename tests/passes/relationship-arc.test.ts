@@ -1376,6 +1376,87 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 693 — relationshipArcPass: relational staging drought run, relational seed zone cluster, relational clock drought run', async () => {
+    const runRA693 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_STAGING_DROUGHT_RUN fire:
+    // 10 scenes; visual beats at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run is ≥6', async () => {
+      const recs693a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs693a[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs693a[1] = makeSharedRecord(1, { visualBeats: ['a beat'] });
+      recs693a[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs693a[9] = makeSharedRecord(9, { visualBeats: ['a beat'] });
+      const res = await runRA693(recs693a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_DROUGHT_RUN'), 'RELATIONAL_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_STAGING_DROUGHT_RUN no-fire:
+    // visual beats at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_STAGING_DROUGHT_RUN does not fire when visual beats are distributed without a long drought', async () => {
+      const recs693an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs693an[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs693an[4] = makeSharedRecord(4, { visualBeats: ['a beat'] });
+      recs693an[9] = makeSharedRecord(9, { visualBeats: ['a beat'] });
+      const res = await runRA693(recs693an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAGING_DROUGHT_RUN'), 'RELATIONAL_STAGING_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('RELATIONAL_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs693b = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs693b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs693b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs693b[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runRA693(recs693b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_ZONE_CLUSTER'), 'RELATIONAL_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // RELATIONAL_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('RELATIONAL_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs693bn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs693bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs693bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs693bn[7] = makeSharedRecord(7, { seededClueIds: ['clue-c'] });
+      const res = await runRA693(recs693bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SEED_ZONE_CLUSTER'), 'RELATIONAL_SEED_ZONE_CLUSTER should not fire');
+    });
+
+    // RELATIONAL_CLOCK_DROUGHT_RUN fire:
+    // 10 scenes; clock raised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('RELATIONAL_CLOCK_DROUGHT_RUN fires when the longest no-clock run is ≥6', async () => {
+      const recs693c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs693c[0] = makeSharedRecord(0, { clockRaised: true });
+      recs693c[1] = makeSharedRecord(1, { clockRaised: true });
+      recs693c[2] = makeSharedRecord(2, { clockRaised: true });
+      recs693c[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runRA693(recs693c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DROUGHT_RUN'), 'RELATIONAL_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // RELATIONAL_CLOCK_DROUGHT_RUN no-fire:
+    // clock raised at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('RELATIONAL_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs693cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs693cn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs693cn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs693cn[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runRA693(recs693cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DROUGHT_RUN'), 'RELATIONAL_CLOCK_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 679 — relationshipArcPass: relational clock delta peak uncaused, relational stakes drought run, relational turn zone cluster', async () => {
     const runRA679 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

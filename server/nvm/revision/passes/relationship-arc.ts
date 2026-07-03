@@ -266,6 +266,13 @@
 // presence signal), RELATIONAL_TURN_ZONE_CLUSTER (distribution/timing × dramaticTurn presence ×
 // structural thirds — dramaticTurn anchors extensive decoupled/aftermath-void/peak-absent
 // coverage here, but has never been cluster-audited).
+// Wave 693 additions (built on the shared checks library): RELATIONAL_STAGING_DROUGHT_RUN
+// (run-based × visualBeats absence — Wave 651 applied the zone-cluster mode to visualBeats; the
+// drought-run mode has never been applied to this channel), RELATIONAL_SEED_ZONE_CLUSTER
+// (distribution/timing × seededClueIds × structural thirds — Wave 665 applied the drought-run
+// mode to seededClueIds; the zone-cluster mode has never been applied to this channel),
+// RELATIONAL_CLOCK_DROUGHT_RUN (run-based × clockRaised absence — Wave 665 applied the
+// zone-cluster mode to clockRaised; the drought-run mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4027,6 +4034,70 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `${r679c.maxZoneCount} of the story's ${r679c.count} dramatic-turn scenes (${Math.round((r679c.maxZoneCount / r679c.count) * 100)}%) cluster in the ${zoneName679c} third. Structural pivots concentrate almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no reversal testing the relationship.`,
         suggestedFix: `Give at least one scene outside the ${zoneName679c} third a dramatic turn — spreading structural pivots across the story lets every structural third carry a reversal that tests the relationship.`,
+      });
+    }
+  }
+
+  // ── Wave 693: RELATIONAL_STAGING_DROUGHT_RUN, RELATIONAL_SEED_ZONE_CLUSTER,
+  //              RELATIONAL_CLOCK_DROUGHT_RUN ──────────────────────────────────────────────────
+
+  // RELATIONAL_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the
+  // longest consecutive run of scenes with zero visual beats reaches 6. Wave 651 applied the
+  // zone-cluster mode to visualBeats; the drought-run mode has never been applied to this channel.
+  {
+    const r693a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r693a.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r693a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r693a.longestRun} consecutive scenes with no visual staging beats at all, even though ${r693a.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the relationship without any embodied presence to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r693a.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the relationship stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of
+  // them fall in a single structural third. Wave 665 applied the drought-run mode to
+  // seededClueIds; the zone-cluster mode has never been applied to this channel.
+  {
+    const r693b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r693b.fires) {
+      const zoneName693b = r693b.zoneNames[r693b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName693b} third — ${r693b.maxZoneCount}/${r693b.count} seed scenes`,
+        rule: 'RELATIONAL_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r693b.maxZoneCount} of the story's ${r693b.count} clue-planting scenes (${Math.round((r693b.maxZoneCount / r693b.count) * 100)}%) cluster in the ${zoneName693b} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the relationship's arc an uneven structural rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName693b} third — spreading foreshadowing across the story lets the relationship's arc accumulate gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. Wave 665 applied the zone-cluster
+  // mode to clockRaised; the drought-run mode has never been applied to this channel.
+  {
+    const r693c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r693c.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r693c.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r693c.longestRun} consecutive scenes with no clock raised at all, even though ${r693c.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play leaves the relationship without any urgency bearing on it for an extended run.`,
+        suggestedFix: `Raise a clock somewhere within the ${r693c.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so the relationship stays under some time pressure throughout that stretch.`,
       });
     }
   }
