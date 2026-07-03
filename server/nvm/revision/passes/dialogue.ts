@@ -318,6 +318,15 @@
 // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it),
 // DIALOGUE_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave 672 applied the
 // zone-cluster mode to suspenseDelta; the drought-run mode has never been applied to it).
+// Wave 770 additions: DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 672/756 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), DIALOGUE_SUSPENSE_PEAK_UNCAUSED (backward-cause × suspenseDelta-as-magnitude × 2-scene
+// lookback — Waves 672/756 applied the zone-cluster and run-based drought modes to suspenseDelta;
+// the backward-cause peak mode has never been applied to it, completing the trio),
+// DIALOGUE_RELATIONSHIP_DROUGHT_RUN (run-based × relationshipShifts presence absence — Waves
+// 686/756 applied the backward-cause peak and zone-cluster modes to relationshipShifts; the
+// drought-run mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4538,6 +4547,74 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r756c.longestRun} consecutive scenes with no rise in tension at all, even though ${r756c.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves dialogue with no rising threat to react to for an extended run.`,
         suggestedFix: `Raise suspense somewhere within the ${r756c.longestRun}-scene stretch so dialogue keeps something rising to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 770: DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER, DIALOGUE_SUSPENSE_PEAK_UNCAUSED,
+  //              DIALOGUE_RELATIONSHIP_DROUGHT_RUN ──────────────────────────────────────
+
+  // DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-shifting
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 672/756
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r770a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r770a.fires) {
+      issues.push({
+        location: `${r770a.zoneNames[r770a.maxZoneIdx]} third — ${r770a.maxZoneCount} of ${r770a.count} clock-shifting scenes`,
+        rule: 'DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r770a.maxZoneCount / r770a.count) * 100)}% of the scenes where the clock shifts cluster in the ${r770a.zoneNames[r770a.maxZoneIdx]} third. When every deadline pressure shift lands in the same structural window, dialogue has no urgency pressing on it anywhere else across the story.`,
+        suggestedFix: `Shift the clock in at least one scene outside the ${r770a.zoneNames[r770a.maxZoneIdx]} third so urgency keeps pressing on dialogue more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_PEAK_UNCAUSED — Backward-cause × suspenseDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 suspense-
+  // positive scenes, fires when the peak suspense scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Waves 672/756 applied the zone-cluster and run-based drought modes to
+  // suspenseDelta; the backward-cause peak mode has never been applied to it, completing the
+  // trio.
+  {
+    const r770b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.suspenseDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r770b.fires) {
+      issues.push({
+        location: `scene ${r770b.peakIdx} (peak suspenseDelta ${r770b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-suspense scene (Scene ${r770b.peakIdx}, suspenseDelta ${r770b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r770b.qualifyingCount} scenes elsewhere carry tension. The moment characters are most gripped lands out of nowhere — dialogue has nothing building toward the peak to react against.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r770b.peakIdx} so dialogue has something building toward the peak to react against instead of springing without preparation.`,
+      });
+    }
+  }
+
+  // DIALOGUE_RELATIONSHIP_DROUGHT_RUN — Run-based × relationshipShifts presence absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 relationship-shift scenes overall,
+  // fires when the longest consecutive run of scenes with no bond shift reaches 6. Waves 686/756
+  // applied the backward-cause peak and zone-cluster modes to relationshipShifts; the drought-run
+  // mode has never been applied to it, completing the trio.
+  {
+    const r770c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r770c.fires) {
+      issues.push({
+        location: `longest stretch with no relationship shift: ${r770c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_RELATIONSHIP_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r770c.longestRun} consecutive scenes with no relationship shift at all, even though ${r770c.presentCount} scenes elsewhere do move a bond. A long unbroken stretch with nothing changing between characters leaves dialogue with no relational movement to voice for an extended run.`,
+        suggestedFix: `Shift a relationship somewhere within the ${r770c.longestRun}-scene stretch so dialogue keeps a live bond to voice throughout that stretch.`,
       });
     }
   }

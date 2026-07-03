@@ -1598,6 +1598,86 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 770 — dialoguePass: dialogue clock delta zone cluster, dialogue suspense peak uncaused, dialogue relationship drought run', async () => {
+    const makeRec770 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes770 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD770 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs770a = Array.from({ length: 9 }, (_, i) => makeRec770(i,
+        (i === 0 || i === 1 || i === 2) ? { clockDelta: i === 1 ? -1 : 1 } : {}
+      ));
+      const res = await runD770(buildScenes770(9), recs770a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER'), 'DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    it('DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock-shifting scenes spread across thirds', async () => {
+      const recs770an = Array.from({ length: 9 }, (_, i) => makeRec770(i,
+        (i === 0 || i === 4 || i === 8) ? { clockDelta: 1 } : {}
+      ));
+      const res = await runD770(buildScenes770(9), recs770an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER'), 'DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_SUSPENSE_PEAK_UNCAUSED fire:
+    // 8 scenes; suspenseDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('DIALOGUE_SUSPENSE_PEAK_UNCAUSED fires when the peak suspense scene has no preparing cause nearby', async () => {
+      const recs770b = Array.from({ length: 8 }, (_, i) => makeRec770(i));
+      recs770b[2] = makeRec770(2, { suspenseDelta: 3 });
+      recs770b[5] = makeRec770(5, { suspenseDelta: 3 });
+      const res = await runD770(buildScenes770(8), recs770b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED'), 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED should fire');
+    });
+
+    it('DIALOGUE_SUSPENSE_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak suspense scene', async () => {
+      const recs770bn = Array.from({ length: 8 }, (_, i) => makeRec770(i));
+      recs770bn[2] = makeRec770(2, { suspenseDelta: 3 });
+      recs770bn[5] = makeRec770(5, { suspenseDelta: 3 });
+      recs770bn[1] = makeRec770(1, { dramaticTurn: 'reversal' });
+      const res = await runD770(buildScenes770(8), recs770bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED'), 'DIALOGUE_SUSPENSE_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_RELATIONSHIP_DROUGHT_RUN fire:
+    // n=10; relationship-shift scenes at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('DIALOGUE_RELATIONSHIP_DROUGHT_RUN fires when a long run has no relationship shift', async () => {
+      const recs770c = Array.from({ length: 10 }, (_, i) => makeRec770(i,
+        (i === 0 || i === 1 || i === 2) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runD770(buildScenes770(10), recs770c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_DROUGHT_RUN'), 'DIALOGUE_RELATIONSHIP_DROUGHT_RUN should fire');
+    });
+
+    it('DIALOGUE_RELATIONSHIP_DROUGHT_RUN does not fire when relationship shifts are evenly spread', async () => {
+      const recs770cn = Array.from({ length: 10 }, (_, i) => makeRec770(i,
+        (i === 0 || i === 3 || i === 6 || i === 9) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}
+      ));
+      const res = await runD770(buildScenes770(10), recs770cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_DROUGHT_RUN'), 'DIALOGUE_RELATIONSHIP_DROUGHT_RUN should not fire');
+    });
+  });
+
+
   describe('Wave 756 — dialoguePass: dialogue relationship zone cluster, dialogue clock delta drought run, dialogue suspense drought run', async () => {
     const makeRec756 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
