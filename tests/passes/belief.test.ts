@@ -1204,6 +1204,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 740 — beliefPass: belief clock delta drought run, belief open thread peak uncaused, belief staging drought run', async () => {
+    const runBF740 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_CLOCK_DELTA_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 shift the clock (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('BELIEF_CLOCK_DELTA_DROUGHT_RUN fires when the longest no-clock-movement run reaches 6', async () => {
+      const recs740a = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs740a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs740a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs740a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runBF740(recs740a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DELTA_DROUGHT_RUN'), 'BELIEF_CLOCK_DELTA_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_CLOCK_DELTA_DROUGHT_RUN no-fire:
+    // clock-shifting scenes spread out so no gap reaches 6 consecutive scenes
+    it('BELIEF_CLOCK_DELTA_DROUGHT_RUN does not fire when clock movement is spread through the story', async () => {
+      const recs740an = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs740an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs740an[3] = makeSharedRecord(3, { clockDelta: -1 });
+      recs740an[6] = makeSharedRecord(6, { clockDelta: 1 });
+      recs740an[9] = makeSharedRecord(9, { clockDelta: -1 });
+      const res = await runBF740(recs740an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DELTA_DROUGHT_RUN'), 'BELIEF_CLOCK_DELTA_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('BELIEF_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs740b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs740b[2] = makeSharedRecord(2, { unresolvedClues: ['clue-a'] });
+      recs740b[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF740(recs740b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_PEAK_UNCAUSED'), 'BELIEF_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // BELIEF_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('BELIEF_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs740bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs740bn[2] = makeSharedRecord(2, { unresolvedClues: ['clue-a'] });
+      recs740bn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs740bn[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runBF740(recs740bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_PEAK_UNCAUSED'), 'BELIEF_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // BELIEF_STAGING_DROUGHT_RUN fire:
+    // 10 scenes; visual beats at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run is ≥6', async () => {
+      const recs740c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs740c[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs740c[1] = makeSharedRecord(1, { visualBeats: ['a beat'] });
+      recs740c[2] = makeSharedRecord(2, { visualBeats: ['a beat'] });
+      recs740c[9] = makeSharedRecord(9, { visualBeats: ['a beat'] });
+      const res = await runBF740(recs740c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_DROUGHT_RUN'), 'BELIEF_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_STAGING_DROUGHT_RUN no-fire:
+    // visual beats at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_STAGING_DROUGHT_RUN does not fire when visual beats are distributed without a long drought', async () => {
+      const recs740cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs740cn[0] = makeSharedRecord(0, { visualBeats: ['a beat'] });
+      recs740cn[4] = makeSharedRecord(4, { visualBeats: ['a beat'] });
+      recs740cn[9] = makeSharedRecord(9, { visualBeats: ['a beat'] });
+      const res = await runBF740(recs740cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_STAGING_DROUGHT_RUN'), 'BELIEF_STAGING_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 726 — beliefPass: belief clock delta zone cluster, belief staging peak uncaused, belief open thread zone cluster', async () => {
     const runBF726 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

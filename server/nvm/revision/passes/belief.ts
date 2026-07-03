@@ -290,6 +290,14 @@
 // BELIEF_OPEN_THREAD_ZONE_CLUSTER (distribution/timing × unresolvedClues × structural thirds —
 // Wave 642 applied the run-based drought mode to unresolvedClues; the zone-cluster mode has never
 // been applied to it).
+// Wave 740 additions: BELIEF_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Waves
+// 628/726 applied the backward-cause peak and zone-cluster modes to clockDelta; the drought-run
+// mode has never been applied to it, completing the trio), BELIEF_OPEN_THREAD_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × unresolvedClues magnitude — Waves 642/726 applied the
+// run-based drought and zone-cluster modes to unresolvedClues; the backward-cause peak mode has
+// never been applied to it, completing the trio), BELIEF_STAGING_DROUGHT_RUN (run-based ×
+// visualBeats absence — Waves 642/726 applied the zone-cluster and backward-cause peak modes to
+// visualBeats; the drought-run mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4076,6 +4084,75 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r726c.maxZoneCount / r726c.count) * 100)}% of the scenes carrying outstanding clue-debt cluster in the story's ${r726c.zoneNames[r726c.maxZoneIdx]} third. When every open question is left dangling in the same structural window, the belief-tracking layer has no unresolved mystery pressing on characters' convictions anywhere else in the story.`,
         suggestedFix: `Seed or carry forward at least one open thread outside the ${r726c.zoneNames[r726c.maxZoneIdx]} third so unresolved mystery keeps pressing on the story's beliefs throughout.`,
+      });
+    }
+  }
+
+  // ── Wave 740: BELIEF_CLOCK_DELTA_DROUGHT_RUN, BELIEF_OPEN_THREAD_PEAK_UNCAUSED,
+  //              BELIEF_STAGING_DROUGHT_RUN ───────────────────────────────────────────────
+
+  // BELIEF_CLOCK_DELTA_DROUGHT_RUN — Run-based × clockDelta≠0 absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 clock-shifting scenes overall, fires when the
+  // longest consecutive run of scenes with zero clock movement reaches 6. Waves 628/726 applied
+  // the backward-cause peak and zone-cluster modes to clockDelta; the drought-run mode has never
+  // been applied to it, completing the trio.
+  {
+    const r740a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r740a.fires) {
+      issues.push({
+        location: `longest stretch with no clock movement: ${r740a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_CLOCK_DELTA_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r740a.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r740a.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the belief-tracking layer without any external pressure testing characters' convictions for an extended run.`,
+        suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r740a.longestRun}-scene stretch so external pressure keeps testing the story's beliefs throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // open threads; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Waves 642/726 applied the run-based drought and zone-cluster
+  // modes to unresolvedClues; the backward-cause peak mode has never been applied to it,
+  // completing the trio.
+  {
+    const r740b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r740b.fires) {
+      issues.push({
+        location: `scene ${r740b.peakIdx + 1} — peak open-thread density (${r740b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'BELIEF_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r740b.peakIdx + 1}, with ${r740b.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the belief-tracking layer's peak of accumulated question carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r740b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // BELIEF_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 visually dense scenes overall, fires when the longest
+  // consecutive run of scenes with no staged beats reaches 6. Waves 642/726 applied the
+  // zone-cluster and backward-cause peak modes to visualBeats; the drought-run mode has never been
+  // applied to it, completing the trio.
+  {
+    const r740c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r740c.fires) {
+      issues.push({
+        location: `longest stretch with no visual staging: ${r740c.longestRun} consecutive scenes`,
+        rule: 'BELIEF_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r740c.longestRun} consecutive scenes with no visual staging beats at all, even though ${r740c.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves the belief-tracking layer with no concrete image to anchor a character's conviction to for an extended run.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r740c.longestRun}-scene stretch so the belief-tracking layer keeps a concrete image to anchor conviction to throughout that stretch.`,
       });
     }
   }
