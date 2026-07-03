@@ -400,6 +400,13 @@
 // virgin field), RELATIONAL_COMPLICATE_DROUGHT_RUN (run-based x purpose === 'complicate'
 // absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
 // added in this same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 889 additions: no purpose value had ever been audited by the distinct 4-zone
+// checkZoneImbalance mode in this pass (only relationshipShifts, visualBeats,
+// dialogueHighlights, and unresolvedClues had). This wave applies it to three purpose values
+// with complete 3-zone/run-based trios: RELATIONAL_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
+// RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and RELATIONAL_
+// RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5110,6 +5117,83 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r875c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r875c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the relationship leaves it stalled for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r875c.longestRun}-scene stretch to complicate the story so the relationship keeps facing fresh strain throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 889: RELATIONAL_CLIMAX_ZONE_IMBALANCE, RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              RELATIONAL_RESOLUTION_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // RELATIONAL_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // climax-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone RELATIONAL_CLIMAX_ZONE_CLUSTER and run-based RELATIONAL_CLIMAX_DROUGHT_RUN
+  // — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r889a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r889a.fires) {
+      const emptyNames889a = r889a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName889a = FOUR_ZONE_NAMES[r889a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames889a} empty; ${bloatName889a} has ${r889a.counts[r889a.bloatZoneIdx]}/${r889a.totalCount} climax-purposed scenes`,
+        rule: 'RELATIONAL_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r889a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName889a} contains ${r889a.counts[r889a.bloatZoneIdx]} of them (${Math.round((r889a.counts[r889a.bloatZoneIdx] / r889a.totalCount) * 100)}%) while ${emptyNames889a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the relationship's biggest test an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames889a} — so the relationship builds toward its biggest test more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose ===
+  // 'establish_world' × four structural zones. Built on checkZoneImbalance from the shared
+  // checks library. n≥10, ≥4 world-establishing scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone RELATIONAL_ESTABLISH_WORLD_ZONE_CLUSTER and
+  // run-based RELATIONAL_ESTABLISH_WORLD_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r889b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r889b.fires) {
+      const emptyNames889b = r889b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName889b = FOUR_ZONE_NAMES[r889b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames889b} empty; ${bloatName889b} has ${r889b.counts[r889b.bloatZoneIdx]}/${r889b.totalCount} world-establishing scenes`,
+        rule: 'RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r889b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName889b} contains ${r889b.counts[r889b.bloatZoneIdx]} of them (${Math.round((r889b.counts[r889b.bloatZoneIdx] / r889b.totalCount) * 100)}%) while ${emptyNames889b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the relationship's ground to develop against an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames889b} — so the relationship keeps fresh ground to develop against more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone RELATIONAL_RESOLUTION_ZONE_CLUSTER and run-based RELATIONAL_RESOLUTION_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r889c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r889c.fires) {
+      const emptyNames889c = r889c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName889c = FOUR_ZONE_NAMES[r889c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames889c} empty; ${bloatName889c} has ${r889c.counts[r889c.bloatZoneIdx]}/${r889c.totalCount} resolution-purposed scenes`,
+        rule: 'RELATIONAL_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r889c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName889c} contains ${r889c.counts[r889c.bloatZoneIdx]} of them (${Math.round((r889c.counts[r889c.bloatZoneIdx] / r889c.totalCount) * 100)}%) while ${emptyNames889c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the relationship's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames889c} — so relationship closure is distributed more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

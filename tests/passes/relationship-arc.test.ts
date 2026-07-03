@@ -1376,6 +1376,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 889 — relationshipArcPass: relational climax zone imbalance, relational establish world zone imbalance, relational resolution zone imbalance', async () => {
+    const runRA889 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('RELATIONAL_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs889a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runRA889(recs889a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLIMAX_ZONE_IMBALANCE'), 'RELATIONAL_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs889an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runRA889(recs889an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLIMAX_ZONE_IMBALANCE'), 'RELATIONAL_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs889b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runRA889(recs889b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs889bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runRA889(recs889bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'RELATIONAL_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // RELATIONAL_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('RELATIONAL_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs889c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runRA889(recs889c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_RESOLUTION_ZONE_IMBALANCE'), 'RELATIONAL_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs889cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runRA889(recs889cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_RESOLUTION_ZONE_IMBALANCE'), 'RELATIONAL_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 875 — relationshipArcPass: relational resolution drought run, relational complicate zone cluster, relational complicate drought run', async () => {
     const runRA875 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
