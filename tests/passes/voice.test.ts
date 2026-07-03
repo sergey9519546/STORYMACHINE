@@ -516,6 +516,9 @@ import { themePass } from '../../server/nvm/revision/passes/theme.ts';
 import type { PassInput } from '../../server/nvm/revision/passes/types.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+// Aliased: this file already has its own local makeSceneRecord (below, a pre-existing
+// single-argument factory used by earlier waves) — importing under the shared name would collide.
+import { makeSceneRecord as makeSharedRecord, buildPlainFountain } from './helpers.ts';
 
 // Complete ScreenplaySceneRecord factory — every required field present so the
 // records typecheck under `tsc --noEmit`, not just under runtime strip-types.
@@ -1434,6 +1437,79 @@ Good riddance to you.`;
     });
   });
 
+
+  describe('Wave 599 — voicePass: dialogue highlight revelation decoupled, unresolved clue drought run, revelation zone imbalance', async () => {
+    const runV599 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED fires when no highlight scene coincides with a revelation', async () => {
+      // 6 scenes; highlights at 0,1; revelations at 4,5 — zero overlap
+      const recs599a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs599a[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'] });
+      recs599a[1] = makeSharedRecord(1, { dialogueHighlights: ['bob: believes Y'] });
+      recs599a[4] = makeSharedRecord(4, { revelation: 'She was lying.' });
+      recs599a[5] = makeSharedRecord(5, { revelation: 'He knew all along.' });
+      const res = await runV599(recs599a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED does not fire when a highlight scene coincides with a revelation', async () => {
+      const recs599a = Array.from({ length: 6 }, (_, i) => makeSharedRecord(i));
+      recs599a[0] = makeSharedRecord(0, { dialogueHighlights: ['alice: believes X'], revelation: 'She was lying.' });
+      recs599a[1] = makeSharedRecord(1, { dialogueHighlights: ['bob: believes Y'] });
+      recs599a[4] = makeSharedRecord(4, { revelation: 'He knew all along.' });
+      const res = await runV599(recs599a);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED should not fire');
+    });
+
+    it('UNRESOLVED_CLUE_DROUGHT_RUN fires when ≥6 consecutive scenes carry no outstanding clue-debt', async () => {
+      // 10 scenes; debt at 0,1,2 (3 total); scenes 3-9 (7 in a row) have none
+      const recs599b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs599b[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs599b[1] = makeSharedRecord(1, { unresolvedClues: ['b'] });
+      recs599b[2] = makeSharedRecord(2, { unresolvedClues: ['c'] });
+      const res = await runV599(recs599b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_DROUGHT_RUN'), 'UNRESOLVED_CLUE_DROUGHT_RUN should fire');
+    });
+
+    it('UNRESOLVED_CLUE_DROUGHT_RUN does not fire when debt-carrying scenes are spread with no long gap', async () => {
+      // debt at 0,3,6,9 — max gap = 2 scenes, well under the 6-scene threshold
+      const recs599bnr = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs599bnr[0] = makeSharedRecord(0, { unresolvedClues: ['a'] });
+      recs599bnr[3] = makeSharedRecord(3, { unresolvedClues: ['b'] });
+      recs599bnr[6] = makeSharedRecord(6, { unresolvedClues: ['c'] });
+      recs599bnr[9] = makeSharedRecord(9, { unresolvedClues: ['d'] });
+      const res = await runV599(recs599bnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'UNRESOLVED_CLUE_DROUGHT_RUN'), 'UNRESOLVED_CLUE_DROUGHT_RUN should not fire');
+    });
+
+    it('REVELATION_ZONE_IMBALANCE fires when one zone has zero revelations and another has ≥50%', async () => {
+      // 12 scenes, 4 zones of 3: revelations at 6,7,8 (zone 2) plus 9 (zone 3) to meet minCount=4
+      const recs599c = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs599c[6] = makeSharedRecord(6, { revelation: 'a' });
+      recs599c[7] = makeSharedRecord(7, { revelation: 'b' });
+      recs599c[8] = makeSharedRecord(8, { revelation: 'c' });
+      recs599c[9] = makeSharedRecord(9, { revelation: 'd' });
+      const res = await runV599(recs599c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_IMBALANCE'), 'REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('REVELATION_ZONE_IMBALANCE does not fire when revelations are spread across all zones', async () => {
+      const recs599cnr = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs599cnr[1] = makeSharedRecord(1, { revelation: 'a' });
+      recs599cnr[4] = makeSharedRecord(4, { revelation: 'b' });
+      recs599cnr[7] = makeSharedRecord(7, { revelation: 'c' });
+      recs599cnr[10] = makeSharedRecord(10, { revelation: 'd' });
+      const res = await runV599(recs599cnr);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_IMBALANCE'), 'REVELATION_ZONE_IMBALANCE should not fire');
+    });
+  });
 
   describe('Wave 585 — voicePass: affirmation zone cluster, exclamation aftermath terse, hedged exclamation flood', async () => {
     const runV585 = async (fountain: string) => {

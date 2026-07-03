@@ -193,9 +193,24 @@
 // run-based check on the negation content channel rather than end-punctuation; distinct from
 // DIALOGUE_NEGATION_FLOOD which is a global proportion check that cannot detect concentrated
 // local runs while the overall proportion stays below threshold).
+// Wave 599 additions: dialogue highlight revelation decoupled (co-occurrence/decoupling ×
+// dialogueHighlights-presence × revelation-presence — n≥6, ≥2 scenes with a tracked belief
+// statement, ≥2 revelation scenes, zero overlap; a character voicing a conviction and the story
+// disclosing a hidden truth never share a moment — the two per-scene fields this pass has used
+// least, dialogueHighlights [one prior use, as a text-scanning array] and revelation [never
+// accessed as a field before — the word only ever appeared inside prose suggestion text], paired
+// with each other for the first time here), unresolved clue drought run (run-based ×
+// unresolvedClues-absence, built on checkDroughtRun from the shared checks library — audit M2.2 —
+// n≥10, ≥3 debt-carrying scenes, longest consecutive run with no outstanding clue-debt ≥6; first
+// use of unresolvedClues in this 101-rule file), revelation zone imbalance (underweight/bloat ×
+// revelation-presence × four structural zones, built on checkZoneImbalance — one zone with no
+// revelations while another holds ≥50%; first use of the revelation field as a per-scene signal
+// in this file at all, and the first application of checkZoneImbalance to the revelation channel
+// across every pass this session).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkDroughtRun, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract action line word frequency per scene */
 function sceneWordFrequencies(fountain: string): Map<number, Map<string, number>> {
@@ -3710,6 +3725,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Choose one register per line: either the character is uncertain (keep the hesitation, drop the "!") or they are committed to an outburst (drop the hesitation, keep the "!"). A character can waver first and then exclaim, but in adjacent lines — not in the same line. The "Um... I can't believe this!" moment works as two beats: the stammer is followed by the clean exclamation. Don't stack the hedging inside the exclamation.`,
         });
       }
+    }
+  }
+
+  // ── Wave 599: DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED, UNRESOLVED_CLUE_DROUGHT_RUN,
+  //              REVELATION_ZONE_IMBALANCE ──────────────────────────────────────────────────
+
+  // DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED — Co-occurrence/decoupling × dialogueHighlights ×
+  // revelation. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2
+  // scenes carrying a tracked belief statement (dialogueHighlights non-empty), ≥2 revelation
+  // scenes. Zero overlap → fire. A character voicing a conviction and the story disclosing a
+  // hidden truth never share a scene — the moment a hidden truth surfaces is a natural occasion
+  // for a character's voice to register it (through belief, denial, or a stated reaction), yet
+  // the two channels run on separate tracks.
+  // Distinct from: every other check in this pass, none of which pair dialogueHighlights with
+  // revelation — dialogueHighlights had exactly one prior use (SUBTEXT_ABSENCE, a pure text-scan
+  // for direct-emotion phrases) and revelation had none (the word only ever appeared inside prose
+  // suggestion text, never as an accessed field).
+  {
+    const r599a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+    });
+    if (r599a.fires) {
+      issues.push({
+        location: `${r599a.aCount} dialogue-highlight scene(s) and ${r599a.bCount} revelation scene(s) — zero overlap`,
+        rule: 'DIALOGUE_HIGHLIGHT_REVELATION_DECOUPLED',
+        severity: 'minor',
+        description: `The script has ${r599a.aCount} scene(s) where a character voices a tracked belief and ${r599a.bCount} revelation scene(s), but the two never coincide. A hidden truth coming to light is exactly the moment a character's own conviction is tested — do they believe it, deny it, or does it confirm something they already suspected. When disclosure and voiced belief never share a scene, revelations land as plot information rather than moments the characters are heard reacting to.`,
+        suggestedFix: `Let at least one revelation scene also carry a character stating what they now believe — a line of denial, confirmation, or reinterpretation spoken in reaction to the disclosed truth. The revelation lands harder when the audience hears a character's voice process it, not just the fact of the reveal.`,
+      });
+    }
+  }
+
+  // UNRESOLVED_CLUE_DROUGHT_RUN — Run-based × unresolvedClues absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 scenes carrying outstanding clue-debt, longest
+  // consecutive run of scenes with NO outstanding debt ≥6 → fire. First use of the unresolvedClues
+  // signal in this 101-rule file — an extended stretch where no mystery is left open at all, even
+  // though the story does carry unresolved threads elsewhere, means the story's sense of active
+  // unanswered questions goes fully dark for a long run.
+  {
+    const r599b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r599b.fires) {
+      issues.push({
+        location: `longest stretch with no outstanding clue-debt: ${r599b.longestRun} consecutive scenes`,
+        rule: 'UNRESOLVED_CLUE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r599b.longestRun} consecutive scenes with no outstanding clue-debt at all — no lingering unanswered thread — even though ${r599b.presentCount} scenes elsewhere do carry open mysteries. A long stretch where nothing is left unresolved means the story's sense of active, unanswered questions goes fully dark for an extended run, even if the surrounding scenes are otherwise eventful.`,
+        suggestedFix: `Seed a new thread somewhere within the ${r599b.longestRun}-scene stretch so the story maintains some outstanding mystery throughout — a question doesn't need to be answered soon, it only needs to exist, keeping the audience's sense of active curiosity alive across the run.`,
+      });
+    }
+  }
+
+  // REVELATION_ZONE_IMBALANCE — Underweight/bloat × revelation × four structural zones. Built
+  // on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero revelations
+  // while another holds ≥50% of the total — the first use of the revelation field as a per-scene
+  // signal in this file at all, and the first application of checkZoneImbalance to the revelation
+  // channel across every pass touched this session.
+  {
+    const r599c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation !== null && r.revelation !== '' && r.revelation !== undefined,
+    });
+    if (r599c.fires) {
+      const emptyNames599c = r599c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName599c = FOUR_ZONE_NAMES[r599c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames599c} empty; ${bloatName599c} has ${r599c.counts[r599c.bloatZoneIdx]}/${r599c.totalCount} revelations`,
+        rule: 'REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r599c.totalCount} revelations are unevenly distributed across its four structural zones: ${bloatName599c} contains ${r599c.counts[r599c.bloatZoneIdx]} of them (${Math.round((r599c.counts[r599c.bloatZoneIdx] / r599c.totalCount) * 100)}%) while ${emptyNames599c} contains none. Disclosure bloats in one structural quarter and vanishes from another, giving the audience's sense of ongoing discovery an uneven rhythm across the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation from ${bloatName599c} into the empty zone(s) — ${emptyNames599c} — so every structural quarter carries some new information coming to light.`,
+      });
     }
   }
 
