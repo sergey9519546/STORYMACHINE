@@ -328,6 +328,19 @@
 // revelation; the existing RELATIONSHIP_REVELATION_SILENT audits co-occurrence with a
 // relationship shift, not run-length absence of revelation itself — the drought-run mode has
 // never been applied to it).
+// Wave 791 additions: RELATIONAL_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence —
+// completes the trio for suspenseDelta: Wave 763 applied zone-cluster, Wave 777 applied
+// backward-cause peak; the run-based drought mode had never been applied to it),
+// RELATIONAL_CURIOSITY_PEAK_UNCAUSED (backward-cause × curiosityDelta-as-magnitude × 2-scene
+// lookback — completes the trio for curiosityDelta: Wave 763 applied run-based drought, Wave 777
+// applied zone-cluster; the existing RELATIONSHIP_CURIOSITY_PEAK_ABSENT audits whether a
+// relationship shift co-occurs AT the peak curiosity scene, not a preparing cause before it — the
+// backward-cause peak mode has never been applied to curiosityDelta itself), RELATIONAL_
+// REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude × 2-scene lookback —
+// completes the trio for revelation: Wave 763 applied zone-cluster, Wave 777 applied run-based
+// drought; the existing RELATIONSHIP_PEAK_REVELATION_ABSENT anchors on the peak relationship-
+// shift scene checking for revelation, the reverse direction — the backward-cause peak mode has
+// never been applied to revelation itself).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4564,6 +4577,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story contains a run of ${r777c.longestRun} consecutive scenes with no revelation at all, even though ${r777c.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the relationship with no fresh disclosure reshaping it for an extended run.`,
         suggestedFix: `Let a truth surface somewhere within the ${r777c.longestRun}-scene stretch so the relationship keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 791: RELATIONAL_SUSPENSE_DROUGHT_RUN, RELATIONAL_CURIOSITY_PEAK_UNCAUSED,
+  //              RELATIONAL_REVELATION_PEAK_UNCAUSED ─────────────────────────────────────
+
+  // RELATIONAL_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 suspense-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no rising suspense reaches 6. Completes
+  // the trio for suspenseDelta alongside the zone-cluster mode (Wave 763) and the backward-cause
+  // peak mode (Wave 777) — the run-based drought mode has never been applied to it.
+  {
+    const r791a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r791a.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r791a.longestRun} consecutive scenes`,
+        rule: 'RELATIONAL_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r791a.longestRun} consecutive scenes with no rising suspense at all, even though ${r791a.presentCount} scenes elsewhere carry tension. A long unbroken stretch with nothing raising the stakes leaves the relationship coasting without external pressure testing it for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r791a.longestRun}-scene stretch so the relationship stays under some form of pressure throughout that stretch.`,
+      });
+    }
+  }
+
+  // RELATIONAL_CURIOSITY_PEAK_UNCAUSED — Backward-cause × curiosityDelta-as-magnitude × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 curiosity-
+  // positive scenes, fires when the peak curiosity scene has no dramatic turn or revelation in the
+  // 2 scenes preceding it. Completes the trio for curiosityDelta alongside the run-based drought
+  // mode (Wave 763) and the zone-cluster mode (Wave 777). The existing
+  // RELATIONSHIP_CURIOSITY_PEAK_ABSENT audits whether a relationship shift co-occurs AT the peak
+  // curiosity scene — a same-scene co-occurrence check, not a preparing-cause check on the scenes
+  // before it — so the backward-cause peak mode has never been applied to curiosityDelta itself.
+  {
+    const r791b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => Math.max(0, r.curiosityDelta ?? 0),
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r791b.fires) {
+      issues.push({
+        location: `scene ${r791b.peakIdx} (peak curiosityDelta ${r791b.peakMagnitude}) — no preparing cause nearby`,
+        rule: 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single highest-curiosity scene (Scene ${r791b.peakIdx}, curiosityDelta ${r791b.peakMagnitude}) arrives with no dramatic turn or revelation in the 2 scenes leading into it, even though ${r791b.qualifyingCount} scenes elsewhere provoke wonder. The moment the audience is most desperate for an answer lands out of nowhere — nothing has built toward the question testing the bond.`,
+        suggestedFix: `Add a dramatic turn or revelation in one of the 2 scenes before scene ${r791b.peakIdx} so the relationship's peak moment of curiosity reads as earned rather than arbitrary.`,
+      });
+    }
+  }
+
+  // RELATIONAL_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) ×
+  // 2-scene lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2
+  // revelation scenes, fires when the (first) revelation scene has no dramatic turn in itself or
+  // the 2 scenes preceding it. Completes the trio for revelation alongside the zone-cluster mode
+  // (Wave 763) and the run-based drought mode (Wave 777). The existing
+  // RELATIONSHIP_PEAK_REVELATION_ABSENT anchors on the peak relationship-SHIFT scene and checks
+  // for a nearby revelation — the reverse direction of causal inquiry — so the backward-cause peak
+  // mode, anchored on revelation itself, has never been applied to it. hasCause deliberately omits
+  // revelation to avoid circularity (a revelation scene cannot cause itself).
+  {
+    const r791c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r791c.fires) {
+      issues.push({
+        location: `scene ${r791c.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'RELATIONAL_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r791c.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r791c.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the relationship's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r791c.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the relationship's own turning points.`,
       });
     }
   }

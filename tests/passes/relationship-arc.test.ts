@@ -1376,6 +1376,77 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 791 — relationshipArcPass: relational suspense drought run, relational curiosity peak uncaused, relational revelation peak uncaused', async () => {
+    const runRA791 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RELATIONAL_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; suspenseDelta>0 at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RELATIONAL_SUSPENSE_DROUGHT_RUN fires when a long run has no rising suspense', async () => {
+      const recs791a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA791(recs791a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_DROUGHT_RUN'), 'RELATIONAL_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    it('RELATIONAL_SUSPENSE_DROUGHT_RUN does not fire when suspense rises are evenly spread', async () => {
+      const recs791an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { suspenseDelta: [0, 3, 6, 9].includes(i) ? 2 : 0 }),
+      );
+      const res = await runRA791(recs791an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SUSPENSE_DROUGHT_RUN'), 'RELATIONAL_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+
+    // RELATIONAL_CURIOSITY_PEAK_UNCAUSED fire:
+    // 8 scenes; curiosityDelta qualifying (>0) at 2 and 5; peak resolves to the first (idx 2, tie
+    // on magnitude 3); no dramaticTurn/revelation at indices 0 or 1 (2-scene lookback).
+    it('RELATIONAL_CURIOSITY_PEAK_UNCAUSED fires when the peak curiosity scene has no preparing cause nearby', async () => {
+      const recs791b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs791b[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs791b[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      const res = await runRA791(recs791b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED'), 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED should fire');
+    });
+
+    it('RELATIONAL_CURIOSITY_PEAK_UNCAUSED does not fire when a preparing cause precedes the peak curiosity scene', async () => {
+      const recs791bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs791bn[2] = makeSharedRecord(2, { curiosityDelta: 3 });
+      recs791bn[5] = makeSharedRecord(5, { curiosityDelta: 3 });
+      recs791bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runRA791(recs791bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED'), 'RELATIONAL_CURIOSITY_PEAK_UNCAUSED should not fire');
+    });
+
+    // RELATIONAL_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('RELATIONAL_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs791c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs791c[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs791c[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      const res = await runRA791(recs791c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_PEAK_UNCAUSED'), 'RELATIONAL_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('RELATIONAL_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs791cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs791cn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs791cn[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      recs791cn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runRA791(recs791cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_REVELATION_PEAK_UNCAUSED'), 'RELATIONAL_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 777 — relationshipArcPass: relational suspense peak uncaused, relational curiosity zone cluster, relational revelation drought run', async () => {
     const runRA777 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
