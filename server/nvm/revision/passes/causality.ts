@@ -219,10 +219,18 @@
 // exist elsewhere; a stated conviction never precedes a structural pivot), stated belief zone
 // imbalance (underweight/bloat × dialogueHighlights × four structural zones, built on
 // checkZoneImbalance — one zone silent while another holds ≥50% of all belief assertions).
+// Wave 615 additions (built on the shared checks library, audit M2.2): VISUAL_BEAT_CAUSALITY_
+// ZONE_IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of
+// visualBeats anywhere in this 108-rule pass, its last untouched record field), OPEN_THREAD_
+// DRAMATIC_TURN_DECOUPLED (co-occurrence/decoupling × unresolvedClues × dramaticTurn —
+// unresolvedClues had exactly one prior incidental OR-condition use, never as its own standalone
+// signal), VISUAL_BEAT_PEAK_UNCAUSED (backward-cause × visualBeats-density peak × dramaticTurn/
+// revelation cause — the file's central "backward-cause" analytical lens applied to physical
+// staging for the first time).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function causalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -3582,6 +3590,85 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r601c.totalCount} belief-assertion scenes are unevenly distributed across its four structural zones: ${bloatName601c} contains ${r601c.counts[r601c.bloatZoneIdx]} of them (${Math.round((r601c.counts[r601c.bloatZoneIdx] / r601c.totalCount) * 100)}%) while ${emptyNames601c} contains none. Characters' stated convictions bloat in one structural quarter and vanish from another.`,
         suggestedFix: `Redistribute belief assertions: let at least one character state a conviction in the empty zone(s) — ${emptyNames601c} — so every structural quarter carries some evidence of what characters believe.`,
+      });
+    }
+  }
+
+  // ── Wave 615: VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE, OPEN_THREAD_DRAMATIC_TURN_DECOUPLED,
+  //              VISUAL_BEAT_PEAK_UNCAUSED ────────────────────────────────────────────────────
+
+  // VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with
+  // substantial physical staging (visualBeats.length≥2), divided into four equal structural
+  // zones. Fires only when one zone has zero visually dense scenes while another holds ≥50% of
+  // the total. First use of the visualBeats field anywhere in this 108-rule pass — its last
+  // untouched record field, despite exhaustive coverage of clock, curiosity, dramaticTurn,
+  // relationship, seed, payoff, revelation, and (since Wave 601) dialogueHighlights.
+  {
+    const r615a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r615a.fires) {
+      const emptyNames615a = r615a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName615a = FOUR_ZONE_NAMES[r615a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames615a} empty; ${bloatName615a} has ${r615a.counts[r615a.bloatZoneIdx]}/${r615a.totalCount} visually dense scenes`,
+        rule: 'VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r615a.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName615a} contains ${r615a.counts[r615a.bloatZoneIdx]} of them (${Math.round((r615a.counts[r615a.bloatZoneIdx] / r615a.totalCount) * 100)}%) while ${emptyNames615a} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's causal chain an uneven physical texture across its four quarters.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames615a}, or thin out ${bloatName615a}'s concentration by letting one of its visually dense scenes lean more on dialogue instead. A more even spread keeps physical cause-and-effect visible throughout the story's structure.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_DRAMATIC_TURN_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // dramaticTurn. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8, ≥2
+  // scenes carrying outstanding clue-debt, ≥2 dramatic-turn scenes. Zero overlap → fire. Open
+  // narrative debt and a structural pivot never happen in the same scene — every dramatic turn
+  // lands while every mystery is quiet, and every open thread persists through scenes with no
+  // pivot. First standalone use of unresolvedClues as its own signal in this file — its only
+  // prior appearance was a single incidental OR-condition inside an unrelated tension-deflation
+  // check, never treated as an independent causal channel. Distinct from every other decoupling
+  // check in this pass, none of which pair unresolvedClues with dramaticTurn.
+  {
+    const r615b = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r615b.fires) {
+      issues.push({
+        location: `${r615b.aCount} open-thread scene(s), ${r615b.bCount} dramatic-turn scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_DRAMATIC_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r615b.aCount} scenes carrying outstanding, unpaid clue-debt never coincide with the ${r615b.bCount} scenes carrying a dramatic turn — unresolved narrative tension and structural pivots run on entirely separate tracks. A reversal or turning point often lands hardest when it also reframes an open question; when the two never combine, the story's pivots happen independent of its live mysteries, and its open threads never get resolved or complicated by an actual turn.`,
+        suggestedFix: `Let at least one dramatic turn happen in a scene that also carries open clue-debt — a reversal that reframes what an unresolved thread means, or a turning point that is itself caused by the pressure of not knowing. Tying structural pivots to live mysteries gives both greater causal weight.`,
+      });
+    }
+  }
+
+  // VISUAL_BEAT_PEAK_UNCAUSED — Backward-cause × visualBeats-density peak × dramaticTurn/
+  // revelation cause. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes
+  // with visualBeats present, a 2-scene lookback. Finds the single scene with the most physical
+  // staging beats and fires when neither that scene nor either of the 2 scenes before it contains
+  // a dramatic turn or a revelation. This pass's central analytical lens — backward-cause, already
+  // applied to relationship shifts (Wave 559) — turned on physical staging for the first time: the
+  // story's single most visually dense scene should be caused by something (a pivot the story is
+  // dramatizing, a truth just disclosed), not simply appear as unmotivated staging.
+  {
+    const r615c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => (r.dramaticTurn ?? 'nothing') !== 'nothing' || r.revelation != null,
+    });
+    if (r615c.fires) {
+      issues.push({
+        location: `Scene at position ${r615c.peakIdx + 1} — peak physical staging (${r615c.peakMagnitude} beats) with no dramatic turn or revelation nearby`,
+        rule: 'VISUAL_BEAT_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single densest physical staging (${r615c.peakMagnitude} visual beats, out of ${r615c.qualifyingCount} scenes with any staging at all) has no dramatic turn and no revelation in itself or in either of the 2 scenes before it. The moment the story invests most heavily in physical description and action arrives with no pivot or disclosure explaining why — the staging is dense but causally unmotivated.`,
+        suggestedFix: `Add a dramatic turn or a revelation in the scene with the densest physical staging, or in one of the two scenes before it. The audience should understand why this particular moment earns its heavy physical attention, not just observe that it happens to be busy.`,
       });
     }
   }

@@ -1247,6 +1247,84 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 615 — causalityPass: visual beat causality zone imbalance, open thread dramatic turn decoupled, visual beat peak uncaused', async () => {
+    const runCA615 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs615a = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs615a[6] = makeSharedRecord(6, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615a[9] = makeSharedRecord(9, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615a[10] = makeSharedRecord(10, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615a[11] = makeSharedRecord(11, { visualBeats: ['tears the letter', 'lights the match'] });
+      const res = await runCA615(recs615a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE'), 'VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE should fire');
+    });
+
+    // VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs615an = Array.from({ length: 12 }, (_, i) => makeSharedRecord(i));
+      recs615an[1] = makeSharedRecord(1, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615an[4] = makeSharedRecord(4, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615an[7] = makeSharedRecord(7, { visualBeats: ['tears the letter', 'lights the match'] });
+      recs615an[10] = makeSharedRecord(10, { visualBeats: ['tears the letter', 'lights the match'] });
+      const res = await runCA615(recs615an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE'), 'VISUAL_BEAT_CAUSALITY_ZONE_IMBALANCE should not fire');
+    });
+
+    // OPEN_THREAD_DRAMATIC_TURN_DECOUPLED fire:
+    // n=8; open threads at 0,1 (no turn); turns at 2,3 (no open thread) → zero overlap → fires
+    it('OPEN_THREAD_DRAMATIC_TURN_DECOUPLED fires when open-thread scenes and dramatic-turn scenes never overlap', async () => {
+      const recs615b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs615b[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs615b[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs615b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      recs615b[3] = makeSharedRecord(3, { dramaticTurn: 'revelation' });
+      const res = await runCA615(recs615b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_DRAMATIC_TURN_DECOUPLED'), 'OPEN_THREAD_DRAMATIC_TURN_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_DRAMATIC_TURN_DECOUPLED no-fire:
+    // scene 2 carries BOTH an open thread and a dramatic turn → overlap exists
+    it('OPEN_THREAD_DRAMATIC_TURN_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs615bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs615bn[0] = makeSharedRecord(0, { unresolvedClues: ['unpaid-clue'] });
+      recs615bn[1] = makeSharedRecord(1, { unresolvedClues: ['unpaid-clue'] });
+      recs615bn[2] = makeSharedRecord(2, { unresolvedClues: ['unpaid-clue'], dramaticTurn: 'reversal' });
+      recs615bn[3] = makeSharedRecord(3, { dramaticTurn: 'revelation' });
+      const res = await runCA615(recs615bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_DRAMATIC_TURN_DECOUPLED'), 'OPEN_THREAD_DRAMATIC_TURN_DECOUPLED should not fire');
+    });
+
+    // VISUAL_BEAT_PEAK_UNCAUSED fire:
+    // 8 scenes; visualBeats present at 2 (1 beat) and 6 (5 beats, the peak); no dramaticTurn or
+    // revelation at 6, 5, or 4
+    it('VISUAL_BEAT_PEAK_UNCAUSED fires when the peak physical-staging scene has no dramatic turn or revelation nearby', async () => {
+      const recs615c = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs615c[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs615c[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA615(recs615c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_PEAK_UNCAUSED'), 'VISUAL_BEAT_PEAK_UNCAUSED should fire');
+    });
+
+    // VISUAL_BEAT_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('VISUAL_BEAT_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs615cn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs615cn[2] = makeSharedRecord(2, { visualBeats: ['glances at the clock'] });
+      recs615cn[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs615cn[6] = makeSharedRecord(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runCA615(recs615cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VISUAL_BEAT_PEAK_UNCAUSED'), 'VISUAL_BEAT_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 601 — causalityPass: stated belief revelation decoupled, stated belief dramatic-turn aftermath void, stated belief zone imbalance', async () => {
     const runCA601 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
