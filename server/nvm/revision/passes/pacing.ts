@@ -405,6 +405,14 @@
 // 3-zone/run-based trios that had never been audited by it: PACING_INTRODUCE_CONFLICT_ZONE_
 // IMBALANCE (purpose === 'introduce_conflict'), PACING_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose
 // === 'character_moment'), and PACING_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes').
+//
+// Wave 929 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing PACING_REVELATION_ZONE_CLUSTER/DROUGHT_RUN audit the separate revelation
+// string|null field, not this purpose enum value) -- a genuinely virgin field. This wave adds
+// PACING_REVELATION_PURPOSE_ZONE_CLUSTER and PACING_REVELATION_PURPOSE_DROUGHT_RUN (peak mode
+// conventionally skipped for this categorical field), plus PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE,
+// extending the 4-zone checkZoneImbalance mode to the emotionalShift valence signal (emotionalShift
+// === 'negative' has a complete 3-zone/run trio but has never been audited by it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5223,6 +5231,74 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r915c.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName915c} contains ${r915c.counts[r915c.bloatZoneIdx]} of them (${Math.round((r915c.counts[r915c.bloatZoneIdx] / r915c.totalCount) * 100)}%) while ${emptyNames915c} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving pacing's escalation an uneven structural rhythm.`,
         suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames915c} — so pacing escalates more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from PACING_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a virgin field for all three trio modes.
+  {
+    const r929a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r929a.fires) {
+      issues.push({
+        location: `${r929a.zoneNames[r929a.maxZoneIdx]} third — ${r929a.maxZoneCount} of ${r929a.count} revelation-purposed scenes`,
+        rule: 'PACING_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r929a.maxZoneCount / r929a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r929a.zoneNames[r929a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, pacing surges with new information in one part of the story and stays flat elsewhere.`,
+        suggestedFix: `Purpose at least one scene outside the ${r929a.zoneNames[r929a.maxZoneIdx]} third as a revelation so pacing keeps surging with new information more evenly across the story.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r929b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r929b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r929b.longestRun} consecutive scenes`,
+        rule: 'PACING_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r929b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r929b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with no turns of new information leaves pacing flat for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r929b.longestRun}-scene stretch as a revelation so pacing keeps surging with new information throughout that stretch.`,
+      });
+    }
+  }
+
+  // PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone PACING_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based PACING_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r929c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r929c.fires) {
+      const emptyNames929c = r929c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName929c = FOUR_ZONE_NAMES[r929c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames929c} empty; ${bloatName929c} has ${r929c.counts[r929c.bloatZoneIdx]}/${r929c.totalCount} negative-shift scenes`,
+        rule: 'PACING_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r929c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName929c} contains ${r929c.counts[r929c.bloatZoneIdx]} of them (${Math.round((r929c.counts[r929c.bloatZoneIdx] / r929c.totalCount) * 100)}%) while ${emptyNames929c} contains none. Downturns bloat in one structural quarter and vanish from another, giving pacing's darker beats an uneven structural rhythm.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames929c} — so pacing's darker beats land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
