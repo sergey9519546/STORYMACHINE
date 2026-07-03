@@ -267,6 +267,15 @@
 // this pass, never drought-audited via the shared helper), DIALOGUE_SUSPENSE_ZONE_CLUSTER
 // (distribution/timing × suspenseDelta>0 × structural thirds — suspenseDelta is this pass's
 // least-touched signal field; the zone-cluster mode applied to it for the first time).
+// Wave 686 additions (opens the eighth rotation cycle): DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × relationshipShifts magnitude — relationshipShifts has
+// only ever anchored an aftermath-void trigger [Wave 630] in this pass; the scene with the most
+// simultaneous bond changes has never been backward-cause peak-audited), DIALOGUE_CHARACTER_
+// MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence — distinct from Wave
+// 616's CHARACTER_MOMENT_ZONE_IMBALANCE, which checks four-zone bloat/empty distribution rather
+// than a contiguous run of absence), DIALOGUE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift !== 'neutral' × structural thirds — emotionalShift has only ever anchored
+// hand-rolled positive/negative filters in this pass, never the zone-cluster mode).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4077,6 +4086,76 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r672c.maxZoneCount} of the story's ${r672c.count} scenes where suspense actively rises (${Math.round((r672c.maxZoneCount / r672c.count) * 100)}%) cluster in the ${zoneName672c} third. Tension-building concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no rising pressure for dialogue to play against.`,
         suggestedFix: `Give at least one scene outside the ${zoneName672c} third a rising-suspense beat — spreading tension-building across the story lets dialogue in every structural third play against some mounting pressure.`,
+      });
+    }
+  }
+
+  // ── Wave 686: DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED, DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN,
+  //              DIALOGUE_EMOTION_ZONE_CLUSTER ─────────────────────────────────────────────────
+
+  // DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. relationshipShifts has only ever anchored an aftermath-void
+  // trigger (Wave 630) in this pass; never backward-cause peak-audited.
+  {
+    const r686a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r686a.fires) {
+      issues.push({
+        location: `scene ${r686a.peakIdx + 1} — peak relationship-shift density (${r686a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r686a.peakIdx + 1}, with ${r686a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — dialogue in that scene has no causal ground to stand on.`,
+        suggestedFix: `Give scene ${r686a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes with no character-moment purpose
+  // reaches 6. Distinct from Wave 616's CHARACTER_MOMENT_ZONE_IMBALANCE, which checks four-zone
+  // bloat/empty distribution rather than a contiguous run of absence — a story can have balanced
+  // zone counts while still containing one long unbroken stretch with no dedicated character beat.
+  {
+    const r686b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r686b.fires) {
+      issues.push({
+        location: `longest stretch with no character-moment scene: ${r686b.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r686b.longestRun} consecutive scenes with no scene purposed as a character moment at all, even though ${r686b.presentCount} scenes elsewhere are dedicated to character development. A long unbroken stretch with no dedicated character beat leaves dialogue running on plot mechanics alone for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r686b.longestRun}-scene stretch a character-moment purpose — a beat dedicated to a character's voice and interiority rather than plot momentum, keeping dialogue's personal dimension alive throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift !== 'neutral' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // emotionally-charged scenes, fires when >75% of them fall in a single structural third.
+  // emotionalShift has only ever anchored hand-rolled positive/negative filters in this pass;
+  // never the zone-cluster mode.
+  {
+    const r686c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r686c.fires) {
+      const zoneName686c = r686c.zoneNames[r686c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName686c} third — ${r686c.maxZoneCount}/${r686c.count} emotionally-charged scenes`,
+        rule: 'DIALOGUE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r686c.maxZoneCount} of the story's ${r686c.count} emotionally-charged scenes (${Math.round((r686c.maxZoneCount / r686c.count) * 100)}%) cluster in the ${zoneName686c} third. Emotional shift concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no emotional charge for dialogue to carry.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName686c} third a genuine emotional shift — spreading emotional charge across the story lets dialogue in every structural third carry some feeling, not only in one concentrated stretch.`,
       });
     }
   }

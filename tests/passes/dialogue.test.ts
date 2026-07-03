@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 686 — dialoguePass: dialogue relationship peak uncaused, dialogue character moment drought run, dialogue emotion zone cluster', async () => {
+    const makeRec686 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
+      sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing', payoffSetupIds: [], relationshipShifts: [],
+      emotionalShift: 'neutral', seededClueIds: [], dialogueHighlights: [], unresolvedClues: [],
+      visualBeats: [], purpose: 'complicate', slug: `s${sceneIdx}`, ...extra,
+    });
+    const buildScenes686 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD686 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // n=8; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs686a = Array.from({ length: 8 }, (_, i) => makeRec686(i,
+        i === 2 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] }
+        : i === 6 ? { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) }
+        : {}
+      ));
+      const res = await runD686(buildScenes686(8), recs686a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED'), 'DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs686an = Array.from({ length: 8 }, (_, i) => makeRec686(i,
+        i === 2 ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) }
+        : {}
+      ));
+      const res = await runD686(buildScenes686(8), recs686an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED'), 'DIALOGUE_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // 10 scenes; character-moment at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN fires when the longest no-character-moment run is ≥6', async () => {
+      const recs686b = Array.from({ length: 10 }, (_, i) => makeRec686(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runD686(buildScenes686(10), recs686b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN'), 'DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    // DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN no-fire:
+    // character-moment at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character-moment scenes are distributed without a long drought', async () => {
+      const recs686bn = Array.from({ length: 10 }, (_, i) => makeRec686(i,
+        (i === 0 || i === 4 || i === 9) ? { purpose: 'character_moment' } : {}
+      ));
+      const res = await runD686(buildScenes686(10), recs686bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN'), 'DIALOGUE_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; emotionally-charged scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_EMOTION_ZONE_CLUSTER fires when >75% of emotionally-charged scenes cluster in one third', async () => {
+      const recs686c = Array.from({ length: 9 }, (_, i) => makeRec686(i,
+        (i === 0 || i === 1 || i === 2) ? { emotionalShift: 'positive' } : {}
+      ));
+      const res = await runD686(buildScenes686(9), recs686c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_EMOTION_ZONE_CLUSTER'), 'DIALOGUE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_EMOTION_ZONE_CLUSTER no-fire:
+    // emotionally-charged scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_EMOTION_ZONE_CLUSTER does not fire when emotionally-charged scenes are distributed across thirds', async () => {
+      const recs686cn = Array.from({ length: 9 }, (_, i) => makeRec686(i,
+        (i === 0 || i === 4 || i === 7) ? { emotionalShift: 'negative' } : {}
+      ));
+      const res = await runD686(buildScenes686(9), recs686cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_EMOTION_ZONE_CLUSTER'), 'DIALOGUE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 672 — dialoguePass: dialogue clock delta peak uncaused, dialogue clock drought run, dialogue suspense zone cluster', async () => {
     const makeRec672 = (sceneIdx: number, extra: Record<string, any> = {}): any => ({
       sceneIdx, suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0,
