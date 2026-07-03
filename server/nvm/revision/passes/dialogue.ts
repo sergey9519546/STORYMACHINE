@@ -401,6 +401,16 @@
 // field), DIALOGUE_RESOLUTION_ZONE_CLUSTER (distribution/timing x purpose === 'resolution' x
 // structural thirds -- this purpose value has never been referenced anywhere in this pass; a
 // virgin field).
+//
+// Wave 882 additions (opens the twenty-second rotation cycle): DIALOGUE_RESOLUTION_DROUGHT_RUN
+// (run-based x purpose === 'resolution' absence -- completes 2 of 3 slots for this purpose
+// value alongside the zone-cluster mode added in Wave 868; peak mode conventionally skipped for
+// this categorical field), DIALOGUE_COMPLICATE_ZONE_CLUSTER (distribution/timing x purpose ===
+// 'complicate' x structural thirds -- this purpose value has never been referenced anywhere in
+// this pass; a virgin field), DIALOGUE_COMPLICATE_DROUGHT_RUN (run-based x purpose ===
+// 'complicate' absence -- completes 2 of 3 slots for this purpose value alongside the
+// zone-cluster mode added in this same wave; peak mode conventionally skipped for this
+// categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5158,6 +5168,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r868c.maxZoneCount / r868c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r868c.zoneNames[r868c.maxZoneIdx]} third. When every settling beat concentrates in one structural window, dialogue has no room to voice closure gradually before the ending delivers it all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r868c.zoneNames[r868c.maxZoneIdx]} third so dialogue's closing lines are distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 882: DIALOGUE_RESOLUTION_DROUGHT_RUN, DIALOGUE_COMPLICATE_ZONE_CLUSTER,
+  //              DIALOGUE_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // DIALOGUE_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 868 (peak mode conventionally skipped for this categorical field).
+  {
+    const r882a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r882a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r882a.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r882a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r882a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves dialogue with no closing lines to deliver for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r882a.longestRun}-scene stretch to resolve part of the story, so dialogue keeps voicing closure throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // DIALOGUE_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r882b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r882b.fires) {
+      issues.push({
+        location: `${r882b.zoneNames[r882b.maxZoneIdx]} third — ${r882b.maxZoneCount} of ${r882b.count} complicating scenes`,
+        rule: 'DIALOGUE_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r882b.maxZoneCount / r882b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r882b.zoneNames[r882b.maxZoneIdx]} third. When every complication lands in the same structural window, dialogue has no fresh trouble to react to anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r882b.zoneNames[r882b.maxZoneIdx]} third to complicate the story so dialogue keeps reacting to fresh trouble more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r882c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r882c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r882c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r882c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r882c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves dialogue with no fresh trouble to react to for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r882c.longestRun}-scene stretch to complicate the story so dialogue keeps reacting to fresh trouble throughout that stretch.`,
       });
     }
   }
