@@ -314,6 +314,14 @@
 // never been applied to it, completing the trio), CAUSALITY_PAYOFF_PEAK_UNCAUSED (single-peak
 // isolation/backward-cause × payoffSetupIds magnitude — Wave 685 applied the run-based drought
 // mode to payoffSetupIds; the backward-cause peak mode has never been applied to it).
+// Wave 755 additions (closes the twelfth rotation cycle, 742-755): CAUSALITY_PAYOFF_ZONE_CLUSTER
+// (distribution/timing × payoffSetupIds × structural thirds — Waves 685/741 applied the run-based
+// drought and backward-cause peak modes to payoffSetupIds; the zone-cluster mode has never been
+// applied to it, completing the trio), CAUSALITY_CLOCK_DROUGHT_RUN (run-based × clockRaised
+// absence — Wave 699 applied the zone-cluster mode to clockRaised; the drought-run mode has never
+// been applied to it), CAUSALITY_SUSPENSE_DROUGHT_RUN (run-based × suspenseDelta>0 absence — Wave
+// 699 applied the backward-cause peak mode to suspenseDelta; the drought-run mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4390,6 +4398,71 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for thread resolution (scene ${r741c.peakIdx + 1}, with ${r741c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the causal chain's sense of escalation.`,
         suggestedFix: `Give scene ${r741c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 755: CAUSALITY_PAYOFF_ZONE_CLUSTER, CAUSALITY_CLOCK_DROUGHT_RUN,
+  //              CAUSALITY_SUSPENSE_DROUGHT_RUN ────────────────────────────────────────────
+
+  // CAUSALITY_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when
+  // more than 75% of those scenes cluster in a single third. Waves 685/741 applied the run-based
+  // drought and backward-cause peak modes to payoffSetupIds; the zone-cluster mode has never been
+  // applied to it, completing the trio.
+  {
+    const r755a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r755a.fires) {
+      issues.push({
+        location: `${r755a.zoneNames[r755a.maxZoneIdx]} third — ${r755a.maxZoneCount} of ${r755a.count} payoff scenes`,
+        rule: 'CAUSALITY_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r755a.maxZoneCount / r755a.count) * 100)}% of the story's thread resolutions cluster in the ${r755a.zoneNames[r755a.maxZoneIdx]} third. When every payoff lands in the same structural window, the causal chain spends the rest of the story escalating without ever cashing in tension elsewhere.`,
+        suggestedFix: `Move at least one thread resolution outside the ${r755a.zoneNames[r755a.maxZoneIdx]} third so the causal chain's payoffs land more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clockRaised scenes overall, fires when the longest
+  // consecutive run of scenes with clockRaised false reaches 6. Wave 699 applied the zone-cluster
+  // mode to clockRaised; the drought-run mode has never been applied to it.
+  {
+    const r755b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r755b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r755b.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r755b.longestRun} consecutive scenes with the clock never raised at all, even though ${r755b.presentCount} scenes elsewhere do raise it. A long unbroken stretch where the deadline never tightens leaves the causal chain without any mechanical pressure driving it for an extended run.`,
+        suggestedFix: `Raise the clock somewhere within the ${r755b.longestRun}-scene stretch so the causal chain keeps a mechanical pressure acting on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SUSPENSE_DROUGHT_RUN — Run-based × suspenseDelta>0 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 suspense-positive scenes overall,
+  // fires when the longest consecutive run of scenes with no rising tension reaches 6. Wave 699
+  // applied the backward-cause peak mode to suspenseDelta; the drought-run mode has never been
+  // applied to it.
+  {
+    const r755c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r755c.fires) {
+      issues.push({
+        location: `longest stretch with no rising suspense: ${r755c.longestRun} consecutive scenes`,
+        rule: 'CAUSALITY_SUSPENSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r755c.longestRun} consecutive scenes with no rise in tension at all, even though ${r755c.presentCount} scenes elsewhere do spike. A long unbroken stretch with nothing tightening the danger leaves the causal chain without mounting pressure driving events forward for an extended run.`,
+        suggestedFix: `Raise suspense somewhere within the ${r755c.longestRun}-scene stretch so the causal chain keeps mounting pressure acting on events throughout that stretch.`,
       });
     }
   }

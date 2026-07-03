@@ -1247,6 +1247,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 755 — causalityPass: causality payoff zone cluster, causality clock drought run, causality suspense drought run', async () => {
+    const runCA755 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs755a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs755a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs755a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs755a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runCA755(recs755a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_ZONE_CLUSTER'), 'CAUSALITY_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // CAUSALITY_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CAUSALITY_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs755an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs755an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs755an[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs755an[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runCA755(recs755an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_ZONE_CLUSTER'), 'CAUSALITY_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_CLOCK_DROUGHT_RUN fire:
+    // n=10; clockRaised at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CAUSALITY_CLOCK_DROUGHT_RUN fires when the longest no-clock-raised run is ≥6', async () => {
+      const recs755b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs755b[0] = makeSharedRecord(0, { clockRaised: true });
+      recs755b[1] = makeSharedRecord(1, { clockRaised: true });
+      recs755b[2] = makeSharedRecord(2, { clockRaised: true });
+      recs755b[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runCA755(recs755b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DROUGHT_RUN'), 'CAUSALITY_CLOCK_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_CLOCK_DROUGHT_RUN no-fire:
+    // clockRaised at 0, 4, 9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CAUSALITY_CLOCK_DROUGHT_RUN does not fire when clock raises are distributed without a long drought', async () => {
+      const recs755bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs755bn[0] = makeSharedRecord(0, { clockRaised: true });
+      recs755bn[4] = makeSharedRecord(4, { clockRaised: true });
+      recs755bn[9] = makeSharedRecord(9, { clockRaised: true });
+      const res = await runCA755(recs755bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_DROUGHT_RUN'), 'CAUSALITY_CLOCK_DROUGHT_RUN should not fire');
+    });
+
+    // CAUSALITY_SUSPENSE_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 have rising suspense (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('CAUSALITY_SUSPENSE_DROUGHT_RUN fires when the longest no-rising-suspense run reaches 6', async () => {
+      const recs755c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs755c[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs755c[1] = makeSharedRecord(1, { suspenseDelta: 1 });
+      recs755c[2] = makeSharedRecord(2, { suspenseDelta: 1 });
+      const res = await runCA755(recs755c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SUSPENSE_DROUGHT_RUN'), 'CAUSALITY_SUSPENSE_DROUGHT_RUN should fire');
+    });
+
+    // CAUSALITY_SUSPENSE_DROUGHT_RUN no-fire:
+    // rising-suspense scenes spread out so no gap reaches 6 consecutive scenes
+    it('CAUSALITY_SUSPENSE_DROUGHT_RUN does not fire when rising suspense is spread through the story', async () => {
+      const recs755cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs755cn[0] = makeSharedRecord(0, { suspenseDelta: 1 });
+      recs755cn[3] = makeSharedRecord(3, { suspenseDelta: 1 });
+      recs755cn[6] = makeSharedRecord(6, { suspenseDelta: 1 });
+      recs755cn[9] = makeSharedRecord(9, { suspenseDelta: 1 });
+      const res = await runCA755(recs755cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SUSPENSE_DROUGHT_RUN'), 'CAUSALITY_SUSPENSE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 741 — causalityPass: causality clock delta zone cluster, causality relationship zone cluster, causality payoff peak uncaused', async () => {
     const runCA741 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
