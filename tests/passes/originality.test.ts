@@ -1210,6 +1210,113 @@ He sits at his desk.
   });
 
 
+  describe('Wave 606 — originalityPass: clock raised zone cluster, open thread curiosity decoupled, scene staging zone imbalance', async () => {
+    // originalityPass caps its returned issues to the top 8 by severity (critical, then major,
+    // then minor) — see the truncation block at the end of the pass. All three Wave 606 checks
+    // are 'minor', so every fixture below cycles purpose/emotion/dialogue/slug/sentence per scene
+    // (rather than holding them constant) to avoid also tripping UNIFORM_SCENE_PURPOSES,
+    // PURPOSE_CONSECUTIVE_RUN, EMOTIONAL_ARC_PLATEAU, or SCENE_SHAPE_TEMPLATING, any one of which
+    // would crowd the target 'minor' rule out of the truncated result even though it fired
+    // internally (the exact pitfall documented in the Wave 592 block above).
+    const PURPOSE_POOL_606 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_606 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_606 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor606 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec606 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor606(idx),
+      emotionalShift: EMOTION_POOL_606[idx % EMOTION_POOL_606.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: idx % 2 === 0 ? [`alice: believes point ${idx}`] : [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_606[idx % PURPOSE_POOL_606.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain606 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor606(i)}\n\n${SENTENCE_POOL_606[i % SENTENCE_POOL_606.length]}`).join('\n\n');
+    const runO606 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain606(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // CLOCK_RAISED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clockRaised at 0,1,2 → 100% in opening third
+    it('CLOCK_RAISED_ZONE_CLUSTER fires when >75% of clockRaised scenes cluster in one third', async () => {
+      const recs606a = Array.from({ length: 9 }, (_, i) => makeRec606(i, { clockRaised: i === 0 || i === 1 || i === 2 }));
+      const res = await runO606(recs606a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_ZONE_CLUSTER'), 'CLOCK_RAISED_ZONE_CLUSTER should fire');
+    });
+
+    // CLOCK_RAISED_ZONE_CLUSTER no-fire:
+    // clockRaised at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CLOCK_RAISED_ZONE_CLUSTER does not fire when clockRaised scenes are distributed across thirds', async () => {
+      const recs606an = Array.from({ length: 9 }, (_, i) => makeRec606(i, { clockRaised: i === 0 || i === 4 || i === 7 }));
+      const res = await runO606(recs606an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_RAISED_ZONE_CLUSTER'), 'CLOCK_RAISED_ZONE_CLUSTER should not fire');
+    });
+
+    // OPEN_THREAD_CURIOSITY_DECOUPLED fire:
+    // n=8; open threads at 0,1 (no curiosity spike); curiosity spikes at 2,3 (no open thread) → zero overlap
+    it('OPEN_THREAD_CURIOSITY_DECOUPLED fires when open-thread scenes and curiosity-spike scenes never overlap', async () => {
+      const recs606b = Array.from({ length: 8 }, (_, i) => makeRec606(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['unpaid-clue'] }
+        : i === 2 || i === 3 ? { curiosityDelta: 1 }
+        : {}
+      ));
+      const res = await runO606(recs606b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_CURIOSITY_DECOUPLED'), 'OPEN_THREAD_CURIOSITY_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_CURIOSITY_DECOUPLED no-fire:
+    // scene 2 carries BOTH an open thread and a curiosity spike → overlap exists
+    it('OPEN_THREAD_CURIOSITY_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs606bn = Array.from({ length: 8 }, (_, i) => makeRec606(i,
+        i === 0 || i === 1 ? { unresolvedClues: ['unpaid-clue'] }
+        : i === 2 ? { unresolvedClues: ['unpaid-clue'], curiosityDelta: 1 }
+        : i === 3 ? { curiosityDelta: 1 }
+        : {}
+      ));
+      const res = await runO606(recs606bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_CURIOSITY_DECOUPLED'), 'OPEN_THREAD_CURIOSITY_DECOUPLED should not fire');
+    });
+
+    // SCENE_STAGING_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('SCENE_STAGING_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs606c = Array.from({ length: 12 }, (_, i) => makeRec606(i, {
+        visualBeats: (i === 6 || i === 9 || i === 10 || i === 11) ? ['pockets the key', 'checks the hallway'] : [],
+      }));
+      const res = await runO606(recs606c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SCENE_STAGING_ZONE_IMBALANCE'), 'SCENE_STAGING_ZONE_IMBALANCE should fire');
+    });
+
+    // SCENE_STAGING_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('SCENE_STAGING_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs606cn = Array.from({ length: 12 }, (_, i) => makeRec606(i, {
+        visualBeats: (i === 1 || i === 4 || i === 7 || i === 10) ? ['pockets the key', 'checks the hallway'] : [],
+      }));
+      const res = await runO606(recs606cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SCENE_STAGING_ZONE_IMBALANCE'), 'SCENE_STAGING_ZONE_IMBALANCE should not fire');
+    });
+  });
+
+
   describe('Wave 592 — originalityPass: dramatic turn zone cluster, purpose consecutive run, scene closer ellipsis flood', async () => {
     const makeRec592 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

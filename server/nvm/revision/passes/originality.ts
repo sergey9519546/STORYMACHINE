@@ -201,9 +201,16 @@
 // dialogue lines] — this is the first check in this pass to isolate a fixed STRUCTURAL POSITION
 // within each scene, the closer, mirroring the extensive existing opener-position coverage but for
 // the opposite end of the scene).
+// Wave 606 additions (built on the shared checks library, audit M2.2): CLOCK_RAISED_ZONE_CLUSTER
+// (distribution/timing × clockRaised × structural thirds — first use of clockRaised anywhere in
+// this 105-rule pass), OPEN_THREAD_CURIOSITY_DECOUPLED (co-occurrence/decoupling ×
+// unresolvedClues × curiosityDelta — first use of either field in this pass), SCENE_STAGING_
+// ZONE_IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of
+// visualBeats anywhere in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
@@ -3737,6 +3744,89 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Vary how scenes end: let some close on a hard action, a declarative line, an interruption, or a sound cue instead of a trailing ellipsis. Reserve the ellipsis exit for the scenes where suspended thought is specifically the point — its impact depends on it being the exception, not the rule.`,
         });
       }
+    }
+  }
+
+  // ── Wave 606: CLOCK_RAISED_ZONE_CLUSTER, OPEN_THREAD_CURIOSITY_DECOUPLED,
+  //              SCENE_STAGING_ZONE_IMBALANCE ────────────────────────────────────────────────
+
+  // CLOCK_RAISED_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 clockRaised scenes, more than 75%
+  // falling in a single structural third → fire. First use of the clockRaised field anywhere in
+  // this 105-rule pass — every existing check here operates on lexical/textual signals (dialogue
+  // and action-line patterns) or the purpose/dramaticTurn record channels; this is the first to
+  // audit where the deadline-pressure device sits structurally. When the story's clock is raised
+  // almost exclusively in one third, the audience learns which stretch of the script to expect
+  // urgency in and which stretches are exempt from it — a predictable placement of a genre device,
+  // the same kind of learned-rhythm problem this pass exists to catch in dialogue and action text.
+  // Distinct from DRAMATIC_TURN_ZONE_CLUSTER (Wave 592: dramaticTurn channel, not clockRaised).
+  {
+    const r606a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r606a.fires) {
+      const zoneName606a = r606a.zoneNames[r606a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName606a} third — ${r606a.maxZoneCount}/${r606a.count} clock-raising scenes`,
+        rule: 'CLOCK_RAISED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r606a.maxZoneCount} of the story's ${r606a.count} clock-raising scenes (${Math.round((r606a.maxZoneCount / r606a.count) * 100)}%) cluster in the ${zoneName606a} third. Deadline pressure is introduced almost exclusively in that stretch of the story — once the audience notices the pattern, they learn which third to expect urgency in and read every scene outside it as exempt from time pressure by default.`,
+        suggestedFix: `Raise or reinforce the clock in at least one scene outside the ${zoneName606a} third — even a brief reminder of the deadline in an underused zone keeps time pressure structurally unpredictable rather than confined to a single learned stretch.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_CURIOSITY_DECOUPLED — Co-occurrence/decoupling × unresolvedClues ×
+  // curiosityDelta. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8,
+  // ≥2 scenes carrying outstanding clue-debt, ≥2 scenes with a curiosity spike. Zero overlap →
+  // fire. First use of both the unresolvedClues and curiosityDelta fields together anywhere in
+  // this pass. When the scenes that carry open, unpaid questions never coincide with the scenes
+  // that spike the audience's curiosity, the mystery engine and the debt it should be running on
+  // are disconnected — curiosity spikes arrive divorced from what's actually still unresolved, a
+  // formulaic pattern where the two signals that should reinforce each other instead run on
+  // predictable, separate schedules.
+  {
+    const r606b = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r606b.fires) {
+      issues.push({
+        location: `${r606b.aCount} open-thread scene(s), ${r606b.bCount} curiosity-spike scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_CURIOSITY_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r606b.aCount} scenes carrying outstanding, unpaid clue-debt never coincide with the ${r606b.bCount} scenes where curiosity spikes — the mystery engine and the debt it should be drawing on run on entirely separate tracks. Curiosity spikes that never intersect with what's actually left unresolved read as manufactured rather than earned, since the audience's wondering isn't visibly tied to the specific questions the story is holding open.`,
+        suggestedFix: `Let at least one curiosity spike land in a scene that is also carrying open clue-debt — the audience's heightened wondering should visibly connect to a specific unresolved thread rather than arriving on its own unconnected schedule.`,
+      });
+    }
+  }
+
+  // SCENE_STAGING_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass. A story whose physical staging clusters in one
+  // act and vanishes from another has a learnable structural rhythm — the audience comes to expect
+  // physically staged scenes only in certain stretches, the same predictability problem this pass
+  // tracks in dialogue and action-line templating, applied here to the distribution of staged
+  // physical description itself.
+  {
+    const r606c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r606c.fires) {
+      const emptyNames606c = r606c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName606c = FOUR_ZONE_NAMES[r606c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames606c} empty; ${bloatName606c} has ${r606c.counts[r606c.bloatZoneIdx]}/${r606c.totalCount} visually dense scenes`,
+        rule: 'SCENE_STAGING_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r606c.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName606c} contains ${r606c.counts[r606c.bloatZoneIdx]} of them (${Math.round((r606c.counts[r606c.bloatZoneIdx] / r606c.totalCount) * 100)}%) while ${emptyNames606c} contains none. Physical staging bloats in one structural quarter and vanishes from another, creating a learnable rhythm where staged scenes only ever appear in certain stretches of the script.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames606c}, or thin out ${bloatName606c}'s concentration so staged and unstaged scenes both recur unpredictably throughout the story rather than segregating by act.`,
+      });
     }
   }
 
