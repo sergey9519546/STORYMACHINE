@@ -195,10 +195,18 @@
 // imbalance (underweight/bloat × dialogueHighlights × four structural zones, built on
 // checkZoneImbalance — one zone silent while another holds ≥50% of all highlights; the zone-based
 // sibling of the drought-run check above, both first uses of dialogueHighlights in this file).
+// Wave 611 additions (built on the shared checks library, audit M2.2): VISUAL_BEAT_STRUCTURAL_
+// IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of visualBeats
+// anywhere in this 110-rule pass, its last completely untouched record field), PAYOFF_SCENE_TURN_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × dramaticTurn — payoffSetupIds had exactly
+// one prior incidental OR-condition use in this file, never as its own standalone signal),
+// PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (sequence/aftermath × payoff trigger → dialogueHighlights
+// absence — first aftermath-mode check on the dialogueHighlights channel in this file, which had
+// only drought-run and zone-imbalance coverage from Wave 597).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkDroughtRun, checkZoneImbalance, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
@@ -3314,6 +3322,89 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r597c.totalCount} dialogue-highlight scenes (scenes where a character states a tracked belief) are unevenly distributed across its four structural zones: ${bloatName597c} contains ${r597c.counts[r597c.bloatZoneIdx]} of them (${Math.round((r597c.counts[r597c.bloatZoneIdx] / r597c.totalCount) * 100)}%) while ${emptyNames597c} contains none. The story's spoken-conviction engine bloats in one zone and vanishes from another: one structural quarter carries a burst of characters stating what they believe, while another passes with no one's convictions on record.`,
         suggestedFix: `Redistribute tracked belief-statements: move at least one dialogue highlight from ${bloatName597c} into the empty zone(s) — ${emptyNames597c} — so every structural quarter carries some evidence of characters stating what they think is true.`,
+      });
+    }
+  }
+
+  // ── Wave 611: VISUAL_BEAT_STRUCTURAL_IMBALANCE, PAYOFF_SCENE_TURN_DECOUPLED,
+  //              PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID ───────────────────────────────────
+
+  // VISUAL_BEAT_STRUCTURAL_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this 110-rule pass — its last completely untouched
+  // record field, despite this file's macro-structure lens already covering revelation, clock,
+  // suspense, curiosity, dialogueHighlights, and unresolvedClues trends. Distinct from
+  // DIALOGUE_HIGHLIGHT_ZONE_IMBALANCE (Wave 597: same template, dialogueHighlights channel).
+  {
+    const r611a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r611a.fires) {
+      const emptyNames611a = r611a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName611a = FOUR_ZONE_NAMES[r611a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames611a} empty; ${bloatName611a} has ${r611a.counts[r611a.bloatZoneIdx]}/${r611a.totalCount} visually dense scenes`,
+        rule: 'VISUAL_BEAT_STRUCTURAL_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r611a.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName611a} contains ${r611a.counts[r611a.bloatZoneIdx]} of them (${Math.round((r611a.counts[r611a.bloatZoneIdx] / r611a.totalCount) * 100)}%) while ${emptyNames611a} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's macro-structural balance between staged and unstaged scenes an uneven rhythm.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames611a}, or thin out ${bloatName611a}'s concentration by letting one of its visually dense scenes lean more on dialogue instead. A more even spread keeps physical presence active across the story's full structural range.`,
+      });
+    }
+  }
+
+  // PAYOFF_SCENE_TURN_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × dramaticTurn. Built
+  // on checkCoOccurrenceDecoupled from the shared checks library. n≥8, ≥2 payoff scenes, ≥2
+  // dramatic-turn scenes. Zero overlap → fire. A thread resolving and a structural pivot never
+  // happen in the same scene — every payoff lands in a scene with no reversal, revelation, or
+  // turning point, and every pivot lands in a scene where nothing is being resolved. First
+  // standalone use of the payoffSetupIds field in this file — it had exactly one prior use, as an
+  // incidental OR-condition inside a different check, never as its own signal. Distinct from
+  // PAYOFF_DRAMATIC_TURN_DECOUPLED (payoff.ts, Wave 342: same concept in a different pass, whose
+  // own coverage matrix this check doesn't affect) — the two files' payoff/turn checks are
+  // independent per-file coverage, not a duplicate within this pass.
+  {
+    const r611b = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r611b.fires) {
+      issues.push({
+        location: `${r611b.aCount} payoff scene(s), ${r611b.bCount} dramatic-turn scene(s) — zero overlap`,
+        rule: 'PAYOFF_SCENE_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r611b.aCount} scenes where a planted thread resolves never coincide with the ${r611b.bCount} scenes carrying a dramatic turn — thread resolution and structural pivot run on entirely separate tracks. A payoff often lands hardest when it doubles as a pivot — the resolved thread reframes what a character will do next — and when the two never combine, resolutions read as closing a loop rather than propelling the story forward.`,
+        suggestedFix: `Let at least one payoff scene also carry a dramatic turn — the resolved thread should reframe a choice, trigger a reversal, or reveal something that changes the story's direction, rather than simply closing an open question in isolation.`,
+      });
+    }
+  }
+
+  // PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoff trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥3 scenes anywhere with a dialogue highlight, a
+  // 2-scene lookahead window. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while highlighted dialogue does occur elsewhere in the story. First
+  // aftermath-mode check on the dialogueHighlights channel in this file — Wave 597 covered it
+  // with drought-run and zone-imbalance only. Distinct from DIALOGUE_HIGHLIGHT_DROUGHT_RUN
+  // (Wave 597: global consecutive-absence run, not tied to a specific trigger) and from
+  // PAYOFF_SCENE_TURN_DECOUPLED above (payoff is the same-scene co-occurrence subject there, not
+  // the windowed trigger here).
+  {
+    const r611c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r611c.fires) {
+      issues.push({
+        location: `${r611c.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r611c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r611c.aftermathCount} such scenes exist elsewhere in the script. A resolution's aftermath is where a character often gets to say what the resolved thread meant; when that aftermath never carries a memorable line, the payoff's emotional residue goes unvoiced.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a line worth remembering — a character naming what the resolution cost or what it means now that it's settled. Give the payoff's aftermath a voice, not just a structural close.`,
       });
     }
   }
