@@ -359,6 +359,17 @@
 // (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose value
 // has only ever appeared combined with 'climax' inside a co-occurrence-decoupling check; it has
 // never been audited as its own standalone signal by any of the three shared-library trio modes).
+//
+// Wave 826 additions (opens the eighteenth rotation cycle): DIALOGUE_TURNING_POINT_DROUGHT_RUN
+// (run-based × purpose === 'turning_point' absence — completes 2 of 3 slots for this purpose
+// value alongside the zone-cluster mode added in Wave 812; peak mode conventionally skipped for
+// this categorical field), DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER (distribution/timing ×
+// purpose === 'introduce_conflict' × structural thirds — this purpose value has never been
+// referenced anywhere in this pass; a virgin field), DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'negative' × structural thirds — distinct from
+// DIALOGUE_EMOTION_ZONE_CLUSTER [Wave 686], which tests combined non-neutral emotionalShift
+// [either valence]; this isolates the negative valence alone, which none of the three
+// shared-library trio modes has ever done on its own).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4850,6 +4861,72 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r812c.maxZoneCount / r812c.count) * 100)}% of the story's turning-point scenes cluster in the ${r812c.zoneNames[r812c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, dialogue has no room to voice reaction to a pivot anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r812c.zoneNames[r812c.maxZoneIdx]} third as a turning point so dialogue keeps voicing reaction to redirections more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 826: DIALOGUE_TURNING_POINT_DROUGHT_RUN, DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // DIALOGUE_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall,
+  // fires when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 812 (peak mode conventionally skipped for this categorical field).
+  {
+    const r826a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r826a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r826a.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r826a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r826a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves dialogue with no pivot to react to for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r826a.longestRun}-scene stretch as a turning point so dialogue keeps a pivot to react to throughout that stretch.`,
+      });
+    }
+  }
+
+  // DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r826b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r826b.fires) {
+      issues.push({
+        location: `${r826b.zoneNames[r826b.maxZoneIdx]} third — ${r826b.maxZoneCount} of ${r826b.count} conflict-introducing scenes`,
+        rule: 'DIALOGUE_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r826b.maxZoneCount / r826b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r826b.zoneNames[r826b.maxZoneIdx]} third. When every new front of conflict opens in the same structural window, dialogue has no room to voice fresh friction anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r826b.zoneNames[r826b.maxZoneIdx]} third to introduce conflict so dialogue keeps voicing fresh friction more evenly across the story.`,
+      });
+    }
+  }
+
+  // DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Distinct from DIALOGUE_EMOTION_ZONE_CLUSTER (Wave 686), which tests combined non-neutral
+  // emotionalShift (either valence); this isolates the negative valence alone.
+  {
+    const r826c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r826c.fires) {
+      issues.push({
+        location: `${r826c.zoneNames[r826c.maxZoneIdx]} third — ${r826c.maxZoneCount} of ${r826c.count} negative-emotion scenes`,
+        rule: 'DIALOGUE_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r826c.maxZoneCount / r826c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r826c.zoneNames[r826c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, dialogue carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r826c.zoneNames[r826c.maxZoneIdx]} third so dialogue registers its emotional cost more evenly across the story.`,
       });
     }
   }
