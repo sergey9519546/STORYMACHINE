@@ -361,6 +361,17 @@
 // it), CONFLICT_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment'
 // absence — completing 2 of 3 slots for this purpose value alongside the zone-cluster mode
 // added in this same wave; peak mode conventionally skipped for this categorical field).
+//
+// Wave 828 additions: CONFLICT_TURNING_POINT_ZONE_CLUSTER (distribution/timing × purpose ===
+// 'turning_point' × structural thirds — this purpose value has never been referenced anywhere in
+// this pass; distinct from CONFLICT_TURN_ZONE_CLUSTER [Wave 786], which audits the dramaticTurn
+// free-text field, not this purpose enum value), CONFLICT_TURNING_POINT_DROUGHT_RUN (run-based ×
+// purpose === 'turning_point' absence — completes 2 of 3 slots for this purpose value alongside
+// the zone-cluster mode added in this same wave; peak mode conventionally skipped for this
+// categorical field), CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'positive' × structural thirds — mirrors the negative-valence trio completed
+// in Wave 800; the positive valence has never been isolated by any of the three shared-library
+// trio modes in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4810,6 +4821,73 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r814c.longestRun} consecutive scenes with no character-moment purpose at all, even though ${r814c.presentCount} scenes elsewhere pause for interior reflection. A long unbroken stretch with nothing but escalation leaves the conflict without a beat to let its cost register on the characters for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r814c.longestRun}-scene stretch as a character moment so the conflict keeps registering its cost on the characters throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 828: CONFLICT_TURNING_POINT_ZONE_CLUSTER, CONFLICT_TURNING_POINT_DROUGHT_RUN,
+  //              CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CONFLICT_TURNING_POINT_ZONE_CLUSTER — Distribution/timing × purpose === 'turning_point' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // turning-point scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — distinct from
+  // CONFLICT_TURN_ZONE_CLUSTER (Wave 786), which audits the dramaticTurn free-text field, not
+  // this purpose enum value.
+  {
+    const r828a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r828a.fires) {
+      issues.push({
+        location: `${r828a.zoneNames[r828a.maxZoneIdx]} third — ${r828a.maxZoneCount} of ${r828a.count} turning-point scenes`,
+        rule: 'CONFLICT_TURNING_POINT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r828a.maxZoneCount / r828a.count) * 100)}% of the story's turning-point scenes cluster in the ${r828a.zoneNames[r828a.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the conflict has no redirection testing it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r828a.zoneNames[r828a.maxZoneIdx]} third as a turning point so the conflict keeps facing redirection more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall,
+  // fires when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r828b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r828b.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r828b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r828b.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r828b.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the conflict coasting without a pivot for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r828b.longestRun}-scene stretch as a turning point so the conflict keeps facing redirection throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive'
+  // × structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Mirrors the negative-valence trio completed in Wave 800; the positive valence has never been
+  // isolated by any of the three shared-library trio modes in this pass.
+  {
+    const r828c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r828c.fires) {
+      issues.push({
+        location: `${r828c.zoneNames[r828c.maxZoneIdx]} third — ${r828c.maxZoneCount} of ${r828c.count} positive-emotion scenes`,
+        rule: 'CONFLICT_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r828c.maxZoneCount / r828c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r828c.zoneNames[r828c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the conflict delivers its emotional payoff in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r828c.zoneNames[r828c.maxZoneIdx]} third so the conflict delivers its emotional payoff more evenly across the story.`,
       });
     }
   }
