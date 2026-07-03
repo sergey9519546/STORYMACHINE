@@ -1247,6 +1247,67 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 867 — causalityPass: causality complicate zone cluster, causality turn zone cluster, causality curiosity zone cluster', async () => {
+    const runCA867 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // CAUSALITY_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('CAUSALITY_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs867a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA867(recs867a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_ZONE_CLUSTER'), 'CAUSALITY_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs867an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runCA867(recs867an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_COMPLICATE_ZONE_CLUSTER'), 'CAUSALITY_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramaticTurn present at 0,1,2 → 100% opening third
+    it('CAUSALITY_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs867b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2].includes(i) ? 'a shift occurs' : 'nothing' }),
+      );
+      const res = await runCA867(recs867b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_ZONE_CLUSTER'), 'CAUSALITY_TURN_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes spread across thirds', async () => {
+      const recs867bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 4, 8].includes(i) ? 'a shift occurs' : 'nothing' }),
+      );
+      const res = await runCA867(recs867bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_ZONE_CLUSTER'), 'CAUSALITY_TURN_ZONE_CLUSTER should not fire');
+    });
+
+    // CAUSALITY_CURIOSITY_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; curiosityDelta>0 at 0,1,2 → 100% opening third
+    it('CAUSALITY_CURIOSITY_ZONE_CLUSTER fires when >75% of curiosity-raising scenes cluster in one third', async () => {
+      const recs867c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 1, 2].includes(i) ? 2 : 0 }),
+      );
+      const res = await runCA867(recs867c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CURIOSITY_ZONE_CLUSTER'), 'CAUSALITY_CURIOSITY_ZONE_CLUSTER should fire');
+    });
+
+    it('CAUSALITY_CURIOSITY_ZONE_CLUSTER does not fire when curiosity-raising scenes spread across thirds', async () => {
+      const recs867cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { curiosityDelta: [0, 4, 8].includes(i) ? 2 : 0 }),
+      );
+      const res = await runCA867(recs867cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CURIOSITY_ZONE_CLUSTER'), 'CAUSALITY_CURIOSITY_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 853 — causalityPass: causality climax drought run, causality resolution drought run, causality establish world drought run', async () => {
     const runCA853 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

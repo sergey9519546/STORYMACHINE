@@ -409,6 +409,17 @@
 // CAUSALITY_ESTABLISH_WORLD_DROUGHT_RUN (run-based × purpose === 'establish_world' absence —
 // completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
 // 839; peak mode conventionally skipped for this categorical field).
+//
+// Wave 867 additions (closes the twentieth rotation cycle, 854-867): CAUSALITY_COMPLICATE_
+// ZONE_CLUSTER (distribution/timing x purpose === 'complicate' x structural thirds -- this
+// purpose value has never been referenced anywhere in this pass; a virgin field),
+// CAUSALITY_TURN_ZONE_CLUSTER (distribution/timing x dramaticTurn !== 'nothing' x structural
+// thirds -- completes 2 of 3 slots for this signal alongside the run-based drought mode added
+// in Wave 769; the distributional zone-cluster mode has never been applied to it),
+// CAUSALITY_CURIOSITY_ZONE_CLUSTER (distribution/timing x curiosityDelta>0 x structural thirds
+// -- completes 2 of 3 slots for this signal alongside the run-based drought mode added in Wave
+// 783; the shared-library backward-cause peak mode has never been applied to curiosityDelta
+// magnitude in this pass and remains open for a future wave).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5026,6 +5037,73 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r853c.longestRun} consecutive scenes with no world-establishing purpose at all, even though ${r853c.presentCount} scenes elsewhere ground the audience in setting or rules. A long unbroken stretch with no grounding leaves the causal chain without fresh ground to build fresh cause-and-effect from for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r853c.longestRun}-scene stretch to establish the world so the causal chain keeps fresh ground to build from throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 867: CAUSALITY_COMPLICATE_ZONE_CLUSTER, CAUSALITY_TURN_ZONE_CLUSTER,
+  //              CAUSALITY_CURIOSITY_ZONE_CLUSTER ──────────────────────────────────────
+
+  // CAUSALITY_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r867a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r867a.fires) {
+      issues.push({
+        location: `${r867a.zoneNames[r867a.maxZoneIdx]} third — ${r867a.maxZoneCount} of ${r867a.count} complicating scenes`,
+        rule: 'CAUSALITY_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r867a.maxZoneCount / r867a.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r867a.zoneNames[r867a.maxZoneIdx]} third. When every complication lands in the same structural window, the causal chain stops deepening its cause-and-effect anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r867a.zoneNames[r867a.maxZoneIdx]} third to complicate the story so the causal chain keeps deepening its cause-and-effect more evenly across the story.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn !== 'nothing' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // scenes carrying a dramatic turn, fires when more than 75% of them fall in a single
+  // structural third. Completes 2 of 3 slots for this signal alongside the run-based drought
+  // mode added in Wave 769; the distributional zone-cluster mode has never been applied to it.
+  {
+    const r867b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r867b.fires) {
+      issues.push({
+        location: `${r867b.zoneNames[r867b.maxZoneIdx]} third — ${r867b.maxZoneCount} of ${r867b.count} scenes with a dramatic turn`,
+        rule: 'CAUSALITY_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r867b.maxZoneCount / r867b.count) * 100)}% of the story's scenes with a dramatic turn cluster in the ${r867b.zoneNames[r867b.maxZoneIdx]} third. When every pivot concentrates in one structural window, the causal chain's forward motion is confined to a single part of the story instead of driving it throughout.`,
+        suggestedFix: `Introduce a dramatic turn outside the ${r867b.zoneNames[r867b.maxZoneIdx]} third so the causal chain keeps pivoting the story forward more evenly across its full length.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CURIOSITY_ZONE_CLUSTER — Distribution/timing × curiosityDelta>0 × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes with a
+  // positive curiosity charge, fires when more than 75% of them fall in a single structural
+  // third. Completes 2 of 3 slots for this signal alongside the run-based drought mode added
+  // in Wave 783; the shared-library backward-cause peak mode has never been applied to
+  // curiosityDelta magnitude in this pass and remains open for a future wave.
+  {
+    const r867c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.curiosityDelta > 0,
+    });
+    if (r867c.fires) {
+      issues.push({
+        location: `${r867c.zoneNames[r867c.maxZoneIdx]} third — ${r867c.maxZoneCount} of ${r867c.count} curiosity-raising scenes`,
+        rule: 'CAUSALITY_CURIOSITY_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r867c.maxZoneCount / r867c.count) * 100)}% of the story's curiosity-raising scenes cluster in the ${r867c.zoneNames[r867c.maxZoneIdx]} third. When every spike of wonder concentrates in one structural window, the causal chain's engine for open questions runs dry everywhere else in the story.`,
+        suggestedFix: `Introduce a curiosity-raising beat outside the ${r867c.zoneNames[r867c.maxZoneIdx]} third so the causal chain keeps generating open questions more evenly across the story.`,
       });
     }
   }
