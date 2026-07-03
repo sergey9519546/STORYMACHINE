@@ -323,6 +323,15 @@
 // uses checkZoneImbalance, a different shared-library helper testing deficit-vs-surplus across
 // zones, not the general thirds-based >75%-concentration test that checkZoneCluster performs;
 // none of the three trio modes has ever been applied to revelation as the primary signal).
+// Wave 809 additions: VOICE_REVELATION_DROUGHT_RUN (run-based × revelation absence — completing
+// 2 of 3 slots for revelation alongside the zone-cluster mode added in Wave 795),
+// VOICE_REVELATION_PEAK_UNCAUSED (backward-cause × revelation-as-magnitude [0/1] × 2-scene
+// lookback, anchored on the FIRST revelation scene — completes the trio for revelation; hasCause
+// deliberately omits revelation to avoid circularity), VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER
+// (distribution/timing × emotionalShift === 'negative' × structural thirds — negative-specific
+// emotionalShift has only ever appeared inside a combined co-occurrence check [elevated-tone-vs-
+// negative-shift]; none of the three shared-library trio modes has ever isolated this valence on
+// its own).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4889,6 +4898,73 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r795c.maxZoneCount / r795c.count) * 100)}% of the story's revelation scenes cluster in the ${r795c.zoneNames[r795c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the story's voice has no fresh truth to react to anywhere else across the story.`,
         suggestedFix: `Move at least one revelation outside the ${r795c.zoneNames[r795c.maxZoneIdx]} third so the story's voice keeps reacting to new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 809: VOICE_REVELATION_DROUGHT_RUN, VOICE_REVELATION_PEAK_UNCAUSED,
+  //              VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // VOICE_REVELATION_DROUGHT_RUN — Run-based × revelation absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 revelation scenes overall, fires when the longest
+  // consecutive run of scenes with no revelation reaches 6. Completing 2 of 3 slots for
+  // revelation alongside the zone-cluster mode added in Wave 795.
+  {
+    const r809a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.revelation != null,
+    });
+    if (r809a.fires) {
+      issues.push({
+        location: `longest stretch with no revelation: ${r809a.longestRun} consecutive scenes`,
+        rule: 'VOICE_REVELATION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r809a.longestRun} consecutive scenes with no revelation at all, even though ${r809a.presentCount} scenes elsewhere disclose a truth. A long unbroken stretch with nothing new coming to light leaves the story's voice with no fresh disclosure to react to for an extended run.`,
+        suggestedFix: `Let a truth surface somewhere within the ${r809a.longestRun}-scene stretch so the story's voice keeps reacting to new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_PEAK_UNCAUSED — Backward-cause × revelation-as-magnitude (0/1) × 2-scene
+  // lookback. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 revelation
+  // scenes, fires when the (first) revelation scene has no dramatic turn in itself or the 2
+  // scenes preceding it. Completes the trio for revelation. hasCause deliberately omits
+  // revelation to avoid circularity.
+  {
+    const r809b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.revelation != null ? 1 : 0),
+      hasCause: r => r.dramaticTurn !== 'nothing',
+    });
+    if (r809b.fires) {
+      issues.push({
+        location: `scene ${r809b.peakIdx + 1} — revelation with no dramatic turn nearby`,
+        rule: 'VOICE_REVELATION_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `Scene ${r809b.peakIdx + 1} discloses a revelation with no dramatic turn in itself or the two scenes before it, even though ${r809b.qualifyingCount} scenes elsewhere disclose a truth. A revelation that lands without any preceding pivot reads as a coincidence rather than something the story's own turns forced into the open.`,
+        suggestedFix: `Add a dramatic turn in scene ${r809b.peakIdx + 1} or one of the two scenes before it so the revelation reads as a consequence of the story's own turning points rather than arriving unprepared.`,
+      });
+    }
+  }
+
+  // VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // Negative-specific emotionalShift has only ever appeared inside a combined co-occurrence check
+  // (elevated-tone-vs-negative-shift); none of the three shared-library trio modes has ever
+  // isolated this valence on its own.
+  {
+    const r809c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r809c.fires) {
+      issues.push({
+        location: `${r809c.zoneNames[r809c.maxZoneIdx]} third — ${r809c.maxZoneCount} of ${r809c.count} negative-emotion scenes`,
+        rule: 'VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r809c.maxZoneCount / r809c.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r809c.zoneNames[r809c.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the story's voice carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r809c.zoneNames[r809c.maxZoneIdx]} third so the story's voice registers its emotional cost more evenly across the story.`,
       });
     }
   }

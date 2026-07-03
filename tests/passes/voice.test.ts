@@ -1438,6 +1438,73 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 809 — voicePass: voice revelation drought run, voice revelation peak uncaused, voice negative emotion zone cluster', async () => {
+    const runV809 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // VOICE_REVELATION_DROUGHT_RUN fire:
+    // n=10; revelation present at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('VOICE_REVELATION_DROUGHT_RUN fires when a long run has no revelation', async () => {
+      const recs809a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runV809(recs809a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_DROUGHT_RUN'), 'VOICE_REVELATION_DROUGHT_RUN should fire');
+    });
+
+    it('VOICE_REVELATION_DROUGHT_RUN does not fire when revelations are evenly spread', async () => {
+      const recs809an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 6, 9].includes(i) ? 'truth revealed' : null }),
+      );
+      const res = await runV809(recs809an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_DROUGHT_RUN'), 'VOICE_REVELATION_DROUGHT_RUN should not fire');
+    });
+
+    // VOICE_REVELATION_PEAK_UNCAUSED fire:
+    // 8 scenes; revelation-qualifying (magnitude 1) at 2 and 5; peak resolves to the first (idx 2);
+    // no dramaticTurn at 0, 1, or 2 itself (2-scene lookback + the peak scene itself).
+    it('VOICE_REVELATION_PEAK_UNCAUSED fires when the revelation scene has no dramatic turn nearby', async () => {
+      const recs809b = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs809b[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs809b[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      const res = await runV809(recs809b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_PEAK_UNCAUSED'), 'VOICE_REVELATION_PEAK_UNCAUSED should fire');
+    });
+
+    it('VOICE_REVELATION_PEAK_UNCAUSED does not fire when a dramatic turn precedes the revelation scene', async () => {
+      const recs809bn = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs809bn[2] = makeSharedRecord(2, { revelation: 'truth revealed' });
+      recs809bn[5] = makeSharedRecord(5, { revelation: 'truth revealed' });
+      recs809bn[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      const res = await runV809(recs809bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_PEAK_UNCAUSED'), 'VOICE_REVELATION_PEAK_UNCAUSED should not fire');
+    });
+
+    // VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs809c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runV809(recs809c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs809cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runV809(recs809cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'VOICE_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 795 — voicePass: voice turn zone cluster, voice emotion drought run, voice revelation zone cluster', async () => {
     const runV795 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
