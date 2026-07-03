@@ -1535,6 +1535,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 898 — conflictPass: conflict revelation purpose zone cluster, conflict revelation purpose drought run, conflict turning point zone imbalance', async () => {
+    const makeRec898 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF898 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER fire: n=9, 3 thirds; revelation-purposed scenes
+    // at 0,1,2 (all in opening third) → 3/3 = 100% > 75%.
+    it('CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER fires when >75% of revelation-purposed scenes cluster in one third', async () => {
+      const recs898a = Array.from({ length: 9 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 1, 2].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runCF898(recs898a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER'), 'CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER should fire');
+    });
+
+    it('CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER does not fire when revelation-purposed scenes spread across thirds', async () => {
+      const recs898an = Array.from({ length: 9 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 4, 8].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runCF898(recs898an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER'), 'CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER should not fire');
+    });
+
+    // CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN fire: n=10, revelation-purposed scenes at 0, 8, 9
+    // (minPresentCount 3 satisfied), leaving a 7-scene gap (indices 1-7) — run of 7 >= threshold 6.
+    it('CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN fires when a long run has no revelation-purposed scene', async () => {
+      const recs898b = Array.from({ length: 10 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 8, 9].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runCF898(recs898b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN'), 'CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN should fire');
+    });
+
+    it('CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN does not fire when revelation-purposed scenes are evenly spread', async () => {
+      const recs898bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 3, 6, 9].includes(i) ? 'revelation' : 'development' }),
+      );
+      const res = await runCF898(recs898bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN'), 'CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_TURNING_POINT_ZONE_IMBALANCE fire: n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7},
+    // Z3={8,9}); turning_point at 0,1,2,8,9 → Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('CONFLICT_TURNING_POINT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of turning-point scenes', async () => {
+      const recs898c = Array.from({ length: 10 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runCF898(recs898c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURNING_POINT_ZONE_IMBALANCE'), 'CONFLICT_TURNING_POINT_ZONE_IMBALANCE should fire');
+    });
+
+    it('CONFLICT_TURNING_POINT_ZONE_IMBALANCE does not fire when turning-point scenes touch every zone', async () => {
+      const recs898cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec898(i, { purpose: [0, 3, 5, 8].includes(i) ? 'turning_point' : 'development' }),
+      );
+      const res = await runCF898(recs898cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURNING_POINT_ZONE_IMBALANCE'), 'CONFLICT_TURNING_POINT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 884 — conflictPass: conflict climax zone imbalance, conflict establish world zone imbalance, conflict resolution zone imbalance', async () => {
     const makeRec884 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

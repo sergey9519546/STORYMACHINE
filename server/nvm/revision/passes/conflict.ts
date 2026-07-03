@@ -411,6 +411,16 @@
 // CONFLICT_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution' -- distinct from
 // CONFLICT_RESOLUTION_PREMATURE, which checks timing relative to the climax, not distributional
 // zone imbalance).
+//
+// Wave 898 additions: purpose === 'revelation' has never been referenced anywhere in this pass
+// (the pre-existing CONFLICT_REVELATION_DROUGHT_RUN/CONFLICT_REVELATION_ZONE_CLUSTER audit the
+// separate revelation string|null field, not this purpose enum value) -- a genuinely virgin field
+// for all three shared-library trio modes. This wave adds CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER
+// and CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN (peak mode conventionally skipped for this
+// categorical field), plus CONFLICT_TURNING_POINT_ZONE_IMBALANCE, continuing the checkZoneImbalance
+// rollout begun in Wave 884: purpose === 'turning_point' already has a complete 3-zone/run-based
+// trio (CONFLICT_TURNING_POINT_ZONE_CLUSTER, CONFLICT_TURNING_POINT_DROUGHT_RUN) but has never been
+// audited by the 4-zone bloat+empty-zone mode.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5206,6 +5216,74 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r884c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName884c} contains ${r884c.counts[r884c.bloatZoneIdx]} of them (${Math.round((r884c.counts[r884c.bloatZoneIdx] / r884c.totalCount) * 100)}%) while ${emptyNames884c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the conflict's closure an uneven structural rhythm.`,
         suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames884c} — so every structural quarter carries some capacity to settle the conflict, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'revelation' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 scenes
+  // purposed as a revelation, fires when more than 75% of them fall in a single structural third.
+  // Named distinctly from CONFLICT_REVELATION_ZONE_CLUSTER, which audits the separate revelation
+  // string|null field, not this purpose enum value — purpose === 'revelation' has never been
+  // referenced anywhere in this pass; a genuinely virgin field for all three trio modes.
+  {
+    const r898a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r898a.fires) {
+      issues.push({
+        location: `${r898a.zoneNames[r898a.maxZoneIdx]} third — ${r898a.maxZoneCount} of ${r898a.count} revelation-purposed scenes`,
+        rule: 'CONFLICT_REVELATION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r898a.maxZoneCount / r898a.count) * 100)}% of the scenes purposed as a revelation cluster in the ${r898a.zoneNames[r898a.maxZoneIdx]} third. When every purpose-built disclosure lands in the same structural window, the conflict has no fresh information reshaping it anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r898a.zoneNames[r898a.maxZoneIdx]} third as a revelation so the conflict keeps being reshaped by new disclosures more evenly across the story.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'revelation' absence. Built
+  // on checkDroughtRun from the shared checks library. n≥10, ≥3 revelation-purposed scenes overall,
+  // fires when the longest consecutive run of scenes purposed otherwise reaches 6. Completes 2 of
+  // 3 slots for this purpose value alongside the zone-cluster mode added in this same wave (peak
+  // mode conventionally skipped for this categorical field).
+  {
+    const r898b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r898b.fires) {
+      issues.push({
+        location: `longest stretch with no revelation-purposed scene: ${r898b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_REVELATION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r898b.longestRun} consecutive scenes with no scene purposed as a revelation, even though ${r898b.presentCount} scenes elsewhere disclose information by purpose. A long unbroken stretch with nothing new purpose-built to come to light leaves the conflict static with no fresh information reshaping it for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r898b.longestRun}-scene stretch as a revelation so the conflict keeps being reshaped by new disclosures throughout that stretch.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 884. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing CONFLICT_TURNING_POINT_ZONE_CLUSTER (3-zone
+  // >75%-concentration test) and CONFLICT_TURNING_POINT_DROUGHT_RUN (run-based absence) — the
+  // first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r898c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r898c.fires) {
+      const emptyNames898c = r898c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName898c = FOUR_ZONE_NAMES[r898c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames898c} empty; ${bloatName898c} has ${r898c.counts[r898c.bloatZoneIdx]}/${r898c.totalCount} turning-point scenes`,
+        rule: 'CONFLICT_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r898c.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName898c} contains ${r898c.counts[r898c.bloatZoneIdx]} of them (${Math.round((r898c.counts[r898c.bloatZoneIdx] / r898c.totalCount) * 100)}%) while ${emptyNames898c} contains none. Turning points bloat in one structural quarter and vanish from another, giving the conflict's pivots an uneven structural rhythm.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames898c} — so every structural quarter carries some capacity for the conflict to pivot, not only the quarter currently carrying most of them.`,
       });
     }
   }
