@@ -1136,6 +1136,71 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 806 — rhythmPass: rhythm negative emotion zone cluster, rhythm negative emotion drought run, rhythm character moment zone cluster', async () => {
+    const runR806 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; negative-emotion scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER fires when >75% of negative-emotion scenes cluster in one third', async () => {
+      const recs806a = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runR806(recs806a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER does not fire when negative-emotion scenes spread across thirds', async () => {
+      const recs806an = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 4, 8].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runR806(recs806an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER'), 'RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER should not fire');
+    });
+
+    // RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN fire:
+    // n=10; negative-emotion at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN fires when a long run has no negative-emotion charge', async () => {
+      const recs806b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runR806(recs806b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN'), 'RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN should fire');
+    });
+
+    it('RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN does not fire when negative-emotion scenes are evenly spread', async () => {
+      const recs806bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 6, 9].includes(i) ? 'negative' : 'neutral' }),
+      );
+      const res = await runR806(recs806bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN'), 'RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN should not fire');
+    });
+
+    // RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; character_moment scenes at 0,1,2 → 100% opening third
+    it('RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER fires when >75% of character-moment scenes cluster in one third', async () => {
+      const recs806c = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runR806(recs806c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER'), 'RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER should fire');
+    });
+
+    it('RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER does not fire when character-moment scenes spread across thirds', async () => {
+      const recs806cn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'character_moment' : 'complicate' }),
+      );
+      const res = await runR806(recs806cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER'), 'RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 792 — rhythmPass: rhythm suspense peak uncaused, rhythm curiosity peak uncaused, rhythm revelation zone cluster', async () => {
     const runR792 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

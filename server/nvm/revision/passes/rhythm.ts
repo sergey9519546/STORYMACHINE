@@ -318,6 +318,16 @@
 // structural thirds — completes the trio for revelation alongside the backward-cause peak mode
 // (Wave 764) and the run-based drought mode (Wave 778); the zone-cluster mode has never been
 // applied to it).
+// Wave 806 additions: RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER (distribution/timing ×
+// emotionalShift === 'negative' × structural thirds — the existing EMOTIONAL_SIGNAL_ZONE_CLUSTER
+// and RHYTHM_EMOTION_DROUGHT_RUN [Wave 652] both operate on the 'positive' valence; the
+// 'negative' valence has never been isolated on its own by any of the three trio modes),
+// RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN (run-based × emotionalShift === 'negative' absence —
+// completing 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+// wave; peak mode conventionally skipped for this categorical field), RHYTHM_CHARACTER_
+// MOMENT_ZONE_CLUSTER (distribution/timing × purpose === 'character_moment' × structural thirds
+// — this purpose value has never been referenced anywhere in this pass; none of the three
+// shared-library trio modes has ever been applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3997,6 +4007,73 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r792c.maxZoneCount / r792c.count) * 100)}% of the story's revelation scenes cluster in the ${r792c.zoneNames[r792c.maxZoneIdx]} third. When every disclosure lands in the same structural window, the story's rhythm goes silent on new information for the rest of the story.`,
         suggestedFix: `Move at least one revelation outside the ${r792c.zoneNames[r792c.maxZoneIdx]} third so the rhythm keeps punctuating the story with fresh disclosures more evenly.`,
+      });
+    }
+  }
+
+  // ── Wave 806: RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER, RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN,
+  //              RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER ──────────────────────────────────────
+
+  // RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'negative' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // negative-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // The existing EMOTIONAL_SIGNAL_ZONE_CLUSTER and RHYTHM_EMOTION_DROUGHT_RUN (Wave 652) both
+  // operate on the 'positive' valence; the 'negative' valence has never been isolated on its own
+  // by any of the three trio modes.
+  {
+    const r806a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r806a.fires) {
+      issues.push({
+        location: `${r806a.zoneNames[r806a.maxZoneIdx]} third — ${r806a.maxZoneCount} of ${r806a.count} negative-emotion scenes`,
+        rule: 'RHYTHM_NEGATIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r806a.maxZoneCount / r806a.count) * 100)}% of the story's negative-emotion scenes cluster in the ${r806a.zoneNames[r806a.maxZoneIdx]} third. When all the darkness concentrates in one structural window, the story's rhythm carries its emotional cost in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a negative-emotion scene outside the ${r806a.zoneNames[r806a.maxZoneIdx]} third so the rhythm's emotional cost registers more evenly across the story.`,
+      });
+    }
+  }
+
+  // RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN — Run-based × emotionalShift === 'negative' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 negative-emotion scenes
+  // overall, fires when the longest consecutive run of scenes with no negative charge reaches 6.
+  // Completing 2 of 3 slots for this valence alongside the zone-cluster mode added in this same
+  // wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r806b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r806b.fires) {
+      issues.push({
+        location: `longest stretch with no negative-emotion charge: ${r806b.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_NEGATIVE_EMOTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r806b.longestRun} consecutive scenes with no negative-emotion charge at all, even though ${r806b.presentCount} scenes elsewhere carry one. A long unbroken stretch with no setback leaves the story's rhythm without any adversity punctuating it for an extended run.`,
+        suggestedFix: `Give the story a setback within the ${r806b.longestRun}-scene stretch so the rhythm keeps adversity punctuating it throughout that stretch.`,
+      });
+    }
+  }
+
+  // RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'character_moment' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 character-moment scenes, fires when more than 75% of them fall in a single
+  // structural third. This purpose value has never been referenced anywhere in this pass; none
+  // of the three shared-library trio modes has ever been applied to it.
+  {
+    const r806c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r806c.fires) {
+      issues.push({
+        location: `${r806c.zoneNames[r806c.maxZoneIdx]} third — ${r806c.maxZoneCount} of ${r806c.count} character-moment scenes`,
+        rule: 'RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r806c.maxZoneCount / r806c.count) * 100)}% of the story's character-moment scenes cluster in the ${r806c.zoneNames[r806c.maxZoneIdx]} third. When every beat of interior reflection lands in the same structural window, the story's rhythm has no room to breathe anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r806c.zoneNames[r806c.maxZoneIdx]} third as a character moment so the rhythm keeps room to breathe more evenly across the story.`,
       });
     }
   }
