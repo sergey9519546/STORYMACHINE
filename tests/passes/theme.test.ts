@@ -931,6 +931,85 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 752 — themePass: theme clock delta zone cluster, theme turn drought run, theme character moment drought run', async () => {
+    const runT752 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_CLOCK_DELTA_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-shifting scenes at 0,1,2 → 100% opening third
+    it('THEME_CLOCK_DELTA_ZONE_CLUSTER fires when >75% of clock-shifting scenes cluster in one third', async () => {
+      const recs752a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs752a[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs752a[1] = makeSharedRecord(1, { clockDelta: -1 });
+      recs752a[2] = makeSharedRecord(2, { clockDelta: 1 });
+      const res = await runT752(recs752a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_ZONE_CLUSTER'), 'THEME_CLOCK_DELTA_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_CLOCK_DELTA_ZONE_CLUSTER no-fire:
+    // clock-shifting scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_CLOCK_DELTA_ZONE_CLUSTER does not fire when clock movement is distributed across thirds', async () => {
+      const recs752an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs752an[0] = makeSharedRecord(0, { clockDelta: 1 });
+      recs752an[4] = makeSharedRecord(4, { clockDelta: -1 });
+      recs752an[7] = makeSharedRecord(7, { clockDelta: 1 });
+      const res = await runT752(recs752an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_ZONE_CLUSTER'), 'THEME_CLOCK_DELTA_ZONE_CLUSTER should not fire');
+    });
+
+    // THEME_TURN_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 carry a dramatic turn (>=3 present overall); scenes 3-9 (7 scenes) have none
+    it('THEME_TURN_DROUGHT_RUN fires when the longest no-dramatic-turn run reaches 6', async () => {
+      const recs752b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs752b[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs752b[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs752b[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runT752(recs752b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_DROUGHT_RUN'), 'THEME_TURN_DROUGHT_RUN should fire');
+    });
+
+    // THEME_TURN_DROUGHT_RUN no-fire:
+    // dramatic-turn scenes spread out so no gap reaches 6 consecutive scenes
+    it('THEME_TURN_DROUGHT_RUN does not fire when dramatic turns are spread through the story', async () => {
+      const recs752bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs752bn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs752bn[3] = makeSharedRecord(3, { dramaticTurn: 'reversal' });
+      recs752bn[6] = makeSharedRecord(6, { dramaticTurn: 'reversal' });
+      recs752bn[9] = makeSharedRecord(9, { dramaticTurn: 'reversal' });
+      const res = await runT752(recs752bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_DROUGHT_RUN'), 'THEME_TURN_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_CHARACTER_MOMENT_DROUGHT_RUN fire:
+    // n=10; scenes 0,1,2 purposed as character moments (>=3 present overall); scenes 3-9 (7 scenes) purposed otherwise
+    it('THEME_CHARACTER_MOMENT_DROUGHT_RUN fires when the longest no-character-moment run reaches 6', async () => {
+      const recs752c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs752c[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs752c[1] = makeSharedRecord(1, { purpose: 'character_moment' });
+      recs752c[2] = makeSharedRecord(2, { purpose: 'character_moment' });
+      const res = await runT752(recs752c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_DROUGHT_RUN'), 'THEME_CHARACTER_MOMENT_DROUGHT_RUN should fire');
+    });
+
+    // THEME_CHARACTER_MOMENT_DROUGHT_RUN no-fire:
+    // character-moment scenes spread out so no gap reaches 6 consecutive scenes
+    it('THEME_CHARACTER_MOMENT_DROUGHT_RUN does not fire when character moments are spread through the story', async () => {
+      const recs752cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs752cn[0] = makeSharedRecord(0, { purpose: 'character_moment' });
+      recs752cn[3] = makeSharedRecord(3, { purpose: 'character_moment' });
+      recs752cn[6] = makeSharedRecord(6, { purpose: 'character_moment' });
+      recs752cn[9] = makeSharedRecord(9, { purpose: 'character_moment' });
+      const res = await runT752(recs752cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CHARACTER_MOMENT_DROUGHT_RUN'), 'THEME_CHARACTER_MOMENT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 738 — themePass: theme highlight zone cluster, theme relationship zone cluster, theme clock delta drought run', async () => {
     const runT738 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

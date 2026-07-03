@@ -290,6 +290,14 @@
 // relationshipShifts; the zone-cluster mode has never been applied to it, completing the trio),
 // THEME_CLOCK_DELTA_DROUGHT_RUN (run-based × clockDelta≠0 absence — Wave 682 applied the
 // backward-cause peak mode to clockDelta; the drought-run mode has never been applied to it).
+// Wave 752 additions: THEME_CLOCK_DELTA_ZONE_CLUSTER (distribution/timing × clockDelta≠0
+// presence × structural thirds — Waves 682/738 applied the backward-cause peak and run-based
+// drought modes to clockDelta; the zone-cluster mode has never been applied to it, completing the
+// trio), THEME_TURN_DROUGHT_RUN (run-based × dramaticTurn !== 'nothing' absence — Wave 668
+// applied the zone-cluster mode to this signal; the drought-run mode has never been applied to
+// it), THEME_CHARACTER_MOMENT_DROUGHT_RUN (run-based × purpose === 'character_moment' absence —
+// Wave 682 applied the zone-cluster mode to this signal; the drought-run mode has never been
+// applied to it).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4263,6 +4271,71 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r738c.longestRun} consecutive scenes with zero movement on the ticking clock at all, even though ${r738c.presentCount} scenes elsewhere do shift it. A long unbroken stretch where nothing tightens or loosens the deadline leaves the theme without any external pressure testing it for an extended run.`,
         suggestedFix: `Move the clock — tighten or ease the deadline — somewhere within the ${r738c.longestRun}-scene stretch so external pressure keeps testing the theme throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 752: THEME_CLOCK_DELTA_ZONE_CLUSTER, THEME_TURN_DROUGHT_RUN,
+  //              THEME_CHARACTER_MOMENT_DROUGHT_RUN ─────────────────────────────────────────
+
+  // THEME_CLOCK_DELTA_ZONE_CLUSTER — Distribution/timing × clockDelta≠0 presence × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 clock-shifting
+  // scenes, fires when more than 75% of those scenes cluster in a single third. Waves 682/738
+  // applied the backward-cause peak and run-based drought modes to clockDelta; the zone-cluster
+  // mode has never been applied to it, completing the trio.
+  {
+    const r752a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r752a.fires) {
+      issues.push({
+        location: `${r752a.zoneNames[r752a.maxZoneIdx]} third — ${r752a.maxZoneCount} of ${r752a.count} clock-shifting scenes`,
+        rule: 'THEME_CLOCK_DELTA_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r752a.maxZoneCount / r752a.count) * 100)}% of the scenes that move the ticking clock cluster in the ${r752a.zoneNames[r752a.maxZoneIdx]} third. When every clock movement lands in the same structural window, the theme has no external pressure testing it anywhere else in the story.`,
+        suggestedFix: `Move at least one clock-shifting beat outside the ${r752a.zoneNames[r752a.maxZoneIdx]} third so external pressure keeps testing the theme more evenly across the story.`,
+      });
+    }
+  }
+
+  // THEME_TURN_DROUGHT_RUN — Run-based × dramaticTurn !== 'nothing' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turn scenes overall, fires when the
+  // longest consecutive run of scenes with no dramatic turn reaches 6. Wave 668 applied the
+  // zone-cluster mode to this signal; the drought-run mode has never been applied to it.
+  {
+    const r752b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r752b.fires) {
+      issues.push({
+        location: `longest stretch with no dramatic turn: ${r752b.longestRun} consecutive scenes`,
+        rule: 'THEME_TURN_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r752b.longestRun} consecutive scenes with no dramatic turn at all, even though ${r752b.presentCount} scenes elsewhere do pivot. A long unbroken stretch with nothing reversing or complicating the situation leaves the theme with no structural pivot to test it for an extended run.`,
+        suggestedFix: `Introduce a dramatic turn somewhere within the ${r752b.longestRun}-scene stretch so the theme keeps a structural pivot pressing on it throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_CHARACTER_MOMENT_DROUGHT_RUN — Run-based × purpose === 'character_moment' absence.
+  // Built on checkDroughtRun from the shared checks library. n≥10, ≥3 character-moment scenes
+  // overall, fires when the longest consecutive run of scenes purposed otherwise reaches 6. Wave
+  // 682 applied the zone-cluster mode to this signal; the drought-run mode has never been applied
+  // to it.
+  {
+    const r752c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r752c.fires) {
+      issues.push({
+        location: `longest stretch with no character-moment scene: ${r752c.longestRun} consecutive scenes`,
+        rule: 'THEME_CHARACTER_MOMENT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r752c.longestRun} consecutive scenes purposed otherwise than a character moment, even though ${r752c.presentCount} scenes elsewhere are dedicated to the protagonist's inner life. A long unbroken stretch with nothing but plot-forward scenes leaves the theme with no interior beat to be voiced through for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r752c.longestRun}-scene stretch as a character moment so the theme keeps a beat of interior reflection to be voiced through throughout that stretch.`,
       });
     }
   }
