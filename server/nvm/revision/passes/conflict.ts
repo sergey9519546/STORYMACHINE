@@ -246,6 +246,17 @@
 // rupture), CONFLICT_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural
 // thirds — >75% of highlighted-dialogue scenes concentrate in one third; the zone-cluster
 // template applied to a second channel after curiosity).
+// Wave 660 additions (built on the shared checks library, audit M2.2): CONFLICT_PAYOFF_PEAK_
+// UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds magnitude — the scene with the
+// most simultaneous thread resolutions has no dramatic turn or revelation in itself or the two
+// scenes before it; distinct from CONFLICT_PEAK_PAYOFF_ABSENT [Wave 408], which anchors on the
+// peak RUPTURE scene and checks whether it lacks a payoff — this instead anchors on the peak
+// PAYOFF scene and asks whether it is backward-caused), CONFLICT_SEED_DROUGHT_RUN (run-based ×
+// seededClueIds absence — this pass has extensive seed-channel coverage in decoupling, aftermath-
+// void, and peak-absent modes, but seededClueIds itself has never been drought-audited),
+// CONFLICT_STAGING_ZONE_CLUSTER (distribution/timing × visualBeats × structural thirds — Wave 646
+// applied the peak-uncaused mode to visualBeats; this applies the zone-cluster mode to the same
+// channel, a genuinely different question — concentration vs. causal isolation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3873,6 +3884,76 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r646c.maxZoneCount} of the story's ${r646c.count} scenes carrying a standout line of dialogue (${Math.round((r646c.maxZoneCount / r646c.count) * 100)}%) cluster in the ${zoneName646c} third. Memorable dialogue concentrates almost exclusively in that stretch of the conflict rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the confrontation.`,
         suggestedFix: `Give at least one scene outside the ${zoneName646c} third a standout line of dialogue — spreading memorable confrontation across the story lets each structural third carry its own verbal weight.`,
+      });
+    }
+  }
+
+  // ── Wave 660: CONFLICT_PAYOFF_PEAK_UNCAUSED, CONFLICT_SEED_DROUGHT_RUN,
+  //              CONFLICT_STAGING_ZONE_CLUSTER ───────────────────────────────────────────────
+
+  // CONFLICT_PAYOFF_PEAK_UNCAUSED — Single-peak isolation/backward-cause × payoffSetupIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 payoff scenes,
+  // a 2-scene lookback. Finds the single scene with the most simultaneous thread resolutions;
+  // fires when neither that scene nor either of the two before it contains a dramatic turn or
+  // revelation. Distinct from CONFLICT_PEAK_PAYOFF_ABSENT (Wave 408), which anchors on the peak
+  // RUPTURE scene and checks whether it lacks a payoff — this instead anchors on the peak PAYOFF
+  // scene and asks whether it is backward-caused.
+  {
+    const r660a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.payoffSetupIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r660a.fires) {
+      issues.push({
+        location: `scene ${r660a.peakIdx + 1} — peak payoff density (${r660a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'CONFLICT_PAYOFF_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for thread resolution (scene ${r660a.peakIdx + 1}, with ${r660a.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — the peak of narrative payoff carries no causal weight behind it.`,
+        suggestedFix: `Give scene ${r660a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a shift in the conflict rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. This pass has extensive seed-channel coverage
+  // in decoupling, aftermath-void, and peak-absent modes, but seededClueIds itself has never been
+  // drought-audited.
+  {
+    const r660b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r660b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r660b.longestRun} consecutive scenes`,
+        rule: 'CONFLICT_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r660b.longestRun} consecutive scenes with no clue seeded at all, even though ${r660b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the conflict coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r660b.longestRun}-scene stretch so the conflict keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAGING_ZONE_CLUSTER — Distribution/timing × visualBeats × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 visually-staged scenes, fires when
+  // >75% of them fall in a single structural third. Wave 646 applied the peak-uncaused mode to
+  // visualBeats; this applies the zone-cluster mode to the same channel, a genuinely different
+  // question — concentration vs. causal isolation.
+  {
+    const r660c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r660c.fires) {
+      const zoneName660c = r660c.zoneNames[r660c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName660c} third — ${r660c.maxZoneCount}/${r660c.count} visually dense scenes`,
+        rule: 'CONFLICT_STAGING_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r660c.maxZoneCount} of the story's ${r660c.count} visually dense scenes (${Math.round((r660c.maxZoneCount / r660c.count) * 100)}%) cluster in the ${zoneName660c} third. Physical staging concentrates almost exclusively in that stretch of the conflict rather than surfacing throughout, leaving other structural thirds with no physical anchor for the confrontation.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName660c} third substantial physical staging — spreading physical confrontation across the story lets each structural third carry its own staged weight.`,
       });
     }
   }

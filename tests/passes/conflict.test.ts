@@ -1535,6 +1535,94 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 660 — conflictPass: conflict payoff peak uncaused, conflict seed drought run, conflict staging zone cluster', async () => {
+    const makeRec660 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF660 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // CONFLICT_PAYOFF_PEAK_UNCAUSED fire:
+    // 8 scenes; payoffs at 2 (1 thread) and 6 (5 threads, the peak); no dramaticTurn or revelation
+    // at 6, 5, or 4
+    it('CONFLICT_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs660a = Array.from({ length: 8 }, (_, i) => makeRec660(i,
+        i === 2 ? { payoffSetupIds: ['thread-a'] }
+        : i === 6 ? { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF660(recs660a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_PEAK_UNCAUSED'), 'CONFLICT_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // CONFLICT_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('CONFLICT_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs660an = Array.from({ length: 8 }, (_, i) => makeRec660(i,
+        i === 2 ? { payoffSetupIds: ['thread-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runCF660(recs660an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_PEAK_UNCAUSED'), 'CONFLICT_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+
+    // CONFLICT_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeded at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('CONFLICT_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs660b = Array.from({ length: 10 }, (_, i) => makeRec660(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { seededClueIds: ['clue-x'] } : {}
+      ));
+      const res = await runCF660(recs660b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_DROUGHT_RUN'), 'CONFLICT_SEED_DROUGHT_RUN should fire');
+    });
+
+    // CONFLICT_SEED_DROUGHT_RUN no-fire:
+    // seeded at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('CONFLICT_SEED_DROUGHT_RUN does not fire when seeding is distributed without a long drought', async () => {
+      const recs660bn = Array.from({ length: 10 }, (_, i) => makeRec660(i,
+        (i === 0 || i === 4 || i === 9) ? { seededClueIds: ['clue-x'] } : {}
+      ));
+      const res = await runCF660(recs660bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_DROUGHT_RUN'), 'CONFLICT_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // CONFLICT_STAGING_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; visually dense scenes (visualBeats≥2) at 0,1,2 → 100% opening
+    // third
+    it('CONFLICT_STAGING_ZONE_CLUSTER fires when >75% of visually dense scenes cluster in one third', async () => {
+      const recs660c = Array.from({ length: 9 }, (_, i) => makeRec660(i,
+        (i === 0 || i === 1 || i === 2) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runCF660(recs660c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAGING_ZONE_CLUSTER'), 'CONFLICT_STAGING_ZONE_CLUSTER should fire');
+    });
+
+    // CONFLICT_STAGING_ZONE_CLUSTER no-fire:
+    // visually dense scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('CONFLICT_STAGING_ZONE_CLUSTER does not fire when visually dense scenes are distributed across thirds', async () => {
+      const recs660cn = Array.from({ length: 9 }, (_, i) => makeRec660(i,
+        (i === 0 || i === 4 || i === 7) ? { visualBeats: ['a', 'b'] } : {}
+      ));
+      const res = await runCF660(recs660cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAGING_ZONE_CLUSTER'), 'CONFLICT_STAGING_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 646 — conflictPass: conflict staging peak uncaused, conflict open thread drought run, conflict highlight zone cluster', async () => {
     const makeRec646 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
