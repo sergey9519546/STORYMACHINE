@@ -207,6 +207,12 @@
 // unresolvedClues × curiosityDelta — first use of either field in this pass), SCENE_STAGING_
 // ZONE_IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of
 // visualBeats anywhere in this pass).
+// Wave 620 additions (built on the shared checks library, audit M2.2, plus one hand-rolled
+// average/aggregate check): PAYOFF_PLACEMENT_ZONE_IMBALANCE (underweight/bloat × payoffSetupIds ×
+// four structural zones — first use of payoffSetupIds anywhere in this 108-rule pass),
+// SEED_TURN_DECOUPLED (co-occurrence/decoupling × seededClueIds × dramaticTurn — first use of
+// seededClueIds anywhere in this pass), CLOCK_DELTA_FLATLINE (average/aggregate × clockDelta
+// variety — first use of clockDelta anywhere in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3827,6 +3833,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         description: `The story's ${r606c.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName606c} contains ${r606c.counts[r606c.bloatZoneIdx]} of them (${Math.round((r606c.counts[r606c.bloatZoneIdx] / r606c.totalCount) * 100)}%) while ${emptyNames606c} contains none. Physical staging bloats in one structural quarter and vanishes from another, creating a learnable rhythm where staged scenes only ever appear in certain stretches of the script.`,
         suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames606c}, or thin out ${bloatName606c}'s concentration so staged and unstaged scenes both recur unpredictably throughout the story rather than segregating by act.`,
       });
+    }
+  }
+
+  // ── Wave 620: PAYOFF_PLACEMENT_ZONE_IMBALANCE, SEED_TURN_DECOUPLED, CLOCK_DELTA_FLATLINE ──
+
+  // PAYOFF_PLACEMENT_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero payoffs while
+  // another holds ≥50% of the total. First use of the payoffSetupIds field anywhere in this
+  // 108-rule pass. When thread resolutions cluster entirely in one structural quarter, the
+  // audience learns which stretch of the script to expect answers in — a predictable placement of
+  // payoff density, the same kind of learned-rhythm problem this pass exists to catch elsewhere.
+  {
+    const r620a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r620a.fires) {
+      const emptyNames620a = r620a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName620a = FOUR_ZONE_NAMES[r620a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames620a} empty; ${bloatName620a} has ${r620a.counts[r620a.bloatZoneIdx]}/${r620a.totalCount} payoff scenes`,
+        rule: 'PAYOFF_PLACEMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r620a.totalCount} thread-resolution scenes are unevenly distributed across its four structural zones: ${bloatName620a} contains ${r620a.counts[r620a.bloatZoneIdx]} of them (${Math.round((r620a.counts[r620a.bloatZoneIdx] / r620a.totalCount) * 100)}%) while ${emptyNames620a} contains none. Resolutions bloat in one structural quarter and vanish from another, giving the audience a learnable window for when answers arrive rather than a genuinely unpredictable rhythm.`,
+        suggestedFix: `Redistribute resolutions: move at least one payoff from ${bloatName620a} into the empty zone(s) — ${emptyNames620a} — so answers can land unpredictably throughout the story rather than only in one learnable stretch.`,
+      });
+    }
+  }
+
+  // SEED_TURN_DECOUPLED — Co-occurrence/decoupling × seededClueIds × dramaticTurn. Built on
+  // checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 seed scenes, ≥2
+  // dramatic-turn scenes. Zero overlap → fire. First use of the seededClueIds field anywhere in
+  // this pass. When clue-planting and structural pivots never coincide, the story telegraphs its
+  // two kinds of "something is happening" moments as mutually exclusive categories — the audience
+  // can learn that a pivot scene will never also be where a clue gets planted, and vice versa,
+  // making each type of beat more predictable in isolation.
+  {
+    const r620b = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.seededClueIds ?? []).length > 0,
+      isB: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r620b.fires) {
+      issues.push({
+        location: `${r620b.aCount} seed scene(s), ${r620b.bCount} dramatic-turn scene(s) — zero overlap`,
+        rule: 'SEED_TURN_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r620b.aCount} scenes where a clue is planted never coincide with the ${r620b.bCount} scenes carrying a dramatic turn — the story keeps its foreshadowing beats and its structural pivots in strictly separate categories. Once the audience notices the pattern, a pivot scene reads as guaranteed clue-free and a seed scene as guaranteed pivot-free, each becoming easier to anticipate in isolation.`,
+        suggestedFix: `Let at least one dramatic turn also plant a clue — a reversal that quietly seeds a detail which pays off later, blending the two categories so neither becomes a predictable, mutually exclusive slot.`,
+      });
+    }
+  }
+
+  // CLOCK_DELTA_FLATLINE — Average/aggregate × clockDelta variety. n≥8. Fewer than 20% of
+  // scenes deviate from the average clockDelta by more than 30% of that average → fire. First use
+  // of the clockDelta field anywhere in this pass. A story's deadline pressure that moves in a
+  // single, unvarying increment scene after scene is itself a predictable pattern — the audience
+  // can learn the "shape" of the countdown and stops registering each tick as a distinct event,
+  // the same learned-rhythm problem this pass tracks in dialogue and action-line templating,
+  // applied here to the pacing of the ticking clock itself.
+  if (records.length >= 8) {
+    const clockVals620c = records.map(r => r.clockDelta ?? 0);
+    const avgClock620c = clockVals620c.reduce((s, v) => s + v, 0) / clockVals620c.length;
+    if (Math.abs(avgClock620c) > 1e-9) {
+      const variedClock620c = clockVals620c.filter(v => Math.abs(v - avgClock620c) > Math.abs(avgClock620c) * 0.3).length;
+      if (variedClock620c < clockVals620c.length * 0.2) {
+        issues.push({
+          location: 'clockDelta throughout',
+          rule: 'CLOCK_DELTA_FLATLINE',
+          severity: 'minor',
+          description: `Fewer than 20% of the story's ${records.length} scenes deviate from the average clockDelta (${avgClock620c.toFixed(2)}) by more than 30% — the deadline-pressure signal moves in the same increment almost every time it moves at all. A ticking clock that advances in a single predictable unit scene after scene becomes a learnable pattern rather than a felt escalation: the audience stops registering each tick as urgent once its size is always the same.`,
+          suggestedFix: `Vary how sharply the clock advances — let some scenes compress time only slightly while others compress it sharply, so the deadline's rhythm feels earned rather than metronomic.`,
+        });
+      }
     }
   }
 

@@ -1210,6 +1210,108 @@ He sits at his desk.
   });
 
 
+  describe('Wave 620 — originalityPass: payoff placement zone imbalance, seed turn decoupled, clock delta flatline', async () => {
+    // Same truncation pitfall as Wave 606 above (originalityPass caps issues to the top 8 by
+    // severity) — every fixture cycles purpose/emotion/dialogue/slug/sentence per scene to avoid
+    // tripping unrelated 'major' rules that would crowd these 'minor' checks out.
+    const PURPOSE_POOL_620 = ['establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation', 'turning_point', 'climax', 'resolution', 'character_moment'];
+    const EMOTION_POOL_620 = ['positive', 'negative', 'neutral'];
+    const SENTENCE_POOL_620 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor620 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec620 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor620(idx),
+      emotionalShift: EMOTION_POOL_620[idx % EMOTION_POOL_620.length],
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: idx % 2 === 0 ? [`alice: believes point ${idx}`] : [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_620[idx % PURPOSE_POOL_620.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain620 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor620(i)}\n\n${SENTENCE_POOL_620[i % SENTENCE_POOL_620.length]}`).join('\n\n');
+    const runO620 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain620(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_PLACEMENT_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); payoffs at 6,7,8,9; zone 2 (6-8)=3, zone 3 (9)=1, total=4;
+    // zones 0,1 empty; bloatZoneIdx=zone2, 3/4=75% ≥ 50% → fires
+    it('PAYOFF_PLACEMENT_ZONE_IMBALANCE fires when one zone is empty of payoffs while another is bloated', async () => {
+      const recs620a = Array.from({ length: 12 }, (_, i) => makeRec620(i, {
+        payoffSetupIds: (i === 6 || i === 7 || i === 8 || i === 9) ? ['thread'] : [],
+      }));
+      const res = await runO620(recs620a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PLACEMENT_ZONE_IMBALANCE'), 'PAYOFF_PLACEMENT_ZONE_IMBALANCE should fire');
+    });
+
+    // PAYOFF_PLACEMENT_ZONE_IMBALANCE no-fire:
+    // one payoff per zone (1,4,7,10) → no zone is empty
+    it('PAYOFF_PLACEMENT_ZONE_IMBALANCE does not fire when payoffs are spread across all zones', async () => {
+      const recs620an = Array.from({ length: 12 }, (_, i) => makeRec620(i, {
+        payoffSetupIds: (i === 1 || i === 4 || i === 7 || i === 10) ? ['thread'] : [],
+      }));
+      const res = await runO620(recs620an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PLACEMENT_ZONE_IMBALANCE'), 'PAYOFF_PLACEMENT_ZONE_IMBALANCE should not fire');
+    });
+
+    // SEED_TURN_DECOUPLED fire:
+    // n=6; seeds at 0,1 (no turn); turns at 4,5 (no seed) → zero overlap → fires
+    it('SEED_TURN_DECOUPLED fires when seed scenes and dramatic-turn scenes never overlap', async () => {
+      const recs620b = Array.from({ length: 6 }, (_, i) => makeRec620(i,
+        i === 0 || i === 1 ? { seededClueIds: ['clue-a'] }
+        : i === 4 || i === 5 ? { dramaticTurn: 'reversal' }
+        : {}
+      ));
+      const res = await runO620(recs620b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_TURN_DECOUPLED'), 'SEED_TURN_DECOUPLED should fire');
+    });
+
+    // SEED_TURN_DECOUPLED no-fire:
+    // scene 0 carries BOTH a seed and a dramatic turn → overlap exists
+    it('SEED_TURN_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs620bn = Array.from({ length: 6 }, (_, i) => makeRec620(i,
+        i === 0 ? { seededClueIds: ['clue-a'], dramaticTurn: 'reversal' }
+        : i === 1 ? { seededClueIds: ['clue-b'] }
+        : i === 5 ? { dramaticTurn: 'revelation' }
+        : {}
+      ));
+      const res = await runO620(recs620bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_TURN_DECOUPLED'), 'SEED_TURN_DECOUPLED should not fire');
+    });
+
+    // CLOCK_DELTA_FLATLINE fire:
+    // 8 scenes, every clockDelta identical (1.0) — zero deviation from the average
+    it('CLOCK_DELTA_FLATLINE fires when clockDelta barely varies across scenes', async () => {
+      const recs620c = Array.from({ length: 8 }, (_, i) => makeRec620(i, { clockDelta: 1.0 }));
+      const res = await runO620(recs620c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_FLATLINE'), 'CLOCK_DELTA_FLATLINE should fire');
+    });
+
+    // CLOCK_DELTA_FLATLINE no-fire:
+    // alternating 0.2/2.5 — wide deviation from the average
+    it('CLOCK_DELTA_FLATLINE does not fire when clockDelta varies widely across scenes', async () => {
+      const recs620cn = Array.from({ length: 8 }, (_, i) => makeRec620(i, { clockDelta: i % 2 === 0 ? 0.2 : 2.5 }));
+      const res = await runO620(recs620cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLOCK_DELTA_FLATLINE'), 'CLOCK_DELTA_FLATLINE should not fire');
+    });
+  });
+
   describe('Wave 606 — originalityPass: clock raised zone cluster, open thread curiosity decoupled, scene staging zone imbalance', async () => {
     // originalityPass caps its returned issues to the top 8 by severity (critical, then major,
     // then minor) — see the truncation block at the end of the pass. All three Wave 606 checks
