@@ -350,6 +350,16 @@
 // (distribution/timing × purpose === 'turning_point' × structural thirds — this purpose value
 // has never been referenced anywhere in this pass either; none of the three shared-library trio
 // modes has ever been applied to it).
+//
+// Wave 824 additions: BELIEF_TURNING_POINT_DROUGHT_RUN (run-based × purpose === 'turning_point'
+// absence — completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added
+// in Wave 810; peak mode conventionally skipped for this categorical field), BELIEF_INTRODUCE_
+// CONFLICT_ZONE_CLUSTER (distribution/timing × purpose === 'introduce_conflict' × structural
+// thirds — this purpose value has never been referenced anywhere in this pass; a virgin field),
+// BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER (distribution/timing × emotionalShift === 'positive' ×
+// structural thirds — the positive valence has only ever appeared inside co-occurrence checks
+// like ASSERTION_POSITIVE_DECOUPLED; none of the three shared-library trio modes has ever
+// isolated this valence on its own, mirroring the negative-valence trio completed in Wave 796).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4547,6 +4557,73 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r810c.maxZoneCount / r810c.count) * 100)}% of the story's turning-point scenes cluster in the ${r810c.zoneNames[r810c.maxZoneIdx]} third. When every scene purposed as a turning point lands in the same structural window, the belief-tracking layer has no redirection testing convictions anywhere else in the story.`,
         suggestedFix: `Purpose at least one scene outside the ${r810c.zoneNames[r810c.maxZoneIdx]} third as a turning point so the belief-tracking layer keeps redirection testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 824: BELIEF_TURNING_POINT_DROUGHT_RUN, BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER,
+  //              BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER ──────────────────────────────────────
+
+  // BELIEF_TURNING_POINT_DROUGHT_RUN — Run-based × purpose === 'turning_point' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 turning-point scenes overall, fires
+  // when the longest consecutive run of scenes with no turning-point purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+  // 810 (peak mode conventionally skipped for this categorical field).
+  {
+    const r824a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r824a.fires) {
+      issues.push({
+        location: `longest stretch with no turning point: ${r824a.longestRun} consecutive scenes`,
+        rule: 'BELIEF_TURNING_POINT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r824a.longestRun} consecutive scenes with no turning-point purpose at all, even though ${r824a.presentCount} scenes elsewhere redirect events. A long unbroken stretch with no redirection leaves the belief-tracking layer coasting without a pivot to test convictions against for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r824a.longestRun}-scene stretch as a turning point so the belief-tracking layer keeps a pivot to test convictions against throughout that stretch.`,
+      });
+    }
+  }
+
+  // BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER — Distribution/timing × purpose ===
+  // 'introduce_conflict' × structural thirds. Built on checkZoneCluster from the shared checks
+  // library. n≥9, ≥3 conflict-introducing scenes, fires when more than 75% of them fall in a
+  // single structural third. This purpose value has never been referenced anywhere in this pass —
+  // a virgin field for all three shared-library trio modes.
+  {
+    const r824b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r824b.fires) {
+      issues.push({
+        location: `${r824b.zoneNames[r824b.maxZoneIdx]} third — ${r824b.maxZoneCount} of ${r824b.count} conflict-introducing scenes`,
+        rule: 'BELIEF_INTRODUCE_CONFLICT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r824b.maxZoneCount / r824b.count) * 100)}% of the scenes purposed to introduce conflict cluster in the ${r824b.zoneNames[r824b.maxZoneIdx]} third. When every new conflict lands in the same structural window, the belief-tracking layer has no fresh friction testing convictions anywhere else in the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r824b.zoneNames[r824b.maxZoneIdx]} third to introduce conflict so the belief-tracking layer keeps fresh friction testing convictions more evenly across the story.`,
+      });
+    }
+  }
+
+  // BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER — Distribution/timing × emotionalShift === 'positive' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // positive-emotion scenes, fires when more than 75% of them fall in a single structural third.
+  // The positive valence has only ever appeared inside co-occurrence checks like
+  // ASSERTION_POSITIVE_DECOUPLED; none of the three shared-library trio modes has ever isolated
+  // this valence on its own, mirroring the negative-valence trio completed in Wave 796.
+  {
+    const r824c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.emotionalShift === 'positive',
+    });
+    if (r824c.fires) {
+      issues.push({
+        location: `${r824c.zoneNames[r824c.maxZoneIdx]} third — ${r824c.maxZoneCount} of ${r824c.count} positive-emotion scenes`,
+        rule: 'BELIEF_POSITIVE_EMOTION_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r824c.maxZoneCount / r824c.count) * 100)}% of the story's positive-emotion scenes cluster in the ${r824c.zoneNames[r824c.maxZoneIdx]} third. When all the relief concentrates in one structural window, the belief-tracking layer records emotional payoff testing convictions in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Introduce a positive-emotion scene outside the ${r824c.zoneNames[r824c.maxZoneIdx]} third so the belief-tracking layer registers emotional payoff testing convictions more evenly across the story.`,
       });
     }
   }
