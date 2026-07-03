@@ -202,9 +202,16 @@
 // pairing the payoff channel with emotionalShift in co-occurrence mode, distinct from PAYOFF_
 // CURIOSITY_FLAT and PAYOFF_SUSPENSE_FLAT which use average mode, and from PAYOFF_DRAMA_DECOUPLED /
 // PAYOFF_REVELATION_DECOUPLED / PAYOFF_SEED_DECOUPLED which pair payoff with different channels).
+// Wave 605 additions (built on the shared checks library, audit M2.2): OPEN_THREAD_REVELATION_
+// DECOUPLED (co-occurrence/decoupling × unresolvedClues × revelation — first use of unresolvedClues
+// anywhere in this 99-rule pass, despite its central concern with seed/payoff debt), PHYSICAL_
+// STAGING_ZONE_IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of
+// visualBeats anywhere in this pass), OPEN_THREAD_PAYOFF_AFTERMATH_VOID (sequence/aftermath ×
+// heavy unresolvedClues debt → payoff absence).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract unique character IDs from dialogue highlights across all records */
 function extractCharacterIds(records: PassInput['records']): Set<string> {
@@ -3445,6 +3452,94 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
           suggestedFix: `Redistribute payoffs: move at least one resolution from ${zoneNames591c[bloatZone591c]} into the empty zone(s) — ${emptyZones591c} — so every structural quarter carries some evidence of a planted thread paying off. The goal is not perfect uniformity, but that no zone is completely payoff-free while another carries more than half the total load.`,
         });
       }
+    }
+  }
+
+  // ── Wave 605: OPEN_THREAD_REVELATION_DECOUPLED, PHYSICAL_STAGING_ZONE_IMBALANCE,
+  //              OPEN_THREAD_PAYOFF_AFTERMATH_VOID ──────────────────────────────────────────
+
+  // OPEN_THREAD_REVELATION_DECOUPLED — Co-occurrence/decoupling × unresolvedClues × revelation.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, ≥2 revelation scenes. Zero overlap → fire. Scenes where the story is
+  // carrying open, unpaid setups never coincide with scenes where a hidden truth surfaces —
+  // disclosure and debt run on entirely separate tracks, so a revelation never lands while the
+  // audience is actively holding an open question, and no open question ever gets its moment
+  // in the same beat as a truth coming to light. First use of the unresolvedClues field anywhere
+  // in this 99-rule pass, despite its central concern with the seed/payoff economy. Distinct from
+  // PAYOFF_REVELATION_DECOUPLED (pairs the payoff channel — resolved setups — with revelation;
+  // this pairs the carried-debt channel — setups NOT yet resolved — with revelation instead) and
+  // REVELATION_RELATIONSHIP_DECOUPLED (Wave 591: revelation × relationshipShifts, a different
+  // second channel entirely).
+  {
+    const r605a = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.unresolvedClues ?? []).length > 0,
+      isB: r => r.revelation != null,
+    });
+    if (r605a.fires) {
+      issues.push({
+        location: `${r605a.aCount} open-thread scene(s), ${r605a.bCount} revelation scene(s) — zero overlap`,
+        rule: 'OPEN_THREAD_REVELATION_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r605a.aCount} scenes carrying outstanding, unpaid clue-debt never coincide with the ${r605a.bCount} scenes where a hidden truth is revealed — the story's open questions and its moments of disclosure run on entirely separate tracks. A revelation lands most powerfully when it intersects with what the audience is actively still wondering about; when the two channels never touch, disclosures arrive into scenes where nothing is currently hanging open, and the accumulated debt is never the occasion for an answer.`,
+        suggestedFix: `Let at least one revelation land in a scene that is also carrying open clue-debt — a truth surfacing precisely because a thread the audience has been tracking finally connects to it. Tying disclosure to active unresolved tension gives the revelation a question to answer instead of arriving into a quiet moment.`,
+      });
+    }
+  }
+
+  // PHYSICAL_STAGING_ZONE_IMBALANCE — Underweight/bloat × visualBeats × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with substantial
+  // physical staging (visualBeats.length≥2), divided into four equal structural zones. Fires only
+  // when one zone has zero visually dense scenes while another holds ≥50% of the total. First use
+  // of the visualBeats field anywhere in this pass — every existing check in this file audits the
+  // seed/payoff/revelation economy through non-visual record channels; this is the first to audit
+  // how the story's physical staging — as opposed to its promise-and-payment machinery — is spread
+  // across the four structural quarters. A story whose physical staging clusters in one act and
+  // vanishes from another shifts abruptly between staged and unstaged storytelling rather than
+  // sustaining physical presence throughout the setup/payoff arc.
+  {
+    const r605b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r605b.fires) {
+      const emptyNames605b = r605b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName605b = FOUR_ZONE_NAMES[r605b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames605b} empty; ${bloatName605b} has ${r605b.counts[r605b.bloatZoneIdx]}/${r605b.totalCount} visually dense scenes`,
+        rule: 'PHYSICAL_STAGING_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r605b.totalCount} physically staged scenes are unevenly distributed across its four structural zones: ${bloatName605b} contains ${r605b.counts[r605b.bloatZoneIdx]} of them (${Math.round((r605b.counts[r605b.bloatZoneIdx] / r605b.totalCount) * 100)}%) while ${emptyNames605b} contains none. Physical staging bloats in one structural quarter and vanishes from another, giving the story's balance between staged and unstaged scenes an uneven rhythm relative to its setup/payoff economy.`,
+        suggestedFix: `Redistribute physical staging: bring at least one heavily staged scene into ${emptyNames605b}, or thin out ${bloatName605b}'s concentration by letting one of its visually dense scenes lean more on dialogue or interiority instead. A more even spread keeps physical presence active throughout the story's promise-and-payment arc.`,
+      });
+    }
+  }
+
+  // OPEN_THREAD_PAYOFF_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt trigger
+  // → payoff absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying trigger scenes (unresolvedClues.length≥3 — heavy carried debt), ≥3 scenes anywhere
+  // with a payoff (payoffSetupIds non-empty), a 2-scene lookahead window. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no payoff, while payoffs do occur elsewhere
+  // in the story. The story's heaviest concentrations of open debt never lead into a nearby
+  // resolution — the pressure of stacked unpaid setups mounts without any relief in its immediate
+  // wake. Distinct from PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave 507: payoff is the TRIGGER there,
+  // suspense the aftermath signal — the reverse direction and reverse channel of this check) and
+  // OPEN_THREAD_REVELATION_DECOUPLED above (same debt field, but that check is same-scene
+  // co-occurrence with no positional/windowed component and checks revelation, not payoff).
+  {
+    const r605c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r605c.fires) {
+      issues.push({
+        location: `${r605c.triggerCount} heavy clue-debt scene(s) — no payoff within 2 scenes after any of them`,
+        rule: 'OPEN_THREAD_PAYOFF_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r605c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no payoff, even though ${r605c.aftermathCount} payoffs occur elsewhere in the story. The heaviest concentrations of open debt never lead into a nearby resolution — the pressure of stacked unanswered setups is never relieved in its immediate aftermath.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, resolve at least one of the outstanding threads — let the accumulated pressure of unpaid setups find release nearby rather than compounding indefinitely before any payoff arrives.`,
+      });
     }
   }
 

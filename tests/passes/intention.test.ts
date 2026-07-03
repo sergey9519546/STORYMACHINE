@@ -1352,6 +1352,103 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 605 — intentionPass: open thread revelation decoupled, physical staging zone imbalance, open thread payoff aftermath void', async () => {
+    const makeRec605 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN605 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // OPEN_THREAD_REVELATION_DECOUPLED fire:
+    // n=8; open threads at 0,1 (no revelation); revelations at 2,3 (no open thread) → zero overlap → fires
+    it('OPEN_THREAD_REVELATION_DECOUPLED fires when open-thread scenes and revelation scenes never overlap', async () => {
+      const recs605a = Array.from({ length: 8 }, (_, i) => makeRec605(i));
+      recs605a[0] = makeRec605(0, { unresolvedClues: ['unpaid-clue'] });
+      recs605a[1] = makeRec605(1, { unresolvedClues: ['unpaid-clue'] });
+      recs605a[2] = makeRec605(2, { revelation: 'The truth comes out' });
+      recs605a[3] = makeRec605(3, { revelation: 'Another truth' });
+      const res = await runIN605(recs605a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_REVELATION_DECOUPLED'), 'OPEN_THREAD_REVELATION_DECOUPLED should fire');
+    });
+
+    // OPEN_THREAD_REVELATION_DECOUPLED no-fire:
+    // scene 2 carries BOTH an open thread and a revelation → overlap exists
+    it('OPEN_THREAD_REVELATION_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs605an = Array.from({ length: 8 }, (_, i) => makeRec605(i));
+      recs605an[0] = makeRec605(0, { unresolvedClues: ['unpaid-clue'] });
+      recs605an[1] = makeRec605(1, { unresolvedClues: ['unpaid-clue'] });
+      recs605an[2] = makeRec605(2, { unresolvedClues: ['unpaid-clue'], revelation: 'The truth comes out' });
+      recs605an[3] = makeRec605(3, { revelation: 'Another truth' });
+      const res = await runIN605(recs605an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_REVELATION_DECOUPLED'), 'OPEN_THREAD_REVELATION_DECOUPLED should not fire');
+    });
+
+    // PHYSICAL_STAGING_ZONE_IMBALANCE fire:
+    // n=12 (three scenes per zone); visually dense scenes (visualBeats≥2) at 6,9,10,11;
+    // zones 0 (0-2) and 1 (3-5) are empty; zone 3 (9-11) holds 3/4 = 75% ≥ 50% → fires
+    it('PHYSICAL_STAGING_ZONE_IMBALANCE fires when one zone is empty of visually dense scenes while another is bloated', async () => {
+      const recs605b = Array.from({ length: 12 }, (_, i) => makeRec605(i, {
+        visualBeats: (i === 6 || i === 9 || i === 10 || i === 11) ? ['opens the drawer', 'reads the letter'] : [],
+      }));
+      const res = await runIN605(recs605b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PHYSICAL_STAGING_ZONE_IMBALANCE'), 'PHYSICAL_STAGING_ZONE_IMBALANCE should fire');
+    });
+
+    // PHYSICAL_STAGING_ZONE_IMBALANCE no-fire:
+    // one visually dense scene per zone (1,4,7,10) → no zone is empty
+    it('PHYSICAL_STAGING_ZONE_IMBALANCE does not fire when every zone has a visually dense scene', async () => {
+      const recs605bn = Array.from({ length: 12 }, (_, i) => makeRec605(i, {
+        visualBeats: (i === 1 || i === 4 || i === 7 || i === 10) ? ['opens the drawer', 'reads the letter'] : [],
+      }));
+      const res = await runIN605(recs605bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PHYSICAL_STAGING_ZONE_IMBALANCE'), 'PHYSICAL_STAGING_ZONE_IMBALANCE should not fire');
+    });
+
+    // OPEN_THREAD_PAYOFF_AFTERMATH_VOID fire:
+    // n=8, window=2; heavy clue-debt triggers at 0,1; their windows {1,2} and {2,3} carry no
+    // payoff; payoffs exist elsewhere at 5,6,7 → fires
+    it('OPEN_THREAD_PAYOFF_AFTERMATH_VOID fires when heavy clue-debt scenes are never followed by a payoff', async () => {
+      const recs605c = Array.from({ length: 8 }, (_, i) => makeRec605(i));
+      recs605c[0] = makeRec605(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs605c[1] = makeRec605(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs605c[5] = makeRec605(5, { payoffSetupIds: ['thread-a'] });
+      recs605c[6] = makeRec605(6, { payoffSetupIds: ['thread-b'] });
+      recs605c[7] = makeRec605(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runIN605(recs605c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'OPEN_THREAD_PAYOFF_AFTERMATH_VOID'), 'OPEN_THREAD_PAYOFF_AFTERMATH_VOID should fire');
+    });
+
+    // OPEN_THREAD_PAYOFF_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries a payoff → that trigger's aftermath
+    // is no longer void
+    it('OPEN_THREAD_PAYOFF_AFTERMATH_VOID does not fire when a trigger window contains a payoff', async () => {
+      const recs605cn = Array.from({ length: 8 }, (_, i) => makeRec605(i));
+      recs605cn[0] = makeRec605(0, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs605cn[1] = makeRec605(1, { unresolvedClues: ['c1', 'c2', 'c3'] });
+      recs605cn[3] = makeRec605(3, { payoffSetupIds: ['thread-a'] });
+      recs605cn[5] = makeRec605(5, { payoffSetupIds: ['thread-b'] });
+      recs605cn[6] = makeRec605(6, { payoffSetupIds: ['thread-c'] });
+      recs605cn[7] = makeRec605(7, { payoffSetupIds: ['thread-d'] });
+      const res = await runIN605(recs605cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'OPEN_THREAD_PAYOFF_AFTERMATH_VOID'), 'OPEN_THREAD_PAYOFF_AFTERMATH_VOID should not fire');
+    });
+  });
+
+
   describe('Wave 591 — intentionPass: payoff relationship decoupled, revelation relationship decoupled, payoff zone imbalance', async () => {
     const makeRec591 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
