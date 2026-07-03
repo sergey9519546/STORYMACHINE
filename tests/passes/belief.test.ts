@@ -1204,6 +1204,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 712 — beliefPass: belief payoff zone cluster, belief seed drought run, belief highlight drought run', async () => {
+    const runBF712 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // BELIEF_PAYOFF_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; payoff scenes at 0,1,2 → 100% opening third
+    it('BELIEF_PAYOFF_ZONE_CLUSTER fires when >75% of payoff scenes cluster in one third', async () => {
+      const recs712a = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs712a[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs712a[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs712a[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      const res = await runBF712(recs712a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_ZONE_CLUSTER'), 'BELIEF_PAYOFF_ZONE_CLUSTER should fire');
+    });
+
+    // BELIEF_PAYOFF_ZONE_CLUSTER no-fire:
+    // payoff scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('BELIEF_PAYOFF_ZONE_CLUSTER does not fire when payoff scenes are distributed across thirds', async () => {
+      const recs712an = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs712an[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs712an[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs712an[7] = makeSharedRecord(7, { payoffSetupIds: ['thread-c'] });
+      const res = await runBF712(recs712an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_ZONE_CLUSTER'), 'BELIEF_PAYOFF_ZONE_CLUSTER should not fire');
+    });
+
+    // BELIEF_SEED_DROUGHT_RUN fire:
+    // 10 scenes; seeds at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_SEED_DROUGHT_RUN fires when the longest no-seed run is ≥6', async () => {
+      const recs712b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs712b[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs712b[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs712b[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      recs712b[9] = makeSharedRecord(9, { seededClueIds: ['clue-d'] });
+      const res = await runBF712(recs712b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_DROUGHT_RUN'), 'BELIEF_SEED_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_SEED_DROUGHT_RUN no-fire:
+    // seeds at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_SEED_DROUGHT_RUN does not fire when seeds are distributed without a long drought', async () => {
+      const recs712bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs712bn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs712bn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs712bn[9] = makeSharedRecord(9, { seededClueIds: ['clue-c'] });
+      const res = await runBF712(recs712bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_DROUGHT_RUN'), 'BELIEF_SEED_DROUGHT_RUN should not fire');
+    });
+
+    // BELIEF_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('BELIEF_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs712c = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs712c[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs712c[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs712c[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs712c[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runBF712(recs712c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_DROUGHT_RUN'), 'BELIEF_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // BELIEF_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('BELIEF_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs712cn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs712cn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs712cn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs712cn[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runBF712(recs712cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_HIGHLIGHT_DROUGHT_RUN'), 'BELIEF_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 698 — beliefPass: belief payoff drought run, belief seed peak uncaused, belief highlight zone cluster', async () => {
     const runBF698 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

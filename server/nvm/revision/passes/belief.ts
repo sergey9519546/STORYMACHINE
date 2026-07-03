@@ -273,6 +273,15 @@
 // (distribution/timing × dialogueHighlights × structural thirds — Wave 670 applied the
 // backward-cause peak mode to dialogueHighlights, this pass's most heavily used field [22
 // accesses]; the zone-cluster mode has never been applied to it).
+// Wave 712 additions (closes the ninth rotation cycle, 700-712): BELIEF_PAYOFF_ZONE_CLUSTER
+// (distribution/timing × payoffSetupIds × structural thirds — Waves 656/698 applied the
+// backward-cause peak and drought-run modes to payoffSetupIds; the zone-cluster mode has never
+// been applied to it, completing the trio), BELIEF_SEED_DROUGHT_RUN (run-based × seededClueIds
+// absence — Waves 656/698 applied the zone-cluster and backward-cause peak modes to
+// seededClueIds; the drought-run mode has never been applied to it, completing the trio),
+// BELIEF_HIGHLIGHT_DROUGHT_RUN (run-based × dialogueHighlights absence — Waves 670/698 applied
+// the backward-cause peak and zone-cluster modes to this pass's most heavily used field; the
+// drought-run mode has never been applied to it, completing the trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3926,6 +3935,72 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r698c.maxZoneCount} of the story's ${r698c.count} scenes carrying a standout line of dialogue (${Math.round((r698c.maxZoneCount / r698c.count) * 100)}%) cluster in the ${zoneName698c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to anchor a character's stated belief.`,
         suggestedFix: `Give at least one scene outside the ${zoneName698c} third a standout line of dialogue — spreading memorable dialogue across the story lets belief and conviction surface verbally in every structural third.`,
+      });
+    }
+  }
+
+  // ── Wave 712: BELIEF_PAYOFF_ZONE_CLUSTER, BELIEF_SEED_DROUGHT_RUN, BELIEF_HIGHLIGHT_DROUGHT_RUN ──
+
+  // BELIEF_PAYOFF_ZONE_CLUSTER — Distribution/timing × payoffSetupIds × structural thirds. Built
+  // on checkZoneCluster from the shared checks library. n≥9, ≥3 payoff scenes, fires when >75% of
+  // them fall in a single structural third. Waves 656/698 applied the backward-cause peak and
+  // drought-run modes to payoffSetupIds; the zone-cluster mode has never been applied to it,
+  // completing the trio.
+  {
+    const r712a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r712a.fires) {
+      const zoneName712a = r712a.zoneNames[r712a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName712a} third — ${r712a.maxZoneCount}/${r712a.count} payoff scenes`,
+        rule: 'BELIEF_PAYOFF_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r712a.maxZoneCount} of the story's ${r712a.count} thread-resolution scenes (${Math.round((r712a.maxZoneCount / r712a.count) * 100)}%) cluster in the ${zoneName712a} third. Resolution concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with no sense of the belief-tracking layer's questions being answered.`,
+        suggestedFix: `Let at least one thread resolve outside the ${zoneName712a} third — spreading resolutions across the story lets the belief-tracking layer's sense of clarity build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_DROUGHT_RUN — Run-based × seededClueIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 seed scenes overall, fires when the longest consecutive
+  // run of scenes with zero clue seeded reaches 6. Waves 656/698 applied the zone-cluster and
+  // backward-cause peak modes to seededClueIds; the drought-run mode has never been applied to
+  // it, completing the trio.
+  {
+    const r712b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r712b.fires) {
+      issues.push({
+        location: `longest stretch with no clue seeded: ${r712b.longestRun} consecutive scenes`,
+        rule: 'BELIEF_SEED_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r712b.longestRun} consecutive scenes with no clue seeded at all, even though ${r712b.presentCount} scenes elsewhere do plant new material. A long unbroken stretch where nothing new is planted leaves the belief-tracking layer coasting on prior setups with nothing fresh to draw on.`,
+        suggestedFix: `Seed a new clue or thread somewhere within the ${r712b.longestRun}-scene stretch so the belief-tracking layer keeps planting forward momentum throughout, not only in isolated bursts.`,
+      });
+    }
+  }
+
+  // BELIEF_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall,
+  // fires when the longest consecutive run of scenes with no highlighted dialogue reaches 6.
+  // Waves 670/698 applied the backward-cause peak and zone-cluster modes to this pass's most
+  // heavily used field; the drought-run mode has never been applied to it, completing the trio.
+  {
+    const r712c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r712c.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r712c.longestRun} consecutive scenes`,
+        rule: 'BELIEF_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r712c.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r712c.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the belief-tracking layer with no character stating a conviction worth tracking for an extended run.`,
+        suggestedFix: `Give at least one scene within the ${r712c.longestRun}-scene stretch a standout line of dialogue — a character stating what they believe memorably, keeping the belief-tracking layer's verbal register alive throughout.`,
       });
     }
   }
