@@ -374,6 +374,12 @@
 // RHYTHM_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution' absence -- completes 2 of
 // 3 slots for this purpose value alongside the zone-cluster mode added in Wave 862; peak mode
 // conventionally skipped for this categorical field).
+//
+// Wave 890 additions: the distinct 4-zone checkZoneImbalance mode had only ever been applied to
+// raise_stakes and seededClueIds in this pass. This wave applies it to three more purpose
+// values with complete 3-zone/run-based trios: RHYTHM_CLIMAX_ZONE_IMBALANCE (purpose ===
+// 'climax'), RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
+// RHYTHM_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4451,6 +4457,82 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r876c.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r876c.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the story's rhythm with no wind-down beat for an extended run.`,
         suggestedFix: `Purpose a scene within the ${r876c.longestRun}-scene stretch to resolve part of the story, so the rhythm keeps winding down throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // ── Wave 890: RHYTHM_CLIMAX_ZONE_IMBALANCE, RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              RHYTHM_RESOLUTION_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // RHYTHM_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // RHYTHM_CLIMAX_ZONE_CLUSTER and run-based RHYTHM_CLIMAX_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r890a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r890a.fires) {
+      const emptyNames890a = r890a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName890a = FOUR_ZONE_NAMES[r890a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames890a} empty; ${bloatName890a} has ${r890a.counts[r890a.bloatZoneIdx]}/${r890a.totalCount} climax-purposed scenes`,
+        rule: 'RHYTHM_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r890a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName890a} contains ${r890a.counts[r890a.bloatZoneIdx]} of them (${Math.round((r890a.counts[r890a.bloatZoneIdx] / r890a.totalCount) * 100)}%) while ${emptyNames890a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the story's rhythm an uneven surge pattern.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames890a} — so the rhythm's biggest surges land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone RHYTHM_ESTABLISH_WORLD_ZONE_CLUSTER and run-based RHYTHM_ESTABLISH_WORLD_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r890b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r890b.fires) {
+      const emptyNames890b = r890b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName890b = FOUR_ZONE_NAMES[r890b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames890b} empty; ${bloatName890b} has ${r890b.counts[r890b.bloatZoneIdx]}/${r890b.totalCount} world-establishing scenes`,
+        rule: 'RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r890b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName890b} contains ${r890b.counts[r890b.bloatZoneIdx]} of them (${Math.round((r890b.counts[r890b.bloatZoneIdx] / r890b.totalCount) * 100)}%) while ${emptyNames890b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the rhythm's grounding an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames890b} — so the rhythm keeps fresh ground to orient the reader against more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone RHYTHM_RESOLUTION_ZONE_CLUSTER and run-based RHYTHM_RESOLUTION_DROUGHT_RUN
+  // — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r890c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r890c.fires) {
+      const emptyNames890c = r890c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName890c = FOUR_ZONE_NAMES[r890c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames890c} empty; ${bloatName890c} has ${r890c.counts[r890c.bloatZoneIdx]}/${r890c.totalCount} resolution-purposed scenes`,
+        rule: 'RHYTHM_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r890c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName890c} contains ${r890c.counts[r890c.bloatZoneIdx]} of them (${Math.round((r890c.counts[r890c.bloatZoneIdx] / r890c.totalCount) * 100)}%) while ${emptyNames890c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the rhythm's wind-down an uneven structural pattern.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames890c} — so the rhythm's wind-down is distributed more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
