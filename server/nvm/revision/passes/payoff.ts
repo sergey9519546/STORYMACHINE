@@ -422,6 +422,13 @@
 // mode conventionally skipped for this categorical field), plus PAYOFF_CHARACTER_MOMENT_ZONE_
 // IMBALANCE, continuing the checkZoneImbalance rollout: purpose === 'character_moment' already has
 // a complete 3-zone/run-based trio but has never been audited by the 4-zone bloat+empty-zone mode.
+//
+// Wave 930 additions: continuing the checkZoneImbalance rollout, this wave applies the 4-zone
+// bloat+empty-zone mode to three more signals that each already have a complete 3-zone/run-based
+// trio but had never been audited by it: PAYOFF_STAKES_ZONE_IMBALANCE (purpose === 'raise_stakes'),
+// PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation', whose trio was completed in
+// Wave 916), and PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE (emotionalShift === 'negative', a valence
+// signal with a complete 3-zone/run trio).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5087,6 +5094,80 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r916c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName916c} contains ${r916c.counts[r916c.bloatZoneIdx]} of them (${Math.round((r916c.counts[r916c.bloatZoneIdx] / r916c.totalCount) * 100)}%) while ${emptyNames916c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the payoff engine's emotional pauses an uneven structural rhythm.`,
         suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames916c} — so the payoff engine's emotional pauses land more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_ZONE_IMBALANCE — Underweight/bloat × purpose === 'raise_stakes' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library, continuing the rollout begun
+  // in Wave 888. n≥10, ≥4 stakes-raising scenes total, divided across four equal structural zones.
+  // Fires only when one zone has zero such scenes while another holds ≥50% of the total. Distinct
+  // from the existing 3-zone PAYOFF_STAKES_ZONE_CLUSTER and run-based PAYOFF_STAKES_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r930a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'raise_stakes',
+    });
+    if (r930a.fires) {
+      const emptyNames930a = r930a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName930a = FOUR_ZONE_NAMES[r930a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames930a} empty; ${bloatName930a} has ${r930a.counts[r930a.bloatZoneIdx]}/${r930a.totalCount} stakes-raising scenes`,
+        rule: 'PAYOFF_STAKES_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r930a.totalCount} stakes-raising scenes are unevenly distributed across its four structural zones: ${bloatName930a} contains ${r930a.counts[r930a.bloatZoneIdx]} of them (${Math.round((r930a.counts[r930a.bloatZoneIdx] / r930a.totalCount) * 100)}%) while ${emptyNames930a} contains none. Stakes bloat upward in one structural quarter and never rise at all in another, giving the payoff engine's escalating debts an uneven structural rhythm.`,
+        suggestedFix: `Redistribute stakes-raising beats: move at least one raise_stakes-purposed scene into the empty zone(s) — ${emptyNames930a} — so the payoff engine keeps raising the price of its debts across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE — Underweight/bloat × purpose === 'revelation' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, closing the
+  // 4-zone gap for this purpose value (its 3-zone/run trio was completed in Wave 916). n≥10, ≥4
+  // revelation-purposed scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from PAYOFF_
+  // REVELATION_PURPOSE_ZONE_CLUSTER/DROUGHT_RUN (Wave 916) and from the revelation-string-field
+  // rules — the first application of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r930b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'revelation',
+    });
+    if (r930b.fires) {
+      const emptyNames930b = r930b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName930b = FOUR_ZONE_NAMES[r930b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames930b} empty; ${bloatName930b} has ${r930b.counts[r930b.bloatZoneIdx]}/${r930b.totalCount} revelation-purposed scenes`,
+        rule: 'PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r930b.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName930b} contains ${r930b.counts[r930b.bloatZoneIdx]} of them (${Math.round((r930b.counts[r930b.bloatZoneIdx] / r930b.totalCount) * 100)}%) while ${emptyNames930b} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, so the payoff engine discharges setups in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: move at least one revelation-purposed scene into the empty zone(s) — ${emptyNames930b} — so the payoff engine keeps discharging setups across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × emotionalShift === 'negative' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, extending
+  // the 4-zone mode to the emotionalShift valence signal. n≥10, ≥4 negative-shift scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Distinct from the existing 3-zone PAYOFF_NEGATIVE_EMOTION_
+  // ZONE_CLUSTER and run-based PAYOFF_NEGATIVE_EMOTION_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this valence signal.
+  {
+    const r930c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.emotionalShift === 'negative',
+    });
+    if (r930c.fires) {
+      const emptyNames930c = r930c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName930c = FOUR_ZONE_NAMES[r930c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames930c} empty; ${bloatName930c} has ${r930c.counts[r930c.bloatZoneIdx]}/${r930c.totalCount} negative-shift scenes`,
+        rule: 'PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r930c.totalCount} scenes with a negative emotional shift are unevenly distributed across its four structural zones: ${bloatName930c} contains ${r930c.counts[r930c.bloatZoneIdx]} of them (${Math.round((r930c.counts[r930c.bloatZoneIdx] / r930c.totalCount) * 100)}%) while ${emptyNames930c} contains none. Downturns bloat in one structural quarter and vanish from another, so the cost of the payoff engine's cashed-in debts lands in only part of the story.`,
+        suggestedFix: `Redistribute downturns: place a negative emotional beat in at least one scene inside the empty zone(s) — ${emptyNames930c} — so the cost of paid-off setups is felt across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

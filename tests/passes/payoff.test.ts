@@ -1365,6 +1365,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 930 — payoffPass: payoff stakes zone imbalance, payoff revelation purpose zone imbalance, payoff negative emotion zone imbalance', async () => {
+    const runPY930 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PAYOFF_STAKES_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of stakes-raising scenes', async () => {
+      const recs930a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runPY930(recs930a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_ZONE_IMBALANCE'), 'PAYOFF_STAKES_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_STAKES_ZONE_IMBALANCE does not fire when stakes-raising scenes touch every zone', async () => {
+      const recs930an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'raise_stakes' : 'establish_world' }));
+      const res = await runPY930(recs930an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_ZONE_IMBALANCE'), 'PAYOFF_STAKES_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation-purposed scenes', async () => {
+      const recs930b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY930(recs930b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE does not fire when revelation-purposed scenes touch every zone', async () => {
+      const recs930bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'revelation' : 'establish_world' }));
+      const res = await runPY930(recs930bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE'), 'PAYOFF_REVELATION_PURPOSE_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of negative-shift scenes', async () => {
+      const recs930c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runPY930(recs930c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE does not fire when negative-shift scenes touch every zone', async () => {
+      const recs930cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'negative' : 'neutral' }));
+      const res = await runPY930(recs930cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE'), 'PAYOFF_NEGATIVE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 916 — payoffPass: payoff revelation purpose zone cluster, payoff revelation purpose drought run, payoff character moment zone imbalance', async () => {
     const runPY916 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
