@@ -225,6 +225,17 @@
 // visualBeats-density peak × revelation/dramaticTurn cause — first backward-cause check in this
 // file), THEME_PAYOFF_ZONE_CLUSTER (distribution/timing × payoffSetupIds × structural thirds —
 // first zone-cluster mode applied to records here).
+// Wave 654 additions: THEME_OPEN_THREAD_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// unresolvedClues magnitude — the scene carrying the most simultaneous open threads has no
+// dramatic turn or revelation in itself or the two scenes before it; Wave 640's THEME_STAGING_
+// PEAK_UNCAUSED applied the peak-uncaused mode to visualBeats; unresolvedClues had only a single
+// incidental mention in this 111-rule pass before this wave), THEME_HIGHLIGHT_DROUGHT_RUN
+// (run-based × dialogueHighlights absence — Wave 640's THEME_CLOCK_DROUGHT_RUN applied the
+// drought-run mode to clockRaised; dialogueHighlights itself has never been drought-audited here
+// despite already anchoring the hand-rolled THEME_DIALOGUE_PEAK_SILENT), THEME_SEED_ZONE_CLUSTER
+// (distribution/timing × seededClueIds × structural thirds — Wave 640's THEME_PAYOFF_ZONE_CLUSTER
+// applied the zone-cluster mode to payoffSetupIds; seededClueIds itself has never been
+// cluster-audited here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3722,6 +3733,76 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r640c.maxZoneCount} of the story's ${r640c.count} payoff scenes (${Math.round((r640c.maxZoneCount / r640c.count) * 100)}%) cluster in the ${zoneName640c} third. Thematic resolution concentrates almost exclusively in that stretch of the story rather than resolving gradually throughout.`,
         suggestedFix: `Resolve at least one thread outside the ${zoneName640c} third — spreading payoffs across the story lets the theme's sense of closure build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 654: THEME_OPEN_THREAD_PEAK_UNCAUSED, THEME_HIGHLIGHT_DROUGHT_RUN,
+  //              THEME_SEED_ZONE_CLUSTER ─────────────────────────────────────────────────────
+
+  // THEME_OPEN_THREAD_PEAK_UNCAUSED — Single-peak isolation/backward-cause × unresolvedClues
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // outstanding clue-debt, a 2-scene lookback. Finds the single scene carrying the most
+  // simultaneous open threads; fires when neither that scene nor either of the two before it
+  // contains a dramatic turn or revelation. Wave 640's THEME_STAGING_PEAK_UNCAUSED applied the
+  // peak-uncaused mode to visualBeats; unresolvedClues had only a single incidental mention in
+  // this pass before this wave.
+  {
+    const r654a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.unresolvedClues ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r654a.fires) {
+      issues.push({
+        location: `scene ${r654a.peakIdx + 1} — peak open-thread density (${r654a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_OPEN_THREAD_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for outstanding clue-debt (scene ${r654a.peakIdx + 1}, with ${r654a.peakMagnitude} open threads) has no dramatic turn or revelation in itself or the two scenes before it. The moment where unresolved mystery concentrates most heavily arrives without any structural pivot or disclosure driving it — the peak of accumulated question and the theme's sense of causal escalation never coincide.`,
+        suggestedFix: `Give scene ${r654a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most mystery-dense moment is earned by a shift in the plot rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // THEME_HIGHLIGHT_DROUGHT_RUN — Run-based × dialogueHighlights absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 highlighted-dialogue scenes overall, fires when the
+  // longest consecutive run of scenes with no highlighted dialogue reaches 6. Wave 640's
+  // THEME_CLOCK_DROUGHT_RUN applied the drought-run mode to clockRaised; dialogueHighlights itself
+  // has never been drought-audited here despite already anchoring the hand-rolled THEME_DIALOGUE_
+  // PEAK_SILENT.
+  {
+    const r654b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r654b.fires) {
+      issues.push({
+        location: `longest stretch with no highlighted dialogue: ${r654b.longestRun} consecutive scenes`,
+        rule: 'THEME_HIGHLIGHT_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r654b.longestRun} consecutive scenes with no highlighted dialogue at all, even though ${r654b.presentCount} scenes elsewhere carry a standout line. A long unbroken stretch with nothing verbally memorable leaves the theme's most quotable articulations with no verbal high point to punctuate them.`,
+        suggestedFix: `Give at least one scene within the ${r654b.longestRun}-scene stretch a standout line of dialogue — a character voicing something close to the theme memorably, keeping the verbal register alive throughout.`,
+      });
+    }
+  }
+
+  // THEME_SEED_ZONE_CLUSTER — Distribution/timing × seededClueIds × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 seed scenes, fires when >75% of them
+  // fall in a single structural third. Wave 640's THEME_PAYOFF_ZONE_CLUSTER applied the
+  // zone-cluster mode to payoffSetupIds; seededClueIds itself has never been cluster-audited here.
+  {
+    const r654c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r654c.fires) {
+      const zoneName654c = r654c.zoneNames[r654c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName654c} third — ${r654c.maxZoneCount}/${r654c.count} seed scenes`,
+        rule: 'THEME_SEED_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r654c.maxZoneCount} of the story's ${r654c.count} clue-planting scenes (${Math.round((r654c.maxZoneCount / r654c.count) * 100)}%) cluster in the ${zoneName654c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's sense of gradual accumulation an uneven structural rhythm.`,
+        suggestedFix: `Plant at least one clue outside the ${zoneName654c} third — spreading foreshadowing across the story lets the theme's sense of accumulating mystery build gradually instead of arriving all at once.`,
       });
     }
   }

@@ -931,6 +931,84 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 654 — themePass: theme open thread peak uncaused, theme highlight drought run, theme seed zone cluster', async () => {
+    const runT654 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_OPEN_THREAD_PEAK_UNCAUSED fire:
+    // 8 scenes; open threads at 2 (1 clue) and 6 (5 clues, the peak); no dramaticTurn or
+    // revelation at 6, 5, or 4
+    it('THEME_OPEN_THREAD_PEAK_UNCAUSED fires when the peak open-thread scene has no dramatic turn or revelation nearby', async () => {
+      const recs654a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs654a[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs654a[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT654(recs654a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_PEAK_UNCAUSED'), 'THEME_OPEN_THREAD_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_OPEN_THREAD_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_OPEN_THREAD_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs654an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs654an[2] = makeSharedRecord(2, { unresolvedClues: ['a'] });
+      recs654an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs654an[6] = makeSharedRecord(6, { unresolvedClues: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runT654(recs654an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_PEAK_UNCAUSED'), 'THEME_OPEN_THREAD_PEAK_UNCAUSED should not fire');
+    });
+
+    // THEME_HIGHLIGHT_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('THEME_HIGHLIGHT_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs654b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs654b[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs654b[1] = makeSharedRecord(1, { dialogueHighlights: ['line-b'] });
+      recs654b[2] = makeSharedRecord(2, { dialogueHighlights: ['line-c'] });
+      recs654b[9] = makeSharedRecord(9, { dialogueHighlights: ['line-d'] });
+      const res = await runT654(recs654b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_DROUGHT_RUN'), 'THEME_HIGHLIGHT_DROUGHT_RUN should fire');
+    });
+
+    // THEME_HIGHLIGHT_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_HIGHLIGHT_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs654bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs654bn[0] = makeSharedRecord(0, { dialogueHighlights: ['line-a'] });
+      recs654bn[4] = makeSharedRecord(4, { dialogueHighlights: ['line-b'] });
+      recs654bn[9] = makeSharedRecord(9, { dialogueHighlights: ['line-c'] });
+      const res = await runT654(recs654bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_DROUGHT_RUN'), 'THEME_HIGHLIGHT_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('THEME_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs654c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs654c[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs654c[1] = makeSharedRecord(1, { seededClueIds: ['clue-b'] });
+      recs654c[2] = makeSharedRecord(2, { seededClueIds: ['clue-c'] });
+      const res = await runT654(recs654c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_ZONE_CLUSTER'), 'THEME_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs654cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs654cn[0] = makeSharedRecord(0, { seededClueIds: ['clue-a'] });
+      recs654cn[4] = makeSharedRecord(4, { seededClueIds: ['clue-b'] });
+      recs654cn[7] = makeSharedRecord(7, { seededClueIds: ['clue-c'] });
+      const res = await runT654(recs654cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_ZONE_CLUSTER'), 'THEME_SEED_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 640 — themePass: theme clock drought run, theme staging peak uncaused, theme payoff zone cluster', async () => {
     const runT640 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
