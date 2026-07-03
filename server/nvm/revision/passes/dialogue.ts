@@ -276,6 +276,14 @@
 // than a contiguous run of absence), DIALOGUE_EMOTION_ZONE_CLUSTER (distribution/timing ×
 // emotionalShift !== 'neutral' × structural thirds — emotionalShift has only ever anchored
 // hand-rolled positive/negative filters in this pass, never the zone-cluster mode).
+// Wave 700 additions (opens the ninth rotation cycle): DIALOGUE_HIGHLIGHT_ZONE_CLUSTER
+// (distribution/timing × dialogueHighlights × structural thirds — Wave 644 applied the
+// backward-cause peak mode to dialogueHighlights; the zone-cluster mode has never been applied to
+// this channel), DIALOGUE_SEED_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// seededClueIds magnitude — Wave 658 applied the drought-run mode to seededClueIds; the
+// backward-cause peak mode has never been applied to this channel), DIALOGUE_PAYOFF_DROUGHT_RUN
+// (run-based × payoffSetupIds absence — Wave 658 applied the zone-cluster mode to payoffSetupIds;
+// the drought-run mode has never been applied to this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4156,6 +4164,75 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r686c.maxZoneCount} of the story's ${r686c.count} emotionally-charged scenes (${Math.round((r686c.maxZoneCount / r686c.count) * 100)}%) cluster in the ${zoneName686c} third. Emotional shift concentrates almost exclusively in that stretch rather than surfacing throughout, leaving other structural thirds with no emotional charge for dialogue to carry.`,
         suggestedFix: `Give at least one scene outside the ${zoneName686c} third a genuine emotional shift — spreading emotional charge across the story lets dialogue in every structural third carry some feeling, not only in one concentrated stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 700: DIALOGUE_HIGHLIGHT_ZONE_CLUSTER, DIALOGUE_SEED_PEAK_UNCAUSED,
+  //              DIALOGUE_PAYOFF_DROUGHT_RUN ───────────────────────────────────────────────────
+
+  // DIALOGUE_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-
+  // dialogue scenes, fires when >75% of them fall in a single structural third. Wave 644 applied
+  // the backward-cause peak mode to dialogueHighlights; the zone-cluster mode has never been
+  // applied to this channel.
+  {
+    const r700a = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r700a.fires) {
+      const zoneName700a = r700a.zoneNames[r700a.maxZoneIdx];
+      issues.push({
+        location: `${zoneName700a} third — ${r700a.maxZoneCount}/${r700a.count} highlighted-dialogue scenes`,
+        rule: 'DIALOGUE_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r700a.maxZoneCount} of the story's ${r700a.count} scenes carrying a standout line of dialogue (${Math.round((r700a.maxZoneCount / r700a.count) * 100)}%) cluster in the ${zoneName700a} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout, leaving other structural thirds with nothing verbally memorable to carry the story's voice.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName700a} third a standout line of dialogue — spreading memorable dialogue across the story lets every structural third carry its own verbal high point.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds magnitude.
+  // Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a 2-scene
+  // lookback. Finds the single scene with the most simultaneous clues planted; fires when neither
+  // that scene nor either of the two before it contains a dramatic turn or revelation. Wave 658
+  // applied the drought-run mode to seededClueIds; the backward-cause peak mode has never been
+  // applied to this channel.
+  {
+    const r700b = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r700b.fires) {
+      issues.push({
+        location: `scene ${r700b.peakIdx + 1} — peak seed density (${r700b.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'DIALOGUE_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r700b.peakIdx + 1}, with ${r700b.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — dialogue in that scene has no causal ground to stand on.`,
+        suggestedFix: `Give scene ${r700b.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // DIALOGUE_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. Wave 658 applied the
+  // zone-cluster mode to payoffSetupIds; the drought-run mode has never been applied to this
+  // channel.
+  {
+    const r700c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r700c.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r700c.longestRun} consecutive scenes`,
+        rule: 'DIALOGUE_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r700c.longestRun} consecutive scenes with no thread resolving at all, even though ${r700c.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves dialogue running on unresolved momentum for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r700c.longestRun}-scene stretch so dialogue's sense of accumulating satisfaction keeps building throughout that stretch.`,
       });
     }
   }
