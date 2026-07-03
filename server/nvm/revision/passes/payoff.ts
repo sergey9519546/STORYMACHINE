@@ -398,6 +398,15 @@
 // (run-based x purpose === 'complicate' absence -- completes 2 of 3 slots for this purpose
 // value alongside the zone-cluster mode added in this same wave; peak mode conventionally
 // skipped for this categorical field).
+//
+// Wave 888 additions: no purpose value had ever been audited by the distinct 4-zone
+// checkZoneImbalance mode in this pass (only seededClueIds, visualBeats, unresolvedClues, and
+// dialogueHighlights had). This wave applies it to three purpose values with complete
+// 3-zone/run-based trios: PAYOFF_CLIMAX_ZONE_IMBALANCE (purpose === 'climax'),
+// PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
+// PAYOFF_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution' -- distinct from
+// RESOLUTION_CRAMMED_AT_END/PAYOFF_POST_CLIMAX_CLUSTER, which audit payoffSetupIds temporal
+// position rather than this purpose enum value).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4842,6 +4851,84 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story contains a run of ${r874c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r874c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the payoff engine with no fresh setups planted for an extended run.`,
         suggestedFix: `Purpose at least one scene within the ${r874c.longestRun}-scene stretch to complicate the story so the payoff engine keeps planting fresh setups throughout that stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 888: PAYOFF_CLIMAX_ZONE_IMBALANCE, PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE,
+  //              PAYOFF_RESOLUTION_ZONE_IMBALANCE ──────────────────────────────────────
+
+  // PAYOFF_CLIMAX_ZONE_IMBALANCE — Underweight/bloat × purpose === 'climax' × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 climax-purposed
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero
+  // such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // PAYOFF_CLIMAX_ZONE_CLUSTER and run-based PAYOFF_CLIMAX_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r888a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r888a.fires) {
+      const emptyNames888a = r888a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName888a = FOUR_ZONE_NAMES[r888a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames888a} empty; ${bloatName888a} has ${r888a.counts[r888a.bloatZoneIdx]}/${r888a.totalCount} climax-purposed scenes`,
+        rule: 'PAYOFF_CLIMAX_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r888a.totalCount} climax-purposed scenes are unevenly distributed across its four structural zones: ${bloatName888a} contains ${r888a.counts[r888a.bloatZoneIdx]} of them (${Math.round((r888a.counts[r888a.bloatZoneIdx] / r888a.totalCount) * 100)}%) while ${emptyNames888a} contains none. Peak moments bloat in one structural quarter and vanish from another, giving the payoff engine's biggest rewards an uneven structural rhythm.`,
+        suggestedFix: `Redistribute peak moments: move at least one climax-purposed scene into the empty zone(s) — ${emptyNames888a} — so the payoff engine delivers its biggest rewards more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE — Underweight/bloat × purpose === 'establish_world' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // world-establishing scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from the
+  // existing 3-zone PAYOFF_ESTABLISH_WORLD_ZONE_CLUSTER and run-based PAYOFF_ESTABLISH_WORLD_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this purpose
+  // value.
+  {
+    const r888b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'establish_world',
+    });
+    if (r888b.fires) {
+      const emptyNames888b = r888b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName888b = FOUR_ZONE_NAMES[r888b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames888b} empty; ${bloatName888b} has ${r888b.counts[r888b.bloatZoneIdx]}/${r888b.totalCount} world-establishing scenes`,
+        rule: 'PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r888b.totalCount} world-establishing scenes are unevenly distributed across its four structural zones: ${bloatName888b} contains ${r888b.counts[r888b.bloatZoneIdx]} of them (${Math.round((r888b.counts[r888b.bloatZoneIdx] / r888b.totalCount) * 100)}%) while ${emptyNames888b} contains none. World-building bloats in one structural quarter and vanishes from another, giving the payoff engine's ground to plant setups against an uneven structural rhythm.`,
+        suggestedFix: `Redistribute world-building beats: move at least one establish_world-purposed scene into the empty zone(s) — ${emptyNames888b} — so the payoff engine keeps fresh ground to plant setups against more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_RESOLUTION_ZONE_IMBALANCE — Underweight/bloat × purpose === 'resolution' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // resolution-purposed scenes total, divided across four equal structural zones. Fires only
+  // when one zone has zero such scenes while another holds ≥50% of the total. Distinct from
+  // RESOLUTION_CRAMMED_AT_END/PAYOFF_POST_CLIMAX_CLUSTER (which audit payoffSetupIds temporal
+  // position rather than this purpose enum value) and from the existing 3-zone PAYOFF_
+  // RESOLUTION_ZONE_CLUSTER and run-based PAYOFF_RESOLUTION_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to this purpose value.
+  {
+    const r888c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r888c.fires) {
+      const emptyNames888c = r888c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName888c = FOUR_ZONE_NAMES[r888c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames888c} empty; ${bloatName888c} has ${r888c.counts[r888c.bloatZoneIdx]}/${r888c.totalCount} resolution-purposed scenes`,
+        rule: 'PAYOFF_RESOLUTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r888c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName888c} contains ${r888c.counts[r888c.bloatZoneIdx]} of them (${Math.round((r888c.counts[r888c.bloatZoneIdx] / r888c.totalCount) * 100)}%) while ${emptyNames888c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the payoff engine's closure an uneven structural rhythm.`,
+        suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames888c} — so the payoff engine's threads keep settling more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

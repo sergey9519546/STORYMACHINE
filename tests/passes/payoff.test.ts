@@ -1365,6 +1365,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 888 — payoffPass: payoff climax zone imbalance, payoff establish world zone imbalance, payoff resolution zone imbalance', async () => {
+    const runPY888 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_CLIMAX_ZONE_IMBALANCE fire:
+    // n=10, 4 zones (Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}); climax at 0,1,2,8,9 →
+    // Z0 has 3/5=60% (bloat, >=50%), Z1 and Z2 are empty.
+    it('PAYOFF_CLIMAX_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of climax-purposed scenes', async () => {
+      const recs888a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runPY888(recs888a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLIMAX_ZONE_IMBALANCE'), 'PAYOFF_CLIMAX_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_CLIMAX_ZONE_IMBALANCE does not fire when climax-purposed scenes touch every zone', async () => {
+      const recs888an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'climax' : 'complicate' }),
+      );
+      const res = await runPY888(recs888an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLIMAX_ZONE_IMBALANCE'), 'PAYOFF_CLIMAX_ZONE_IMBALANCE should not fire');
+    });
+
+    // PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of world-establishing scenes', async () => {
+      const recs888b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runPY888(recs888b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE does not fire when world-establishing scenes touch every zone', async () => {
+      const recs888bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'establish_world' : 'complicate' }),
+      );
+      const res = await runPY888(recs888bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE'), 'PAYOFF_ESTABLISH_WORLD_ZONE_IMBALANCE should not fire');
+    });
+
+    // PAYOFF_RESOLUTION_ZONE_IMBALANCE fire: same zone geometry as above.
+    it('PAYOFF_RESOLUTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of resolution-purposed scenes', async () => {
+      const recs888c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2, 8, 9].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runPY888(recs888c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RESOLUTION_ZONE_IMBALANCE'), 'PAYOFF_RESOLUTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_RESOLUTION_ZONE_IMBALANCE does not fire when resolution-purposed scenes touch every zone', async () => {
+      const recs888cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 5, 8].includes(i) ? 'resolution' : 'complicate' }),
+      );
+      const res = await runPY888(recs888cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RESOLUTION_ZONE_IMBALANCE'), 'PAYOFF_RESOLUTION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 874 — payoffPass: payoff resolution drought run, payoff complicate zone cluster, payoff complicate drought run', async () => {
     const runPY874 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
