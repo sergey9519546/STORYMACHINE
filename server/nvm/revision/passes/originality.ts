@@ -257,6 +257,16 @@
 // ORIGINALITY_PAYOFF_PEAK_UNCAUSED (single-peak isolation/backward-cause × payoffSetupIds
 // magnitude — Wave 662 applied the zone-cluster mode to payoffSetupIds; this applies the
 // backward-cause peak mode to the same channel, a genuinely different question).
+// Wave 690 additions (built on the shared checks library): ORIGINALITY_PAYOFF_DROUGHT_RUN
+// (run-based × payoffSetupIds absence — Waves 648/662/676 applied co-occurrence-decoupling,
+// zone-cluster, and backward-cause peak modes to payoffSetupIds; the run-based drought mode has
+// never been applied to it, completing the field's coverage), ORIGINALITY_CLOCK_DROUGHT_RUN
+// (run-based × clockRaised absence — Wave 606's CLOCK_RAISED_ZONE_CLUSTER applied the
+// distribution/timing mode to this channel; the run-based drought mode has never been applied to
+// it), ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER (distribution/timing × dialogueHighlights × structural
+// thirds — Wave 662 applied the backward-cause peak mode to dialogueHighlights; the zone-cluster
+// mode has never been applied to this channel — a predictable, front- or back-loaded distribution
+// of the story's most memorable dialogue is itself a learnable pattern).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4243,6 +4253,75 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's single densest scene for thread resolution (scene ${r676c.peakIdx + 1}, with ${r676c.peakMagnitude} payoffs resolving at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where the most convergent resolution lands arrives without any structural pivot or disclosure driving it — a learnable, causally unmotivated convenience rather than an earned convergence.`,
         suggestedFix: `Give scene ${r676c.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most convergent resolution is earned by a structural shift rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // ── Wave 690: ORIGINALITY_PAYOFF_DROUGHT_RUN, ORIGINALITY_CLOCK_DROUGHT_RUN,
+  //              ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER ────────────────────────────────────────────
+
+  // ORIGINALITY_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest
+  // consecutive run of scenes with zero thread resolution reaches 6. Waves 648/662/676 applied
+  // co-occurrence-decoupling, zone-cluster, and backward-cause peak modes to payoffSetupIds; the
+  // run-based drought mode has never been applied to it. A long, predictable stretch where nothing
+  // ever resolves is itself a learnable rhythm.
+  {
+    const r690a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r690a.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r690a.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r690a.longestRun} consecutive scenes with no thread resolving at all, even though ${r690a.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves is itself a learnable pattern — the audience can predict that no answer will arrive for an extended stretch.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r690a.longestRun}-scene stretch so the audience can't predict a long, answer-free lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_DROUGHT_RUN — Run-based × clockRaised absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 clock-raised scenes overall, fires when the longest
+  // consecutive run of scenes with no clock raised reaches 6. Wave 606's CLOCK_RAISED_ZONE_CLUSTER
+  // applied the distribution/timing mode to this channel; the run-based drought mode has never
+  // been applied to it.
+  {
+    const r690b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r690b.fires) {
+      issues.push({
+        location: `longest stretch with no clock raised: ${r690b.longestRun} consecutive scenes`,
+        rule: 'ORIGINALITY_CLOCK_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r690b.longestRun} consecutive scenes with no clock raised at all, even though ${r690b.presentCount} scenes elsewhere do establish time pressure. A long unbroken stretch with no deadline in play is itself a learnable rhythm — the audience can predict that urgency won't reappear for an extended stretch.`,
+        suggestedFix: `Raise a clock somewhere within the ${r690b.longestRun}-scene stretch — a deadline, a closing window, a ticking consequence — so time pressure resurfaces unpredictably throughout the story.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER — Distribution/timing × dialogueHighlights × structural
+  // thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3 highlighted-
+  // dialogue scenes, fires when >75% of them fall in a single structural third. Wave 662 applied
+  // the backward-cause peak mode to dialogueHighlights; the zone-cluster mode has never been
+  // applied to this channel — a predictable, front- or back-loaded distribution of the story's
+  // most memorable dialogue is itself a learnable pattern.
+  {
+    const r690c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r690c.fires) {
+      const zoneName690c = r690c.zoneNames[r690c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName690c} third — ${r690c.maxZoneCount}/${r690c.count} highlighted-dialogue scenes`,
+        rule: 'ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r690c.maxZoneCount} of the story's ${r690c.count} scenes carrying a standout line of dialogue (${Math.round((r690c.maxZoneCount / r690c.count) * 100)}%) cluster in the ${zoneName690c} third. Memorable dialogue concentrates almost exclusively in that stretch rather than landing throughout — once the audience notices the pattern, they learn which third to expect a quotable line in rather than experiencing genuinely unpredictable placement.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName690c} third a standout line of dialogue — spreading memorable dialogue across the story keeps its placement genuinely unpredictable.`,
       });
     }
   }
