@@ -208,10 +208,16 @@
 // STAGING_ZONE_IMBALANCE (underweight/bloat × visualBeats × four structural zones — first use of
 // visualBeats anywhere in this pass), OPEN_THREAD_PAYOFF_AFTERMATH_VOID (sequence/aftermath ×
 // heavy unresolvedClues debt → payoff absence).
+// Wave 619 additions (built on the shared checks library, audit M2.2): PAYOFF_PHYSICAL_STAGING_
+// DECOUPLED (co-occurrence/decoupling × payoffSetupIds × visualBeats — visualBeats has never been
+// paired with any other field in this 102-rule pass, only used standalone in Wave 605's zone
+// check), SEED_STAGING_AFTERMATH_VOID (sequence/aftermath × seededClueIds trigger → visualBeats
+// absence), PHYSICAL_STAGING_PEAK_UNCAUSED (backward-cause × visualBeats-density peak ×
+// revelation/dramaticTurn cause).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract unique character IDs from dialogue highlights across all records */
 function extractCharacterIds(records: PassInput['records']): Set<string> {
@@ -3539,6 +3545,82 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r605c.triggerCount} instances, each with 3 or more open threads at once) is followed by two full scenes with no payoff, even though ${r605c.aftermathCount} payoffs occur elsewhere in the story. The heaviest concentrations of open debt never lead into a nearby resolution — the pressure of stacked unanswered setups is never relieved in its immediate aftermath.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, resolve at least one of the outstanding threads — let the accumulated pressure of unpaid setups find release nearby rather than compounding indefinitely before any payoff arrives.`,
+      });
+    }
+  }
+
+  // ── Wave 619: PAYOFF_PHYSICAL_STAGING_DECOUPLED, SEED_STAGING_AFTERMATH_VOID,
+  //              PHYSICAL_STAGING_PEAK_UNCAUSED ─────────────────────────────────────────────
+  // visualBeats has only ever been used standalone (Wave 605's zone-imbalance check) — never
+  // paired with any other signal in this 102-rule pass. All three checks below pair it for the
+  // first time, with the seed/payoff channels and with the backward-cause analytical lens.
+
+  // PAYOFF_PHYSICAL_STAGING_DECOUPLED — Co-occurrence/decoupling × payoffSetupIds × visualBeats.
+  // Built on checkCoOccurrenceDecoupled from the shared checks library. n≥6, ≥2 payoff scenes, ≥2
+  // visually-staged scenes (visualBeats.length≥2). Zero overlap → fire. A resolved setup and a
+  // scene rich in physical staging never happen together — every payoff lands through dialogue or
+  // interiority alone.
+  {
+    const r619a = checkCoOccurrenceDecoupled({
+      records, minRecords: 6, minACount: 2, minBCount: 2,
+      isA: r => (r.payoffSetupIds ?? []).length > 0,
+      isB: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r619a.fires) {
+      issues.push({
+        location: `${r619a.aCount} payoff scene(s), ${r619a.bCount} visually-staged scene(s) — zero overlap`,
+        rule: 'PAYOFF_PHYSICAL_STAGING_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r619a.aCount} scenes where a planted setup resolves never coincide with the ${r619a.bCount} scenes leaning heavily on physical staging — resolution and physical presence run on separate tracks. A payoff often lands with more weight when a character's physical action embodies what the resolution means, rather than the moment being carried entirely through dialogue.`,
+        suggestedFix: `Let at least one payoff scene also lean on physical staging — an object a character handles, or an action they take, that embodies what the resolved setup means now that it has paid off.`,
+      });
+    }
+  }
+
+  // SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a 2-scene lookahead
+  // window. Fires when every seed's two-scene aftermath contains no visually dense scene, while
+  // such scenes do occur elsewhere. Seeds are the story's long-horizon deposits; when their
+  // immediate aftermath is never physically staged, the planted material gets no visible presence
+  // in the world nearby — it exists only as dialogue or narration until its eventual payoff.
+  {
+    const r619b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r619b.fires) {
+      issues.push({
+        location: `${r619b.triggerCount} seed scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r619b.triggerCount} clue-planting scenes is followed by two scenes with no substantial physical staging, even though ${r619b.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when the world around them briefly holds physical attention — an object lingered on, a space explored — but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry substantial physical staging — the planted material or its surroundings given some visible, tactile presence before the story moves on.`,
+      });
+    }
+  }
+
+  // PHYSICAL_STAGING_PEAK_UNCAUSED — Backward-cause × visualBeats-density peak ×
+  // revelation/dramaticTurn cause. Built on checkPeakUncaused from the shared checks library.
+  // n≥8, ≥2 scenes with visualBeats present, a 2-scene lookback. Finds the single scene with the
+  // most physical staging beats and fires when neither that scene nor either of the 2 scenes
+  // before it contains a revelation or a dramatic turn. The story's single most visually dense
+  // scene should be motivated by something the narrative is dramatizing — a disclosed truth or a
+  // pivot — not simply appear as unmotivated staging.
+  {
+    const r619c = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.visualBeats ?? []).length,
+      hasCause: r => r.revelation != null || (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r619c.fires) {
+      issues.push({
+        location: `Scene at position ${r619c.peakIdx + 1} — peak physical staging (${r619c.peakMagnitude} beats) with no revelation or dramatic turn nearby`,
+        rule: 'PHYSICAL_STAGING_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The scene with the story's single densest physical staging (${r619c.peakMagnitude} visual beats, out of ${r619c.qualifyingCount} scenes with any staging at all) has no revelation and no dramatic turn in itself or in either of the 2 scenes before it. The moment the story invests most heavily in physical description arrives with no disclosure or pivot explaining why — the staging is dense but unmotivated by anything the plot is doing.`,
+        suggestedFix: `Add a revelation or a dramatic turn in the scene with the densest physical staging, or in one of the two scenes before it, so the audience understands why this particular moment earns such heavy physical attention.`,
       });
     }
   }

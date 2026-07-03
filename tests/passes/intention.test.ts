@@ -1352,6 +1352,102 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 619 — intentionPass: payoff physical staging decoupled, seed staging aftermath void, physical staging peak uncaused', async () => {
+    const makeRec619 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN619 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_PHYSICAL_STAGING_DECOUPLED fire:
+    // n=6; payoffs at 0,1 (no staging); staged at 4,5 (no payoff) → zero overlap → fires
+    it('PAYOFF_PHYSICAL_STAGING_DECOUPLED fires when payoff scenes and visually-staged scenes never overlap', async () => {
+      const recs619a = Array.from({ length: 6 }, (_, i) => makeRec619(i));
+      recs619a[0] = makeRec619(0, { payoffSetupIds: ['thread-a'] });
+      recs619a[1] = makeRec619(1, { payoffSetupIds: ['thread-b'] });
+      recs619a[4] = makeRec619(4, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619a[5] = makeRec619(5, { visualBeats: ['opens the box', 'reads the note'] });
+      const res = await runIN619(recs619a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_PHYSICAL_STAGING_DECOUPLED'), 'PAYOFF_PHYSICAL_STAGING_DECOUPLED should fire');
+    });
+
+    // PAYOFF_PHYSICAL_STAGING_DECOUPLED no-fire:
+    // scene 0 carries BOTH a payoff and visual staging → overlap exists
+    it('PAYOFF_PHYSICAL_STAGING_DECOUPLED does not fire when a scene carries both signals', async () => {
+      const recs619an = Array.from({ length: 6 }, (_, i) => makeRec619(i));
+      recs619an[0] = makeRec619(0, { payoffSetupIds: ['thread-a'], visualBeats: ['opens the box', 'reads the note'] });
+      recs619an[1] = makeRec619(1, { payoffSetupIds: ['thread-b'] });
+      recs619an[5] = makeRec619(5, { visualBeats: ['opens the box', 'reads the note'] });
+      const res = await runIN619(recs619an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_PHYSICAL_STAGING_DECOUPLED'), 'PAYOFF_PHYSICAL_STAGING_DECOUPLED should not fire');
+    });
+
+    // SEED_STAGING_AFTERMATH_VOID fire:
+    // n=8, window=2; seed triggers at 0,1; their windows {1,2} and {2,3} carry no visually dense
+    // scene; staged scenes exist elsewhere at 5,6,7 → fires
+    it('SEED_STAGING_AFTERMATH_VOID fires when no seed is followed by a visually dense scene within 2 scenes', async () => {
+      const recs619b = Array.from({ length: 8 }, (_, i) => makeRec619(i));
+      recs619b[0] = makeRec619(0, { seededClueIds: ['clue-a'] });
+      recs619b[1] = makeRec619(1, { seededClueIds: ['clue-b'] });
+      recs619b[5] = makeRec619(5, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619b[6] = makeRec619(6, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619b[7] = makeRec619(7, { visualBeats: ['opens the box', 'reads the note'] });
+      const res = await runIN619(recs619b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'SEED_STAGING_AFTERMATH_VOID'), 'SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    // SEED_STAGING_AFTERMATH_VOID no-fire:
+    // scene 3 (inside trigger 1's window {2,3}) now carries staging → that trigger's aftermath
+    // is no longer void
+    it('SEED_STAGING_AFTERMATH_VOID does not fire when a trigger window contains a visually dense scene', async () => {
+      const recs619bn = Array.from({ length: 8 }, (_, i) => makeRec619(i));
+      recs619bn[0] = makeRec619(0, { seededClueIds: ['clue-a'] });
+      recs619bn[1] = makeRec619(1, { seededClueIds: ['clue-b'] });
+      recs619bn[3] = makeRec619(3, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619bn[5] = makeRec619(5, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619bn[6] = makeRec619(6, { visualBeats: ['opens the box', 'reads the note'] });
+      recs619bn[7] = makeRec619(7, { visualBeats: ['opens the box', 'reads the note'] });
+      const res = await runIN619(recs619bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'SEED_STAGING_AFTERMATH_VOID'), 'SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    // PHYSICAL_STAGING_PEAK_UNCAUSED fire:
+    // 8 scenes; visualBeats present at 2 (1 beat) and 6 (5 beats, the peak); no revelation or
+    // dramaticTurn at 6, 5, or 4
+    it('PHYSICAL_STAGING_PEAK_UNCAUSED fires when the peak physical-staging scene has no revelation or dramatic turn nearby', async () => {
+      const recs619c = Array.from({ length: 8 }, (_, i) => makeRec619(i));
+      recs619c[2] = makeRec619(2, { visualBeats: ['glances outside'] });
+      recs619c[6] = makeRec619(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runIN619(recs619c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PHYSICAL_STAGING_PEAK_UNCAUSED'), 'PHYSICAL_STAGING_PEAK_UNCAUSED should fire');
+    });
+
+    // PHYSICAL_STAGING_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('PHYSICAL_STAGING_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs619cn = Array.from({ length: 8 }, (_, i) => makeRec619(i));
+      recs619cn[2] = makeRec619(2, { visualBeats: ['glances outside'] });
+      recs619cn[5] = makeRec619(5, { dramaticTurn: 'reversal' });
+      recs619cn[6] = makeRec619(6, { visualBeats: ['a', 'b', 'c', 'd', 'e'] });
+      const res = await runIN619(recs619cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PHYSICAL_STAGING_PEAK_UNCAUSED'), 'PHYSICAL_STAGING_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 605 — intentionPass: open thread revelation decoupled, physical staging zone imbalance, open thread payoff aftermath void', async () => {
     const makeRec605 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
