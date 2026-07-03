@@ -236,6 +236,17 @@
 // (distribution/timing × seededClueIds × structural thirds — Wave 640's THEME_PAYOFF_ZONE_CLUSTER
 // applied the zone-cluster mode to payoffSetupIds; seededClueIds itself has never been
 // cluster-audited here).
+// Wave 668 additions: THEME_RELATIONSHIP_PEAK_UNCAUSED (single-peak isolation/backward-cause ×
+// relationshipShifts magnitude — the scene with the most simultaneous bond changes has no
+// dramatic turn or revelation in itself or the two scenes before it; distinct from the existing
+// hand-rolled THEME_RELATIONSHIP_PEAK_ABSENT [Wave 360], which checks whether the peak
+// relational-shift scene lacks thematic resonance, not whether it is backward-caused),
+// THEME_PAYOFF_DROUGHT_RUN (run-based × payoffSetupIds absence — Wave 640 applied the
+// drought-run mode to clockRaised; payoffSetupIds itself has never been drought-audited despite
+// anchoring THEME_PAYOFF_ZONE_CLUSTER and THEME_PAYOFF_PEAK_ABSENT already), THEME_TURN_ZONE_
+// CLUSTER (distribution/timing × dramaticTurn presence × structural thirds — Wave 640/654 applied
+// the zone-cluster mode to payoffSetupIds and seededClueIds; dramaticTurn itself has never been
+// cluster-audited despite being the most heavily used field in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3803,6 +3814,76 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r654c.maxZoneCount} of the story's ${r654c.count} clue-planting scenes (${Math.round((r654c.maxZoneCount / r654c.count) * 100)}%) cluster in the ${zoneName654c} third. Foreshadowing concentrates almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's sense of gradual accumulation an uneven structural rhythm.`,
         suggestedFix: `Plant at least one clue outside the ${zoneName654c} third — spreading foreshadowing across the story lets the theme's sense of accumulating mystery build gradually instead of arriving all at once.`,
+      });
+    }
+  }
+
+  // ── Wave 668: THEME_RELATIONSHIP_PEAK_UNCAUSED, THEME_PAYOFF_DROUGHT_RUN,
+  //              THEME_TURN_ZONE_CLUSTER ─────────────────────────────────────────────────────
+
+  // THEME_RELATIONSHIP_PEAK_UNCAUSED — Single-peak isolation/backward-cause × relationshipShifts
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 scenes carrying
+  // a relationship shift, a 2-scene lookback. Finds the single scene with the most simultaneous
+  // bond changes; fires when neither that scene nor either of the two before it contains a
+  // dramatic turn or revelation. Distinct from the existing hand-rolled THEME_RELATIONSHIP_PEAK_
+  // ABSENT (Wave 360), which checks whether the peak relational-shift scene lacks thematic
+  // resonance, not whether it is backward-caused.
+  {
+    const r668a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.relationshipShifts ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r668a.fires) {
+      issues.push({
+        location: `scene ${r668a.peakIdx + 1} — peak relationship-shift density (${r668a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'THEME_RELATIONSHIP_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for relationship shifts (scene ${r668a.peakIdx + 1}, with ${r668a.peakMagnitude} simultaneous bond changes) has no dramatic turn or revelation in itself or the two scenes before it. The moment where relational upheaval concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike that undercuts the theme's sense of causal escalation.`,
+        suggestedFix: `Give scene ${r668a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most relationally dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_DROUGHT_RUN — Run-based × payoffSetupIds absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 payoff scenes overall, fires when the longest consecutive
+  // run of scenes with zero thread resolution reaches 6. Wave 640 applied the drought-run mode to
+  // clockRaised; payoffSetupIds itself has never been drought-audited despite anchoring THEME_
+  // PAYOFF_ZONE_CLUSTER and THEME_PAYOFF_PEAK_ABSENT already.
+  {
+    const r668b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r668b.fires) {
+      issues.push({
+        location: `longest stretch with no payoff: ${r668b.longestRun} consecutive scenes`,
+        rule: 'THEME_PAYOFF_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r668b.longestRun} consecutive scenes with no thread resolving at all, even though ${r668b.presentCount} scenes elsewhere do pay off a setup. A long stretch where nothing resolves leaves the theme's sense of accumulating meaning dormant for an extended run.`,
+        suggestedFix: `Resolve at least one thread somewhere within the ${r668b.longestRun}-scene stretch so the theme's sense of accumulating meaning keeps building throughout that stretch.`,
+      });
+    }
+  }
+
+  // THEME_TURN_ZONE_CLUSTER — Distribution/timing × dramaticTurn presence × structural thirds.
+  // Built on checkZoneCluster from the shared checks library. n≥9, ≥3 dramatic-turn scenes, fires
+  // when >75% of them fall in a single structural third. Waves 640/654 applied the zone-cluster
+  // mode to payoffSetupIds and seededClueIds; dramaticTurn itself has never been cluster-audited
+  // despite being the most heavily used field in this pass.
+  {
+    const r668c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r668c.fires) {
+      const zoneName668c = r668c.zoneNames[r668c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName668c} third — ${r668c.maxZoneCount}/${r668c.count} dramatic-turn scenes`,
+        rule: 'THEME_TURN_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r668c.maxZoneCount} of the story's ${r668c.count} dramatic-turn scenes (${Math.round((r668c.maxZoneCount / r668c.count) * 100)}%) cluster in the ${zoneName668c} third. Structural pivots concentrate almost exclusively in that stretch of the story rather than surfacing throughout, giving the theme's argument an uneven structural rhythm.`,
+        suggestedFix: `Give at least one scene outside the ${zoneName668c} third a dramatic turn — spreading structural pivots across the story lets the theme's argument develop gradually instead of arriving all at once.`,
       });
     }
   }

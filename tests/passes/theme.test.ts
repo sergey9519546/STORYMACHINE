@@ -931,6 +931,84 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 668 — themePass: theme relationship peak uncaused, theme payoff drought run, theme turn zone cluster', async () => {
+    const runT668 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // THEME_RELATIONSHIP_PEAK_UNCAUSED fire:
+    // 8 scenes; shifts at 2 (1 shift) and 6 (5 shifts, the peak); no dramaticTurn or revelation at
+    // 6, 5, or 4
+    it('THEME_RELATIONSHIP_PEAK_UNCAUSED fires when the peak relationship-shift scene has no dramatic turn or revelation nearby', async () => {
+      const recs668a = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs668a[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs668a[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runT668(recs668a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_PEAK_UNCAUSED'), 'THEME_RELATIONSHIP_PEAK_UNCAUSED should fire');
+    });
+
+    // THEME_RELATIONSHIP_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('THEME_RELATIONSHIP_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs668an = Array.from({ length: 8 }, (_, i) => makeSharedRecord(i));
+      recs668an[2] = makeSharedRecord(2, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.2 }] });
+      recs668an[5] = makeSharedRecord(5, { dramaticTurn: 'reversal' });
+      recs668an[6] = makeSharedRecord(6, { relationshipShifts: [0, 1, 2, 3, 4].map(n => ({ pairKey: `a|${n}`, dimension: 'trust', amount: 0.2 })) });
+      const res = await runT668(recs668an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_RELATIONSHIP_PEAK_UNCAUSED'), 'THEME_RELATIONSHIP_PEAK_UNCAUSED should not fire');
+    });
+
+    // THEME_PAYOFF_DROUGHT_RUN fire:
+    // 10 scenes; payoffs at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('THEME_PAYOFF_DROUGHT_RUN fires when the longest no-payoff run is ≥6', async () => {
+      const recs668b = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs668b[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs668b[1] = makeSharedRecord(1, { payoffSetupIds: ['thread-b'] });
+      recs668b[2] = makeSharedRecord(2, { payoffSetupIds: ['thread-c'] });
+      recs668b[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-d'] });
+      const res = await runT668(recs668b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DROUGHT_RUN'), 'THEME_PAYOFF_DROUGHT_RUN should fire');
+    });
+
+    // THEME_PAYOFF_DROUGHT_RUN no-fire:
+    // payoffs at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('THEME_PAYOFF_DROUGHT_RUN does not fire when payoffs are distributed without a long drought', async () => {
+      const recs668bn = Array.from({ length: 10 }, (_, i) => makeSharedRecord(i));
+      recs668bn[0] = makeSharedRecord(0, { payoffSetupIds: ['thread-a'] });
+      recs668bn[4] = makeSharedRecord(4, { payoffSetupIds: ['thread-b'] });
+      recs668bn[9] = makeSharedRecord(9, { payoffSetupIds: ['thread-c'] });
+      const res = await runT668(recs668bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DROUGHT_RUN'), 'THEME_PAYOFF_DROUGHT_RUN should not fire');
+    });
+
+    // THEME_TURN_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; dramatic-turn scenes at 0,1,2 → 100% opening third
+    it('THEME_TURN_ZONE_CLUSTER fires when >75% of dramatic-turn scenes cluster in one third', async () => {
+      const recs668c = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs668c[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs668c[1] = makeSharedRecord(1, { dramaticTurn: 'reversal' });
+      recs668c[2] = makeSharedRecord(2, { dramaticTurn: 'reversal' });
+      const res = await runT668(recs668c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_ZONE_CLUSTER'), 'THEME_TURN_ZONE_CLUSTER should fire');
+    });
+
+    // THEME_TURN_ZONE_CLUSTER no-fire:
+    // dramatic-turn scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('THEME_TURN_ZONE_CLUSTER does not fire when dramatic-turn scenes are distributed across thirds', async () => {
+      const recs668cn = Array.from({ length: 9 }, (_, i) => makeSharedRecord(i));
+      recs668cn[0] = makeSharedRecord(0, { dramaticTurn: 'reversal' });
+      recs668cn[4] = makeSharedRecord(4, { dramaticTurn: 'reversal' });
+      recs668cn[7] = makeSharedRecord(7, { dramaticTurn: 'reversal' });
+      const res = await runT668(recs668cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_ZONE_CLUSTER'), 'THEME_TURN_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 654 — themePass: theme open thread peak uncaused, theme highlight drought run, theme seed zone cluster', async () => {
     const runT654 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
