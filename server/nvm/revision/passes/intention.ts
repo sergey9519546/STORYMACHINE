@@ -254,6 +254,15 @@
 // (distribution/timing × emotionalShift === 'positive' × structural thirds — emotionalShift
 // anchors several hand-rolled decoupled checks [PROACTIVE_EMOTION_DECOUPLED, PAYOFF_EMOTION_
 // DECOUPLED, REVELATION_EMOTION_DECOUPLED] but has never been cluster-audited).
+// Wave 689 additions (built on the shared checks library): INTENTION_SEED_PEAK_UNCAUSED
+// (single-peak isolation/backward-cause × seededClueIds magnitude — seededClueIds is this pass's
+// most heavily used field [36 accesses] but has only ever anchored hand-rolled aggregate and
+// co-occurrence logic, never the shared-library backward-cause peak mode), INTENTION_STAGING_
+// DROUGHT_RUN (run-based × visualBeats absence — visualBeats has only anchored a single
+// co-occurrence/decoupling check [Wave 647] against curiosityDelta; never drought-audited),
+// INTENTION_CLOCK_ZONE_CLUSTER (distribution/timing × clockRaised × structural thirds — Wave 661
+// applied the drought-run mode to clockRaised; the zone-cluster mode has never been applied to
+// this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -3945,6 +3954,73 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${r675c.maxZoneCount} of the story's ${r675c.count} positive-emotion scenes (${Math.round((r675c.maxZoneCount / r675c.count) * 100)}%) cluster in the ${zoneName675c} third. Emotional lift concentrates almost exclusively in that stretch of the story rather than surfacing throughout, leaving other structural thirds with no sense of the protagonist's initiative paying off in felt relief.`,
         suggestedFix: `Let at least one scene outside the ${zoneName675c} third carry a positive emotional shift — spreading moments of relief across the story keeps the protagonist's initiative rewarded throughout, not only in one stretch.`,
+      });
+    }
+  }
+
+  // ── Wave 689: INTENTION_SEED_PEAK_UNCAUSED, INTENTION_STAGING_DROUGHT_RUN,
+  //              INTENTION_CLOCK_ZONE_CLUSTER ───────────────────────────────────────────────────
+
+  // INTENTION_SEED_PEAK_UNCAUSED — Single-peak isolation/backward-cause × seededClueIds
+  // magnitude. Built on checkPeakUncaused from the shared checks library. n≥8, ≥2 seed scenes, a
+  // 2-scene lookback. Finds the single scene with the most simultaneous clues planted; fires when
+  // neither that scene nor either of the two before it contains a dramatic turn or revelation.
+  // seededClueIds is this pass's most heavily used field but has only ever anchored hand-rolled
+  // aggregate and co-occurrence logic, never the shared-library backward-cause peak mode.
+  {
+    const r689a = checkPeakUncaused({
+      records, minRecords: 8, minQualifying: 2, lookback: 2,
+      magnitude: r => (r.seededClueIds ?? []).length,
+      hasCause: r => r.dramaticTurn !== 'nothing' || r.revelation != null,
+    });
+    if (r689a.fires) {
+      issues.push({
+        location: `scene ${r689a.peakIdx + 1} — peak seed density (${r689a.peakMagnitude}) with no dramatic turn or revelation nearby`,
+        rule: 'INTENTION_SEED_PEAK_UNCAUSED',
+        severity: 'minor',
+        description: `The story's single densest scene for planting new clues (scene ${r689a.peakIdx + 1}, with ${r689a.peakMagnitude} clues seeded at once) has no dramatic turn or revelation in itself or the two scenes before it. The moment where foreshadowing concentrates most heavily arrives without any structural pivot or disclosure driving it — an uncaused spike in setup that undercuts the sense that initiative drives what gets planted.`,
+        suggestedFix: `Give scene ${r689a.peakIdx + 1} — or one of the two scenes just before it — a dramatic turn or revelation, so the story's most seed-dense moment is earned by a shift in circumstance rather than arriving in a causal vacuum.`,
+      });
+    }
+  }
+
+  // INTENTION_STAGING_DROUGHT_RUN — Run-based × visualBeats absence. Built on checkDroughtRun from
+  // the shared checks library. n≥10, ≥3 physically-staged scenes overall, fires when the longest
+  // consecutive run of scenes with zero visual beats reaches 6. visualBeats has only anchored a
+  // single co-occurrence/decoupling check (Wave 647) against curiosityDelta; never drought-audited.
+  {
+    const r689b = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r689b.fires) {
+      issues.push({
+        location: `longest stretch with zero visual staging: ${r689b.longestRun} consecutive scenes`,
+        rule: 'INTENTION_STAGING_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r689b.longestRun} consecutive scenes with no visual staging beats at all, even though ${r689b.presentCount} scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the protagonist's initiative without any staged action to anchor it.`,
+        suggestedFix: `Add a physical staging beat somewhere within the ${r689b.longestRun}-scene stretch — a gesture, an object, a piece of blocking — so the protagonist's intention stays visually grounded throughout.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_ZONE_CLUSTER — Distribution/timing × clockRaised × structural thirds. Built on
+  // checkZoneCluster from the shared checks library. n≥9, ≥3 clock-raised scenes, fires when >75%
+  // of them fall in a single structural third. Wave 661 applied the drought-run mode to
+  // clockRaised; the zone-cluster mode has never been applied to this channel.
+  {
+    const r689c = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r689c.fires) {
+      const zoneName689c = r689c.zoneNames[r689c.maxZoneIdx];
+      issues.push({
+        location: `${zoneName689c} third — ${r689c.maxZoneCount}/${r689c.count} clock-raised scenes`,
+        rule: 'INTENTION_CLOCK_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r689c.maxZoneCount} of the story's ${r689c.count} clock-raised scenes (${Math.round((r689c.maxZoneCount / r689c.count) * 100)}%) cluster in the ${zoneName689c} third. Time pressure concentrates almost exclusively in that stretch of the story rather than persisting throughout, leaving other structural thirds with no deadline sharpening the protagonist's initiative.`,
+        suggestedFix: `Raise a clock in at least one scene outside the ${zoneName689c} third — spreading time pressure across the story keeps the protagonist's initiative under some urgency in every structural third.`,
       });
     }
   }

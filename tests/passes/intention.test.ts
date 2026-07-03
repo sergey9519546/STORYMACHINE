@@ -1352,6 +1352,93 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 689 — intentionPass: intention seed peak uncaused, intention staging drought run, intention clock zone cluster', async () => {
+    const makeRec689 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN689 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: { revelationCount: records.filter((r: any) => r.revelation).length } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // INTENTION_SEED_PEAK_UNCAUSED fire:
+    // 8 scenes; seeds at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('INTENTION_SEED_PEAK_UNCAUSED fires when the peak seed scene has no dramatic turn or revelation nearby', async () => {
+      const recs689a = Array.from({ length: 8 }, (_, i) => makeRec689(i,
+        i === 2 ? { seededClueIds: ['clue-a'] }
+        : i === 6 ? { seededClueIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runIN689(recs689a);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_SEED_PEAK_UNCAUSED'), 'INTENTION_SEED_PEAK_UNCAUSED should fire');
+    });
+
+    // INTENTION_SEED_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('INTENTION_SEED_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs689an = Array.from({ length: 8 }, (_, i) => makeRec689(i,
+        i === 2 ? { seededClueIds: ['clue-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { seededClueIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runIN689(recs689an);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_SEED_PEAK_UNCAUSED'), 'INTENTION_SEED_PEAK_UNCAUSED should not fire');
+    });
+
+    // INTENTION_STAGING_DROUGHT_RUN fire:
+    // 10 scenes; visual beats at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('INTENTION_STAGING_DROUGHT_RUN fires when the longest no-visual-beat run is ≥6', async () => {
+      const recs689b = Array.from({ length: 10 }, (_, i) => makeRec689(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { visualBeats: ['a beat'] } : {}
+      ));
+      const res = await runIN689(recs689b);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_STAGING_DROUGHT_RUN'), 'INTENTION_STAGING_DROUGHT_RUN should fire');
+    });
+
+    // INTENTION_STAGING_DROUGHT_RUN no-fire:
+    // visual beats at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('INTENTION_STAGING_DROUGHT_RUN does not fire when visual beats are distributed without a long drought', async () => {
+      const recs689bn = Array.from({ length: 10 }, (_, i) => makeRec689(i,
+        (i === 0 || i === 4 || i === 9) ? { visualBeats: ['a beat'] } : {}
+      ));
+      const res = await runIN689(recs689bn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_STAGING_DROUGHT_RUN'), 'INTENTION_STAGING_DROUGHT_RUN should not fire');
+    });
+
+    // INTENTION_CLOCK_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; clock-raised scenes at 0,1,2 → 100% opening third
+    it('INTENTION_CLOCK_ZONE_CLUSTER fires when >75% of clock-raised scenes cluster in one third', async () => {
+      const recs689c = Array.from({ length: 9 }, (_, i) => makeRec689(i,
+        (i === 0 || i === 1 || i === 2) ? { clockRaised: true } : {}
+      ));
+      const res = await runIN689(recs689c);
+      assert.ok(res.issues.some((iss: any) => iss.rule === 'INTENTION_CLOCK_ZONE_CLUSTER'), 'INTENTION_CLOCK_ZONE_CLUSTER should fire');
+    });
+
+    // INTENTION_CLOCK_ZONE_CLUSTER no-fire:
+    // clock-raised scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('INTENTION_CLOCK_ZONE_CLUSTER does not fire when clock-raised scenes are distributed across thirds', async () => {
+      const recs689cn = Array.from({ length: 9 }, (_, i) => makeRec689(i,
+        (i === 0 || i === 4 || i === 7) ? { clockRaised: true } : {}
+      ));
+      const res = await runIN689(recs689cn);
+      assert.ok(!res.issues.some((iss: any) => iss.rule === 'INTENTION_CLOCK_ZONE_CLUSTER'), 'INTENTION_CLOCK_ZONE_CLUSTER should not fire');
+    });
+  });
+
   describe('Wave 675 — intentionPass: intention clock delta peak uncaused, intention stakes drought run, intention positive emotion zone cluster', async () => {
     const makeRec675 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
