@@ -1598,6 +1598,94 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 714 — dialoguePass: highlighted dialogue drought run, dialogue seed zone cluster, dialogue payoff peak uncaused', async () => {
+    const makeRec714 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'complicate', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes714 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD714 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // HIGHLIGHTED_DIALOGUE_DROUGHT_RUN fire:
+    // 10 scenes; highlights at 0,1,2,9; drought run 3-8 = 6 consecutive ≥ 6
+    it('HIGHLIGHTED_DIALOGUE_DROUGHT_RUN fires when the longest no-highlighted-dialogue run is ≥6', async () => {
+      const recs714a = Array.from({ length: 10 }, (_, i) => makeRec714(i,
+        (i === 0 || i === 1 || i === 2 || i === 9) ? { dialogueHighlights: ['line-a'] } : {}
+      ));
+      const res = await runD714(buildScenes714(10), recs714a);
+      assert.ok(res.issues.some((is: any) => is.rule === 'HIGHLIGHTED_DIALOGUE_DROUGHT_RUN'), 'HIGHLIGHTED_DIALOGUE_DROUGHT_RUN should fire');
+    });
+
+    // HIGHLIGHTED_DIALOGUE_DROUGHT_RUN no-fire:
+    // highlights at 0,4,9 → longest drought run = 4 (scenes 5-8) < 6
+    it('HIGHLIGHTED_DIALOGUE_DROUGHT_RUN does not fire when highlighted dialogue is distributed without a long drought', async () => {
+      const recs714an = Array.from({ length: 10 }, (_, i) => makeRec714(i,
+        (i === 0 || i === 4 || i === 9) ? { dialogueHighlights: ['line-a'] } : {}
+      ));
+      const res = await runD714(buildScenes714(10), recs714an);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'HIGHLIGHTED_DIALOGUE_DROUGHT_RUN'), 'HIGHLIGHTED_DIALOGUE_DROUGHT_RUN should not fire');
+    });
+
+    // DIALOGUE_SEED_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; seed scenes at 0,1,2 → 100% opening third
+    it('DIALOGUE_SEED_ZONE_CLUSTER fires when >75% of seed scenes cluster in one third', async () => {
+      const recs714b = Array.from({ length: 9 }, (_, i) => makeRec714(i,
+        (i === 0 || i === 1 || i === 2) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runD714(buildScenes714(9), recs714b);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_SEED_ZONE_CLUSTER'), 'DIALOGUE_SEED_ZONE_CLUSTER should fire');
+    });
+
+    // DIALOGUE_SEED_ZONE_CLUSTER no-fire:
+    // seed scenes at 0, 4, 7 (one per third) → maxZone/total = 1/3
+    it('DIALOGUE_SEED_ZONE_CLUSTER does not fire when seed scenes are distributed across thirds', async () => {
+      const recs714bn = Array.from({ length: 9 }, (_, i) => makeRec714(i,
+        (i === 0 || i === 4 || i === 7) ? { seededClueIds: ['clue-a'] } : {}
+      ));
+      const res = await runD714(buildScenes714(9), recs714bn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_SEED_ZONE_CLUSTER'), 'DIALOGUE_SEED_ZONE_CLUSTER should not fire');
+    });
+
+    // DIALOGUE_PAYOFF_PEAK_UNCAUSED fire:
+    // n=8; payoffs at 2 (1) and 6 (5, the peak); no dramaticTurn or revelation at 6, 5, or 4
+    it('DIALOGUE_PAYOFF_PEAK_UNCAUSED fires when the peak payoff scene has no dramatic turn or revelation nearby', async () => {
+      const recs714c = Array.from({ length: 8 }, (_, i) => makeRec714(i,
+        i === 2 ? { payoffSetupIds: ['thread-a'] }
+        : i === 6 ? { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD714(buildScenes714(8), recs714c);
+      assert.ok(res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_PEAK_UNCAUSED'), 'DIALOGUE_PAYOFF_PEAK_UNCAUSED should fire');
+    });
+
+    // DIALOGUE_PAYOFF_PEAK_UNCAUSED no-fire:
+    // dramatic turn at scene 5, within the peak's 2-scene lookback (6-1=5)
+    it('DIALOGUE_PAYOFF_PEAK_UNCAUSED does not fire when a dramatic turn precedes the peak within the lookback', async () => {
+      const recs714cn = Array.from({ length: 8 }, (_, i) => makeRec714(i,
+        i === 2 ? { payoffSetupIds: ['thread-a'] }
+        : i === 5 ? { dramaticTurn: 'reversal' }
+        : i === 6 ? { payoffSetupIds: ['a', 'b', 'c', 'd', 'e'] }
+        : {}
+      ));
+      const res = await runD714(buildScenes714(8), recs714cn);
+      assert.ok(!res.issues.some((is: any) => is.rule === 'DIALOGUE_PAYOFF_PEAK_UNCAUSED'), 'DIALOGUE_PAYOFF_PEAK_UNCAUSED should not fire');
+    });
+  });
+
   describe('Wave 700 — dialoguePass: dialogue highlight zone cluster, dialogue seed peak uncaused, dialogue payoff drought run', async () => {
     const makeRec700 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
