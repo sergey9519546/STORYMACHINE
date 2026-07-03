@@ -1365,6 +1365,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 874 — payoffPass: payoff resolution drought run, payoff complicate zone cluster, payoff complicate drought run', async () => {
+    const runPY874 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // PAYOFF_RESOLUTION_DROUGHT_RUN fire:
+    // n=10; resolution at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PAYOFF_RESOLUTION_DROUGHT_RUN fires when a long run has no resolution-purposed scene', async () => {
+      const recs874a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_RESOLUTION_DROUGHT_RUN'), 'PAYOFF_RESOLUTION_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_RESOLUTION_DROUGHT_RUN does not fire when resolution-purposed scenes are evenly spread', async () => {
+      const recs874an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'resolution' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_RESOLUTION_DROUGHT_RUN'), 'PAYOFF_RESOLUTION_DROUGHT_RUN should not fire');
+    });
+
+    // PAYOFF_COMPLICATE_ZONE_CLUSTER fire:
+    // n=9; thirds=[0-2],[3-5],[6-8]; complicate scenes at 0,1,2 → 100% opening third
+    it('PAYOFF_COMPLICATE_ZONE_CLUSTER fires when >75% of complicating scenes cluster in one third', async () => {
+      const recs874b = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_ZONE_CLUSTER'), 'PAYOFF_COMPLICATE_ZONE_CLUSTER should fire');
+    });
+
+    it('PAYOFF_COMPLICATE_ZONE_CLUSTER does not fire when complicating scenes spread across thirds', async () => {
+      const recs874bn = Array.from({ length: 9 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 4, 8].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_ZONE_CLUSTER'), 'PAYOFF_COMPLICATE_ZONE_CLUSTER should not fire');
+    });
+
+    // PAYOFF_COMPLICATE_DROUGHT_RUN fire:
+    // n=10; complicate at 0,1,2 only, then a run of 7 consecutive scenes (3-9) with none.
+    it('PAYOFF_COMPLICATE_DROUGHT_RUN fires when a long run has no complicating scene', async () => {
+      const recs874c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 1, 2].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_DROUGHT_RUN'), 'PAYOFF_COMPLICATE_DROUGHT_RUN should fire');
+    });
+
+    it('PAYOFF_COMPLICATE_DROUGHT_RUN does not fire when complicating scenes are evenly spread', async () => {
+      const recs874cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { purpose: [0, 3, 6, 9].includes(i) ? 'complicate' : 'establish_world' }),
+      );
+      const res = await runPY874(recs874cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_COMPLICATE_DROUGHT_RUN'), 'PAYOFF_COMPLICATE_DROUGHT_RUN should not fire');
+    });
+  });
+
   describe('Wave 860 — payoffPass: payoff climax drought run, payoff establish world drought run, payoff resolution zone cluster', async () => {
     const runPY860 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

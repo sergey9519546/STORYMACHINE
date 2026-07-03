@@ -387,6 +387,17 @@
 // and PAYOFF_POST_CLIMAX_CLUSTER, both of which audit the temporal position of payoffSetupIds
 // resolution, not scenes whose `purpose` field equals 'resolution'; none of the three
 // shared-library trio modes has ever isolated the purpose value itself as a standalone signal).
+//
+// Wave 874 additions: PAYOFF_RESOLUTION_DROUGHT_RUN (run-based x purpose === 'resolution'
+// absence -- completes 2 of 3 slots for this purpose value alongside the zone-cluster mode
+// added in Wave 860; distinct from RESOLUTION_CRAMMED_AT_END/PAYOFF_POST_CLIMAX_CLUSTER, which
+// audit payoffSetupIds temporal position rather than sustained absence of this purpose value;
+// peak mode conventionally skipped for this categorical field), PAYOFF_COMPLICATE_ZONE_CLUSTER
+// (distribution/timing x purpose === 'complicate' x structural thirds -- this purpose value has
+// never been referenced anywhere in this pass; a virgin field), PAYOFF_COMPLICATE_DROUGHT_RUN
+// (run-based x purpose === 'complicate' absence -- completes 2 of 3 slots for this purpose
+// value alongside the zone-cluster mode added in this same wave; peak mode conventionally
+// skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4763,6 +4774,74 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r860c.maxZoneCount / r860c.count) * 100)}% of the scenes purposed as resolution cluster in the ${r860c.zoneNames[r860c.maxZoneIdx]} third. When every resolution beat concentrates in one structural window, the payoff engine has no room to let earlier threads settle before the ending absorbs them all at once.`,
         suggestedFix: `Purpose at least one resolution scene outside the ${r860c.zoneNames[r860c.maxZoneIdx]} third so closure is distributed across the story rather than concentrated in a single structural window.`,
+      });
+    }
+  }
+
+  // ── Wave 874: PAYOFF_RESOLUTION_DROUGHT_RUN, PAYOFF_COMPLICATE_ZONE_CLUSTER,
+  //              PAYOFF_COMPLICATE_DROUGHT_RUN ──────────────────────────────────────
+
+  // PAYOFF_RESOLUTION_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in
+  // Wave 860. Distinct from RESOLUTION_CRAMMED_AT_END and PAYOFF_POST_CLIMAX_CLUSTER, which
+  // both audit the temporal position of payoffSetupIds resolution rather than sustained absence
+  // of the scene's `purpose` field; peak mode conventionally skipped for this categorical field.
+  {
+    const r874a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r874a.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r874a.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_RESOLUTION_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r874a.longestRun} consecutive scenes with no scene purposed to resolve the story, even though ${r874a.presentCount} scenes elsewhere are. A long unbroken stretch with nothing settled leaves the payoff engine's threads dangling for an extended run.`,
+        suggestedFix: `Purpose a scene within the ${r874a.longestRun}-scene stretch to resolve part of the story, so the payoff engine keeps settling threads throughout the story rather than only at its very end.`,
+      });
+    }
+  }
+
+  // PAYOFF_COMPLICATE_ZONE_CLUSTER — Distribution/timing × purpose === 'complicate' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // complicating scenes, fires when more than 75% of them fall in a single structural third.
+  // This purpose value has never been referenced anywhere in this pass — a virgin field for
+  // all three shared-library trio modes.
+  {
+    const r874b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r874b.fires) {
+      issues.push({
+        location: `${r874b.zoneNames[r874b.maxZoneIdx]} third — ${r874b.maxZoneCount} of ${r874b.count} complicating scenes`,
+        rule: 'PAYOFF_COMPLICATE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r874b.maxZoneCount / r874b.count) * 100)}% of the scenes purposed to complicate the story cluster in the ${r874b.zoneNames[r874b.maxZoneIdx]} third. When every complication lands in the same structural window, the payoff engine stops planting fresh setups to resolve anywhere else across the story.`,
+        suggestedFix: `Purpose at least one scene outside the ${r874b.zoneNames[r874b.maxZoneIdx]} third to complicate the story so the payoff engine keeps planting fresh setups more evenly across the story.`,
+      });
+    }
+  }
+
+  // PAYOFF_COMPLICATE_DROUGHT_RUN — Run-based × purpose === 'complicate' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 complicating scenes overall, fires
+  // when the longest consecutive run of scenes with no complicating purpose reaches 6.
+  // Completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r874c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'complicate',
+    });
+    if (r874c.fires) {
+      issues.push({
+        location: `longest stretch with no complication: ${r874c.longestRun} consecutive scenes`,
+        rule: 'PAYOFF_COMPLICATE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r874c.longestRun} consecutive scenes with no complicating purpose at all, even though ${r874c.presentCount} scenes elsewhere deepen the trouble. A long unbroken stretch with nothing new complicating the situation leaves the payoff engine with no fresh setups planted for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r874c.longestRun}-scene stretch to complicate the story so the payoff engine keeps planting fresh setups throughout that stretch.`,
       });
     }
   }
