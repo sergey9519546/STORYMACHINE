@@ -380,6 +380,13 @@
 // values with complete 3-zone/run-based trios: RHYTHM_CLIMAX_ZONE_IMBALANCE (purpose ===
 // 'climax'), RHYTHM_ESTABLISH_WORLD_ZONE_IMBALANCE (purpose === 'establish_world'), and
 // RHYTHM_RESOLUTION_ZONE_IMBALANCE (purpose === 'resolution').
+//
+// Wave 904 additions: continuing the checkZoneImbalance rollout begun in Wave 890, this wave
+// applies the 4-zone bloat+empty-zone mode to three more purpose values that each already have a
+// complete 3-zone/run-based trio (checkZoneCluster + checkDroughtRun) but have never been audited
+// by it: RHYTHM_TURNING_POINT_ZONE_IMBALANCE (purpose === 'turning_point'),
+// RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE (purpose === 'introduce_conflict'), and
+// RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE (purpose === 'character_moment').
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4533,6 +4540,81 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r890c.totalCount} resolution-purposed scenes are unevenly distributed across its four structural zones: ${bloatName890c} contains ${r890c.counts[r890c.bloatZoneIdx]} of them (${Math.round((r890c.counts[r890c.bloatZoneIdx] / r890c.totalCount) * 100)}%) while ${emptyNames890c} contains none. Settling beats bloat in one structural quarter and vanish from another, giving the rhythm's wind-down an uneven structural pattern.`,
         suggestedFix: `Redistribute settling beats: move at least one resolution-purposed scene into the empty zone(s) — ${emptyNames890c} — so the rhythm's wind-down is distributed more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_TURNING_POINT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'turning_point' × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library, continuing the
+  // rollout begun in Wave 890. n≥10, ≥4 turning-point scenes total, divided across four equal
+  // structural zones. Fires only when one zone has zero such scenes while another holds ≥50% of
+  // the total. Distinct from the existing 3-zone RHYTHM_TURNING_POINT_ZONE_CLUSTER and run-based
+  // RHYTHM_TURNING_POINT_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode
+  // to this purpose value.
+  {
+    const r904a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'turning_point',
+    });
+    if (r904a.fires) {
+      const emptyNames904a = r904a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName904a = FOUR_ZONE_NAMES[r904a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames904a} empty; ${bloatName904a} has ${r904a.counts[r904a.bloatZoneIdx]}/${r904a.totalCount} turning-point scenes`,
+        rule: 'RHYTHM_TURNING_POINT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r904a.totalCount} turning-point scenes are unevenly distributed across its four structural zones: ${bloatName904a} contains ${r904a.counts[r904a.bloatZoneIdx]} of them (${Math.round((r904a.counts[r904a.bloatZoneIdx] / r904a.totalCount) * 100)}%) while ${emptyNames904a} contains none. Pivots bloat in one structural quarter and vanish from another, giving the rhythm's direction changes an uneven structural pattern.`,
+        suggestedFix: `Redistribute turning points: move at least one turning_point-purposed scene into the empty zone(s) — ${emptyNames904a} — so the rhythm changes direction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'introduce_conflict'
+  // × four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 890. n≥10, ≥4 conflict-introducing scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone RHYTHM_INTRODUCE_CONFLICT_ZONE_CLUSTER and
+  // run-based RHYTHM_INTRODUCE_CONFLICT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r904b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'introduce_conflict',
+    });
+    if (r904b.fires) {
+      const emptyNames904b = r904b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName904b = FOUR_ZONE_NAMES[r904b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames904b} empty; ${bloatName904b} has ${r904b.counts[r904b.bloatZoneIdx]}/${r904b.totalCount} conflict-introducing scenes`,
+        rule: 'RHYTHM_INTRODUCE_CONFLICT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r904b.totalCount} conflict-introducing scenes are unevenly distributed across its four structural zones: ${bloatName904b} contains ${r904b.counts[r904b.bloatZoneIdx]} of them (${Math.round((r904b.counts[r904b.bloatZoneIdx] / r904b.totalCount) * 100)}%) while ${emptyNames904b} contains none. New conflicts bloat in one structural quarter and vanish from another, giving the rhythm's fresh friction an uneven structural pattern.`,
+        suggestedFix: `Redistribute new conflicts: move at least one introduce_conflict-purposed scene into the empty zone(s) — ${emptyNames904b} — so the rhythm introduces fresh friction more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE — Underweight/bloat × purpose === 'character_moment' ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library, continuing
+  // the rollout begun in Wave 890. n≥10, ≥4 character-moment scenes total, divided across four
+  // equal structural zones. Fires only when one zone has zero such scenes while another holds ≥50%
+  // of the total. Distinct from the existing 3-zone RHYTHM_CHARACTER_MOMENT_ZONE_CLUSTER and
+  // run-based RHYTHM_CHARACTER_MOMENT_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this purpose value.
+  {
+    const r904c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.purpose === 'character_moment',
+    });
+    if (r904c.fires) {
+      const emptyNames904c = r904c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName904c = FOUR_ZONE_NAMES[r904c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames904c} empty; ${bloatName904c} has ${r904c.counts[r904c.bloatZoneIdx]}/${r904c.totalCount} character-moment scenes`,
+        rule: 'RHYTHM_CHARACTER_MOMENT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r904c.totalCount} character-moment scenes are unevenly distributed across its four structural zones: ${bloatName904c} contains ${r904c.counts[r904c.bloatZoneIdx]} of them (${Math.round((r904c.counts[r904c.bloatZoneIdx] / r904c.totalCount) * 100)}%) while ${emptyNames904c} contains none. Quiet character beats bloat in one structural quarter and vanish from another, giving the rhythm's breathing room an uneven structural pattern.`,
+        suggestedFix: `Redistribute character beats: move at least one character_moment-purposed scene into the empty zone(s) — ${emptyNames904c} — so the rhythm's breathing room is spread more evenly across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
