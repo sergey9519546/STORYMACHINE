@@ -409,6 +409,16 @@
 // 'climax' × structural thirds — distinct from ARC_CLIMAX_VOID, a co-occurrence check on the
 // fixed climax scene's content; none of the three shared-library trio modes has ever isolated
 // this purpose value as a standalone distributional signal).
+//
+// Wave 855 additions: ARC_CLIMAX_DROUGHT_RUN (run-based × purpose === 'climax' absence —
+// completes 2 of 3 slots for this purpose value alongside the zone-cluster mode added in Wave
+// 841; peak mode conventionally skipped for this categorical field), ARC_RESOLUTION_PURPOSE_ZONE_
+// CLUSTER (distribution/timing × purpose === 'resolution' × structural thirds — distinct from the
+// existing ARC_RESOLUTION_ABSENT/ARC_RESOLUTION_DROUGHT_RUN, which audit payoffSetupIds
+// resolution rather than this purpose enum value; a virgin standalone signal),
+// ARC_RESOLUTION_PURPOSE_DROUGHT_RUN (run-based × purpose === 'resolution' absence — completes 2
+// of 3 slots for this purpose value alongside the zone-cluster mode added in this same wave; peak
+// mode conventionally skipped for this categorical field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4807,6 +4817,73 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `${Math.round((r841c.maxZoneCount / r841c.count) * 100)}% of the scenes purposed as the climax cluster in the ${r841c.zoneNames[r841c.maxZoneIdx]} third. When every peak moment concentrates in one structural window, the character's arc builds toward its payoff in only one part of the story instead of throughout its full length.`,
         suggestedFix: `Reconsider whether every climax-purposed scene belongs in the ${r841c.zoneNames[r841c.maxZoneIdx]} third so the character's arc builds toward its payoff more evenly across the story.`,
+      });
+    }
+  }
+
+  // ── Wave 855: ARC_CLIMAX_DROUGHT_RUN, ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER,
+  //              ARC_RESOLUTION_PURPOSE_DROUGHT_RUN ──────────────────────────────────────
+
+  // ARC_CLIMAX_DROUGHT_RUN — Run-based × purpose === 'climax' absence. Built on checkDroughtRun
+  // from the shared checks library. n≥10, ≥3 climax-purposed scenes overall, fires when the
+  // longest consecutive run of scenes with no climax purpose reaches 6. Completing 2 of 3 slots
+  // for this purpose value alongside the zone-cluster mode added in Wave 841 (peak mode
+  // conventionally skipped for this categorical field).
+  {
+    const r855a = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'climax',
+    });
+    if (r855a.fires) {
+      issues.push({
+        location: `longest stretch with no climax-purposed scene: ${r855a.longestRun} consecutive scenes`,
+        rule: 'ARC_CLIMAX_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r855a.longestRun} consecutive scenes purposed otherwise than the climax, even though ${r855a.presentCount} scenes elsewhere are dedicated to the story's peak. A long unbroken stretch with no climactic scene leaves the character's arc without a payoff to build toward for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r855a.longestRun}-scene stretch as the climax so the character's arc keeps a payoff to build toward throughout that stretch.`,
+      });
+    }
+  }
+
+  // ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER — Distribution/timing × purpose === 'resolution' ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥9, ≥3
+  // resolution-purposed scenes, fires when more than 75% of them fall in a single structural
+  // third. Distinct from the existing ARC_RESOLUTION_ABSENT/ARC_RESOLUTION_DROUGHT_RUN, which
+  // audit payoffSetupIds resolution rather than this purpose enum value; a virgin standalone
+  // signal.
+  {
+    const r855b = checkZoneCluster({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.75,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r855b.fires) {
+      issues.push({
+        location: `${r855b.zoneNames[r855b.maxZoneIdx]} third — ${r855b.maxZoneCount} of ${r855b.count} resolution-purposed scenes`,
+        rule: 'ARC_RESOLUTION_PURPOSE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${Math.round((r855b.maxZoneCount / r855b.count) * 100)}% of the scenes purposed to resolve the story cluster in the ${r855b.zoneNames[r855b.maxZoneIdx]} third. When every act of resolution concentrates in one structural window, the character's arc settles its threads in only one part of the story instead of throughout its full length.`,
+        suggestedFix: `Reconsider whether every resolution-purposed scene belongs in the ${r855b.zoneNames[r855b.maxZoneIdx]} third so the character's arc settles its threads more evenly across the story.`,
+      });
+    }
+  }
+
+  // ARC_RESOLUTION_PURPOSE_DROUGHT_RUN — Run-based × purpose === 'resolution' absence. Built on
+  // checkDroughtRun from the shared checks library. n≥10, ≥3 resolution-purposed scenes overall,
+  // fires when the longest consecutive run of scenes with no resolution purpose reaches 6.
+  // Completing 2 of 3 slots for this purpose value alongside the zone-cluster mode added in this
+  // same wave (peak mode conventionally skipped for this categorical field).
+  {
+    const r855c = checkDroughtRun({
+      records, minRecords: 10, minPresentCount: 3, runThreshold: 6,
+      isPresent: r => r.purpose === 'resolution',
+    });
+    if (r855c.fires) {
+      issues.push({
+        location: `longest stretch with no resolution-purposed scene: ${r855c.longestRun} consecutive scenes`,
+        rule: 'ARC_RESOLUTION_PURPOSE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r855c.longestRun} consecutive scenes purposed otherwise than resolving the story, even though ${r855c.presentCount} scenes elsewhere settle a thread. A long unbroken stretch with nothing resolved leaves the character's arc's own threads dangling for an extended run.`,
+        suggestedFix: `Purpose at least one scene within the ${r855c.longestRun}-scene stretch to resolve the story so the character's arc keeps settling its threads throughout that stretch.`,
       });
     }
   }
