@@ -573,6 +573,16 @@
 // AFTERMATH_VOID and ARC_TURN_SUSPENSE_AFTERMATH_VOID give it two fresh checkAftermathVoid
 // channels (curiosityDelta, suspenseDelta), its first use of the shared library's 2-scene
 // lookahead geometry rather than the file's earlier hand-rolled immediate-next-scene checks.
+// Wave 1135 additions: re-verifying against actual rule: names (not just a channel count),
+// suspenseDelta-as-trigger was actually at five of the five non-self standard channels
+// (curiosityDelta/relationshipShifts/emotionalShift/dialogueHighlights/visualBeats) after Wave
+// 1121, not six as that wave's header stated — ARC_SUSPENSE_RECURRENCE_AFTERMATH_VOID adds the
+// self-referential sixth channel (another suspenseDelta rise elsewhere), following the same
+// self-pairing convention used for relationshipShifts-as-trigger triggers in other pass files.
+// dramaticTurn-as-trigger was at four (emotionalShift/relationshipShifts/curiosityDelta/
+// suspenseDelta) — ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and ARC_TURN_STAGING_AFTERMATH_
+// VOID give it its fifth and sixth channels (dialogueHighlights, visualBeats), completing full
+// six-channel saturation for this trigger.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6483,6 +6493,87 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1121c.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1121c.aftermathCount} such rises occur elsewhere. A pivot that never makes the situation feel more dangerous or uncertain right after it happens leaves the arc's turns registering as incident rather than as escalation.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, sharpen what's now at risk, so the pivot compounds tension rather than resolving into a flat new normal.`,
+      });
+    }
+  }
+
+  // ARC_SUSPENSE_RECURRENCE_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // a further suspenseDelta rise elsewhere. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 further suspense-rise scenes
+  // anywhere, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries no
+  // further rise in suspense, while such rises occur elsewhere in the script. Distinct from
+  // ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID, ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID, ARC_SUSPENSE_
+  // EMOTIONAL_AFTERMATH_VOID, ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, and ARC_SUSPENSE_
+  // STAGING_AFTERMATH_VOID (Wave 1121, same trigger paired with curiosityDelta/relationshipShifts/
+  // emotionalShift/dialogueHighlights/visualBeats) — this self-referential pairing (suspenseDelta
+  // as both trigger and channel) is the sixth and final consequence channel for this trigger,
+  // genuinely completing saturation after Wave 1121's header undercounted it at five.
+  {
+    const r1135a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1135a.fires) {
+      issues.push({
+        location: `${r1135a.triggerCount} suspense-spike scene(s) — no further suspense rise within 2 scenes of any`,
+        rule: 'ARC_SUSPENSE_RECURRENCE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1135a.triggerCount} suspense-spike scenes is followed by two scenes with no further rise in suspense, even though ${r1135a.aftermathCount} such rises occur elsewhere in the script. A tension spike that never compounds into a second wave of danger right after it leaves the arc's suspense reading as isolated jolts rather than a mounting, escalating pressure.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let the tension build further rather than settling, so the arc's danger compounds instead of resetting to baseline after every scare.`,
+      });
+    }
+  }
+
+  // ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ARC_TURN_
+  // CURIOSITY_AFTERMATH_VOID and ARC_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1121), and ARC_TURN_
+  // EMOTIONAL_AFTERMATH_VOID / ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID and ARC_DRAMATIC_
+  // TURN_RELATIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // emotionalShift/relationshipShifts) — this is the fifth consequence channel for this trigger.
+  {
+    const r1135b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1135b.fires) {
+      issues.push({
+        location: `${r1135b.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1135b.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1135b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it happens leaves the arc's turns unvoiced — no character's speech processes what the reversal just changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a line that reckons with what just changed, so the pivot registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // ARC_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every turn's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from ARC_TURN_CURIOSITY_AFTERMATH_VOID, ARC_TURN_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1121), ARC_TURN_EMOTIONAL_AFTERMATH_VOID / ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID,
+  // ARC_DRAMATIC_TURN_RELATIONAL_AFTERMATH_VOID, and ARC_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (this wave, same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts/dialogueHighlights) — this is the sixth and final consequence channel
+  // for this trigger, completing full six-channel saturation.
+  {
+    const r1135c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1135c.fires) {
+      issues.push({
+        location: `${r1135c.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'ARC_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1135c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1135c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the arc's turns registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
       });
     }
   }
