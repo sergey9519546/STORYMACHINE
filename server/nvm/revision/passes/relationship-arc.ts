@@ -482,6 +482,14 @@
 // HIGHLIGHT_AFTERMATH_VOID (raise_stakes, first pairing with dialogueHighlights), RELATIONAL_SEED_
 // SUSPENSE_AFTERMATH_VOID (seededClueIds, first pairing with suspenseDelta), and RELATIONAL_OPEN_
 // THREAD_SUSPENSE_AFTERMATH_VOID (heavy unresolvedClues debt, first pairing with suspenseDelta).
+// Wave 1057 additions: this wave completes full standard-channel saturation (all six of
+// dialogueHighlights/visualBeats/curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts)
+// for all three of the pass's most-audited triggers: RELATIONAL_SEED_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID (seededClueIds, previously at five channels, now also paired with
+// dialogueHighlights), RELATIONAL_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (heavy
+// unresolvedClues debt, previously at five channels, now also paired with dialogueHighlights), and
+// RELATIONAL_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously at five channels, now also
+// paired with visualBeats — its only missing standard channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6083,6 +6091,88 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1043c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1043c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the relational arc's uncertainty stalling instead of pressuring the bonds it's meant to complicate.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the relationship rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n>=8, >=2 qualifying seed scenes (pos<n-2), >=2 highlighted-dialogue scenes anywhere,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath carries no highlighted
+  // dialogue, while such dialogue occurs elsewhere. Distinct from RELATIONAL_SEED_STAGING_
+  // AFTERMATH_VOID, RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID, RELATIONAL_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, RELATIONAL_SEED_AFTERMATH_VOID, and RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID
+  // (same trigger paired with visualBeats/curiosityDelta/emotionalShift/relationshipShifts/
+  // suspenseDelta respectively) — this is the sixth and final standard-channel pairing for this
+  // trigger, completing full saturation.
+  {
+    const r1057a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1057a.fires) {
+      issues.push({
+        location: `${r1057a.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RELATIONAL_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1057a.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1057a.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands registers as inert plot machinery rather than something a character's voice gives weight to.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n>=8, >=2 qualifying heavy-debt scenes (pos<n-2, threshold >=3),
+  // >=2 highlighted-dialogue scenes anywhere, 2-scene lookahead. Fires when every heavy-debt
+  // scene's two-scene aftermath carries no highlighted dialogue, while such dialogue occurs
+  // elsewhere. Distinct from RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID, RELATIONAL_OPEN_
+  // THREAD_EMOTIONAL_AFTERMATH_VOID, RELATIONAL_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, RELATIONAL_
+  // OPEN_THREAD_AFTERMATH_VOID, and RELATIONAL_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID (same trigger
+  // paired with visualBeats/emotionalShift/curiosityDelta/relationshipShifts/suspenseDelta
+  // respectively) — this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1057b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1057b.fires) {
+      issues.push({
+        location: `${r1057b.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RELATIONAL_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1057b.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1057b.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the relational arc's uncertainty voiceless rather than felt in what characters say to each other.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying stakes-raising scenes (pos<n-2), >=2 visually-dense scenes anywhere (visualBeats
+  // length>=2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from RELATIONAL_STAKES_
+  // AFTERMATH_VOID, RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID, RELATIONAL_STAKES_SUSPENSE_
+  // AFTERMATH_VOID, RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID, and RELATIONAL_STAKES_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (same trigger paired with relationshipShifts/curiosityDelta/
+  // suspenseDelta/emotionalShift/dialogueHighlights respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1057c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1057c.fires) {
+      issues.push({
+        location: `${r1057c.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'RELATIONAL_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1057c.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1057c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor in the world.`,
       });
     }
   }
