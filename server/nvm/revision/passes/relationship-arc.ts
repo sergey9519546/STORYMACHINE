@@ -518,6 +518,11 @@
 // imbalance/zone-cluster) checks here, never sequence/aftermath: RELATIONSHIP_CLOCK_CURIOSITY_
 // AFTERMATH_VOID pairs clockRaised with curiosityDelta, and RELATIONSHIP_REVELATION_SUSPENSE_
 // AFTERMATH_VOID pairs revelation with suspenseDelta.
+// Wave 1113 additions: this wave gives clockRaised and revelation further channels —
+// RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID and RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID
+// pair clockRaised with suspenseDelta and emotionalShift respectively (second and third
+// channels for this trigger), and RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID pairs
+// revelation with curiosityDelta (second channel for this trigger).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6449,6 +6454,78 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1099c.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1099c.aftermathCount} such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the relational arc's reckoning with new information feeling inert rather than consequential to the bonds it should complicate.`,
         suggestedFix: `In the two scenes following at least one revelation, let a new tension rise in how characters relate to each other, so the discovery's relational fallout keeps pressing on the story instead of resolving into calm.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1099, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1113a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1113a.fires) {
+      issues.push({
+        location: `${r1113a.triggerCount} clock-raise scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1113a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1113a.aftermathCount} such rises occur elsewhere. Time pressure that never re-tightens tension right after it fires leaves the relational arc's sense of urgency disconnected from the danger these bonds should feel.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new tension rise around a relationship, so the ticking clock deepens the bonds' danger, not just the plot's.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // and RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // suspenseDelta) — this is the third consequence channel for this trigger.
+  {
+    const r1113b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1113b.fires) {
+      issues.push({
+        location: `${r1113b.triggerCount} clock-raise scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1113b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1113b.aftermathCount} such shifts occur elsewhere. Time pressure that never registers emotionally right after it tightens leaves the relational arc's bonds unmoved by a deadline that should force feeling, not just planning.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to what the deadline means for a relationship, so the ticking clock carries felt weight between characters, not just mechanical pressure.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // (non-null) trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // rise in curiosity, while such rises occur elsewhere. Distinct from RELATIONSHIP_REVELATION_
+  // SUSPENSE_AFTERMATH_VOID (Wave 1099, same trigger paired with suspenseDelta) — this is the
+  // second consequence channel for this trigger.
+  {
+    const r1113c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1113c.fires) {
+      issues.push({
+        location: `${r1113c.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1113c.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1113c.aftermathCount} such rises occur elsewhere. A discovery that never reopens the field of questions right after it lands leaves the relational arc's reckoning with new information feeling like a closed fact rather than a development that keeps the bonds worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface about how it will affect a relationship, so the discovery keeps curiosity about the bonds alive.`,
       });
     }
   }
