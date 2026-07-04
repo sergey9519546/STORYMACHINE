@@ -515,6 +515,11 @@
 // THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID gives payoffSetupIds its fourth channel (suspenseDelta);
 // THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID and THEME_CLOCK_RELATIONAL_AFTERMATH_VOID give
 // clockRaised its third and fourth channels (emotionalShift, relationshipShifts).
+// Wave 1144 additions: payoffSetupIds and clockRaised were each at four of six channels.
+// THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and THEME_PAYOFF_STAGING_AFTERMATH_VOID give
+// payoffSetupIds its fifth and sixth channels (dialogueHighlights, visualBeats), completing
+// full saturation for this trigger. THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
+// clockRaised its fifth channel (dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6509,6 +6514,85 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1130c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1130c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the theme's clock isolated from the interpersonal stakes it should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains
+  // no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from THEME_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1102), THEME_PAYOFF_EMOTIONAL_AFTERMATH_VOID, THEME_PAYOFF_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1116), and THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave 1130,
+  // same trigger paired with curiosityDelta/emotionalShift/relationshipShifts/suspenseDelta) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1144a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1144a.fires) {
+      issues.push({
+        location: `${r1144a.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1144a.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1144a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the theme's payoffs unvoiced — no character's speech processes what the resolution meant.`,
+        suggestedFix: `In the two scenes following at least one payoff, give a character a line that processes what the resolution meant, so the theme's payoffs register in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 1102),
+  // THEME_PAYOFF_EMOTIONAL_AFTERMATH_VOID, THEME_PAYOFF_RELATIONAL_AFTERMATH_VOID (Wave 1116),
+  // THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave 1130), and THEME_PAYOFF_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta/dialogueHighlights) — this is the sixth and final
+  // consequence channel for this trigger, completing full saturation.
+  {
+    const r1144b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1144b.fires) {
+      issues.push({
+        location: `${r1144b.triggerCount} payoff scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'THEME_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1144b.triggerCount} payoff scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1144b.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a visually charged follow-through leaves the theme's payoffs registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one payoff, stage at least two concrete visual beats, so the resolution registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line
+  // of dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath has no
+  // memorable line, while such lines occur elsewhere. Distinct from THEME_CLOCK_SUSPENSE_
+  // AFTERMATH_VOID (Wave 1102), THEME_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1116), and THEME_
+  // CLOCK_EMOTIONAL_AFTERMATH_VOID / THEME_CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 1130, same
+  // trigger paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) — this
+  // is the fifth consequence channel for this trigger.
+  {
+    const r1144c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1144c.fires) {
+      issues.push({
+        location: `${r1144c.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1144c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no memorable line, even though ${r1144c.aftermathCount} such lines exist elsewhere in the script. A deadline that tightens without earning a line that reckons with it leaves the theme's clock voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs, so the pressure registers in speech, not just in plot mechanics.`,
       });
     }
   }

@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1144 — themePass: theme payoff-dialogue-highlight aftermath void, theme payoff-staging aftermath void, theme clock-dialogue-highlight aftermath void', async () => {
+    const runT1144 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every payoff is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1144a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a payoff is followed by highlighted dialogue within its window', async () => {
+      const recs1144an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1144b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_STAGING_AFTERMATH_VOID'), 'THEME_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by a heavily-staged scene within its window', async () => {
+      const recs1144bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_STAGING_AFTERMATH_VOID'), 'THEME_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1144c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1144cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1144(recs1144cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1130 — themePass: theme payoff-suspense aftermath void, theme clock-emotional aftermath void, theme clock-relational aftermath void', async () => {
     const runT1130 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
