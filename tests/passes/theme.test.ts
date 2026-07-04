@@ -931,6 +931,70 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 990 — themePass: theme highlight zone imbalance, theme open thread zone imbalance, theme stakes-curiosity aftermath void', async () => {
+    const runT990 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('THEME_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs990a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['line'] : [] }));
+      const res = await runT990(recs990a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_ZONE_IMBALANCE'), 'THEME_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs990an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['line'] : [] }));
+      const res = await runT990(recs990an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_HIGHLIGHT_ZONE_IMBALANCE'), 'THEME_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_OPEN_THREAD_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of open-thread scenes', async () => {
+      const recs990b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runT990(recs990b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_ZONE_IMBALANCE'), 'THEME_OPEN_THREAD_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_OPEN_THREAD_ZONE_IMBALANCE does not fire when open-thread scenes touch every zone', async () => {
+      const recs990bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { unresolvedClues: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runT990(recs990bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_ZONE_IMBALANCE'), 'THEME_OPEN_THREAD_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: curiosity raised only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: curiosity raised at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs990c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT990(recs990c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAKES_CURIOSITY_AFTERMATH_VOID'), 'THEME_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs990cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT990(recs990cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAKES_CURIOSITY_AFTERMATH_VOID'), 'THEME_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 976 — themePass: theme clock zone imbalance, theme clock delta zone imbalance, theme turn zone imbalance', async () => {
     const runT976 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');

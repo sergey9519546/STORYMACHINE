@@ -439,6 +439,12 @@
 // classes: THEME_CLOCK_ZONE_IMBALANCE (clockRaised boolean — whether a ticking clock is introduced),
 // THEME_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta, distinct from the boolean
 // field above), and THEME_TURN_ZONE_IMBALANCE (dramaticTurn !== 'nothing' categorical).
+// Wave 990 additions: THEME_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) and THEME_OPEN_
+// THREAD_ZONE_IMBALANCE (unresolvedClues array) — the last two clean trio-complete zone-imbalance
+// candidates in this pass (THEME_STAGING was skipped: its cluster/drought predicates disagree, >=2
+// vs >0 visualBeats). With zone-imbalance now down to just these two, this wave completes the trio
+// with one aftermath-void pairing: THEME_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
+// curiosityDelta), the first use of raise_stakes as an aftermath-void trigger in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5609,6 +5615,79 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r976c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName976c} contains ${r976c.counts[r976c.bloatZoneIdx]} of them (${Math.round((r976c.counts[r976c.bloatZoneIdx] / r976c.totalCount) * 100)}%) while ${emptyNames976c} contains none. Turns bloat in one structural quarter and never fire in another, so the theme is tested by reversal in only part of the story.`,
         suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames976c} — a dramatic turn so the theme keeps being tested by reversal across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // highlighted-dialogue scenes total, divided across four equal structural zones. Distinct from
+  // the existing 3-zone THEME_HIGHLIGHT_ZONE_CLUSTER and run-based THEME_HIGHLIGHT_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this channel.
+  {
+    const r990a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r990a.fires) {
+      const emptyNames990a = r990a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName990a = FOUR_ZONE_NAMES[r990a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames990a} empty; ${bloatName990a} has ${r990a.counts[r990a.bloatZoneIdx]}/${r990a.totalCount} highlighted-dialogue scenes`,
+        rule: 'THEME_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r990a.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName990a} contains ${r990a.counts[r990a.bloatZoneIdx]} of them (${Math.round((r990a.counts[r990a.bloatZoneIdx] / r990a.totalCount) * 100)}%) while ${emptyNames990a} contains none. Memorable dialogue bloats in one structural quarter and never lands in another, so the theme's most articulate statements arrive in only part of the story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames990a} — a standout line of dialogue so the theme's most articulate statements land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_ZONE_IMBALANCE — Underweight/bloat × unresolvedClues array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 debt-
+  // carrying scenes total, divided across four equal structural zones. Distinct from the existing
+  // 3-zone THEME_OPEN_THREAD_ZONE_CLUSTER and run-based THEME_OPEN_THREAD_DROUGHT_RUN — the last of
+  // this pass's two remaining clean trio-complete signals (THEME_STAGING was skipped: its cluster
+  // (visualBeats.length>=2) and drought-run (visualBeats.length>0) predicates disagree, so its
+  // "trio" doesn't actually audit one consistent signal).
+  {
+    const r990b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r990b.fires) {
+      const emptyNames990b = r990b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName990b = FOUR_ZONE_NAMES[r990b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames990b} empty; ${bloatName990b} has ${r990b.counts[r990b.bloatZoneIdx]}/${r990b.totalCount} open-thread scenes`,
+        rule: 'THEME_OPEN_THREAD_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r990b.totalCount} scenes carrying unresolved clue-debt are unevenly distributed across its four structural zones: ${bloatName990b} contains ${r990b.counts[r990b.bloatZoneIdx]} of them (${Math.round((r990b.counts[r990b.bloatZoneIdx] / r990b.totalCount) * 100)}%) while ${emptyNames990b} contains none. Open questions bloat in one structural quarter and never carry into another, so the theme's uncertainty concentrates in only part of the story.`,
+        suggestedFix: `Redistribute open threads: carry unresolved clue-debt into at least one scene inside the empty zone(s) — ${emptyNames990b} — so the theme's uncertainty holds across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now exhausted down to the two
+  // signals above, this wave completes the trio via the sequence/aftermath mode. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying stakes-raise scenes
+  // (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every stakes-raise's two-scene aftermath opens no new curiosity, while curiosity
+  // does occur elsewhere. The only prior aftermath-void rule in this pass (THEME_SEED_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID) uses seededClueIds as its trigger — this is the first use of
+  // raise_stakes as an aftermath-void trigger in this pass.
+  {
+    const r990c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r990c.fires) {
+      issues.push({
+        location: `${r990c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'THEME_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r990c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r990c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger that never provokes a new uncertainty about what comes next leaves the theme untested by the story's own rising pressure in the beats immediately following.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps testing the theme rather than sitting in a learnable void.`,
       });
     }
   }
