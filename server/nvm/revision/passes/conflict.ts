@@ -493,6 +493,16 @@
 // STAGING_AFTERMATH_VOID (payoffSetupIds, first pairing with visualBeats — dramaticTurn and
 // unresolvedClues already carry this channel), and CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_
 // AFTERMATH_VOID (heavy unresolvedClues debt, first pairing with dialogueHighlights).
+// Wave 1066 additions: raise_stakes, payoffSetupIds, and heavy unresolvedClues debt each reach
+// full six-channel saturation: CONFLICT_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously
+// paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights,
+// now also paired with visualBeats — its only remaining standard channel), CONFLICT_PAYOFF_
+// DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (payoffSetupIds, previously paired with emotionalShift/
+// suspenseDelta/curiosityDelta/relationshipShifts/visualBeats, now also paired with
+// dialogueHighlights — its only remaining standard channel), and CONFLICT_OPEN_THREAD_SUSPENSE_
+// AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with relationshipShifts/
+// visualBeats/curiosityDelta/emotionalShift/dialogueHighlights, now also paired with
+// suspenseDelta — its only remaining standard channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6173,6 +6183,88 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1052c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1052c.aftermathCount} such scenes exist elsewhere in the script. A pile-up of open questions that never earns a single memorable line reacting to it right after leaves the conflict's mounting uncertainty unspoken rather than voiced.`,
         suggestedFix: `In the two scenes following a heavy clue-debt moment, let a character deliver a memorable line naming or reacting to the mounting uncertainty so it registers in speech, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from CONFLICT_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID, CONFLICT_STAKES_EMOTIONAL_
+  // AFTERMATH_VOID, CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID, and CONFLICT_STAKES_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts/dialogueHighlights respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1066a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1066a.fires) {
+      issues.push({
+        location: `${r1066a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CONFLICT_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1066a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1066a.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the conflict's escalation abstract rather than lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CONFLICT_PAYOFF_
+  // EMOTIONAL_AFTERMATH_VOID, CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID, CONFLICT_PAYOFF_CURIOSITY_
+  // AFTERMATH_VOID, CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID, and CONFLICT_PAYOFF_STAGING_
+  // AFTERMATH_VOID (same trigger paired with emotionalShift/suspenseDelta/curiosityDelta/
+  // relationshipShifts/visualBeats respectively) — this is the sixth and final standard-channel
+  // pairing for this trigger, completing full saturation.
+  {
+    const r1066b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1066b.fires) {
+      issues.push({
+        location: `${r1066b.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CONFLICT_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1066b.triggerCount} cashed-in setups) is followed by two scenes with no highlighted dialogue, even though ${r1066b.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the conflict's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 suspense-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no rise in suspense, while such rises occur elsewhere. Distinct from CONFLICT_OPEN_
+  // THREAD_RELATIONAL_AFTERMATH_VOID (the amount≥0.3 relationshipShifts trigger variant),
+  // CONFLICT_OPEN_THREAD_STAGING_AFTERMATH_VOID, CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID,
+  // CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, and CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with visualBeats/curiosityDelta/emotionalShift/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1066c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1066c.fires) {
+      issues.push({
+        location: `${r1066c.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'CONFLICT_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1066c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1066c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the conflict's uncertainty stalling instead of pressuring the story forward.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the conflict rather than sitting in a learnable lull.`,
       });
     }
   }
