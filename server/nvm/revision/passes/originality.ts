@@ -475,6 +475,13 @@
 // (seededClueIds, the first use of this field as a checkAftermathVoid TRIGGER in this pass), and
 // ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoffSetupIds, likewise its first use as a
 // checkAftermathVoid TRIGGER in this pass).
+// Wave 1012 additions: this wave gives three more triggers a fresh consequence channel:
+// ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (heavy unresolvedClues debt, previously only
+// paired with dialogueHighlights, now paired with curiosityDelta), ORIGINALITY_CLOCK_EMOTIONAL_
+// AFTERMATH_VOID (clockRaised, previously only paired with relationshipShifts, now paired with
+// emotionalShift), and ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes, previously
+// paired with curiosityDelta and suspenseDelta, now paired with relationshipShifts for a third
+// channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6096,6 +6103,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r998c.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r998c.aftermathCount} emotionally-charged scenes exist elsewhere. Once the audience notices the pattern, they learn that payoffs never carry feeling nearby — a predictable, avoidable absence where a callback lands as pure information rather than a felt beat.`,
         suggestedFix: `Let at least one payoff carry feeling in its aftermath: in the scene or two after a setup pays off, show someone reacting to it emotionally — relief, grief, triumph.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-
+  // clue-debt trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥2
+  // curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-
+  // scene aftermath opens no new curiosity, while curiosity does occur elsewhere. Distinct from
+  // ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // dialogueHighlights) — this pairs heavy clue-debt with curiosityDelta for the first time in
+  // this pass.
+  {
+    const r1012a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1012a.fires) {
+      issues.push({
+        location: `${r1012a.triggerCount} heavy clue-debt scene(s) — no curiosity raised within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1012a.triggerCount} instances) is followed by two full scenes that raise no new curiosity, even though ${r1012a.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that accumulated mystery never compounds into a further question nearby — a predictable, avoidable absence.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raising scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raising scene's two-scene aftermath is emotionally flat,
+  // while charged scenes occur elsewhere. Distinct from ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_
+  // VOID (Wave 984, same trigger paired with relationshipShifts) — this pairs clockRaised with
+  // emotionalShift for the first time in this pass.
+  {
+    const r1012b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1012b.fires) {
+      issues.push({
+        location: `${r1012b.triggerCount} clock-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1012b.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1012b.aftermathCount} emotionally-charged scenes exist elsewhere. Once the audience notices the pattern, they learn that a raised deadline never carries felt weight nearby — a predictable, avoidable absence where urgency is stated but never felt.`,
+        suggestedFix: `Let at least one ticking clock provoke felt weight in its aftermath: in the scene or two after a deadline is raised, show someone reacting to the pressure emotionally.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raise scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no relationship shift,
+  // while such shifts occur elsewhere. Distinct from ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID
+  // (curiosityDelta) and ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 998, suspenseDelta) —
+  // this is the third consequence channel for this trigger in this pass.
+  {
+    const r1012c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1012c.fires) {
+      issues.push({
+        location: `${r1012c.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1012c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r1012c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that escalating danger never bears on how characters treat each other nearby — a predictable, avoidable absence.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so rising pressure registers on the bonds between characters, not only on the plot.`,
       });
     }
   }

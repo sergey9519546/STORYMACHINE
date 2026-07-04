@@ -1210,6 +1210,110 @@ He sits at his desk.
   });
 
 
+  describe('Wave 1012 — originalityPass: originality open-thread-curiosity aftermath void, originality clock-emotional aftermath void, originality stakes-relational aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/984/998 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (unresolvedClues array / clockRaised bool / purpose==='raise_stakes') never overlap the
+    // filler purpose pool, so cycling never contaminates a fixture.
+    const PURPOSE_POOL_1012 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_1012 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor1012 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec1012 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor1012(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_1012[idx % PURPOSE_POOL_1012.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain1012 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor1012(i)}\n\n${SENTENCE_POOL_1012[i % SENTENCE_POOL_1012.length]}`).join('\n\n');
+    const runO1012 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain1012(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no new curiosity', async () => {
+      const recs1012a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1012(i, { curiosityDelta: 1 });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by new curiosity within its window', async () => {
+      const recs1012an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1012(i, { curiosityDelta: 1 });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1012b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1012(i, { emotionalShift: 'positive' });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by an emotional shift within its window', async () => {
+      const recs1012bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1012(i, { emotionalShift: 'positive' });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1012c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1012(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1012cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1012(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1012(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1012(i);
+      });
+      const res = await runO1012(recs1012cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 998 — originalityPass: originality stakes-suspense aftermath void, originality seed-curiosity aftermath void, originality payoff-emotional aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/970/984 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
