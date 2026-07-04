@@ -481,6 +481,12 @@
 // relationshipShifts, now also paired with dialogueHighlights). VOICE_TURN_STAGING_AFTERMATH_
 // VOID gives dramaticTurn a fifth channel (previously paired with suspenseDelta/
 // relationshipShifts/curiosityDelta/emotionalShift, now also paired with visualBeats).
+// Wave 1103 additions: this wave closes out three triggers' sixth and final channel each —
+// VOICE_SEED_STAGING_AFTERMATH_VOID gives seededClueIds its remaining channel (visualBeats),
+// VOICE_STAKES_STAGING_AFTERMATH_VOID gives raise_stakes its remaining channel (visualBeats),
+// and VOICE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn its remaining channel
+// (dialogueHighlights) — completing full six-channel saturation for three more of this pass's
+// main triggers (clockRaised was already complete as of Wave 1075).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6557,6 +6563,84 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1089c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1089c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a visually charged follow-through leaves the voice's turns registering as plot mechanics rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot registers in image, not just as a structural beat.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires when every
+  // seed's two-scene aftermath has no heavily-staged scene, while such staging occurs elsewhere.
+  // Distinct from VOICE_SEED_RELATIONAL_AFTERMATH_VOID, VOICE_SEED_EMOTIONAL_AFTERMATH_VOID,
+  // VOICE_SEED_CURIOSITY_AFTERMATH_VOID, and VOICE_SEED_SUSPENSE_AFTERMATH_VOID (same trigger
+  // paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta respectively) —
+  // this is the sixth and final consequence channel for this trigger.
+  {
+    const r1103a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1103a.fires) {
+      issues.push({
+        location: `${r1103a.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'VOICE_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1103a.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1103a.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the voice's foreshadowing registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // stakes-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every stakes-raise's two-scene aftermath has no heavily-staged scene, while such staging
+  // occurs elsewhere. Distinct from VOICE_STAKES_CURIOSITY_AFTERMATH_VOID, VOICE_STAKES_
+  // SUSPENSE_AFTERMATH_VOID, VOICE_STAKES_EMOTIONAL_AFTERMATH_VOID, and VOICE_STAKES_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // emotionalShift/dialogueHighlights respectively) — this is the sixth and final consequence
+  // channel for this trigger.
+  {
+    const r1103b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1103b.fires) {
+      issues.push({
+        location: `${r1103b.triggerCount} stakes-raise(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'VOICE_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1103b.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1103b.aftermathCount} such scenes exist elsewhere. Stakes that never earn a visually charged follow-through leave the voice's escalation registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, stage at least two concrete visual beats, so the escalation registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // VOICE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from VOICE_TURN_
+  // SUSPENSE_AFTERMATH_VOID, VOICE_TURN_RELATIONAL_AFTERMATH_VOID, VOICE_TURN_CURIOSITY_
+  // AFTERMATH_VOID, VOICE_TURN_EMOTIONAL_AFTERMATH_VOID, and VOICE_TURN_STAGING_AFTERMATH_VOID
+  // (same trigger paired with suspenseDelta/relationshipShifts/curiosityDelta/emotionalShift/
+  // visualBeats respectively) — this is the sixth and final consequence channel for this
+  // trigger.
+  {
+    const r1103c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1103c.fires) {
+      issues.push({
+        location: `${r1103c.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'VOICE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1103c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1103c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a memorable line right after it lands leaves the voice's turns registering as plot mechanics without a voice confirming what changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a character voice what just changed — a line worth remembering, not just a structural pivot passing silently.`,
       });
     }
   }
