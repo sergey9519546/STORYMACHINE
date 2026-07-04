@@ -535,6 +535,11 @@
 // CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: compound negative-conflict-signal channel, not a
 // positive curiosityDelta rise) and CONFLICT_CLOCK_TURN_AFTERMATH_VOID (Wave 590:
 // dramaticTurn as the aftermath channel, not curiosityDelta).
+// Wave 1136 additions: revelation was at three of six channels (curiosityDelta, emotionalShift,
+// suspenseDelta) and clockRaised at two (suspenseDelta, curiosityDelta). CONFLICT_REVELATION_
+// RELATIONAL_AFTERMATH_VOID gives revelation its fourth channel (relationshipShifts);
+// CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID and CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID give
+// clockRaised its third and fourth channels (emotionalShift, relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6600,6 +6605,84 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1122c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1122c.aftermathCount} such rises occur elsewhere. A deadline that tightens without opening a new question leaves the conflict's clock registering as a schedule rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface from the mounting pressure, so the deadline keeps generating curiosity, not just counting down.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1108), CONFLICT_REVELATION_EMOTIONAL_
+  // AFTERMATH_VOID, and CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1122, same trigger
+  // paired with curiosityDelta/emotionalShift/suspenseDelta) — this is the fourth consequence
+  // channel for this trigger.
+  {
+    const r1136a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1136a.fires) {
+      issues.push({
+        location: `${r1136a.triggerCount} revelation scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'CONFLICT_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1136a.triggerCount} revelation scenes is followed by two scenes with no recorded relationship shift, even though ${r1136a.aftermathCount} such shifts exist elsewhere in the script. A truth that surfaces without moving how any two characters stand with each other treats the discovery as private information rather than something that reshapes the conflict's relational battlefield.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the discovery registers between characters, not just within one.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1108) and CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1122, same trigger paired with
+  // suspenseDelta/curiosityDelta), plus the non-standard hand-rolled CONFLICT_CLOCK_AFTERMATH_
+  // VOID (Wave 450) and CONFLICT_CLOCK_TURN_AFTERMATH_VOID (Wave 590) — this is the third
+  // checkAftermathVoid-based channel for this trigger.
+  {
+    const r1136b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1136b.fires) {
+      issues.push({
+        location: `${r1136b.triggerCount} clock-raise scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1136b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1136b.aftermathCount} such shifts occur elsewhere. Time pressure that never registers on any character's felt state right after it tightens leaves the conflict's clock reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the mounting pressure, so the conflict's ticking clock carries felt weight, not just structural urgency.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave 1108), CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1122), and CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired
+  // with suspenseDelta/curiosityDelta/emotionalShift) — this is the fourth checkAftermathVoid-
+  // based channel for this trigger.
+  {
+    const r1136c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1136c.fires) {
+      issues.push({
+        location: `${r1136c.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1136c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1136c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the conflict's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
       });
     }
   }
