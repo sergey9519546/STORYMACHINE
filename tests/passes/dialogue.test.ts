@@ -1598,6 +1598,88 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 994 — dialoguePass: dialogue clock delta zone imbalance, dialogue stakes-curiosity aftermath void, dialogue seed-suspense aftermath void', async () => {
+    const makeRec994 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes994 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD994 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const records994a = Array.from({ length: 10 }, (_, i) =>
+        makeRec994(i, [0, 1, 2, 8, 9].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runD994(buildScenes994(10), records994a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE'), 'DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const records994an = Array.from({ length: 10 }, (_, i) =>
+        makeRec994(i, [0, 3, 5, 8].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runD994(buildScenes994(10), records994an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE'), 'DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const records994b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec994(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec994(i, { curiosityDelta: 1 });
+        return makeRec994(i);
+      });
+      const res = await runD994(buildScenes994(10), records994b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const records994bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec994(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec994(i, { curiosityDelta: 1 });
+        return makeRec994(i);
+      });
+      const res = await runD994(buildScenes994(10), records994bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID fires when every seed is followed by two scenes with no rise in suspense', async () => {
+      const records994c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec994(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec994(i, { suspenseDelta: 1 });
+        return makeRec994(i);
+      });
+      const res = await runD994(buildScenes994(10), records994c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID does not fire when a seed is followed by rising suspense within its window', async () => {
+      const records994cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec994(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec994(i, { suspenseDelta: 1 });
+        return makeRec994(i);
+      });
+      const res = await runD994(buildScenes994(10), records994cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 980 — dialoguePass: dialogue emotion zone imbalance, dialogue seed zone imbalance, dialogue clock zone imbalance', async () => {
     const makeRec980 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

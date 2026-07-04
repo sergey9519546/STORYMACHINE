@@ -458,6 +458,15 @@
 // (emotionalShift !== 'neutral' -- the any-direction valence signal), DIALOGUE_SEED_ZONE_IMBALANCE
 // (seededClueIds array), and DIALOGUE_CLOCK_ZONE_IMBALANCE (clockRaised boolean -- the split-name
 // DIALOGUE_CLOCK/DIALOGUE_CLOCK_RAISED cluster+drought pair, both keyed on the same field).
+// Wave 994 additions (opens the thirty-first rotation cycle): DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE
+// (clockDelta !== 0, distinct from the boolean clockRaised field audited in Wave 980) — the last
+// clean trio-complete zone-imbalance candidate in this pass (DIALOGUE_STAGING was skipped: its
+// cluster/drought predicates disagree, >=2 vs >0 visualBeats). With zone-imbalance now exhausted,
+// this wave completes the trio with two aftermath-void pairings: DIALOGUE_STAKES_CURIOSITY_
+// AFTERMATH_VOID (raise_stakes, already a trigger in this pass paired with dialogueHighlights, now
+// paired with curiosityDelta for the first time) and DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID
+// (seededClueIds → suspenseDelta, the first use of either field as a checkAftermathVoid channel in
+// this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5794,6 +5803,79 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r980c.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName980c} contains ${r980c.counts[r980c.bloatZoneIdx]} of them (${Math.round((r980c.counts[r980c.bloatZoneIdx] / r980c.totalCount) * 100)}%) while ${emptyNames980c} contains none. Ticking clocks bloat in one quarter and are never introduced in another, giving dialogue's register of urgency an uneven structural rhythm.`,
         suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) -- ${emptyNames980c} -- so dialogue's register of urgency recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE -- Underweight/bloat x (clockDelta !== 0) x four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4 clock-moving
+  // scenes total, divided across four equal structural zones. Distinct from DIALOGUE_CLOCK_ZONE_
+  // IMBALANCE above (clockRaised boolean, Wave 980) -- this audits the numeric clockDelta field,
+  // and reuses the same predicate as the existing 3-zone DIALOGUE_CLOCK_DELTA_ZONE_CLUSTER and run-
+  // based DIALOGUE_CLOCK_DELTA_DROUGHT_RUN, completing that trio.
+  {
+    const r994a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r994a.fires) {
+      const emptyNames994a = r994a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName994a = FOUR_ZONE_NAMES[r994a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames994a} empty; ${bloatName994a} has ${r994a.counts[r994a.bloatZoneIdx]}/${r994a.totalCount} clock-moving scenes`,
+        rule: 'DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r994a.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName994a} contains ${r994a.counts[r994a.bloatZoneIdx]} of them (${Math.round((r994a.counts[r994a.bloatZoneIdx] / r994a.totalCount) * 100)}%) while ${emptyNames994a} contains none. Deadline pressure bloats in one quarter and never moves in another, giving dialogue's register of urgency an uneven structural rhythm distinct from the boolean clock-raising signal above.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta !== 0) into the empty zone(s) -- ${emptyNames994a} -- so dialogue keeps registering urgency across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID -- with zone-imbalance now exhausted, this wave
+  // completes the trio via the sequence/aftermath mode. Built on checkAftermathVoid from the
+  // shared checks library. n>=8, >=2 qualifying stakes-raise scenes (purpose === 'raise_stakes',
+  // pos<n-2), >=2 curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every stakes-
+  // raise's two-scene aftermath opens no new curiosity, while curiosity does occur elsewhere.
+  // Distinct from RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // dialogueHighlights) -- this pairs raise_stakes with curiosityDelta for the first time in this
+  // pass.
+  {
+    const r994b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r994b.fires) {
+      issues.push({
+        location: `${r994b.triggerCount} stakes-raise aftermath(s) -- no curiosity raised within 2 scenes`,
+        rule: 'DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r994b.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r994b.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke new uncertainty about what dialogue does next; when every stakes-raise's aftermath opens no curiosity, the escalation sits inert rather than propelling the conversation forward.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps propelling dialogue forward rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID -- Sequence/aftermath x seededClueIds trigger ->
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying seed scenes (pos<n-2), >=2 tension-raising scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath raises no tension, while tension does rise elsewhere.
+  // First use of either seededClueIds or suspenseDelta as a checkAftermathVoid channel in this pass
+  // -- a planted clue that never tightens tension nearby leaves the mystery inert rather than
+  // propulsive.
+  {
+    const r994c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r994c.fires) {
+      issues.push({
+        location: `${r994c.triggerCount} seed aftermath(s) -- no suspense raised within 2 scenes`,
+        rule: 'DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r994c.triggerCount} plants) is followed by two scenes with no rise in tension, even though ${r994c.aftermathCount} such rises occur elsewhere. A planted clue should usually tighten tension as its implications sink in; when every seed's aftermath registers no suspense, the mystery sits flat rather than compounding.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, raise the tension -- a ticking complication or a near-miss tied to the new information -- so the mystery keeps compounding rather than idling.`,
       });
     }
   }
