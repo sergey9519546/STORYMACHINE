@@ -473,6 +473,13 @@
 // trigger (threshold ≥3, previously only paired with curiosityDelta): BELIEF_OPEN_THREAD_
 // EMOTIONAL_AFTERMATH_VOID (paired with emotionalShift) and BELIEF_OPEN_THREAD_RELATIONAL_
 // AFTERMATH_VOID (paired with relationshipShifts).
+// Wave 1048 additions: with raise_stakes, payoffSetupIds, and seededClueIds all now at four
+// channels each, this wave gives the heavy-unresolvedClues-debt trigger its fourth channel
+// (BELIEF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, paired with suspenseDelta) and extends two of the
+// saturated triggers to a fifth channel using dialogueHighlights and visualBeats — fields that
+// (per grep) have never been used as checkAftermathVoid consequence channels anywhere in this
+// pass: BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes) and BELIEF_PAYOFF_STAGING_
+// AFTERMATH_VOID (payoffSetupIds).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5828,6 +5835,81 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1034c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1034c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the belief-tracking layer's uncertainty purely informational rather than something straining the bond.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the belief-tracking layer's open threads register interpersonally, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath carries
+  // no suspense rise, while such rises occur elsewhere. Distinct from BELIEF_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID, BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, and BELIEF_OPEN_THREAD_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1048a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1048a.fires) {
+      issues.push({
+        location: `${r1048a.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'BELIEF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1048a.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1048a.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of danger right after it leaves the belief-tracking layer's uncertainty stalling instead of pressuring the story forward.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the belief-tracking layer's stakes rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying raise_stakes scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. dialogueHighlights has never been
+  // used as a checkAftermathVoid consequence channel anywhere in this pass — this is the first
+  // pairing of the field with the sequence/aftermath mode here, and the fifth consequence channel
+  // for this trigger.
+  {
+    const r1048b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1048b.fires) {
+      issues.push({
+        location: `${r1048b.triggerCount} raise-stakes aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1048b.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1048b.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the belief-tracking layer's stakes registering structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with substantial physical staging,
+  // 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. visualBeats has never been used as a
+  // checkAftermathVoid consequence channel anywhere in this pass — this is the first pairing of
+  // the field with the sequence/aftermath mode here, and the fifth consequence channel for this
+  // trigger.
+  {
+    const r1048c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1048c.fires) {
+      issues.push({
+        location: `${r1048c.triggerCount} payoff scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'BELIEF_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1048c.triggerCount} cashed-in setups) is followed by two scenes with no substantial physical staging, even though ${r1048c.aftermathCount} such scenes exist elsewhere in the script. A resolved setup gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — the aftermath of the resolution given some visible presence before the belief-tracking layer moves on.`,
       });
     }
   }
