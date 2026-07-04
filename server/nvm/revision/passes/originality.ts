@@ -467,6 +467,14 @@
 // this wave pivots to the sequence/aftermath mode for two more checks, each a first-use pairing in
 // this pass: ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes → curiosityDelta) and
 // ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID (clockRaised → relationshipShifts).
+// Wave 998 additions: zone-imbalance remains fully exhausted (ORIGINALITY_STAGING re-checked and
+// re-excluded — same predicate mismatch, >=2 vs >0 visualBeats). This wave adds three more
+// aftermath-void pairings, none reusing a channel from the existing three-rule family:
+// ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID (raise_stakes, previously only paired with
+// curiosityDelta, now paired with suspenseDelta), ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID
+// (seededClueIds, the first use of this field as a checkAftermathVoid TRIGGER in this pass), and
+// ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoffSetupIds, likewise its first use as a
+// checkAftermathVoid TRIGGER in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6016,6 +6024,78 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene that raises a ticking clock (${r984c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r984c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that time pressure never bears on how characters treat each other nearby — a predictable, avoidable absence.`,
         suggestedFix: `In the two scenes following at least one clock-raising moment, let the ticking deadline strain or shift a relationship so escalating time pressure carries interpersonal weight rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath raises no tension, while
+  // tension does rise elsewhere. Distinct from ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID (Wave
+  // 984, same trigger paired with curiosityDelta) — this pairs raise_stakes with suspenseDelta for
+  // the first time in this pass.
+  {
+    const r998a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r998a.fires) {
+      issues.push({
+        location: `${r998a.triggerCount} stakes-raise aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r998a.triggerCount} escalations) is followed by two scenes with no rise in tension, even though ${r998a.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that escalation never tightens the felt sense of jeopardy nearby — a predictable, avoidable absence where danger is stated but never felt.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, tighten the tension — a ticking complication or a near-miss — so escalating danger registers as felt, not just stated.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath opens no new curiosity, while curiosity does occur
+  // elsewhere. First use of seededClueIds as a checkAftermathVoid TRIGGER in this pass — it has
+  // only appeared audited for its own distribution (ORIGINALITY_SEED_ZONE_IMBALANCE and siblings)
+  // before now.
+  {
+    const r998b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r998b.fires) {
+      issues.push({
+        location: `${r998b.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r998b.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r998b.aftermathCount} scenes elsewhere do open fresh questions. Once the audience notices the pattern, they learn that planted clues never compound into a further question nearby — a predictable, avoidable absence rather than genuinely unpredictable follow-through.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question so the pattern of dead-ending seeds isn't learnable.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath is emotionally flat, while charged scenes occur
+  // elsewhere. First use of payoffSetupIds as a checkAftermathVoid TRIGGER in this pass — it has
+  // only appeared audited for its own distribution (ORIGINALITY_PAYOFF_ZONE_IMBALANCE and
+  // siblings) before now.
+  {
+    const r998c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r998c.fires) {
+      issues.push({
+        location: `${r998c.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r998c.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r998c.aftermathCount} emotionally-charged scenes exist elsewhere. Once the audience notices the pattern, they learn that payoffs never carry feeling nearby — a predictable, avoidable absence where a callback lands as pure information rather than a felt beat.`,
+        suggestedFix: `Let at least one payoff carry feeling in its aftermath: in the scene or two after a setup pays off, show someone reacting to it emotionally — relief, grief, triumph.`,
       });
     }
   }

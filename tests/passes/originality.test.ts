@@ -1210,6 +1210,110 @@ He sits at his desk.
   });
 
 
+  describe('Wave 998 — originalityPass: originality stakes-suspense aftermath void, originality seed-curiosity aftermath void, originality payoff-emotional aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/970/984 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (purpose==='raise_stakes' / seededClueIds / payoffSetupIds) never overlap the filler purpose
+    // pool, so cycling never contaminates a fixture.
+    const PURPOSE_POOL_998 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_998 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor998 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec998 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor998(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_998[idx % PURPOSE_POOL_998.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain998 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor998(i)}\n\n${SENTENCE_POOL_998[i % SENTENCE_POOL_998.length]}`).join('\n\n');
+    const runO998 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain998(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no rise in suspense', async () => {
+      const recs998a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec998(i, { suspenseDelta: 1 });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID does not fire when a stakes-raise is followed by rising suspense within its window', async () => {
+      const recs998an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec998(i, { suspenseDelta: 1 });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID fires when every seed is followed by two scenes with no new curiosity', async () => {
+      const recs998b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec998(i, { curiosityDelta: 1 });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID does not fire when a seed is followed by new curiosity within its window', async () => {
+      const recs998bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec998(i, { curiosityDelta: 1 });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID fires when every payoff is followed by two scenes with no emotional shift', async () => {
+      const recs998c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeRec998(i, { emotionalShift: 'positive' });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID does not fire when a payoff is followed by an emotional shift within its window', async () => {
+      const recs998cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec998(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeRec998(i, { emotionalShift: 'positive' });
+        return makeRec998(i);
+      });
+      const res = await runO998(recs998cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 984 — originalityPass: originality highlight zone imbalance, originality stakes curiosity aftermath void, originality clock relationship aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/956/970 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
