@@ -1352,6 +1352,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 997 — intentionPass: revelation zone imbalance, intention stakes-suspense aftermath void, intention seed-curiosity aftermath void', async () => {
+    const makeRec997 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN997 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs997a = Array.from({ length: 10 }, (_, i) =>
+        makeRec997(i, [0, 1, 2, 8, 9].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runIN997(recs997a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_IMBALANCE'), 'REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs997an = Array.from({ length: 10 }, (_, i) =>
+        makeRec997(i, [0, 3, 5, 8].includes(i) ? { revelation: 'a hidden truth surfaces' } : {}));
+      const res = await runIN997(recs997an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REVELATION_ZONE_IMBALANCE'), 'REVELATION_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no rise in suspense', async () => {
+      const recs997b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec997(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec997(i, { suspenseDelta: 1 });
+        return makeRec997(i);
+      });
+      const res = await runIN997(recs997b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID does not fire when a stakes-raise is followed by rising suspense within its window', async () => {
+      const recs997bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec997(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec997(i, { suspenseDelta: 1 });
+        return makeRec997(i);
+      });
+      const res = await runIN997(recs997bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_SEED_CURIOSITY_AFTERMATH_VOID fires when every seed is followed by two scenes with no new curiosity', async () => {
+      const recs997c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec997(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec997(i, { curiosityDelta: 1 });
+        return makeRec997(i);
+      });
+      const res = await runIN997(recs997c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SEED_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_SEED_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_SEED_CURIOSITY_AFTERMATH_VOID does not fire when a seed is followed by new curiosity within its window', async () => {
+      const recs997cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec997(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec997(i, { curiosityDelta: 1 });
+        return makeRec997(i);
+      });
+      const res = await runIN997(recs997cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SEED_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_SEED_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 983 — intentionPass: intention clock zone imbalance, intention highlight zone imbalance, intention stakes-curiosity aftermath void', async () => {
     const makeRec983 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

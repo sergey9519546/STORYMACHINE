@@ -444,6 +444,15 @@
 // (dialogueHighlights array) — plus, since zone-imbalance is now down to those two, one aftermath-
 // void pairing via checkAftermathVoid: INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
 // curiosity), the first use of raise_stakes as an aftermath-void TRIGGER in this pass.
+// Wave 997 additions: REVELATION_ZONE_IMBALANCE (revelation string field != null) — a clean trio-
+// complete signal this pass's existing unprefixed REVELATION_ZONE_CLUSTER/REVELATION_DROUGHT_RUN
+// pair had never been extended to (INTENTION_STAGING was checked and excluded: its cluster/drought
+// predicates disagree, >=2 vs >0 visualBeats). With zone-imbalance now down to that single signal,
+// this wave completes the trio with two more aftermath-void pairings, each reusing an already-
+// paired trigger with a fresh channel: INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID (raise_stakes,
+// previously only paired with curiosityDelta in Wave 983, now paired with suspenseDelta) and
+// INTENTION_SEED_CURIOSITY_AFTERMATH_VOID (seededClueIds, previously only paired with visualBeats,
+// now paired with curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5673,6 +5682,80 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r983c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r983c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke a new uncertainty about what the character's pursuit will cost or require next. When every stakes-raise's aftermath opens no curiosity, the character's escalating intention sits inert rather than propelling the audience forward.`,
         suggestedFix: `Let at least one stakes-raise open a new question in its aftermath: in the scene or two after the danger sharpens, plant an uncertainty about what the character's pursuit of their goal will cost next.`,
+      });
+    }
+  }
+
+  // REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes total,
+  // divided across four equal structural zones. Uses the same revelation !== null && !== undefined
+  // && !== '' predicate as this pass's existing 3-zone REVELATION_ZONE_CLUSTER and run-based
+  // REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this
+  // channel, completing that trio. This is the last clean trio-complete zone-imbalance candidate
+  // in this pass: INTENTION_STAGING was considered but skipped because its cluster
+  // (visualBeats.length>=2) and drought-run (visualBeats.length>0) predicates disagree, so its
+  // "trio" doesn't actually audit one consistent signal.
+  {
+    const r997a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null && r.revelation !== '',
+    });
+    if (r997a.fires) {
+      const emptyNames997a = r997a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName997a = FOUR_ZONE_NAMES[r997a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames997a} empty; ${bloatName997a} has ${r997a.counts[r997a.bloatZoneIdx]}/${r997a.totalCount} revelation scenes`,
+        rule: 'REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r997a.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName997a} contains ${r997a.counts[r997a.bloatZoneIdx]} of them (${Math.round((r997a.counts[r997a.bloatZoneIdx] / r997a.totalCount) * 100)}%) while ${emptyNames997a} contains none. Disclosures bloat in one structural quarter and never land in another, so the character's understanding of their own pursuit deepens in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames997a} — so the character's understanding of their own pursuit keeps deepening across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID — with zone-imbalance now exhausted, this wave
+  // completes the trio with two more aftermath-void pairings. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying stakes-raise scenes (purpose === 'raise_stakes',
+  // pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene lookahead. Fires when every stakes-
+  // raise's two-scene aftermath raises no tension, while tension does rise elsewhere. Distinct from
+  // INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID (Wave 983, same trigger paired with curiosityDelta)
+  // — this pairs raise_stakes with suspenseDelta for the first time in this pass.
+  {
+    const r997b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r997b.fires) {
+      issues.push({
+        location: `${r997b.triggerCount} stakes-raise aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r997b.triggerCount} escalations) is followed by two scenes with no rise in tension, even though ${r997b.aftermathCount} such rises occur elsewhere. Escalating danger should usually tighten the felt sense of jeopardy around the character's pursuit; when every stakes-raise's aftermath registers no suspense, the intention's escalation reads as a stated fact rather than a threat the audience feels.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, tighten the tension around the character's pursuit — a ticking complication or a near-miss — so escalating danger registers as felt, not just stated.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath opens no new curiosity, while curiosity does occur
+  // elsewhere. Distinct from SEED_STAGING_AFTERMATH_VOID (same trigger paired with visualBeats) —
+  // this pairs seededClueIds with curiosityDelta for the first time in this pass.
+  {
+    const r997c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r997c.fires) {
+      issues.push({
+        location: `${r997c.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'INTENTION_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r997c.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r997c.aftermathCount} scenes elsewhere do open fresh questions. A planted clue should usually compound into a further question about the character's pursuit; when every seed's aftermath opens no curiosity, the groundwork sits inert rather than deepening the audience's investment.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what the character's pursuit will uncover next.`,
       });
     }
   }
