@@ -487,6 +487,13 @@
 // AFTERMATH_VOID pair the numeric clock-delta signal with suspenseDelta and curiosityDelta for
 // the first time via this mode (clockDelta already has drought-run, zone-cluster, zone-imbalance,
 // and peak-uncaused coverage, but never sequence/aftermath).
+// Wave 1097 additions: with all six boolean/purpose/length triggers (raise_stakes, revelation,
+// seededClueIds, payoffSetupIds, dramaticTurn, clockRaised, unresolvedClues-debt) fully saturated
+// since Wave 1083, this wave continues building out clockDelta≠0's channel set (currently just
+// suspenseDelta and curiosityDelta) — PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID
+// (emotionalShift), PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID (relationshipShifts), and
+// PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID (visualBeats) give this trigger three fresh channels,
+// leaving only dialogueHighlights before it too reaches full six-channel saturation.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6202,6 +6209,83 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene where the clock's numeric pressure shifts (${r1083c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1083c.aftermathCount} such rises occur elsewhere. A changing deadline that never opens a fresh question right after it shifts leaves the pacing's clock mechanics registering as a closed adjustment rather than a development that generates the next thing to wonder about.`,
         suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let a new question arise from the change so the pacing's clock mechanics keep generating curiosity, not just tracking a number.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-delta scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-delta scene's two-scene aftermath carries no emotional
+  // shift, while such shifts occur elsewhere. Distinct from PACING_CLOCK_DELTA_SUSPENSE_
+  // AFTERMATH_VOID and PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID (Wave 1083, same clockDelta≠0
+  // trigger paired with suspenseDelta/curiosityDelta) — this is the third sequence/aftermath
+  // channel for this numeric trigger.
+  {
+    const r1097a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1097a.fires) {
+      issues.push({
+        location: `${r1097a.triggerCount} clock-delta scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1097a.triggerCount} instances) is followed by two scenes with no emotional shift, even though ${r1097a.aftermathCount} such shifts occur elsewhere. A changing deadline that never registers emotionally right after it shifts leaves the pacing's clock mechanics feeling procedural — a number moving without anyone visibly reacting to it.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let a character's emotional register shift in response, so the pacing's clock mechanics carry felt weight, not just a changing number.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-delta scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every clock-delta scene's two-scene aftermath carries no
+  // relationship movement, while such movement occurs elsewhere. Distinct from PACING_CLOCK_
+  // DELTA_SUSPENSE_AFTERMATH_VOID, PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID, and PACING_
+  // CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID (same trigger paired with suspenseDelta/curiosityDelta/
+  // emotionalShift) — this is the fourth sequence/aftermath channel for this numeric trigger.
+  {
+    const r1097b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1097b.fires) {
+      issues.push({
+        location: `${r1097b.triggerCount} clock-delta scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1097b.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1097b.aftermathCount} such shifts occur elsewhere. A changing deadline that never moves how characters stand with each other leaves the pacing's clock mechanics isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let it shift how a pair of characters relate, so the clock's mechanics carry interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-delta scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-delta scene's two-scene aftermath has no heavily-staged
+  // scene, while such staging occurs elsewhere. Distinct from PACING_CLOCK_DELTA_SUSPENSE_
+  // AFTERMATH_VOID, PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID, PACING_CLOCK_DELTA_EMOTIONAL_
+  // AFTERMATH_VOID, and PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) — this is the fifth
+  // sequence/aftermath channel for this numeric trigger, leaving only dialogueHighlights before
+  // clockDelta reaches full six-channel saturation.
+  {
+    const r1097c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1097c.fires) {
+      issues.push({
+        location: `${r1097c.triggerCount} clock-delta scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1097c.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1097c.aftermathCount} such scenes exist elsewhere in the script. A changing deadline that never earns a visually charged follow-through leaves the pacing's clock mechanics registering as narrated pressure rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, stage at least two concrete visual beats, so the clock's mechanics register in image, not just as a changing number.`,
       });
     }
   }
