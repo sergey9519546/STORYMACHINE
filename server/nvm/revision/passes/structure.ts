@@ -472,6 +472,14 @@
 // unresolvedClues debt, previously paired with dialogueHighlights/emotionalShift, now a third
 // channel with curiosityDelta), and STRUCTURE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (heavy
 // unresolvedClues debt, now a fourth channel with relationshipShifts).
+// Wave 1059 additions: with all four main triggers now at four channels each, this wave gives
+// three of them a fifth: STRUCTURE_PAYOFF_SUSPENSE_AFTERMATH_VOID (payoffSetupIds, previously
+// paired with dialogueHighlights/relationshipShifts/emotionalShift/curiosityDelta, now also
+// paired with suspenseDelta), STRUCTURE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (dramaticTurn,
+// previously paired with visualBeats/curiosityDelta/relationshipShifts/emotionalShift, now also
+// paired with dialogueHighlights), and STRUCTURE_OPEN_THREAD_STAGING_AFTERMATH_VOID (heavy
+// unresolvedClues debt, previously paired with dialogueHighlights/emotionalShift/curiosityDelta/
+// relationshipShifts, now also paired with visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5868,6 +5876,85 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1045c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1045c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the structure's uncertainty purely informational rather than something straining the bonds it's meant to be tracking.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the structure's open threads register interpersonally, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // STRUCTURE_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, STRUCTURE_PAYOFF_
+  // RELATIONAL_AFTERMATH_VOID, STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID, and STRUCTURE_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with dialogueHighlights/relationshipShifts/
+  // emotionalShift/curiosityDelta respectively) — this is the fifth consequence channel for this
+  // trigger.
+  {
+    const r1059a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1059a.fires) {
+      issues.push({
+        location: `${r1059a.triggerCount} payoff scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'STRUCTURE_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1059a.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1059a.aftermathCount} such rises occur elsewhere. A resolved setup that never re-tightens tension right after it lands leaves the structure's payoffs registering as a closed loop with nothing left pressing on the reader.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise so resolution doesn't flatten the structure's forward pressure entirely.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from DRAMATIC_TURN_
+  // STAGING_AFTERMATH_VOID, STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID, STRUCTURE_TURN_RELATIONAL_
+  // AFTERMATH_VOID, and STRUCTURE_TURN_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // visualBeats/curiosityDelta/relationshipShifts/emotionalShift respectively) — this is the fifth
+  // consequence channel for this trigger.
+  {
+    const r1059b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1059b.fires) {
+      issues.push({
+        location: `${r1059b.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'STRUCTURE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1059b.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1059b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it lands leaves the structure's turns registering as plot mechanics without a voice confirming what changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a character voice what just changed — a line worth remembering, not just a structural pivot passing silently.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 visually-dense
+  // scenes anywhere (visualBeats length≥2), 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath contains no visually dense scene, while such scenes occur elsewhere.
+  // Distinct from STRUCTURE_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID, STRUCTURE_OPEN_THREAD_EMOTIONAL_
+  // AFTERMATH_VOID, STRUCTURE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and STRUCTURE_OPEN_THREAD_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights/emotionalShift/
+  // curiosityDelta/relationshipShifts respectively) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1059c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1059c.fires) {
+      issues.push({
+        location: `${r1059c.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'STRUCTURE_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1059c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1059c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the structure's open threads feeling abstract rather than lodged in the world.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
       });
     }
   }
