@@ -517,6 +517,14 @@
 // VOID and PAYOFF_STAKES_STAGING_AFTERMATH_VOID give raise_stakes its fifth and sixth channels,
 // completing full saturation for this trigger. PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_
 // VOID gives heavy unresolvedClues debt a fifth channel.
+// Wave 1126 additions: with raise_stakes, clockRaised, seededClueIds, and dramaticTurn all fully
+// saturated, this wave closes the remaining gaps on the two triggers still short of six channels.
+// PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID gives heavy unresolvedClues debt its sixth and final
+// channel (visualBeats), completing full saturation for this trigger too. revelation stood at
+// four channels (relationshipShifts/curiosityDelta/emotionalShift/suspenseDelta) —
+// PAYOFF_REVELATION_STAGING_AFTERMATH_VOID and PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID give it its fifth and sixth channels (visualBeats, dialogueHighlights), completing full
+// six-channel saturation for every tracked trigger in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6230,6 +6238,87 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1112c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1112c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the payoff machinery's open threads feeling abstract rather than voiced.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so the accumulating mystery registers in speech, not just as narrative backlog.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from PAYOFF_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID, PAYOFF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, PAYOFF_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID, PAYOFF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, and PAYOFF_OPEN_
+  // THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with suspenseDelta/
+  // emotionalShift/curiosityDelta/relationshipShifts/dialogueHighlights) — this is the sixth and
+  // final consequence channel for this trigger, completing full saturation.
+  {
+    const r1126a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1126a.fires) {
+      issues.push({
+        location: `${r1126a.triggerCount} heavy clue-debt scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1126a.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1126a.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a visually charged follow-through leaves the payoff machinery's open threads feeling like narrated backlog rather than something the camera dwells on.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, stage at least two concrete visual beats, so the accumulating mystery has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every revelation's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID,
+  // PAYOFF_REVELATION_CURIOSITY_AFTERMATH_VOID, PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID, and
+  // PAYOFF_REVELATION_SUSPENSE_AFTERMATH_VOID (same trigger paired with relationshipShifts/
+  // curiosityDelta/emotionalShift/suspenseDelta) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1126b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1126b.fires) {
+      issues.push({
+        location: `${r1126b.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PAYOFF_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1126b.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1126b.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a visually charged follow-through leaves the payoff machinery's revelations registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the discovery registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID, PAYOFF_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID, PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID, PAYOFF_REVELATION_SUSPENSE_AFTERMATH_VOID,
+  // and PAYOFF_REVELATION_STAGING_AFTERMATH_VOID (this wave, same trigger paired with
+  // relationshipShifts/curiosityDelta/emotionalShift/suspenseDelta/visualBeats) — this is the
+  // sixth and final consequence channel for this trigger, completing full six-channel saturation
+  // for every tracked trigger in this pass.
+  {
+    const r1126c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1126c.fires) {
+      issues.push({
+        location: `${r1126c.triggerCount} revelation scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1126c.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1126c.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a memorable line right after it lands leaves the payoff machinery's revelations unvoiced — no character's speech processes what was just learned.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered, so the payoff's reckoning with new information registers in speech, not just in plot state.`,
       });
     }
   }

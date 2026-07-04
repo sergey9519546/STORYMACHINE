@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1126 — payoffPass: payoff open-thread-staging aftermath void, payoff revelation-staging aftermath void, payoff revelation-dialogue-highlight aftermath void', async () => {
+    const runPY1126 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1126a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a heavily-staged scene within its window', async () => {
+      const recs1126an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'PAYOFF_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_REVELATION_STAGING_AFTERMATH_VOID fires when every revelation is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1126b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_STAGING_AFTERMATH_VOID'), 'PAYOFF_REVELATION_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_REVELATION_STAGING_AFTERMATH_VOID does not fire when a revelation is followed by a heavily-staged scene within its window', async () => {
+      const recs1126bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_STAGING_AFTERMATH_VOID'), 'PAYOFF_REVELATION_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every revelation is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1126c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a revelation is followed by highlighted dialogue within its window', async () => {
+      const recs1126cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1126(recs1126cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1112 — payoffPass: payoff stakes-dialogue-highlight aftermath void, payoff stakes-staging aftermath void, payoff open-thread-dialogue-highlight aftermath void', async () => {
     const runPY1112 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
