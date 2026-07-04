@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1149 — characterArcPass: arc positive-curiosity aftermath void, arc positive-suspense aftermath void, arc negative-curiosity aftermath void', async () => {
+    const makeRec1149 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1149 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID fires when every positive-emotion scene is followed by two scenes with no curiosity rise', async () => {
+      const recs1149a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeRec1149(i, { curiosityDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID'), 'ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID does not fire when a positive-emotion scene is followed by a curiosity rise within its window', async () => {
+      const recs1149an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeRec1149(i, { curiosityDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID'), 'ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID fires when every positive-emotion scene is followed by two scenes with no suspense rise', async () => {
+      const recs1149b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeRec1149(i, { suspenseDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID'), 'ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID does not fire when a positive-emotion scene is followed by a suspense rise within its window', async () => {
+      const recs1149bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeRec1149(i, { suspenseDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID'), 'ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID fires when every negative-emotion scene is followed by two scenes with no curiosity rise', async () => {
+      const recs1149c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'negative' });
+        if (i === 8 || i === 9) return makeRec1149(i, { curiosityDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID'), 'ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID does not fire when a negative-emotion scene is followed by a curiosity rise within its window', async () => {
+      const recs1149cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1149(i, { emotionalShift: 'negative' });
+        if (i === 1 || i === 9) return makeRec1149(i, { curiosityDelta: 1 });
+        return makeRec1149(i);
+      });
+      const res = await runArc1149(recs1149cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID'), 'ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1135 — characterArcPass: arc suspense-recurrence aftermath void, arc turn-dialogue-highlight aftermath void, arc turn-staging aftermath void', async () => {
     const makeRec1135 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
