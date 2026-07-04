@@ -488,6 +488,13 @@
 // curiosityDelta, now a fourth channel with emotionalShift), and DIALOGUE_SHIFT_CURIOSITY_
 // AFTERMATH_VOID (the relationshipShifts amount>=0.3 trigger, previously only paired with
 // visualBeats, now paired with curiosityDelta for a second channel).
+// Wave 1050 additions (opens the thirty-fourth rotation cycle for this pass): with unresolvedClues,
+// raise_stakes, and seededClueIds all now at four channels each, this wave targets the
+// relationshipShifts (amount>=0.3) trigger, previously only at two channels: DIALOGUE_SHIFT_
+// SUSPENSE_AFTERMATH_VOID (paired with suspenseDelta) and DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID
+// (paired with emotionalShift). The third check, DIALOGUE_SEED_STAGING_AFTERMATH_VOID, pairs
+// seededClueIds with visualBeats for a fifth channel, the last of the standard consequence
+// channels for that trigger.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6117,6 +6124,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1036c.triggerCount} relationship-shift scenes is followed by two scenes with no rise in curiosity, even though ${r1036c.aftermathCount} such rises occur elsewhere. A bond that has just shifted should usually raise a fresh question -- what changes now, who else notices, what it costs -- and when every shift's aftermath opens nothing new, dialogue treats the change as settled rather than as something the audience keeps wondering about.`,
         suggestedFix: `After at least one relationship shift, let a character's line raise a new question about what the change means so the shift keeps generating curiosity rather than closing the subject.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID -- Sequence/aftermath x relationshipShifts
+  // (amount>=0.3) trigger -> suspenseDelta absence. Built on checkAftermathVoid from the shared
+  // checks library. n>=8, >=2 qualifying shift scenes (pos<n-2), >=2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every shift's two-scene aftermath carries no suspense
+  // rise, while such rises occur elsewhere. Distinct from DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID
+  // and DIALOGUE_SHIFT_CURIOSITY_AFTERMATH_VOID (same trigger paired with visualBeats and
+  // curiosityDelta respectively) -- this is the third consequence channel for this trigger.
+  {
+    const r1050a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1050a.fires) {
+      issues.push({
+        location: `${r1050a.triggerCount} relationship-shift scene(s) -- no suspense rise within 2 scenes of any`,
+        rule: 'DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1050a.triggerCount} relationship-shift scenes is followed by two scenes with no rise in suspense, even though ${r1050a.aftermathCount} such rises occur elsewhere. A bond that has just shifted should usually tighten the tension around it -- what the change costs, who else notices, what could go wrong now -- and when every shift's aftermath carries no rising danger, dialogue treats the change as settled rather than as something that raises the stakes.`,
+        suggestedFix: `After at least one relationship shift, let the tension in the dialogue rise so the shift's consequences feel dangerous, not just discussed.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID -- Sequence/aftermath x relationshipShifts
+  // (amount>=0.3) trigger -> emotionalShift absence. Built on checkAftermathVoid from the shared
+  // checks library. n>=8, >=2 qualifying shift scenes (pos<n-2), >=2 emotionally-charged scenes
+  // anywhere, 2-scene lookahead. Fires when every shift's two-scene aftermath carries no emotional
+  // shift, while such shifts occur elsewhere. Distinct from DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID,
+  // DIALOGUE_SHIFT_CURIOSITY_AFTERMATH_VOID, and DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID (same
+  // trigger paired with visualBeats/curiosityDelta/suspenseDelta respectively) -- this is the
+  // fourth consequence channel for this trigger.
+  {
+    const r1050b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1050b.fires) {
+      issues.push({
+        location: `${r1050b.triggerCount} relationship-shift scene(s) -- no emotional shift within 2 scenes of any`,
+        rule: 'DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1050b.triggerCount} relationship-shift scenes is followed by two emotionally neutral scenes, even though ${r1050b.aftermathCount} emotionally-charged scenes exist elsewhere. A bond that has just shifted should usually register as felt -- relief, hurt, quiet triumph -- and when every shift's aftermath is affectively flat, dialogue treats the change as informational bookkeeping rather than something anyone visibly carries.`,
+        suggestedFix: `After at least one relationship shift, let a character's feelings register in the dialogue -- a beat of relief, hurt, or hope -- so the shift lands emotionally, not just structurally.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_STAGING_AFTERMATH_VOID -- Sequence/aftermath x seededClueIds trigger ->
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying seed scenes (pos<n-2), >=2 scenes anywhere with substantial physical staging,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID,
+  // DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID, DIALOGUE_SEED_CURIOSITY_AFTERMATH_VOID, and
+  // DIALOGUE_SEED_EMOTIONAL_AFTERMATH_VOID (same trigger paired with suspenseDelta/
+  // relationshipShifts/curiosityDelta/emotionalShift respectively) -- this is the fifth
+  // consequence channel for this trigger, completing the standard set.
+  {
+    const r1050c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1050c.fires) {
+      issues.push({
+        location: `${r1050c.triggerCount} seed scene(s) -- no visually dense scene within 2 scenes of any`,
+        rule: 'DIALOGUE_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1050c.triggerCount} plants) is followed by two scenes with no substantial physical staging, even though ${r1050c.aftermathCount} such scenes exist elsewhere in the script. A planted clue gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one clue-seeding moment, let one of the following two scenes carry substantial physical staging -- the planted material or its surroundings given some visible presence before the dialogue moves on.`,
       });
     }
   }

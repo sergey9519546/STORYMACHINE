@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1050 — dialoguePass: dialogue shift-suspense aftermath void, dialogue shift-emotional aftermath void, dialogue seed-staging aftermath void', async () => {
+    const makeRec1050 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1050 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1050 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID fires when every relationship-shift scene is followed by two scenes with no suspense rise', async () => {
+      const records1050a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 8 || i === 9) return makeRec1050(i, { suspenseDelta: 1 });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID does not fire when a relationship-shift scene is followed by a suspense rise within its window', async () => {
+      const records1050an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 1 || i === 9) return makeRec1050(i, { suspenseDelta: 1 });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID fires when every relationship-shift scene is followed by two scenes with no emotional shift', async () => {
+      const records1050b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 8 || i === 9) return makeRec1050(i, { emotionalShift: 'positive' });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID does not fire when a relationship-shift scene is followed by an emotional shift within its window', async () => {
+      const records1050bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 1 || i === 9) return makeRec1050(i, { emotionalShift: 'positive' });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_SEED_STAGING_AFTERMATH_VOID fires when every seed is followed by two scenes with no substantial staging', async () => {
+      const records1050c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1050(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_STAGING_AFTERMATH_VOID'), 'DIALOGUE_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by substantial staging within its window', async () => {
+      const records1050cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1050(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1050(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeRec1050(i);
+      });
+      const res = await runD1050(buildScenes1050(10), records1050cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_STAGING_AFTERMATH_VOID'), 'DIALOGUE_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1036 — dialoguePass: dialogue open-thread-suspense aftermath void, dialogue seed-emotional aftermath void, dialogue shift-curiosity aftermath void', async () => {
     const makeRec1036 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
