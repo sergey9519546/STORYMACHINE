@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 996 — conflictPass: conflict stakes-suspense aftermath void, conflict payoff-emotional aftermath void, conflict open-thread-curiosity aftermath void', async () => {
+    const makeRec996 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF996 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no rise in suspense', async () => {
+      const recs996a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec996(i, { suspenseDelta: 1 });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID does not fire when a stakes-raise is followed by rising suspense within its window', async () => {
+      const recs996an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec996(i, { suspenseDelta: 1 });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID fires when every payoff is followed by two scenes with no emotional shift', async () => {
+      const recs996b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeRec996(i, { emotionalShift: 'positive' });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID does not fire when a payoff is followed by an emotional shift within its window', async () => {
+      const recs996bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeRec996(i, { emotionalShift: 'positive' });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no new curiosity', async () => {
+      const recs996c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec996(i, { curiosityDelta: 1 });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by new curiosity within its window', async () => {
+      const recs996cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec996(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec996(i, { curiosityDelta: 1 });
+        return makeRec996(i);
+      });
+      const res = await runCF996(recs996cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 982 — conflictPass: conflict emotion zone imbalance, conflict highlight zone imbalance, conflict stakes curiosity aftermath void', async () => {
     const makeRec982 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
