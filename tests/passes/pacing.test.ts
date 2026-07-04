@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1139 — pacingPass: pacing suspense-dialogue-highlight aftermath void, pacing emotion-suspense aftermath void, pacing emotion-dialogue-highlight aftermath void', async () => {
+    const runP1139 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1139a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a suspense-rise is followed by highlighted dialogue within its window', async () => {
+      const recs1139an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_EMOTION_SUSPENSE_AFTERMATH_VOID fires when every emotionally-charged scene is followed by two scenes with no suspense rise', async () => {
+      const recs1139b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_EMOTION_SUSPENSE_AFTERMATH_VOID'), 'PACING_EMOTION_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_EMOTION_SUSPENSE_AFTERMATH_VOID does not fire when an emotionally-charged scene is followed by a suspense rise within its window', async () => {
+      const recs1139bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_EMOTION_SUSPENSE_AFTERMATH_VOID'), 'PACING_EMOTION_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every emotionally-charged scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1139c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when an emotionally-charged scene is followed by highlighted dialogue within its window', async () => {
+      const recs1139cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1139(recs1139cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1125 — pacingPass: pacing suspense-emotional aftermath void, pacing suspense-relational aftermath void, pacing emotion-curiosity aftermath void', async () => {
     const runP1125 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

@@ -510,6 +510,12 @@
 // PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID give suspenseDelta its second and third channels
 // (emotionalShift, relationshipShifts); PACING_EMOTION_CURIOSITY_AFTERMATH_VOID gives
 // emotionalShift its second channel (curiosityDelta).
+// Wave 1139 additions: suspenseDelta>0 was at three of six channels (curiosityDelta,
+// emotionalShift, relationshipShifts) and emotionalShift at two (relationshipShifts,
+// curiosityDelta). PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives suspenseDelta its
+// fourth channel (dialogueHighlights); PACING_EMOTION_SUSPENSE_AFTERMATH_VOID and PACING_
+// EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID give emotionalShift its third and fourth channels
+// (suspenseDelta, dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6453,6 +6459,83 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1125c.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in curiosity, even though ${r1125c.aftermathCount} such rises occur elsewhere. A strong feeling that never opens a fresh question right after it lands leaves the pacing's emotional beats registering as closed moments rather than links that pull the audience forward.`,
         suggestedFix: `In the two scenes following at least one emotionally-charged moment, let a new question surface from what the character now feels, so the pacing's emotional beats keep generating curiosity, not just internal state.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every suspense-spike's two-scene
+  // aftermath has no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 1111), PACING_SUSPENSE_EMOTIONAL_AFTERMATH_
+  // VOID, and PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID (Wave 1125, same trigger paired with
+  // curiosityDelta/emotionalShift/relationshipShifts) — this is the fourth consequence channel
+  // for this trigger.
+  {
+    const r1139a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1139a.fires) {
+      issues.push({
+        location: `${r1139a.triggerCount} suspense-spike scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1139a.triggerCount} suspense-spike scenes is followed by two scenes with no highlighted dialogue, even though ${r1139a.aftermathCount} such scenes exist elsewhere in the script. A tension spike that never earns a memorable line right after it happens leaves the pacing's danger unvoiced — no character's speech processes what the rising stakes mean.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, give a character a line that reckons with the danger, so the pacing's tension registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 suspense-rising scenes anywhere,
+  // 2-scene lookahead. Fires when every emotionally-charged scene's two-scene aftermath carries
+  // no rise in suspense, while such rises occur elsewhere. Distinct from PACING_EMOTION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1111) and PACING_EMOTION_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1125, same trigger paired with relationshipShifts/curiosityDelta) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1139b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1139b.fires) {
+      issues.push({
+        location: `${r1139b.triggerCount} emotionally-charged scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'PACING_EMOTION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1139b.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in suspense, even though ${r1139b.aftermathCount} such rises occur elsewhere. A strong feeling that never sharpens danger or uncertainty right after it lands leaves the pacing's emotional beats registering as internal state rather than something that compounds tension.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let the feeling raise the stakes, so the pacing's emotional beats keep building tension, not just registering how a character feels.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × emotionalShift
+  // (non-neutral) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 scenes
+  // anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // emotionally-charged scene's two-scene aftermath contains no highlighted dialogue, while such
+  // dialogue occurs elsewhere. Distinct from PACING_EMOTION_RELATIONAL_AFTERMATH_VOID (Wave
+  // 1111), PACING_EMOTION_CURIOSITY_AFTERMATH_VOID (Wave 1125), and PACING_EMOTION_SUSPENSE_
+  // AFTERMATH_VOID (this wave, same trigger paired with relationshipShifts/curiosityDelta/
+  // suspenseDelta) — this is the fourth consequence channel for this trigger.
+  {
+    const r1139c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1139c.fires) {
+      issues.push({
+        location: `${r1139c.triggerCount} emotionally-charged scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1139c.triggerCount} emotionally-charged scenes is followed by two scenes with no highlighted dialogue, even though ${r1139c.aftermathCount} such scenes exist elsewhere in the script. A strong feeling that never earns a memorable line right after it lands leaves the pacing's emotional beats unvoiced — no character's speech processes what was just felt.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, give a character a line that names what they're feeling, so the pacing's emotional beats register in speech, not just in internal state.`,
       });
     }
   }
