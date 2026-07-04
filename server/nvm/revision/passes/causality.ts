@@ -476,6 +476,12 @@
 // CAUSALITY_REVELATION_PURPOSE one), CAUSALITY_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array,
 // distinct from the payoff/seed arrays audited in Wave 951), and CAUSALITY_TURN_ZONE_IMBALANCE
 // (dramaticTurn !== 'nothing' categorical).
+// Wave 979 additions (closes the twenty-eighth rotation cycle, 966-979): with zone-imbalance nearly
+// exhausted for this pass, pivots to the sequence/aftermath mode via checkAftermathVoid, adding three
+// trigger→aftermath pairings using trigger signals (raise_stakes purpose, seededClueIds,
+// unresolvedClues) absent from the pass's existing aftermath-void rules: CAUSALITY_STAKES_EMOTIONAL_
+// AFTERMATH_VOID (raise_stakes → emotional), CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID (seed →
+// curiosity), and CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID (open-thread → suspense).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5677,6 +5683,85 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r965c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName965c} contains ${r965c.counts[r965c.bloatZoneIdx]} of them (${Math.round((r965c.counts[r965c.bloatZoneIdx] / r965c.totalCount) * 100)}%) while ${emptyNames965c} contains none. Turns bloat in one structural quarter and never fire in another, so the pivots where one event forces the next concentrate in only part of the story.`,
         suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames965c} — a dramatic turn so the causal chain keeps pivoting across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 979 (closes the twenty-eighth rotation cycle, 966-979): with the underweight/bloat
+  // (zone-imbalance) mode now nearly exhausted for this pass, this wave pivots to the sequence/
+  // aftermath mode via the shared checkAftermathVoid helper, adding three trigger→aftermath
+  // pairings that use trigger signals (raise_stakes purpose, seededClueIds, unresolvedClues) absent
+  // from the pass's existing aftermath-void rules (built around clockRaised/dramaticTurn/payoff/
+  // dialogueHighlights/visualBeats triggers). Each fires only when the trigger genuinely occurs
+  // (≥2, full 2-scene lookahead) AND the aftermath signal genuinely occurs somewhere (≥2), but NO
+  // trigger's window contains it — proving decoupling, not mere absence. ─────────────────────────
+
+  // CAUSALITY_STAKES_EMOTIONAL_AFTERMATH_VOID — raise-stakes trigger × emotional aftermath. Every
+  // stakes-raising scene is followed by two scenes with no emotional shift, even though feeling
+  // registers elsewhere. Escalating danger should usually provoke a felt response; when every
+  // stakes-raise's aftermath is emotionally flat, the causal chain's escalations are mechanically
+  // logged but never felt. Distinct from every existing clockRaised/dramaticTurn/payoff-triggered
+  // aftermath rule in this pass — this is the first use of raise_stakes as an aftermath-void TRIGGER.
+  {
+    const r979a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r979a.fires) {
+      issues.push({
+        location: `${r979a.triggerCount} stakes-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'CAUSALITY_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r979a.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r979a.aftermathCount} emotionally-charged scenes exist elsewhere. Escalating danger should usually provoke a felt response — dread, resolve, fear for someone at risk. When every stakes-raise's aftermath is affectively flat, the causal chain's escalations are mechanically logged consequences with no felt weight behind them.`,
+        suggestedFix: `Let at least one stakes-raise land emotionally in its aftermath: in the scene or two after the danger sharpens, show someone reacting — fear, resolve, the private cost of what's now at stake. A stakes-raise whose aftermath is felt has consequence beyond the plot mechanics of escalation.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID — seed trigger × curiosity aftermath. Every clue-
+  // seeding scene is followed by two scenes that raise no new curiosity, even though fresh
+  // questions do open elsewhere. Planting a clue should usually compound into further questions
+  // as its implications ripple outward; when every seed's aftermath opens no curiosity, the causal
+  // chain's groundwork sits inert rather than propagating. Distinct from every existing seed-
+  // paired rule in this pass — this is the first use of seededClueIds as an aftermath-void TRIGGER.
+  {
+    const r979b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r979b.fires) {
+      issues.push({
+        location: `${r979b.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r979b.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r979b.aftermathCount} scenes elsewhere do open fresh questions. A planted clue should usually compound — its implications should provoke further wondering as the causal chain propagates outward. When every seed's aftermath opens no curiosity, the groundwork sits inert rather than rippling forward.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question — what else does this mean, who else is involved, what happens if it's true. A seed whose aftermath opens curiosity keeps the causal chain propagating.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — open-thread trigger × suspense aftermath. Every
+  // scene leaving a thread unresolved is followed by two scenes with no suspense rise, even though
+  // tension does build elsewhere. An open question should usually keep tension elevated as the
+  // causal chain waits for resolution; when every open thread's aftermath shows no suspense rise,
+  // unresolved questions sit flat rather than generating pressure. Distinct from every existing
+  // clock/dramatic-turn-triggered suspense rule in this pass — this is the first use of
+  // unresolvedClues as an aftermath-void TRIGGER.
+  {
+    const r979c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r979c.fires) {
+      issues.push({
+        location: `${r979c.triggerCount} open-thread aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene leaving a thread unresolved (${r979c.triggerCount} open questions) is followed by two scenes with no suspense rise, even though ${r979c.aftermathCount} scenes elsewhere do build tension. An open question should usually keep tension elevated as the causal chain waits on resolution; when every open thread's aftermath shows no suspense rise, unresolved questions sit flat rather than generating pressure.`,
+        suggestedFix: `Let at least one open thread raise suspense in its aftermath: in the scene or two after a question is left hanging, let the uncertainty compress time or raise the stakes of not knowing. An open thread whose aftermath builds tension keeps the causal chain propelling forward instead of idling.`,
       });
     }
   }
