@@ -512,6 +512,14 @@
 // fourth channel with curiosityDelta), and CAUSALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID
 // (unresolvedClues, previously paired with suspenseDelta/emotionalShift, now a third channel with
 // relationshipShifts).
+// Wave 1049 additions (closes the thirty-third rotation cycle, 1036-1049): with raise_stakes and
+// payoffSetupIds now at four channels each, this wave gives the remaining two triggers their
+// fourth channel: CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID (seededClueIds, previously paired with
+// curiosityDelta/emotionalShift/suspenseDelta, now paired with relationshipShifts) and CAUSALITY_
+// OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (unresolvedClues, previously paired with suspenseDelta/
+// emotionalShift/relationshipShifts, now paired with curiosityDelta). The third check, CAUSALITY_
+// STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, pairs raise_stakes with dialogueHighlights — a field
+// that has never been used as a checkAftermathVoid consequence channel anywhere in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6084,6 +6092,81 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying an open thread (${r1035c.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1035c.aftermathCount} such shifts occur elsewhere. An unresolved question that never bears on how characters treat each other nearby leaves the causal chain's loose ends purely mechanical, disconnected from the relationships the story is meant to be tracking.`,
         suggestedFix: `In the two scenes following an open-thread scene, let the unresolved question strain or shift a relationship so the causal chain's loose end registers interpersonally, not just structurally.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no bond change, while such changes occur
+  // elsewhere. Distinct from CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID, CAUSALITY_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, and CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/emotionalShift/suspenseDelta respectively) — this is the fourth consequence
+  // channel for this trigger in this pass.
+  {
+    const r1049a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1049a.fires) {
+      issues.push({
+        location: `${r1049a.triggerCount} seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1049a.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1049a.aftermathCount} such shifts occur elsewhere. A planted clue that never bears on how characters treat each other nearby leaves the causal chain's groundwork purely mechanical, disconnected from the relationships the story is meant to be tracking.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the causal chain's groundwork carries interpersonal weight, not only narrative function.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger
+  // → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying open-thread scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every open-thread scene's two-scene aftermath carries no curiosity
+  // rise, while such rises occur elsewhere. Distinct from CAUSALITY_OPEN_THREAD_SUSPENSE_
+  // AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, and CAUSALITY_OPEN_THREAD_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with suspenseDelta/emotionalShift/
+  // relationshipShifts respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1049b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1049b.fires) {
+      issues.push({
+        location: `${r1049b.triggerCount} open-thread aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an open thread (${r1049b.triggerCount} of them) is followed by two scenes with no rise in curiosity, even though ${r1049b.aftermathCount} such rises occur elsewhere. An unresolved question that never sharpens into fresh intrigue right after it leaves the causal chain's loose ends stalling rather than pulling the audience toward what comes next.`,
+        suggestedFix: `In the two scenes following an open-thread scene, let a new question sharpen the audience's curiosity so the causal chain's loose ends keep pulling the story forward rather than sitting inert.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying raise_stakes scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // dialogueHighlights has never been used as a checkAftermathVoid consequence channel anywhere
+  // in this pass — this is the first pairing of the field with the sequence/aftermath mode here,
+  // and the fifth consequence channel for this trigger.
+  {
+    const r1049c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1049c.fires) {
+      issues.push({
+        location: `${r1049c.triggerCount} raise-stakes aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'CAUSALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1049c.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1049c.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the causal chain's stakes registering structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the causal chain's escalation registers in speech, not just in plot mechanics.`,
       });
     }
   }
