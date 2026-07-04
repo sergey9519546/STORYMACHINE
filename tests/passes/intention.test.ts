@@ -1352,6 +1352,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1011 — intentionPass: intention open-thread-curiosity aftermath void, intention clock-emotional aftermath void, intention stakes-relational aftermath void', async () => {
+    const makeRec1011 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1011 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no new curiosity', async () => {
+      const recs1011a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1011(i, { curiosityDelta: 1 });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by new curiosity within its window', async () => {
+      const recs1011an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1011(i, { curiosityDelta: 1 });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1011b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1011(i, { emotionalShift: 'positive' });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by an emotional shift within its window', async () => {
+      const recs1011bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1011(i, { emotionalShift: 'positive' });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1011c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1011(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID'), 'INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1011cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1011(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1011(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1011(i);
+      });
+      const res = await runIN1011(recs1011cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID'), 'INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 997 — intentionPass: revelation zone imbalance, intention stakes-suspense aftermath void, intention seed-curiosity aftermath void', async () => {
     const makeRec997 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

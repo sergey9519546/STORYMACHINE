@@ -453,6 +453,12 @@
 // previously only paired with curiosityDelta in Wave 983, now paired with suspenseDelta) and
 // INTENTION_SEED_CURIOSITY_AFTERMATH_VOID (seededClueIds, previously only paired with visualBeats,
 // now paired with curiosityDelta).
+// Wave 1011 additions: this wave gives three more triggers a fresh consequence channel: INTENTION_
+// OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (heavy unresolvedClues debt, previously only paired with
+// payoffSetupIds, now paired with curiosityDelta), INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID
+// (clockRaised, previously only paired with visualBeats, now paired with emotionalShift), and
+// INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta
+// and suspenseDelta, now paired with relationshipShifts for a third channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5756,6 +5762,78 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clue-seeding scene (${r997c.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r997c.aftermathCount} scenes elsewhere do open fresh questions. A planted clue should usually compound into a further question about the character's pursuit; when every seed's aftermath opens no curiosity, the groundwork sits inert rather than deepening the audience's investment.`,
         suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what the character's pursuit will uncover next.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-
+  // debt trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥2
+  // curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-
+  // scene aftermath opens no new curiosity, while curiosity does occur elsewhere. Distinct from
+  // OPEN_THREAD_PAYOFF_AFTERMATH_VOID (same trigger paired with payoffSetupIds) — this pairs heavy
+  // clue-debt with curiosityDelta for the first time in this pass.
+  {
+    const r1011a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1011a.fires) {
+      issues.push({
+        location: `${r1011a.triggerCount} heavy clue-debt scene(s) — no curiosity raised within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1011a.triggerCount} instances) is followed by two full scenes that raise no new curiosity, even though ${r1011a.aftermathCount} such rises occur elsewhere. Accumulated mystery about the character's pursuit should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the intention's uncertainty stalls instead of deepening.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question tied to the character's pursuit so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raising scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raising scene's two-scene aftermath is emotionally flat,
+  // while charged scenes occur elsewhere. Distinct from INTENTION_CLOCK_STAGING_AFTERMATH_VOID
+  // (same trigger paired with visualBeats) — this pairs clockRaised with emotionalShift for the
+  // first time in this pass.
+  {
+    const r1011b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1011b.fires) {
+      issues.push({
+        location: `${r1011b.triggerCount} clock-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1011b.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1011b.aftermathCount} emotionally-charged scenes exist elsewhere. A deadline should usually carry felt weight for the character racing it; when every clock-raise's aftermath is affectively flat, the intention's urgency reads as a stated fact rather than a pressure anyone feels.`,
+        suggestedFix: `Let at least one ticking clock provoke felt weight in its aftermath: in the scene or two after a deadline is raised, show the character reacting emotionally to the pressure on their pursuit.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raise scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no relationship shift,
+  // while such shifts occur elsewhere. Distinct from INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID
+  // (Wave 983, curiosityDelta) and INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 997,
+  // suspenseDelta) — this is the third consequence channel for this trigger in this pass.
+  {
+    const r1011c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1011c.fires) {
+      issues.push({
+        location: `${r1011c.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1011c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r1011c.aftermathCount} such shifts occur elsewhere. Escalating danger that never bears on how characters treat each other in the scenes right after it leaves the character's pursuit untouched by the story's own rising pressure.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so the character's pursuit registers on the bonds between characters, not only on the plot.`,
       });
     }
   }
