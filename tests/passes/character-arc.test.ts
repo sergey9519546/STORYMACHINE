@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1065 — characterArcPass: arc clock-suspense aftermath void, arc payoff-suspense aftermath void, arc stakes-dialogue-highlight aftermath void', async () => {
+    const makeRec1065 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1065 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_CLOCK_SUSPENSE_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no suspense rise', async () => {
+      const recs1065a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1065(i, { suspenseDelta: 1 });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'ARC_CLOCK_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_CLOCK_SUSPENSE_AFTERMATH_VOID does not fire when a clock-raise is followed by a suspense rise within its window', async () => {
+      const recs1065an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1065(i, { suspenseDelta: 1 });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'ARC_CLOCK_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID fires when every payoff is followed by two scenes with no suspense rise', async () => {
+      const recs1065b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1065(i, { suspenseDelta: 1 });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when a payoff is followed by a suspense rise within its window', async () => {
+      const recs1065bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1065(i, { suspenseDelta: 1 });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1065c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1065(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a stakes-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1065cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1065(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1065(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1065(i);
+      });
+      const res = await runArc1065(recs1065cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1051 — characterArcPass: arc seed-suspense aftermath void, arc suspense-dialogue-highlight aftermath void, arc open-thread-suspense aftermath void', async () => {
     const makeRec1051 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

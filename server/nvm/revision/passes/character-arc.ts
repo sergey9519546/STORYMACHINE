@@ -526,6 +526,16 @@
 // used as a checkAftermathVoid consequence channel by this trigger before), and ARC_OPEN_THREAD_
 // SUSPENSE_AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with emotionalShift/
 // visualBeats/curiosityDelta, now a fourth channel with suspenseDelta).
+// Wave 1065 additions: with seededClueIds, suspenseDelta-as-trigger, and unresolvedClues now at
+// four channels each, this wave gives three of the other four-channel triggers a fifth using
+// combinations never audited by any mode in this pass: ARC_CLOCK_SUSPENSE_AFTERMATH_VOID
+// (clockRaised, previously paired with visualBeats/emotionalShift via checkAftermathVoid plus
+// curiosityDelta/relationshipShifts via other analytical modes, now also paired with
+// suspenseDelta), ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID (payoffSetupIds, previously paired with
+// emotionalShift/visualBeats/relationshipShifts via checkAftermathVoid plus curiosityDelta via a
+// distinct immediate-adjacency mode, now also paired with suspenseDelta), and ARC_STAKES_
+// DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes, previously paired with relationshipShifts/
+// curiosityDelta/suspenseDelta/emotionalShift, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6037,6 +6047,84 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1051c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1051c.aftermathCount} such rises occur elsewhere. Accumulated mystery about the protagonist's arc that never tightens the felt sense of danger right after it leaves the arc's uncertainty stalling instead of pressuring the protagonist forward.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the protagonist's arc rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → suspenseDelta
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every clock-raise's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from ARC_CLOCK_STAGING_AFTERMATH_VOID and ARC_CLOCK_EMOTIONAL_
+  // AFTERMATH_VOID (same trigger paired with visualBeats and emotionalShift respectively via this
+  // same sequence/aftermath mode) — this is the third checkAftermathVoid channel for this trigger,
+  // and a combination no other analytical mode in this pass has audited.
+  {
+    const r1065a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1065a.fires) {
+      issues.push({
+        location: `${r1065a.triggerCount} clock-raise aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ARC_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1065a.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1065a.aftermathCount} such rises occur elsewhere. A ticking deadline that doesn't tighten the felt sense of urgency right after it lands leaves the arc's pressure registering as a stated fact rather than something the protagonist visibly feels bearing down.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the tension visibly climb so the ticking deadline presses on the protagonist's arc, not just the plot.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID, ARC_PAYOFF_STAGING_
+  // AFTERMATH_VOID, and ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift/visualBeats/relationshipShifts respectively via this same sequence/aftermath
+  // mode) and from ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID (a distinct immediate-adjacency mode
+  // auditing curiosityDelta, not suspenseDelta, and a 1-scene window rather than this check's
+  // 2-scene window) — this is the fourth checkAftermathVoid channel for this trigger.
+  {
+    const r1065b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1065b.fires) {
+      issues.push({
+        location: `${r1065b.triggerCount} payoff scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1065b.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1065b.aftermathCount} such rises occur elsewhere. A resolved setup that never re-tightens tension right after it lands leaves the protagonist's arc registering the payoff as a closed loop with nothing left pressing forward.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise so resolution doesn't flatten the arc's forward pressure entirely.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ARC_STAKES_
+  // RELATIONAL_AFTERMATH_VOID, ARC_STAKES_CURIOSITY_AFTERMATH_VOID, ARC_STAKES_SUSPENSE_
+  // AFTERMATH_VOID, and ARC_STAKES_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // relationshipShifts/curiosityDelta/suspenseDelta/emotionalShift respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1065c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1065c.fires) {
+      issues.push({
+        location: `${r1065c.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1065c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1065c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes that never earn a memorable line right after they land leave the protagonist's arc registering escalation as plot mechanics, with no voice naming what's now at risk.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the arc's stakes are voiced, not just structurally raised.`,
       });
     }
   }
