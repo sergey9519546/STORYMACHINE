@@ -453,6 +453,13 @@
 // PACING_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn → relationshipShifts), PACING_CLOCK_
 // RELATIONAL_AFTERMATH_VOID (clockRaised → relationshipShifts), and PACING_CLOCK_STAGING_
 // AFTERMATH_VOID (clockRaised → visualBeats).
+// Wave 1027 additions: payoffSetupIds and dramaticTurn are the last two triggers still missing the
+// visualBeats (staging) channel that revelation/seededClueIds/clockRaised already carry —
+// PACING_PAYOFF_STAGING_AFTERMATH_VOID and PACING_TURN_STAGING_AFTERMATH_VOID close that gap. The
+// third check, PACING_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, pairs seededClueIds with
+// dialogueHighlights — a field that (per grep) has never been used as a checkAftermathVoid
+// consequence channel anywhere in this 107-rule pass, only as its own presence signal in the
+// PACING_HIGHLIGHT_ZONE_* family.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5786,6 +5793,81 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene that raises a ticking clock (${r1013c.triggerCount} instances) is followed by two visually inert scenes, even though ${r1013c.aftermathCount} scenes elsewhere do carry substantial staging. A deadline should usually sharpen how urgency plays out physically — hurried movement, a body straining against time; when every clock-raise's aftermath is visually flat, pacing announces pressure without letting the audience see it in the body.`,
         suggestedFix: `Let at least one ticking clock provoke visible staging in its aftermath: in the scene or two after a deadline is raised, show urgency in physical action.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a
+  // 2-scene lookahead window. Fires when every payoff's two-scene aftermath contains no visually
+  // dense scene, while such scenes occur elsewhere. Distinct from PACING_PAYOFF_RELATIONSHIP_
+  // AFTERMATH_VOID and the hand-rolled PAYOFF_AFTERMATH_SUSPENSE/CURIOSITY/EMOTION_FLAT family
+  // (same trigger, different channels) — this is the last of the standard consequence channels for
+  // this trigger, completing the payoff row alongside revelation/seededClueIds/clockRaised.
+  {
+    const r1027a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1027a.fires) {
+      issues.push({
+        location: `${r1027a.triggerCount} payoff scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'PACING_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1027a.triggerCount} payoff scenes is followed by two scenes with no substantial physical staging, even though ${r1027a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — the aftermath of the resolution given some visible presence before the pacing moves on.`,
+      });
+    }
+  }
+
+  // PACING_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥3 scenes anywhere with substantial physical staging, a
+  // 2-scene lookahead window. Fires when every turn's two-scene aftermath contains no visually
+  // dense scene, while such scenes occur elsewhere. Distinct from PACING_TURN_RELATIONAL_
+  // AFTERMATH_VOID and the hand-rolled TURN_AFTERMATH_SUSPENSE/CURIOSITY/EMOTION_FLAT family (same
+  // trigger, different channels) — this is the last of the standard consequence channels for this
+  // trigger, completing the turn row alongside revelation/seededClueIds/clockRaised/payoffSetupIds.
+  {
+    const r1027b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1027b.fires) {
+      issues.push({
+        location: `${r1027b.triggerCount} dramatic-turn scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'PACING_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1027b.triggerCount} dramatic-turn scenes is followed by two scenes with no substantial physical staging, even though ${r1027b.aftermathCount} such scenes exist elsewhere in the script. A pivot gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every turn.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry substantial physical staging — the pivot's immediate surroundings given some visible presence before the pacing moves on.`,
+      });
+    }
+  }
+
+  // PACING_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥3 scenes anywhere with a highlighted line of dialogue, a
+  // 2-scene lookahead window. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while such dialogue occurs elsewhere. dialogueHighlights has never been used as a
+  // checkAftermathVoid consequence channel anywhere in this pass (only as its own presence signal
+  // in the PACING_HIGHLIGHT_ZONE_* family) — this is the first pairing of the field with the
+  // sequence/aftermath mode in this pass.
+  {
+    const r1027c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1027c.fires) {
+      issues.push({
+        location: `${r1027c.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1027c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1027c.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when a memorable line lands nearby, but that opportunity consistently passes in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, or a reaction that gives it verbal presence before the pacing moves on.`,
       });
     }
   }
