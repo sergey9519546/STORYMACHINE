@@ -435,6 +435,10 @@
 // the revelation string field, distinct from the purpose-enum THEME_REVELATION_PURPOSE one), and
 // THEME_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts.length > 0 — a relationshipShifts array field
 // distinct from all four already-audited array imbalances: unresolvedClues/visualBeats/payoff/seed).
+// Wave 976 additions: auditing three more trio-complete signals in this pass, spanning three distinct
+// classes: THEME_CLOCK_ZONE_IMBALANCE (clockRaised boolean — whether a ticking clock is introduced),
+// THEME_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta, distinct from the boolean
+// field above), and THEME_TURN_ZONE_IMBALANCE (dramaticTurn !== 'nothing' categorical).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5531,6 +5535,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r962c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName962c} contains ${r962c.counts[r962c.bloatZoneIdx]} of them (${Math.round((r962c.counts[r962c.bloatZoneIdx] / r962c.totalCount) * 100)}%) while ${emptyNames962c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the theme is dramatized through relationships in only part of the story.`,
         suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames962c} — a relationship shift so the theme keeps being dramatized through bonds across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_ZONE_IMBALANCE — Underweight/bloat × (clockRaised === true) × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Uses the same clockRaised === true predicate as the existing
+  // 3-zone THEME_CLOCK_ZONE_CLUSTER and run-based THEME_CLOCK_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the clockRaised BOOLEAN field, distinct from the numeric
+  // clockDelta signal audited just below.
+  {
+    const r976a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r976a.fires) {
+      const emptyNames976a = r976a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName976a = FOUR_ZONE_NAMES[r976a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames976a} empty; ${bloatName976a} has ${r976a.counts[r976a.bloatZoneIdx]}/${r976a.totalCount} clock-raising scenes`,
+        rule: 'THEME_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r976a.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName976a} contains ${r976a.counts[r976a.bloatZoneIdx]} of them (${Math.round((r976a.counts[r976a.bloatZoneIdx] / r976a.totalCount) * 100)}%) while ${emptyNames976a} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the theme's cost is felt under deadline pressure in only part of the story.`,
+        suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) — ${emptyNames976a} — so the theme keeps testing itself under deadline pressure across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta !== 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-moving scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockDelta !== 0 predicate as the existing
+  // 3-zone THEME_CLOCK_DELTA_ZONE_CLUSTER and run-based THEME_CLOCK_DELTA_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this delta signal, distinct from the boolean
+  // clockRaised field audited just above.
+  {
+    const r976b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r976b.fires) {
+      const emptyNames976b = r976b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName976b = FOUR_ZONE_NAMES[r976b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames976b} empty; ${bloatName976b} has ${r976b.counts[r976b.bloatZoneIdx]}/${r976b.totalCount} clock-moving scenes`,
+        rule: 'THEME_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r976b.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName976b} contains ${r976b.counts[r976b.bloatZoneIdx]} of them (${Math.round((r976b.counts[r976b.bloatZoneIdx] / r976b.totalCount) * 100)}%) while ${emptyNames976b} contains none. Deadline pressure bloats in one structural quarter and never moves in another, so the theme's cost is compressed by urgency in only part of the story.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames976b} — so the theme keeps being tested by urgency across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // THEME_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a
+  // dramatic turn total, divided across four equal structural zones. Fires only when one zone has
+  // zero such scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing'
+  // predicate as the existing 3-zone THEME_TURN_ZONE_CLUSTER and run-based THEME_TURN_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical signal.
+  {
+    const r976c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r976c.fires) {
+      const emptyNames976c = r976c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName976c = FOUR_ZONE_NAMES[r976c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames976c} empty; ${bloatName976c} has ${r976c.counts[r976c.bloatZoneIdx]}/${r976c.totalCount} dramatic-turn scenes`,
+        rule: 'THEME_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r976c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName976c} contains ${r976c.counts[r976c.bloatZoneIdx]} of them (${Math.round((r976c.counts[r976c.bloatZoneIdx] / r976c.totalCount) * 100)}%) while ${emptyNames976c} contains none. Turns bloat in one structural quarter and never fire in another, so the theme is tested by reversal in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames976c} — a dramatic turn so the theme keeps being tested by reversal across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

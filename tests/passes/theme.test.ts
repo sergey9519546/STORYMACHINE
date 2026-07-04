@@ -931,6 +931,61 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 976 — themePass: theme clock zone imbalance, theme clock delta zone imbalance, theme turn zone imbalance', async () => {
+    const runT976 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('THEME_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs976a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 1, 2, 8, 9].includes(i) }));
+      const res = await runT976(recs976a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_ZONE_IMBALANCE'), 'THEME_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs976an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 3, 5, 8].includes(i) }));
+      const res = await runT976(recs976an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_ZONE_IMBALANCE'), 'THEME_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs976b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runT976(recs976b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_ZONE_IMBALANCE'), 'THEME_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs976bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runT976(recs976bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_DELTA_ZONE_IMBALANCE'), 'THEME_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('THEME_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs976c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runT976(recs976c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_ZONE_IMBALANCE'), 'THEME_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('THEME_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs976cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runT976(recs976cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_ZONE_IMBALANCE'), 'THEME_TURN_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 962 — themePass: theme curiosity zone imbalance, theme revelation zone imbalance, theme relationship zone imbalance', async () => {
     const runT962 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
