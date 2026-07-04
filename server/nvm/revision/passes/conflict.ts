@@ -503,6 +503,15 @@
 // AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with relationshipShifts/
 // visualBeats/curiosityDelta/emotionalShift/dialogueHighlights, now also paired with
 // suspenseDelta — its only remaining standard channel).
+// Wave 1080 additions: with raise_stakes, payoffSetupIds, and heavy unresolvedClues debt all now
+// fully saturated, this wave closes out dramaticTurn's remaining two channels — CONFLICT_TURN_
+// SUSPENSE_AFTERMATH_VOID (previously paired with visualBeats/curiosityDelta/emotionalShift/
+// relationshipShifts, now also paired with suspenseDelta) and CONFLICT_TURN_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID (now also paired with dialogueHighlights), bringing all four main triggers to
+// full six-channel saturation. The third check, CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID, gives
+// seededClueIds its first checkAftermathVoid-based sequence/aftermath pairing with curiosityDelta
+// — distinct from the existing hand-rolled CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID (Wave 590, same
+// trigger paired with suspenseDelta via a different implementation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6265,6 +6274,82 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1066c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1066c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the conflict's uncertainty stalling instead of pressuring the story forward.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the conflict rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while such
+  // rises occur elsewhere. Distinct from CONFLICT_TURN_STAGING_AFTERMATH_VOID, CONFLICT_TURN_
+  // CURIOSITY_AFTERMATH_VOID, CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID, and CONFLICT_TURN_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with visualBeats/curiosityDelta/emotionalShift/
+  // relationshipShifts respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1080a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1080a.fires) {
+      issues.push({
+        location: `${r1080a.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1080a.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1080a.aftermathCount} such rises occur elsewhere. A pivot that never tightens tension right after it lands leaves the conflict's turns registering as isolated events rather than pressure the story keeps building on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let suspense rise so the pivot keeps building pressure rather than resolving into a flat aftermath.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line
+  // of dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CONFLICT_TURN_
+  // STAGING_AFTERMATH_VOID, CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID, CONFLICT_TURN_EMOTIONAL_
+  // AFTERMATH_VOID, CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID, and CONFLICT_TURN_SUSPENSE_
+  // AFTERMATH_VOID (same trigger paired with visualBeats/curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta respectively) — this is the sixth and final standard-channel
+  // pairing for this trigger, completing full saturation for all four main triggers in this pass.
+  {
+    const r1080b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1080b.fires) {
+      issues.push({
+        location: `${r1080b.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1080b.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1080b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it lands leaves the conflict's turns registering as plot mechanics without a voice confirming what changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a character voice what just changed — a line worth remembering, not just a structural pivot passing silently.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no rise in curiosity, while such rises
+  // occur elsewhere. Distinct from CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID (Wave 590, same trigger
+  // paired with suspenseDelta via a hand-rolled implementation) — this is the first
+  // checkAftermathVoid-based pairing of this trigger with curiosityDelta.
+  {
+    const r1080c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1080c.fires) {
+      issues.push({
+        location: `${r1080c.triggerCount} seed scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1080c.triggerCount} clue-planting scenes is followed by two scenes with no rise in curiosity, even though ${r1080c.aftermathCount} such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the conflict's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the conflict's foreshadowing keeps generating curiosity, not just sitting as inert setup.`,
       });
     }
   }

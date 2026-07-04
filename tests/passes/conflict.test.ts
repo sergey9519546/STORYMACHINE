@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1080 — conflictPass: conflict turn-suspense aftermath void, conflict turn-dialogue-highlight aftermath void, conflict seed-curiosity aftermath void', async () => {
+    const makeRec1080 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1080 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const recs1080a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1080(i, { suspenseDelta: 1 });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const recs1080an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1080(i, { suspenseDelta: 1 });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1080b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1080(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a dramatic turn is followed by highlighted dialogue within its window', async () => {
+      const recs1080bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1080(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID fires when every seed is followed by two scenes with no curiosity rise', async () => {
+      const recs1080c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1080(i, { curiosityDelta: 1 });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID does not fire when a seed is followed by a curiosity rise within its window', async () => {
+      const recs1080cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1080(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1080(i, { curiosityDelta: 1 });
+        return makeRec1080(i);
+      });
+      const res = await runCF1080(recs1080cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1066 — conflictPass: conflict stakes-staging aftermath void, conflict payoff-dialogue-highlight aftermath void, conflict open-thread-suspense aftermath void', async () => {
     const makeRec1066 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
