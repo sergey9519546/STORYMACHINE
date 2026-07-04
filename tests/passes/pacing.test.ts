@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1013 — pacingPass: pacing turn-relational aftermath void, pacing clock-relational aftermath void, pacing clock-staging aftermath void', async () => {
+    const runP1013 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_TURN_RELATIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no relationship shift', async () => {
+      const recs1013a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_TURN_RELATIONAL_AFTERMATH_VOID'), 'PACING_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by a relationship shift within its window', async () => {
+      const recs1013an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_TURN_RELATIONAL_AFTERMATH_VOID'), 'PACING_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_CLOCK_RELATIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1013b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'PACING_CLOCK_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_CLOCK_RELATIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by a relationship shift within its window', async () => {
+      const recs1013bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'PACING_CLOCK_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no substantial staging', async () => {
+      const recs1013c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_STAGING_AFTERMATH_VOID'), 'PACING_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by substantial staging within its window', async () => {
+      const recs1013cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1013(recs1013cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_STAGING_AFTERMATH_VOID'), 'PACING_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 999 — pacingPass: pacing revelation-relationship aftermath void, pacing seed-relationship aftermath void, pacing payoff-relationship aftermath void', async () => {
     const runP999 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

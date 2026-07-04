@@ -446,6 +446,13 @@
 // previously only paired with visualBeats), and PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID
 // (payoffSetupIds, previously audited via hand-rolled average-based checks on suspense/curiosity/
 // emotion but never via the boolean all-or-nothing checkAftermathVoid mode, and never on this channel).
+// Wave 1013 additions: reconnaissance found dramaticTurn and clockRaised fully saturated on the
+// suspense/curiosity/emotion channels (hand-rolled average-based families) but never paired with
+// relationshipShifts or visualBeats via the boolean checkAftermathVoid mode — the two channels
+// only revelation and seededClueIds had been given so far. This wave closes that gap:
+// PACING_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn → relationshipShifts), PACING_CLOCK_
+// RELATIONAL_AFTERMATH_VOID (clockRaised → relationshipShifts), and PACING_CLOCK_STAGING_
+// AFTERMATH_VOID (clockRaised → visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5703,6 +5710,82 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r999c.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r999c.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as narrative bookkeeping rather than a beat that ripples through the relationships pacing has built.`,
         suggestedFix: `In the two scenes following at least one payoff, let the resolved setup strain or shift a relationship so the callback pays off interpersonally, not only structurally.`,
+      });
+    }
+  }
+
+  // PACING_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. This pass already audits turn-triggered aftermath on the
+  // suspense/curiosity/emotion channels via hand-rolled average-based checks (TURN_AFTERMATH_
+  // SUSPENSE_FLAT, TURN_AFTERMATH_CURIOSITY_FLAT, TURN_AFTERMATH_EMOTION_FLAT) — this is the first
+  // pairing with relationshipShifts, and the first use of the boolean all-or-nothing
+  // checkAftermathVoid mode for the turn trigger.
+  {
+    const r1013a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1013a.fires) {
+      issues.push({
+        location: `${r1013a.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1013a.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1013a.aftermathCount} such shifts occur elsewhere. A pivot that never bears on how characters treat each other in the scenes right after it lands as a plot beat rather than a reversal that ripples through the relationships pacing has built.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let the pivot strain or shift a relationship so the reversal registers interpersonally, not only structurally.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raising scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raising scene's two-scene aftermath carries no relationship
+  // shift, while such shifts occur elsewhere. This pass already audits clock-triggered aftermath
+  // on the suspense/curiosity/emotion channels via hand-rolled average-based checks (CLOCK_
+  // AFTERMATH_SUSPENSE_FLAT, CLOCK_AFTERMATH_CURIOSITY_FLAT, CLOCK_AFTERMATH_EMOTION_FLAT) — this
+  // is the first pairing with relationshipShifts for this trigger.
+  {
+    const r1013b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1013b.fires) {
+      issues.push({
+        location: `${r1013b.triggerCount} clock-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1013b.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1013b.aftermathCount} such shifts occur elsewhere. A deadline that never bears on how characters treat each other in the scenes right after it leaves the escalating time pressure disconnected from pacing's relational momentum.`,
+        suggestedFix: `In the two scenes following at least one clock-raising moment, let the ticking deadline strain or shift a relationship so escalating time pressure carries interpersonal weight.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying clock-
+  // raising scenes (pos<n-2), ≥2 visually dense scenes anywhere, 2-scene lookahead. Fires when
+  // every clock-raising scene's two-scene aftermath has no substantial physical staging, while such
+  // staging occurs elsewhere. Distinct from PACING_CLOCK_RELATIONAL_AFTERMATH_VOID above (same
+  // trigger paired with relationshipShifts) — this is the first pairing with visualBeats for this
+  // trigger, and the last of the two open channels (relationshipShifts, visualBeats) this pass had
+  // only ever given to revelation and seededClueIds before this wave.
+  {
+    const r1013c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1013c.fires) {
+      issues.push({
+        location: `${r1013c.triggerCount} clock-raise aftermath(s) — no substantial staging within 2 scenes`,
+        rule: 'PACING_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1013c.triggerCount} instances) is followed by two visually inert scenes, even though ${r1013c.aftermathCount} scenes elsewhere do carry substantial staging. A deadline should usually sharpen how urgency plays out physically — hurried movement, a body straining against time; when every clock-raise's aftermath is visually flat, pacing announces pressure without letting the audience see it in the body.`,
+        suggestedFix: `Let at least one ticking clock provoke visible staging in its aftermath: in the scene or two after a deadline is raised, show urgency in physical action.`,
       });
     }
   }
