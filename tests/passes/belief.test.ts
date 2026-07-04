@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1090 — beliefPass: belief revelation-curiosity aftermath void, belief revelation-suspense aftermath void, belief revelation-relational aftermath void', async () => {
+    const runBF1090 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID fires when every revelation has no curiosity rise within 2 scenes', async () => {
+      const recs1090a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1090(recs1090a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when a revelation is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1090an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1090(recs1090an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID fires when every revelation has no suspense rise within 2 scenes', async () => {
+      const recs1090b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runBF1090(recs1090b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID does not fire when a revelation is followed by a suspense rise within 2 scenes', async () => {
+      const recs1090bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runBF1090(recs1090bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation has no relationship shift within 2 scenes', async () => {
+      const recs1090c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runBF1090(recs1090c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within 2 scenes', async () => {
+      const recs1090cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runBF1090(recs1090cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1076 — beliefPass: belief seed-staging aftermath void, belief open-thread-dialogue-highlight aftermath void, belief open-thread-staging aftermath void', async () => {
     const runBF1076 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

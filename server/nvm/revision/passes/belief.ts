@@ -497,6 +497,15 @@
 // emotionalShift/relationshipShifts/suspenseDelta, now also paired with dialogueHighlights) and
 // BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID (now also paired with visualBeats), bringing this
 // trigger to full six-channel saturation as well.
+// Wave 1090 additions: with all four of this pass's main triggers (raise_stakes, payoffSetupIds,
+// seededClueIds, unresolvedClues-debt) now fully saturated, this wave introduces revelation
+// (r.revelation != null) as a genuinely fresh sequence/aftermath trigger — never previously used
+// in this file's checkAftermathVoid family, though revelation is heavily analyzed elsewhere via
+// co-occurrence/decoupling (revelation curiosity decoupled, Wave 323; revelation suspense
+// decoupled, Wave 295; revelation relationship decoupled, Wave 334 — all same-scene averages,
+// not windowed aftermaths). BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID, BELIEF_REVELATION_
+// SUSPENSE_AFTERMATH_VOID, and BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID give this fresh
+// trigger its first three consequence channels.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6088,6 +6097,83 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1076c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1076c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the belief-tracking layer's open threads feeling abstract rather than lodged in the world.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from the existing revelation-curiosity
+  // co-occurrence/decoupling check (Wave 323), which audits whether curiosityDelta averages ≤0
+  // across the revelation scenes THEMSELVES — this check instead audits the two-scene window
+  // that FOLLOWS each revelation, a genuinely fresh sequence/aftermath pairing for this trigger
+  // in this pass.
+  {
+    const r1090a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1090a.fires) {
+      issues.push({
+        location: `${r1090a.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1090a.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1090a.aftermathCount} such rises occur elsewhere. A discovery that never reopens the field of questions right after it lands leaves the belief layer's revelations feeling like closed facts rather than doors to further mystery.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface so the discovery keeps curiosity alive instead of settling the matter entirely.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta) and from the existing revelation-suspense
+  // co-occurrence/decoupling check (Wave 295, same-scene average rather than windowed
+  // aftermath) — this is the second consequence channel for this fresh trigger.
+  {
+    const r1090b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1090b.fires) {
+      issues.push({
+        location: `${r1090b.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1090b.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1090b.aftermathCount} such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the belief layer's revelations feeling inert rather than consequential.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new tension rise so the discovery carries forward pressure instead of resolving into calm.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID and BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta) and from the existing
+  // revelation-relationship co-occurrence/decoupling check (Wave 334, same-scene rather than
+  // windowed aftermath) — this is the third consequence channel for this fresh trigger.
+  {
+    const r1090c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1090c.fires) {
+      issues.push({
+        location: `${r1090c.triggerCount} revelation scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1090c.triggerCount} revelation scenes is followed by two scenes with no recorded relationship shift, even though ${r1090c.aftermathCount} such shifts occur elsewhere. A discovery that never moves how characters stand with each other right after it lands leaves the belief layer's revelations registering as private facts rather than something that ripples through the story's relationships.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it shift how a pair of characters relate, so the discovery has interpersonal consequence, not just informational weight.`,
       });
     }
   }
