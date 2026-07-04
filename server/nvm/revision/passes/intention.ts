@@ -515,6 +515,11 @@
 // fourth channel (suspenseDelta); INTENTION_TURN_CURIOSITY_AFTERMATH_VOID and INTENTION_TURN_
 // RELATIONAL_AFTERMATH_VOID give dramaticTurn its third and fourth channels (curiosityDelta,
 // relationshipShifts).
+// Wave 1137 additions: payoffSetupIds and dramaticTurn were each at four of six channels.
+// INTENTION_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and INTENTION_PAYOFF_STAGING_AFTERMATH_
+// VOID give payoffSetupIds its fifth and sixth channels (dialogueHighlights, visualBeats),
+// completing full saturation for this trigger. INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID gives dramaticTurn its fifth channel (dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6504,6 +6509,85 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1123c.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1123c.aftermathCount} such shifts exist elsewhere in the script. A pivot that never moves how the character stands with anyone else treats the turn as an internal recalibration of intention rather than something that reshapes the relational world the pursuit plays out in.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a relationship — an ally reassessing the character's motives, a bond strained or strengthened by the pivot — so the turn registers between characters, not just within one.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains
+  // no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from INTENTION_
+  // PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 1090), INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID,
+  // INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID (Wave 1109), and INTENTION_PAYOFF_SUSPENSE_
+  // AFTERMATH_VOID (Wave 1123, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta) — this is the fifth consequence channel for this trigger.
+  {
+    const r1137a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1137a.fires) {
+      issues.push({
+        location: `${r1137a.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1137a.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1137a.aftermathCount} such scenes exist elsewhere in the script. A resolved intention that never earns a memorable line right after it lands leaves the character's pursuit unvoiced — no one's speech processes what was just achieved or lost.`,
+        suggestedFix: `In the two scenes following at least one payoff, give a character a line that processes what the resolution meant, so the intention layer's payoffs register in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1090), INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID, INTENTION_PAYOFF_RELATIONAL_AFTERMATH_
+  // VOID (Wave 1109), INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave 1123), and INTENTION_
+  // PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift/relationshipShifts/suspenseDelta/dialogueHighlights) — this is the sixth and
+  // final consequence channel for this trigger, completing full saturation.
+  {
+    const r1137b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1137b.fires) {
+      issues.push({
+        location: `${r1137b.triggerCount} payoff scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1137b.triggerCount} payoff scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1137b.aftermathCount} such scenes exist elsewhere in the script. A resolved intention that never earns a visually charged follow-through leaves the character's pursuit registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one payoff, stage at least two concrete visual beats, so the resolution registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath
+  // contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // INTENTION_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1095), INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID
+  // (Wave 1109), and INTENTION_TURN_CURIOSITY_AFTERMATH_VOID / INTENTION_TURN_RELATIONAL_
+  // AFTERMATH_VOID (Wave 1123, same trigger paired with suspenseDelta/emotionalShift/
+  // curiosityDelta/relationshipShifts) — this is the fifth consequence channel for this trigger.
+  {
+    const r1137c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1137c.fires) {
+      issues.push({
+        location: `${r1137c.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1137c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1137c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it happens leaves the character's intention unvoiced — no one's speech reckons with what just changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a line that names what the pivot means for what they want, so the turn registers in speech, not just in plot mechanics.`,
       });
     }
   }
