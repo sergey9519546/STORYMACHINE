@@ -467,6 +467,12 @@
 // unresolvedClues debt, previously only paired with suspenseDelta, now paired with emotionalShift),
 // and PAYOFF_REVELATION_CURIOSITY_AFTERMATH_VOID (revelation, previously only paired with
 // relationshipShifts, now paired with curiosityDelta).
+// Wave 1028 additions: three more triggers get a third consequence channel: PAYOFF_STAKES_
+// EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/suspenseDelta, now
+// paired with emotionalShift), PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID (clockRaised, previously
+// paired with visualBeats/curiosityDelta, now paired with relationshipShifts), and PAYOFF_
+// REVELATION_EMOTIONAL_AFTERMATH_VOID (revelation, previously paired with relationshipShifts/
+// curiosityDelta, now paired with emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5650,6 +5656,78 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every revelation in the story (${r1014c.triggerCount} disclosures) is followed by two scenes that raise no new curiosity, even though ${r1014c.aftermathCount} scenes elsewhere do open fresh questions. A disclosure that never opens a further question leaves the payoff engine with nothing new to seed and collect on.`,
         suggestedFix: `In the two scenes following at least one revelation, plant a new open question that the disclosure itself raises so the payoff engine keeps compounding rather than settling.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID and
+  // PAYOFF_STAKES_SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta and
+  // suspenseDelta respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1028a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1028a.fires) {
+      issues.push({
+        location: `${r1028a.triggerCount} raise-stakes aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1028a.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1028a.aftermathCount} emotionally-charged scenes exist elsewhere. A stakes-raise that isn't matched by any feeling in the scenes right after it leaves the escalation registering as a declared fact the payoff machinery tracks structurally rather than something anyone visibly feels.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let someone's feelings visibly register the new danger so escalating pressure carries emotional weight alongside its setup value.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no bond change, while
+  // such changes occur elsewhere. Distinct from the original clockRaised → visualBeats rule and
+  // PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID (same trigger paired with visualBeats and curiosityDelta
+  // respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1028b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1028b.fires) {
+      issues.push({
+        location: `${r1028b.triggerCount} clock-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1028b.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1028b.aftermathCount} such shifts occur elsewhere. A ticking deadline that never bears on how characters treat each other in the scenes right after it leaves the pressure purely external, disconnected from the bonds the eventual payoff will need to have moved.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the ticking deadline strain or shift a relationship so the pressure registers interpersonally, setting up richer payoff material later.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no emotional shift, while
+  // such shifts occur elsewhere. Distinct from PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID and
+  // PAYOFF_REVELATION_CURIOSITY_AFTERMATH_VOID (same trigger paired with relationshipShifts and
+  // curiosityDelta respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1028c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1028c.fires) {
+      issues.push({
+        location: `${r1028c.triggerCount} revelation aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1028c.triggerCount} discoveries) is followed by two emotionally neutral scenes, even though ${r1028c.aftermathCount} emotionally-charged scenes exist elsewhere. A discovery that never registers as felt in the scenes right after it leaves the payoff informationally significant but emotionally inert — knowledge delivered without anyone visibly reckoning with it.`,
+        suggestedFix: `In the two scenes following at least one revelation, let someone's feelings register the new knowledge so the payoff lands emotionally, not only informationally.`,
       });
     }
   }

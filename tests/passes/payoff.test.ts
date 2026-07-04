@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1028 — payoffPass: payoff stakes-emotional aftermath void, payoff clock-relational aftermath void, payoff revelation-emotional aftermath void', async () => {
+    const runPY1028 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1028a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by an emotional shift within its window', async () => {
+      const recs1028an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1028b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by a relationship shift within its window', async () => {
+      const recs1028bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'PAYOFF_CLOCK_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1028c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1028cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1028(recs1028cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1014 — payoffPass: payoff stakes-suspense aftermath void, payoff open-thread-emotional aftermath void, payoff revelation-curiosity aftermath void', async () => {
     const runPY1014 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
