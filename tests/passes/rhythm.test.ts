@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1030 — rhythmPass: rhythm stakes-emotional aftermath void, rhythm payoff-suspense aftermath void, rhythm revelation-suspense aftermath void', async () => {
+    const runR1030 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID fires when every stakes-raise has no emotional shift within 2 scenes', async () => {
+      const recs1030a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runR1030(recs1030a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by an emotional shift within 2 scenes', async () => {
+      const recs1030an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runR1030(recs1030an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID fires when every payoff has no rise in suspense within 2 scenes', async () => {
+      const recs1030b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1030(recs1030b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when a payoff is followed by rising suspense within 2 scenes', async () => {
+      const recs1030bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1030(recs1030bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID fires when every revelation has no rise in suspense within 2 scenes', async () => {
+      const recs1030c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1030(recs1030c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID does not fire when a revelation is followed by rising suspense within 2 scenes', async () => {
+      const recs1030cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1030(recs1030cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1016 — rhythmPass: rhythm revelation-curiosity aftermath void, rhythm turn-emotional aftermath void, rhythm stakes-relational aftermath void', async () => {
     const runR1016 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
