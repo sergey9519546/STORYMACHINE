@@ -486,6 +486,13 @@
 // with visualBeats/curiosityDelta/emotionalShift, now a fourth channel with relationshipShifts),
 // and CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID (payoffSetupIds, previously paired with
 // emotionalShift/suspenseDelta/curiosityDelta, now a fourth channel with relationshipShifts).
+// Wave 1052 additions: with all four main triggers (raise_stakes, payoffSetupIds, dramaticTurn,
+// unresolvedClues) now at four checkAftermathVoid channels each, this wave extends three of them
+// to a fifth channel using fields never paired with them before: CONFLICT_STAKES_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID (raise_stakes, first pairing with dialogueHighlights), CONFLICT_PAYOFF_
+// STAGING_AFTERMATH_VOID (payoffSetupIds, first pairing with visualBeats — dramaticTurn and
+// unresolvedClues already carry this channel), and CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID (heavy unresolvedClues debt, first pairing with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6090,6 +6097,82 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene in the story (${r1038c.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r1038c.aftermathCount} such shifts occur elsewhere. A conflict that resolves cleanly with no fresh strain on any relationship in its wake leaves the payoff feeling settled rather than still generating friction between the people caught in it.`,
         suggestedFix: `In the two scenes following at least one payoff, let the resolution strain or shift a relationship so the conflict's payoff ripples interpersonally, not just narratively.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying raise_stakes scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // dialogueHighlights has never been used as a checkAftermathVoid consequence channel anywhere
+  // in this pass — this is the first pairing of the field with the sequence/aftermath mode here,
+  // and the fifth consequence channel for this trigger.
+  {
+    const r1052a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1052a.fires) {
+      issues.push({
+        location: `${r1052a.triggerCount} raise-stakes aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1052a.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1052a.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the conflict's stakes registering structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with substantial physical staging,
+  // 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_
+  // VOID, CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID, CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID, and
+  // CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID (same trigger paired with emotionalShift/
+  // suspenseDelta/curiosityDelta/relationshipShifts respectively) — this is the fifth consequence
+  // channel for this trigger, the last of the standard set already applied to dramaticTurn and
+  // unresolvedClues.
+  {
+    const r1052b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1052b.fires) {
+      issues.push({
+        location: `${r1052b.triggerCount} payoff aftermath(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1052b.triggerCount} cashed-in setups) is followed by two scenes with no substantial physical staging, even though ${r1052b.aftermathCount} such scenes exist elsewhere in the script. A resolved conflict gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — the aftermath of the resolution given some visible presence before the conflict moves on.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2
+  // scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. dialogueHighlights has never been used as a checkAftermathVoid consequence
+  // channel anywhere in this pass — this is the fifth consequence channel for this trigger.
+  {
+    const r1052c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1052c.fires) {
+      issues.push({
+        location: `${r1052c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1052c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1052c.aftermathCount} such scenes exist elsewhere in the script. A pile-up of open questions that never earns a single memorable line reacting to it right after leaves the conflict's mounting uncertainty unspoken rather than voiced.`,
+        suggestedFix: `In the two scenes following a heavy clue-debt moment, let a character deliver a memorable line naming or reacting to the mounting uncertainty so it registers in speech, not just as plot backlog.`,
       });
     }
   }

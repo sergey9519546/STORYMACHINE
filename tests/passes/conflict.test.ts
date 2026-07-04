@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1052 — conflictPass: conflict stakes-dialogue-highlight aftermath void, conflict payoff-staging aftermath void, conflict open-thread-dialogue-highlight aftermath void', async () => {
+    const makeRec1052 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1052 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1052a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1052(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a stakes-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1052an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1052(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff is followed by two scenes with no substantial staging', async () => {
+      const recs1052b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1052(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by substantial staging within its window', async () => {
+      const recs1052bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1052(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1052c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1052(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by highlighted dialogue within its window', async () => {
+      const recs1052cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1052(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1052(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1052(i);
+      });
+      const res = await runCF1052(recs1052cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CONFLICT_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1038 — conflictPass: conflict open-thread-emotional aftermath void, conflict turn-relational aftermath void, conflict payoff-relational aftermath void', async () => {
     const makeRec1038 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
