@@ -505,6 +505,14 @@
 // (emotionalShift), STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID (suspenseDelta), and
 // STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID (relationshipShifts) give this trigger three
 // fresh channels.
+// Wave 1115 additions: STRUCTURE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and STRUCTURE_
+// REVELATION_STAGING_AFTERMATH_VOID give revelation its fifth and sixth channels (previously
+// paired with curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts, now also paired
+// with dialogueHighlights and visualBeats respectively), completing full six-channel saturation
+// for all five of this pass's tracked triggers. With those exhausted, this wave introduces
+// clockRaised as a genuinely fresh checkAftermathVoid trigger — it has only ever anchored
+// distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/aftermath:
+// STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6214,6 +6222,84 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every revelation in the story (${r1101c.triggerCount} discoveries) is followed by two scenes with no recorded relationship shift, even though ${r1101c.aftermathCount} such shifts occur elsewhere. A truth that lands without moving how characters stand with each other leaves the structure's revelations registering as private facts rather than developments that ripple through the story's relationships.`,
         suggestedFix: `In the two scenes following at least one revelation, let it shift how a pair of characters relate, so the structure's discoveries carry interpersonal weight, not just informational weight.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_VOID, STRUCTURE_REVELATION_EMOTIONAL_
+  // AFTERMATH_VOID, STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID, and STRUCTURE_REVELATION_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/emotionalShift/
+  // suspenseDelta/relationshipShifts respectively) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1115a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1115a.fires) {
+      issues.push({
+        location: `${r1115a.triggerCount} revelation aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1115a.triggerCount} discoveries) is followed by two scenes with no highlighted dialogue, even though ${r1115a.aftermathCount} such scenes exist elsewhere in the script. A truth that lands without earning a memorable line right after it leaves the structure's revelations unvoiced — no character's speech processes what was just learned.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered, so the structure's reckoning with new information registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every revelation's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_VOID,
+  // STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID, STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID,
+  // STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_REVELATION_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/emotionalShift/
+  // suspenseDelta/relationshipShifts/dialogueHighlights respectively) — this is the sixth and
+  // final consequence channel for this trigger, completing full saturation.
+  {
+    const r1115b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1115b.fires) {
+      issues.push({
+        location: `${r1115b.triggerCount} revelation aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1115b.triggerCount} discoveries) is followed by two scenes with no heavily-staged visual beat, even though ${r1115b.aftermathCount} such scenes exist elsewhere in the script. A truth that lands without earning a visually charged follow-through leaves the structure's revelations registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the discovery registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised check in this
+  // file (all zone-imbalance/zone-cluster, distribution/timing modes, none sequence/aftermath) —
+  // this is the first check to use clockRaised as a checkAftermathVoid trigger in this pass.
+  {
+    const r1115c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1115c.fires) {
+      issues.push({
+        location: `${r1115c.triggerCount} clock-raise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1115c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1115c.aftermathCount} such rises occur elsewhere. Time pressure that never reopens the field of questions right after it tightens leaves the structure's relationship with urgency feeling mechanical rather than generative.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface so the structure's ticking clock keeps deepening curiosity, not just urgency.`,
       });
     }
   }
