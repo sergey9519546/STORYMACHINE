@@ -471,6 +471,11 @@
 // channels: PACING_STAKES_RELATIONAL_AFTERMATH_VOID and PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_
 // VOID pair the isStakesRaise593/isHeavyDebt607 predicates with relationshipShifts for the first
 // time, and PACING_STAKES_STAGING_AFTERMATH_VOID pairs isStakesRaise593 with visualBeats.
+// Wave 1069 additions: payoffSetupIds and raise_stakes are the last two triggers still missing
+// the dialogueHighlights channel — PACING_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and
+// PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID close that gap, giving both triggers full
+// six-channel saturation. The third check, PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID, pairs the
+// isHeavyDebt607 predicate with visualBeats — a channel it has never carried before.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6028,6 +6033,86 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene in the story (${r1055c.triggerCount} of them) is followed by two scenes with no substantial physical staging, even though ${r1055c.aftermathCount} such scenes exist elsewhere in the script. Escalating danger gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — the new danger given some visible presence before the pacing moves on.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from PACING_PAYOFF_
+  // RELATIONSHIP_AFTERMATH_VOID, PACING_PAYOFF_STAGING_AFTERMATH_VOID, and the hand-rolled
+  // PAYOFF_AFTERMATH_CURIOSITY/EMOTION/SUSPENSE_FLAT family (same trigger paired with
+  // relationshipShifts/visualBeats/curiosityDelta/emotionalShift/suspenseDelta respectively) —
+  // this is the sixth and final standard-channel pairing for this trigger, completing full
+  // saturation.
+  {
+    const r1069a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1069a.fires) {
+      issues.push({
+        location: `${r1069a.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1069a.triggerCount} cashed-in setups) is followed by two scenes with no highlighted dialogue, even though ${r1069a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the pacing's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from PACING_STAKES_
+  // RELATIONAL_AFTERMATH_VOID, PACING_STAKES_STAGING_AFTERMATH_VOID, and the hand-rolled STAKES_
+  // AFTERMATH_SUSPENSE/CURIOSITY/EMOTION_FLAT family (same trigger paired with relationshipShifts/
+  // visualBeats/suspenseDelta/curiosityDelta/emotionalShift respectively) — this is the sixth and
+  // final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1069b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1069b.fires) {
+      issues.push({
+        location: `${r1069b.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1069b.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1069b.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the pacing's stakes registering structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the pacing's escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 visually-dense scenes anywhere
+  // (visualBeats length≥2), 2-scene lookahead. Fires when every heavy-debt scene's two-scene
+  // aftermath contains no visually dense scene, while such scenes occur elsewhere. Distinct from
+  // PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID and the hand-rolled OPEN_THREAD_AFTERMATH_
+  // SUSPENSE/CURIOSITY/EMOTION_FLAT family (same trigger paired with relationshipShifts/
+  // suspenseDelta/curiosityDelta/emotionalShift respectively) — this pairs the isHeavyDebt607
+  // predicate with visualBeats for the first time in this pass, the fifth consequence channel for
+  // this trigger.
+  {
+    const r1069c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1069c.fires) {
+      issues.push({
+        location: `${r1069c.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1069c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1069c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the pacing's open threads feeling abstract rather than lodged in the world.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
       });
     }
   }
