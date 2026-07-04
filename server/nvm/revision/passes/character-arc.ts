@@ -510,6 +510,13 @@
 // and emotionalShift, now a third channel with curiosityDelta), and ARC_SUSPENSE_EMOTIONAL_
 // AFTERMATH_VOID (suspenseDelta as trigger, previously paired with curiosityDelta and
 // relationshipShifts, now a third channel with emotionalShift).
+// Wave 1037 additions: ARC_STAKES_EMOTIONAL_AFTERMATH_VOID gives raise_stakes a fourth channel
+// (previously paired with relationshipShifts/curiosityDelta/suspenseDelta, now paired with
+// emotionalShift), ARC_REVELATION_SUSPENSE_AFTERMATH_VOID gives revelation a fourth channel
+// (previously paired with relationshipShifts/emotionalShift/curiosityDelta, now paired with
+// suspenseDelta), and ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID gives the heavy-unresolvedClues-
+// debt trigger a third channel (previously paired with emotionalShift/visualBeats, now paired with
+// curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5870,6 +5877,81 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every suspense-raising scene (${r1023c.triggerCount} tension rises) is followed by two emotionally neutral scenes, even though ${r1023c.aftermathCount} emotionally-charged scenes exist elsewhere. Rising tension should usually register as felt — dread, adrenaline, a knot of worry; when every suspense spike's aftermath is affectively flat, the arc's danger reads as mechanical pressure rather than something the protagonist actually feels.`,
         suggestedFix: `Let at least one suspense rise land emotionally in its aftermath: in the scene or two after tension spikes, show the protagonist visibly feeling it — fear, adrenaline, a private flicker of dread.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from ARC_STAKES_RELATIONAL_AFTERMATH_VOID, ARC_
+  // STAKES_CURIOSITY_AFTERMATH_VOID, and ARC_STAKES_SUSPENSE_AFTERMATH_VOID (same trigger paired
+  // with relationshipShifts/curiosityDelta/suspenseDelta respectively) — this is the fourth
+  // consequence channel for this trigger in this pass.
+  {
+    const r1037a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1037a.fires) {
+      issues.push({
+        location: `${r1037a.triggerCount} raise-stakes aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ARC_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1037a.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1037a.aftermathCount} emotionally-charged scenes exist elsewhere. A stakes-raise that isn't matched by any feeling in the scenes right after it leaves the arc's escalation registering as a declared beat rather than something the protagonist visibly feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the protagonist's feelings visibly register the new danger so the escalation lands emotionally, not only structurally.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every revelation's two-scene aftermath carries no suspense rise, while such rises
+  // occur elsewhere. Distinct from ARC_REVELATION_RELATIONAL_AFTERMATH_VOID, ARC_REVELATION_
+  // EMOTIONAL_AFTERMATH_VOID, and ARC_REVELATION_CURIOSITY_AFTERMATH_VOID (same trigger paired
+  // with relationshipShifts/emotionalShift/curiosityDelta respectively) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1037b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1037b.fires) {
+      issues.push({
+        location: `${r1037b.triggerCount} revelation aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ARC_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1037b.triggerCount} discoveries) is followed by two scenes with no rise in suspense, even though ${r1037b.aftermathCount} such rises occur elsewhere. A discovery that never tightens the felt sense of danger right after it leaves the arc's revelations landing as flat information rather than a beat that raises the pressure on the protagonist.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the tension climb so the arc's discoveries keep building pressure rather than settling once the truth is out.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath carries
+  // no curiosity rise, while such rises occur elsewhere. Distinct from this pass's original
+  // unresolvedClues → emotionalShift rule and ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID (same
+  // trigger paired with emotionalShift and visualBeats respectively) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1037c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1037c.fires) {
+      issues.push({
+        location: `${r1037c.triggerCount} heavy clue-debt scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1037c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1037c.aftermathCount} such rises occur elsewhere. Accumulated mystery about the protagonist's arc should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the arc's uncertainty stalls instead of deepening.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question tied to the protagonist's arc so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
       });
     }
   }
