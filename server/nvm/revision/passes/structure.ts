@@ -513,6 +513,12 @@
 // clockRaised as a genuinely fresh checkAftermathVoid trigger — it has only ever anchored
 // distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/aftermath:
 // STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
+// Wave 1129 additions: clockRaised also carries a pre-existing hand-rolled sequence/aftermath
+// channel — CLOCK_AFTERMATH_EMOTION_VOID (Wave 583, emotionalShift) — putting it at two
+// channels rather than one as of Wave 1115. STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID,
+// STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID give it its third, fourth, and fifth channels (suspenseDelta, relationshipShifts,
+// dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6300,6 +6306,82 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1115c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1115c.aftermathCount} such rises occur elsewhere. Time pressure that never reopens the field of questions right after it tightens leaves the structure's relationship with urgency feeling mechanical rather than generative.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface so the structure's ticking clock keeps deepening curiosity, not just urgency.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1115) and the hand-rolled CLOCK_AFTERMATH_EMOTION_VOID (Wave 583, same trigger paired
+  // with curiosityDelta/emotionalShift) — this is the third consequence channel for this trigger.
+  {
+    const r1129a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1129a.fires) {
+      issues.push({
+        location: `${r1129a.triggerCount} clock-raise scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1129a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1129a.aftermathCount} such rises occur elsewhere. A deadline that tightens without making the outcome feel more threatening leaves the structure's clock registering as a schedule rather than a source of dread.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, sharpen what's at risk if the deadline is missed, so the tightening clock is felt as danger, not just noted as a fact.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1115), the hand-rolled CLOCK_AFTERMATH_
+  // EMOTION_VOID (Wave 583), and STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID (this wave, same
+  // trigger paired with curiosityDelta/emotionalShift/suspenseDelta) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1129b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1129b.fires) {
+      issues.push({
+        location: `${r1129b.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1129b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1129b.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the structure's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene
+  // aftermath has no memorable line, while such lines occur elsewhere. Distinct from STRUCTURE_
+  // CLOCK_CURIOSITY_AFTERMATH_VOID, the hand-rolled CLOCK_AFTERMATH_EMOTION_VOID, STRUCTURE_
+  // CLOCK_SUSPENSE_AFTERMATH_VOID, and STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID (same trigger
+  // paired with curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1129c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1129c.fires) {
+      issues.push({
+        location: `${r1129c.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1129c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no memorable line, even though ${r1129c.aftermathCount} such lines exist elsewhere in the script. A deadline that tightens without earning a line that reckons with it leaves the structure's clock voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs, so the pressure registers in speech, not just in plot mechanics.`,
       });
     }
   }

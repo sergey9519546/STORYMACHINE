@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1129 — structurePass: structure clock-suspense aftermath void, structure clock-relational aftermath void, structure clock-dialogue-highlight aftermath void', async () => {
+    const runST1129 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no suspense rise', async () => {
+      const recs1129a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID does not fire when a clock-raise is followed by a suspense rise within its window', async () => {
+      const recs1129an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1129b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by a relationship shift within its window', async () => {
+      const recs1129bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1129c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1129cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1129(recs1129cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1115 — structurePass: structure revelation-dialogue-highlight aftermath void, structure revelation-staging aftermath void, structure clock-curiosity aftermath void', async () => {
     const runST1115 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
