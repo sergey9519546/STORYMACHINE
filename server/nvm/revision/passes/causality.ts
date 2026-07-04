@@ -549,6 +549,12 @@
 // side of STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID). CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID
 // pairs clockRaised with curiosityDelta; CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID pairs
 // dramaticTurn with suspenseDelta — each a first consequence channel for its trigger.
+// Wave 1105 additions (closes the thirty-seventh rotation cycle, 1092-1105): this wave gives
+// clockRaised and dramaticTurn further channels — CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID and
+// CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_VOID pair clockRaised with emotionalShift and
+// relationshipShifts respectively (second and third channels for this trigger), and CAUSALITY_
+// TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with curiosityDelta (second channel for this
+// trigger).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6435,6 +6441,79 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1091c.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1091c.aftermathCount} such rises occur elsewhere. A pivot that never re-tightens tension right after it happens leaves the causal chain's turns registering as isolated events rather than links that keep pulling the story forward.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a new tension rise so the pivot's consequences keep pressing on the story instead of settling immediately.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1091, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1105a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1105a.fires) {
+      issues.push({
+        location: `${r1105a.triggerCount} clock-raise scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1105a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1105a.aftermathCount} such shifts occur elsewhere. Time pressure that never registers emotionally right after it tightens leaves the causal chain's clock feeling procedural — a deadline moving without anyone visibly reacting to it.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the new urgency, so the ticking clock carries felt weight, not just mechanical pressure.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath carries no
+  // relationship movement, while such movement occurs elsewhere. Distinct from CAUSALITY_CLOCK_
+  // CURIOSITY_AFTERMATH_VOID and CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with curiosityDelta/emotionalShift) — this is the third consequence channel for this
+  // trigger.
+  {
+    const r1105b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1105b.fires) {
+      issues.push({
+        location: `${r1105b.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1105b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1105b.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the causal chain's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in curiosity, while
+  // such rises occur elsewhere. Distinct from CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1091,
+  // same trigger paired with suspenseDelta) — this is the second consequence channel for this
+  // trigger.
+  {
+    const r1105c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1105c.fires) {
+      issues.push({
+        location: `${r1105c.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1105c.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1105c.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question right after it happens leaves the causal chain's turns registering as closed events rather than links that generate the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface from the pivot so the causal chain keeps generating curiosity, not just settling into the new state of affairs.`,
       });
     }
   }
