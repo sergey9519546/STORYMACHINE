@@ -480,6 +480,16 @@
 // paired with dialogueHighlights), and STRUCTURE_OPEN_THREAD_STAGING_AFTERMATH_VOID (heavy
 // unresolvedClues debt, previously paired with dialogueHighlights/emotionalShift/curiosityDelta/
 // relationshipShifts, now also paired with visualBeats).
+// Wave 1073 additions: payoffSetupIds, dramaticTurn, and heavy unresolvedClues debt each reach
+// full six-channel saturation: STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID (payoffSetupIds,
+// previously paired with dialogueHighlights/relationshipShifts/emotionalShift/curiosityDelta/
+// suspenseDelta, now also paired with visualBeats — its only remaining standard channel),
+// STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID (dramaticTurn, previously paired with visualBeats/
+// curiosityDelta/relationshipShifts/emotionalShift/dialogueHighlights, now also paired with
+// suspenseDelta — its only remaining standard channel), and STRUCTURE_OPEN_THREAD_SUSPENSE_
+// AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with dialogueHighlights/
+// emotionalShift/curiosityDelta/relationshipShifts/visualBeats, now also paired with
+// suspenseDelta — its only remaining standard channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5955,6 +5965,87 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1059c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1059c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the structure's open threads feeling abstract rather than lodged in the world.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID, STRUCTURE_PAYOFF_RELATIONAL_AFTERMATH_VOID, STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID,
+  // STRUCTURE_PAYOFF_CURIOSITY_AFTERMATH_VOID, and STRUCTURE_PAYOFF_SUSPENSE_AFTERMATH_VOID (same
+  // trigger paired with dialogueHighlights/relationshipShifts/emotionalShift/curiosityDelta/
+  // suspenseDelta respectively) — this is the sixth and final standard-channel pairing for this
+  // trigger, completing full saturation.
+  {
+    const r1073a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1073a.fires) {
+      issues.push({
+        location: `${r1073a.triggerCount} payoff scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1073a.triggerCount} payoff scenes is followed by two scenes with no substantial physical staging, even though ${r1073a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the resolution a physical anchor before the structure moves on.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while such
+  // rises occur elsewhere. Distinct from DRAMATIC_TURN_STAGING_AFTERMATH_VOID, STRUCTURE_TURN_
+  // CURIOSITY_AFTERMATH_VOID, STRUCTURE_TURN_RELATIONAL_AFTERMATH_VOID, STRUCTURE_TURN_EMOTIONAL_
+  // AFTERMATH_VOID, and STRUCTURE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // visualBeats/curiosityDelta/relationshipShifts/emotionalShift/dialogueHighlights respectively)
+  // — this is the sixth and final standard-channel pairing for this trigger, completing full
+  // saturation.
+  {
+    const r1073b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1073b.fires) {
+      issues.push({
+        location: `${r1073b.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1073b.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1073b.aftermathCount} such rises occur elsewhere. A pivot that never tightens tension right after it lands leaves the structure's turns registering as isolated events rather than pressure the story keeps building on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let suspense rise so the pivot keeps building pressure rather than resolving into a flat aftermath.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 suspense-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no rise in suspense, while such rises occur elsewhere. Distinct from STRUCTURE_OPEN_
+  // THREAD_HIGHLIGHT_AFTERMATH_VOID, STRUCTURE_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, STRUCTURE_
+  // OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, STRUCTURE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, and
+  // STRUCTURE_OPEN_THREAD_STAGING_AFTERMATH_VOID (same trigger paired with dialogueHighlights/
+  // emotionalShift/curiosityDelta/relationshipShifts/visualBeats respectively) — this is the sixth
+  // and final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1073c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1073c.fires) {
+      issues.push({
+        location: `${r1073c.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1073c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1073c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the structure's uncertainty stalling instead of pressuring the story forward.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the structure rather than sitting in a learnable lull.`,
       });
     }
   }

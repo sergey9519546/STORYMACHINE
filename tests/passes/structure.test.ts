@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1073 — structurePass: structure payoff-staging aftermath void, structure turn-suspense aftermath void, structure open-thread-suspense aftermath void', async () => {
+    const runST1073 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff is followed by two scenes with no visually dense scene', async () => {
+      const recs1073a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID'), 'STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by a visually dense scene within its window', async () => {
+      const recs1073an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID'), 'STRUCTURE_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const recs1073b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const recs1073bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no suspense rise', async () => {
+      const recs1073c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a suspense rise within its window', async () => {
+      const recs1073cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1073(recs1073cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1059 — structurePass: structure payoff-suspense aftermath void, structure turn-dialogue-highlight aftermath void, structure open-thread-staging aftermath void', async () => {
     const runST1059 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
