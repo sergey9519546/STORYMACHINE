@@ -434,6 +434,12 @@
 // RELATIONAL_AFTERMATH_VOID (revelation, previously only paired with emotionalShift, now paired
 // with relationshipShifts), and RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds, previously
 // only paired with emotionalShift, now paired with curiosityDelta).
+// Wave 1016 additions: this wave gives three more triggers a third consequence channel: RHYTHM_
+// REVELATION_CURIOSITY_AFTERMATH_VOID (revelation, previously paired with emotionalShift and
+// relationshipShifts, now paired with curiosityDelta), RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID
+// (dramaticTurn, previously paired with payoffSetupIds and relationshipShifts, now paired with
+// emotionalShift), and RHYTHM_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes, previously paired
+// with curiosityDelta and suspenseDelta, now paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5171,6 +5177,78 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r1002c.triggerCount} cashed-in setups) is followed by two scenes that raise no new curiosity, even though ${r1002c.aftermathCount} scenes elsewhere do open fresh questions. A payoff usually clears the way for the next question the rhythm will chase; when every payoff's aftermath opens nothing new, threads close without replacing themselves and the rhythm's engine of anticipation stalls right after delivering.`,
         suggestedFix: `Let at least one payoff open a new question in its aftermath: in the scene or two after a setup pays off, plant a fresh uncertainty so the rhythm keeps moving forward instead of settling.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (revelation != null, pos<n-2), ≥2 curiosity-raising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath opens no new
+  // curiosity, while curiosity does occur elsewhere. Distinct from REVELATION_SIGNAL_AFTERMATH_
+  // FLAT (emotionalShift) and RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 1002,
+  // relationshipShifts) — this is the third consequence channel for this trigger in this pass.
+  {
+    const r1016a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1016a.fires) {
+      issues.push({
+        location: `${r1016a.triggerCount} revelation aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RHYTHM_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1016a.triggerCount} disclosures) is followed by two scenes that raise no new curiosity, even though ${r1016a.aftermathCount} scenes elsewhere do open fresh questions. A disclosure should usually open a further question — what else does this mean, who else is involved; when every revelation's aftermath opens nothing new, the rhythm's beat of discovery closes rather than compounding.`,
+        suggestedFix: `In the two scenes following at least one revelation, plant a new open question the disclosure itself raises so the rhythm's discovery beats keep compounding rather than settling.`,
+      });
+    }
+  }
+
+  // RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath is emotionally flat, while charged
+  // scenes occur elsewhere. Distinct from RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID (relationshipShifts)
+  // and DRAMATIC_TURN_PAYOFF_AFTERMATH_VOID (payoffSetupIds) — this is the third consequence
+  // channel for this trigger in this pass.
+  {
+    const r1016b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1016b.fires) {
+      issues.push({
+        location: `${r1016b.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1016b.triggerCount} pivots) is followed by two emotionally neutral scenes, even though ${r1016b.aftermathCount} emotionally-charged scenes exist elsewhere. A pivot should usually carry felt weight for the characters living through it; when every turn's aftermath is affectively flat, the rhythm's reversal reads as a plot beat rather than something anyone feels.`,
+        suggestedFix: `Let at least one dramatic turn provoke felt weight in its aftermath: in the scene or two after the reversal, show a character reacting to it emotionally.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raise scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no relationship shift,
+  // while such shifts occur elsewhere. Distinct from RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID
+  // (curiosityDelta) and RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 1002, suspenseDelta) — this
+  // is the third consequence channel for this trigger in this pass.
+  {
+    const r1016c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1016c.fires) {
+      issues.push({
+        location: `${r1016c.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RHYTHM_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1016c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r1016c.aftermathCount} such shifts occur elsewhere. Escalating danger that never bears on how characters treat each other in the scenes right after it leaves the rhythm's escalation beat isolated from the relationships it should be testing.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so the rhythm's rising pressure registers on the bonds between characters.`,
       });
     }
   }
