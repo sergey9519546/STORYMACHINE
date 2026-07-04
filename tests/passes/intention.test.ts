@@ -1352,6 +1352,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1067 — intentionPass: intention seed-dialogue-highlight aftermath void, intention clock-dialogue-highlight aftermath void, intention stakes-staging aftermath void', async () => {
+    const makeRec1067 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1067 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every seed is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1067a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1067(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a seed is followed by highlighted dialogue within its window', async () => {
+      const recs1067an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1067(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1067b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1067(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1067bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1067(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_STAKES_STAGING_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no visually dense scene', async () => {
+      const recs1067c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1067(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_STAGING_AFTERMATH_VOID'), 'INTENTION_STAKES_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_STAKES_STAGING_AFTERMATH_VOID does not fire when a stakes-raise is followed by a visually dense scene within its window', async () => {
+      const recs1067cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1067(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1067(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1067(i);
+      });
+      const res = await runIN1067(recs1067cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_STAKES_STAGING_AFTERMATH_VOID'), 'INTENTION_STAKES_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1053 — intentionPass: intention open-thread-suspense aftermath void, intention seed-relational aftermath void, intention clock-relational aftermath void', async () => {
     const makeRec1053 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

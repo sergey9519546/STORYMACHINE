@@ -477,6 +477,15 @@
 // curiosityDelta/emotionalShift, now paired with suspenseDelta), and INTENTION_SEED_RELATIONAL_
 // AFTERMATH_VOID / INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID extend seededClueIds and clockRaised
 // (both already at four channels) to a fifth with relationshipShifts.
+// Wave 1067 additions: seededClueIds and clockRaised each reach full six-channel saturation:
+// INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (seededClueIds, previously paired with
+// visualBeats/curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts, now also paired
+// with dialogueHighlights — its only remaining standard channel) and INTENTION_CLOCK_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID (clockRaised, previously paired with visualBeats/emotionalShift/
+// curiosityDelta/suspenseDelta/relationshipShifts, now also paired with dialogueHighlights — its
+// only remaining standard channel). INTENTION_STAKES_STAGING_AFTERMATH_VOID gives raise_stakes a
+// fifth channel (previously paired with curiosityDelta/suspenseDelta/relationshipShifts/
+// emotionalShift, now also paired with visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6077,6 +6086,86 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clock-raise scene in the story (${r1053c.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1053c.aftermathCount} such shifts occur elsewhere. A ticking deadline that never bears on how characters treat each other in the scenes right after it leaves the character's intention facing pressure that's purely external, disconnected from the relationships shaping their pursuit.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let the ticking deadline strain or shift a relationship so the character's intention feels the pressure interpersonally, not only temporally.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every seed's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from SEED_STAGING_
+  // AFTERMATH_VOID, INTENTION_SEED_CURIOSITY_AFTERMATH_VOID, INTENTION_SEED_EMOTIONAL_AFTERMATH_
+  // VOID, INTENTION_SEED_SUSPENSE_AFTERMATH_VOID, and INTENTION_SEED_RELATIONAL_AFTERMATH_VOID
+  // (same trigger paired with visualBeats/curiosityDelta/emotionalShift/suspenseDelta/
+  // relationshipShifts respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1067a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1067a.fires) {
+      issues.push({
+        location: `${r1067a.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'INTENTION_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1067a.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1067a.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands registers as inert plot machinery rather than something the character's pursuit gives voice to.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from INTENTION_CLOCK_
+  // STAGING_AFTERMATH_VOID, INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID, INTENTION_CLOCK_CURIOSITY_
+  // AFTERMATH_VOID, INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID, and INTENTION_CLOCK_RELATIONAL_
+  // AFTERMATH_VOID (same trigger paired with visualBeats/emotionalShift/curiosityDelta/
+  // suspenseDelta/relationshipShifts respectively) — this is the sixth and final standard-channel
+  // pairing for this trigger, completing full saturation.
+  {
+    const r1067b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1067b.fires) {
+      issues.push({
+        location: `${r1067b.triggerCount} clock-raise aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'INTENTION_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1067b.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1067b.aftermathCount} such scenes exist elsewhere in the script. A ticking deadline that never earns a memorable line right after it's introduced reads as a mechanical constraint the character's intention states but never voices.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character deliver a memorable line naming the deadline's weight, so the pressure is voiced, not just ticking in the background.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from INTENTION_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID, INTENTION_STAKES_
+  // RELATIONAL_AFTERMATH_VOID, and INTENTION_STAKES_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift respectively) — this is
+  // the fifth consequence channel for this trigger.
+  {
+    const r1067c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1067c.fires) {
+      issues.push({
+        location: `${r1067c.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'INTENTION_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1067c.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1067c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the character's intention pursuing an abstraction rather than something lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
       });
     }
   }
