@@ -523,6 +523,15 @@
 // pair clockRaised with suspenseDelta and emotionalShift respectively (second and third
 // channels for this trigger), and RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID pairs
 // revelation with curiosityDelta (second channel for this trigger).
+// Wave 1127 additions: clockRaised was at three of six channels (curiosityDelta/suspenseDelta/
+// emotionalShift) and revelation at two (suspenseDelta/curiosityDelta). RELATIONSHIP_CLOCK_
+// AFTERMATH_VOID gives clockRaised its fourth channel — relationshipShifts, this pass's own
+// central signal, following the same no-suffix naming convention already used for RELATIONAL_
+// STAKES_AFTERMATH_VOID / RELATIONAL_SEED_AFTERMATH_VOID / RELATIONAL_OPEN_THREAD_AFTERMATH_
+// VOID (each pairing its trigger with a further relationshipShifts entry elsewhere in the
+// script). RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID and RELATIONSHIP_REVELATION_
+// AFTERMATH_VOID give revelation its third and fourth channels (emotionalShift,
+// relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6526,6 +6535,84 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1113c.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1113c.aftermathCount} such rises occur elsewhere. A discovery that never reopens the field of questions right after it lands leaves the relational arc's reckoning with new information feeling like a closed fact rather than a development that keeps the bonds worth wondering about.`,
         suggestedFix: `In the two scenes following at least one revelation, let a new question surface about how it will affect a relationship, so the discovery keeps curiosity about the bonds alive.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Follows the
+  // no-suffix naming convention already established for RELATIONAL_STAKES_AFTERMATH_VOID /
+  // RELATIONAL_SEED_AFTERMATH_VOID / RELATIONAL_OPEN_THREAD_AFTERMATH_VOID (each pairing its
+  // trigger with this pass's own central signal). Distinct from RELATIONSHIP_CLOCK_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1099), RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID, and RELATIONSHIP_
+  // CLOCK_EMOTIONAL_AFTERMATH_VOID (Wave 1113, same trigger paired with curiosityDelta/
+  // suspenseDelta/emotionalShift) — this is the fourth consequence channel for this trigger.
+  {
+    const r1127a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1127a.fires) {
+      issues.push({
+        location: `${r1127a.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1127a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1127a.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the relational arc's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // (non-null) trigger → emotionalShift absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 emotionally-shifted
+  // scenes anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from RELATIONSHIP_
+  // REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1099) and RELATIONSHIP_REVELATION_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1113, same trigger paired with suspenseDelta/curiosityDelta) — this is
+  // the third consequence channel for this trigger.
+  {
+    const r1127b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1127b.fires) {
+      issues.push({
+        location: `${r1127b.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1127b.triggerCount} revelation scenes is followed by two scenes with no emotional shift, even though ${r1127b.aftermathCount} such shifts occur elsewhere. A discovery that never registers on any character's felt state right after it lands leaves the relational arc's reckoning with new information reading as plot mechanics rather than something anyone actually feels toward anyone else.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register toward someone else in the story, so the discovery lands as something felt between people, not just learned.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Follows the same
+  // no-suffix naming convention as RELATIONSHIP_CLOCK_AFTERMATH_VOID (this wave) and RELATIONAL_
+  // STAKES_AFTERMATH_VOID / RELATIONAL_SEED_AFTERMATH_VOID / RELATIONAL_OPEN_THREAD_AFTERMATH_
+  // VOID — this is the fourth consequence channel for this trigger.
+  {
+    const r1127c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1127c.fires) {
+      issues.push({
+        location: `${r1127c.triggerCount} revelation scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RELATIONSHIP_REVELATION_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1127c.triggerCount} revelation scenes is followed by two scenes with no recorded relationship shift, even though ${r1127c.aftermathCount} such shifts exist elsewhere in the script. A truth that surfaces without moving how any two characters stand with each other treats the discovery as private information rather than something that reshapes the relational world it lands in.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the discovery registers between characters, not just within one.`,
       });
     }
   }

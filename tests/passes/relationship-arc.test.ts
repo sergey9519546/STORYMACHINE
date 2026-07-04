@@ -1376,6 +1376,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1127 — relationshipArcPass: relationship clock aftermath void, relationship revelation-emotional aftermath void, relationship revelation aftermath void', async () => {
+    const runRA1127 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('RELATIONSHIP_CLOCK_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1127a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_AFTERMATH_VOID'), 'RELATIONSHIP_CLOCK_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_CLOCK_AFTERMATH_VOID does not fire when a clock-raise is followed by a relationship shift within its window', async () => {
+      const recs1127an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_CLOCK_AFTERMATH_VOID'), 'RELATIONSHIP_CLOCK_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1127b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1127bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const recs1127c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const recs1127cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1127(recs1127cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1113 — relationshipArcPass: relationship clock-suspense aftermath void, relationship clock-emotional aftermath void, relationship revelation-curiosity aftermath void', async () => {
     const runRA1113 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
