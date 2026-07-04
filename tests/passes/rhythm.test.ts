@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1142 — rhythmPass: rhythm open-thread-relational aftermath void, rhythm clock-suspense aftermath void, rhythm clock-emotional aftermath void', async () => {
+    const runR1142 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID fires when every open-thread scene has no relationship shift within 2 scenes', async () => {
+      const recs1142a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1'] } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1142(recs1142a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID does not fire when an open-thread scene is followed by a relationship shift within 2 scenes', async () => {
+      const recs1142an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1'] } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1142(recs1142an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID fires when every clock-raise has no suspense rise within 2 scenes', async () => {
+      const recs1142b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1142(recs1142b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID does not fire when a clock-raise is followed by a suspense rise within 2 scenes', async () => {
+      const recs1142bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1142(recs1142bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID fires when every clock-raise has no emotional shift within 2 scenes', async () => {
+      const recs1142c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runR1142(recs1142c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by an emotional shift within 2 scenes', async () => {
+      const recs1142cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runR1142(recs1142cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1128 — rhythmPass: rhythm open-thread-suspense aftermath void, rhythm open-thread-emotional aftermath void, rhythm clock-curiosity aftermath void', async () => {
     const runR1128 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

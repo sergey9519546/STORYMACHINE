@@ -500,6 +500,10 @@
 // anchored a checkAftermathVoid trigger in this file — only distribution/timing (zone-cluster,
 // peak-uncaused) — RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID gives it a first, fresh channel
 // (curiosityDelta).
+// Wave 1142 additions: unresolvedClues was at three of six channels; clockRaised at one.
+// RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives unresolvedClues its fourth channel
+// (relationshipShifts); RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID and RHYTHM_CLOCK_EMOTIONAL_
+// AFTERMATH_VOID give clockRaised its second and third channels (suspenseDelta, emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5916,6 +5920,80 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1128c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1128c.aftermathCount} such rises occur elsewhere. A deadline that tightens without opening a new question leaves the rhythm's clock registering as a schedule rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface from the mounting pressure, so the deadline keeps the rhythm generating curiosity, not just counting down.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → relationshipShifts absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 scenes anywhere
+  // with a recorded relationship shift, 2-scene lookahead. Fires when every open-thread scene's
+  // two-scene aftermath carries no relationship movement, while such movement occurs elsewhere.
+  // Distinct from RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (Wave 1114), RHYTHM_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID, and RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (Wave 1128, same
+  // trigger paired with curiosityDelta/suspenseDelta/emotionalShift) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1142a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1142a.fires) {
+      issues.push({
+        location: `${r1142a.triggerCount} open-thread scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1142a.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1142a.aftermathCount} such shifts occur elsewhere in the script. An open question that never moves how any two characters stand with each other right after it lingers leaves the rhythm's unresolved threads isolated from the interpersonal stakes they should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, let it shift a relationship — a trust tested by the lingering uncertainty — so the rhythm's unresolved threads carry interpersonal weight, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1128, same trigger paired with curiosityDelta) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1142b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1142b.fires) {
+      issues.push({
+        location: `${r1142b.triggerCount} clock-raise scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1142b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1142b.aftermathCount} such rises occur elsewhere. A deadline that tightens without making the outcome feel more threatening leaves the rhythm's clock registering as a schedule rather than a source of dread.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, sharpen what's at risk if the deadline is missed, so the tightening clock is felt as danger, not just noted as a fact.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1128) and RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID (this wave, same trigger paired with
+  // curiosityDelta/suspenseDelta) — this is the third consequence channel for this trigger.
+  {
+    const r1142c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1142c.fires) {
+      issues.push({
+        location: `${r1142c.triggerCount} clock-raise scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1142c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1142c.aftermathCount} such shifts occur elsewhere. Time pressure that never registers on any character's felt state right after it tightens leaves the rhythm's clock reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the mounting pressure, so the rhythm's ticking clock carries felt weight, not just structural urgency.`,
       });
     }
   }
