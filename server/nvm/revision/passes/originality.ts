@@ -536,6 +536,14 @@
 // debt its fifth and sixth channels (previously paired with dialogueHighlights/curiosityDelta/
 // suspenseDelta/emotionalShift, now also paired with relationshipShifts and visualBeats
 // respectively), completing full saturation for this trigger too.
+// Wave 1124 additions: with all five tracked triggers (raise_stakes, clockRaised, seededClueIds,
+// payoffSetupIds, unresolvedClues-debt) fully saturated, this wave introduces revelation and
+// dramaticTurn as fresh checkAftermathVoid subjects — both have only ever anchored
+// distribution/timing (zone-imbalance/zone-cluster/drought-run/peak-uncaused) checks in this
+// file, never sequence/aftermath. ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID and
+// ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID give revelation its first two channels
+// (curiosityDelta, suspenseDelta); ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID gives dramaticTurn
+// its first channel (emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6767,6 +6775,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1110c.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1110c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that accumulated mystery never earns a visually charged follow-through — a predictable, avoidable absence that leaves the debt feeling like narrated backlog rather than something the camera dwells on.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, stage at least two concrete visual beats, so the accumulating mystery has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing revelation check in this file
+  // (ORIGINALITY_REVELATION_DROUGHT_RUN, ORIGINALITY_REVELATION_ZONE_CLUSTER, ORIGINALITY_
+  // REVELATION_PEAK_UNCAUSED, ORIGINALITY_REVELATION_ZONE_IMBALANCE — all distribution/timing
+  // modes, none sequence/aftermath) — this is the first check to use revelation as a
+  // checkAftermathVoid trigger in this pass.
+  {
+    const r1124a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1124a.fires) {
+      issues.push({
+        location: `${r1124a.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1124a.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1124a.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a discovery never reopens the field of unanswered questions — a predictable, avoidable absence that leaves each reveal feeling like a closed loop rather than the seed of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface, so the discovery keeps generating curiosity instead of settling the matter and inviting the audience to expect the same flatness from every future reveal.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID (this wave, same trigger paired with curiosityDelta) and every distribution/timing
+  // revelation check in this file — this is the second consequence channel for this trigger.
+  {
+    const r1124b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1124b.fires) {
+      issues.push({
+        location: `${r1124b.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1124b.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1124b.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a discovery never sharpens danger or uncertainty in its wake — a predictable, avoidable absence that leaves each reveal reading as settled information rather than a newly charged development.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm and training the audience to expect nothing to follow from what they just learned.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no emotional shift, while
+  // such shifts occur elsewhere. Distinct from ORIGINALITY_TURN_DROUGHT_RUN, ORIGINALITY_
+  // TURNING_POINT_ZONE_CLUSTER, ORIGINALITY_TURNING_POINT_DROUGHT_RUN, and ORIGINALITY_
+  // TURNING_POINT_ZONE_IMBALANCE (all distribution/timing modes, none sequence/aftermath) —
+  // this is the first check to use dramaticTurn as a checkAftermathVoid trigger in this pass.
+  {
+    const r1124c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1124c.fires) {
+      issues.push({
+        location: `${r1124c.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1124c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1124c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a pivot never registers on any character's felt state right after it happens — a predictable, avoidable absence that leaves the story's turns reading as plot mechanics rather than moments that cost or change anyone anything.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt and the story avoids training the audience to expect its turns to pass through characters untouched.`,
       });
     }
   }
