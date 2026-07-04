@@ -536,6 +536,13 @@
 // distinct immediate-adjacency mode, now also paired with suspenseDelta), and ARC_STAKES_
 // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes, previously paired with relationshipShifts/
 // curiosityDelta/suspenseDelta/emotionalShift, now also paired with dialogueHighlights).
+// Wave 1079 additions: ARC_STAKES_STAGING_AFTERMATH_VOID gives raise_stakes its sixth
+// checkAftermathVoid channel (previously paired with relationshipShifts/curiosityDelta/
+// suspenseDelta/emotionalShift/dialogueHighlights, now also paired with visualBeats).
+// ARC_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID each give payoffSetupIds and heavy unresolvedClues debt a fresh channel using
+// dialogueHighlights — a field neither trigger has been paired with via checkAftermathVoid
+// before in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6125,6 +6132,88 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1065c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1065c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes that never earn a memorable line right after they land leave the protagonist's arc registering escalation as plot mechanics, with no voice naming what's now at risk.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the arc's stakes are voiced, not just structurally raised.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no visually
+  // dense scene, while such scenes occur elsewhere. Distinct from ARC_STAKES_RELATIONAL_
+  // AFTERMATH_VOID, ARC_STAKES_CURIOSITY_AFTERMATH_VOID, ARC_STAKES_SUSPENSE_AFTERMATH_VOID,
+  // ARC_STAKES_EMOTIONAL_AFTERMATH_VOID, and ARC_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same
+  // trigger paired with relationshipShifts/curiosityDelta/suspenseDelta/emotionalShift/
+  // dialogueHighlights respectively) — this is the sixth checkAftermathVoid channel for this
+  // trigger.
+  {
+    const r1079a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1079a.fires) {
+      issues.push({
+        location: `${r1079a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'ARC_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1079a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1079a.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the protagonist's arc pursuing an abstraction rather than something lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ARC_PAYOFF_
+  // EMOTIONAL_AFTERMATH_VOID, ARC_PAYOFF_STAGING_AFTERMATH_VOID, ARC_PAYOFF_RELATIONAL_
+  // AFTERMATH_VOID, and ARC_PAYOFF_SUSPENSE_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift/visualBeats/relationshipShifts/suspenseDelta respectively via this same
+  // sequence/aftermath mode) and from ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID (a distinct
+  // immediate-adjacency mode auditing curiosityDelta, not dialogueHighlights) — dialogueHighlights
+  // has never been paired with this trigger before.
+  {
+    const r1079b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1079b.fires) {
+      issues.push({
+        location: `${r1079b.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1079b.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1079b.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the protagonist's arc registering the payoff as structural closure alone, with no voice confirming what the resolution meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, ARC_OPEN_THREAD_
+  // STAGING_AFTERMATH_VOID, ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and ARC_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID (same trigger paired with emotionalShift/visualBeats/curiosityDelta/
+  // suspenseDelta respectively) — dialogueHighlights has never been paired with this trigger
+  // before.
+  {
+    const r1079c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1079c.fires) {
+      issues.push({
+        location: `${r1079c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1079c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1079c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery about the protagonist's arc that never earns a memorable line right after it compounds leaves the arc's uncertainty voiceless rather than felt in what characters say to each other.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
       });
     }
   }
