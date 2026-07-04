@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 999 — pacingPass: pacing revelation-relationship aftermath void, pacing seed-relationship aftermath void, pacing payoff-relationship aftermath void', async () => {
+    const runP999 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const recs999a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const recs999an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_SEED_RELATIONSHIP_AFTERMATH_VOID fires when every seed is followed by two scenes with no relationship shift', async () => {
+      const recs999b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SEED_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_SEED_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_SEED_RELATIONSHIP_AFTERMATH_VOID does not fire when a seed is followed by a relationship shift within its window', async () => {
+      const recs999bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SEED_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_SEED_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID fires when every payoff is followed by two scenes with no relationship shift', async () => {
+      const recs999c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within its window', async () => {
+      const recs999cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP999(recs999cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 985 — pacingPass: pacing highlight zone imbalance, pacing turn zone imbalance, pacing stakes-curiosity aftermath void', async () => {
     const runP985 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

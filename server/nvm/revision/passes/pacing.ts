@@ -435,6 +435,17 @@
 // >=2 vs >0 visualBeats). With zone-imbalance now down to just these two, this wave completes the
 // trio with one aftermath-void pairing: PACING_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
 // curiosityDelta), the first use of raise_stakes as an aftermath-void trigger in this pass.
+// Wave 999 additions: PACING_STAGING re-checked and re-excluded (same predicate mismatch, >=2 vs
+// >0 visualBeats), confirming zone-imbalance remains exhausted. Reconnaissance found the stakes/
+// heavy-debt/clock/turn/payoff triggers in this pass fully saturated across the suspense/curiosity/
+// emotion channels (Waves 593/607 plus hand-rolled clock/turn/payoff families) — but relationshipShifts
+// has only ever been audited for its own distribution, never as an aftermath channel following a
+// trigger. This wave adds three checkAftermathVoid pairings on that one open channel, each with an
+// already-established trigger: PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID (revelation, previously
+// only paired with visualBeats), PACING_SEED_RELATIONSHIP_AFTERMATH_VOID (seededClueIds, likewise
+// previously only paired with visualBeats), and PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID
+// (payoffSetupIds, previously audited via hand-rolled average-based checks on suspense/curiosity/
+// emotion but never via the boolean all-or-nothing checkAftermathVoid mode, and never on this channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5618,6 +5629,80 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r985c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r985c.aftermathCount} scenes elsewhere do open fresh questions. Pacing that escalates danger without provoking a new uncertainty about what comes next reads as inert rather than propulsive in the beats immediately following every escalation.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so pacing carries curiosity forward rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (revelation != null, pos<n-2), ≥2 relationship-shift scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // relationship shift, while such shifts occur elsewhere. revelation has only ever been paired
+  // with visualBeats as an aftermath channel in this pass (REVELATION_STAGING_AFTERMATH_VOID) —
+  // this is the first pairing with relationshipShifts, a channel this pass has otherwise only
+  // audited for its own distribution (peak/cluster/drought/zone-imbalance), never as a consequence.
+  {
+    const r999a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r999a.fires) {
+      issues.push({
+        location: `${r999a.triggerCount} revelation aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_REVELATION_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r999a.triggerCount} disclosures) is followed by two scenes with no shift in any relationship, even though ${r999a.aftermathCount} such shifts occur elsewhere. A disclosure that never bears on how characters treat each other in the scenes right after it lands as information without interpersonal consequence, leaving pacing's forward momentum purely plot-driven rather than felt between characters.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information strain or shift a relationship so pacing's momentum registers interpersonally, not only informationally.`,
+      });
+    }
+  }
+
+  // PACING_SEED_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no relationship shift, while such shifts
+  // occur elsewhere. Distinct from PACING_SEED_STAGING_AFTERMATH_VOID (same trigger paired with
+  // visualBeats) — this pairs seededClueIds with relationshipShifts for the first time in this pass.
+  {
+    const r999b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r999b.fires) {
+      issues.push({
+        location: `${r999b.triggerCount} seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_SEED_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r999b.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r999b.aftermathCount} such shifts occur elsewhere. A planted clue that never bears on how characters treat each other in the scenes right after it leaves the seed purely mechanical, disconnected from pacing's relational momentum.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the seed carries interpersonal weight alongside its narrative function.`,
+      });
+    }
+  }
+
+  // PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. This pass already audits payoff-triggered aftermath on the
+  // suspense/curiosity/emotion channels via hand-rolled average-based checks (PAYOFF_AFTERMATH_
+  // SUSPENSE_FLAT, PAYOFF_AFTERMATH_CURIOSITY_FLAT, PAYOFF_AFTERMATH_EMOTION_FLAT) — this is the
+  // first pairing with relationshipShifts, and the first use of the boolean all-or-nothing
+  // checkAftermathVoid mode (rather than an averaged threshold) for the payoff trigger.
+  {
+    const r999c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r999c.fires) {
+      issues.push({
+        location: `${r999c.triggerCount} payoff aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_PAYOFF_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r999c.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r999c.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as narrative bookkeeping rather than a beat that ripples through the relationships pacing has built.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolved setup strain or shift a relationship so the callback pays off interpersonally, not only structurally.`,
       });
     }
   }
