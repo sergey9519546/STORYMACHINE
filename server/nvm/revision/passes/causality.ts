@@ -482,6 +482,14 @@
 // unresolvedClues) absent from the pass's existing aftermath-void rules: CAUSALITY_STAKES_EMOTIONAL_
 // AFTERMATH_VOID (raise_stakes → emotional), CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID (seed →
 // curiosity), and CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID (open-thread → suspense).
+// Wave 993 additions (closes the twenty-ninth rotation cycle, 980-993): CAUSALITY_CLOCK_ZONE_
+// IMBALANCE (clockRaised boolean) — the last clean trio-complete zone-imbalance candidate in this
+// pass. With zone-imbalance now exhausted, this wave completes the trio with two more aftermath-
+// void pairings, each reusing an already-paired trigger with a fresh channel: CAUSALITY_STAKES_
+// CURIOSITY_AFTERMATH_VOID (raise_stakes, previously only paired with emotionalShift in Wave 979,
+// now paired with curiosityDelta) and CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoffSetupIds,
+// previously only paired with relationshipShifts via PAYOFF_RELATIONSHIP_AFTERMATH_VOID, now
+// paired with emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5762,6 +5770,79 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene leaving a thread unresolved (${r979c.triggerCount} open questions) is followed by two scenes with no suspense rise, even though ${r979c.aftermathCount} scenes elsewhere do build tension. An open question should usually keep tension elevated as the causal chain waits on resolution; when every open thread's aftermath shows no suspense rise, unresolved questions sit flat rather than generating pressure.`,
         suggestedFix: `Let at least one open thread raise suspense in its aftermath: in the scene or two after a question is left hanging, let the uncertainty compress time or raise the stakes of not knowing. An open thread whose aftermath builds tension keeps the causal chain propelling forward instead of idling.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_ZONE_IMBALANCE — Underweight/bloat × clockRaised boolean × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising
+  // scenes total, divided across four equal structural zones. Distinct from the existing 3-zone
+  // CAUSALITY_CLOCK_ZONE_CLUSTER and run-based CAUSALITY_CLOCK_DROUGHT_RUN — the first application
+  // of the 4-zone bloat+empty-zone mode to this channel, and the last clean trio-complete zone-
+  // imbalance candidate in this pass.
+  {
+    const r993a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r993a.fires) {
+      const emptyNames993a = r993a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName993a = FOUR_ZONE_NAMES[r993a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames993a} empty; ${bloatName993a} has ${r993a.counts[r993a.bloatZoneIdx]}/${r993a.totalCount} clock-raising scenes`,
+        rule: 'CAUSALITY_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r993a.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName993a} contains ${r993a.counts[r993a.bloatZoneIdx]} of them (${Math.round((r993a.counts[r993a.bloatZoneIdx] / r993a.totalCount) * 100)}%) while ${emptyNames993a} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the causal chain races against a deadline in only part of the story.`,
+        suggestedFix: `Redistribute clock-raising beats: move or add a scene that starts a ticking clock into the empty zone(s) — ${emptyNames993a} — so time pressure drives the causal chain across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now exhausted, this wave
+  // completes the trio with two more aftermath-void pairings, each reusing an already-paired
+  // trigger with a fresh consequence channel. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying stakes-raise scenes (purpose === 'raise_stakes', pos<n-2), ≥2
+  // curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath opens no new curiosity, while curiosity does occur elsewhere. Distinct from
+  // CAUSALITY_STAKES_EMOTIONAL_AFTERMATH_VOID (Wave 979, same trigger paired with emotionalShift)
+  // — this pairs raise_stakes with curiosityDelta for the first time in this pass.
+  {
+    const r993b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r993b.fires) {
+      issues.push({
+        location: `${r993b.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r993b.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r993b.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke new uncertainty about what the causal chain does next; when every stakes-raise's aftermath opens no curiosity, the escalation sits inert rather than propelling the chain forward.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps propelling the causal chain forward rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath is emotionally flat, while charged scenes occur
+  // elsewhere. Distinct from PAYOFF_RELATIONSHIP_AFTERMATH_VOID (same trigger paired with
+  // relationshipShifts) — this pairs payoffSetupIds with emotionalShift for the first time in this
+  // pass, completing a second consequence channel for the same trigger.
+  {
+    const r993c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r993c.fires) {
+      issues.push({
+        location: `${r993c.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r993c.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r993c.aftermathCount} emotionally-charged scenes exist elsewhere. A callback usually carries some feeling — relief, cost, vindication; when every payoff's aftermath is affectively flat, the causal chain's resolution registers as pure mechanics with no felt weight.`,
+        suggestedFix: `Let at least one payoff carry feeling in its aftermath: in the scene or two after a setup pays off, show someone reacting to it emotionally — relief, grief, triumph. A payoff whose aftermath is felt lands as more than the causal chain closing a loop.`,
       });
     }
   }
