@@ -540,6 +540,13 @@
 // RELATIONAL_AFTERMATH_VOID gives revelation its fourth channel (relationshipShifts);
 // CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID and CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID give
 // clockRaised its third and fourth channels (emotionalShift, relationshipShifts).
+// Wave 1150 additions: after Wave 1136, clockRaised stood at four of six standard channels
+// (suspenseDelta, curiosityDelta, emotionalShift, relationshipShifts) and revelation at four
+// (curiosityDelta, emotionalShift, suspenseDelta, relationshipShifts). CONFLICT_CLOCK_STAGING_
+// AFTERMATH_VOID and CONFLICT_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID give clockRaised its
+// fifth and sixth channels (visualBeats, dialogueHighlights), completing full six-channel
+// saturation for this trigger. CONFLICT_REVELATION_STAGING_AFTERMATH_VOID gives revelation its
+// fifth channel (visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6683,6 +6690,86 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1136c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1136c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the conflict's clock isolated from the interpersonal stakes it should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1108), CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1122), CONFLICT_CLOCK_EMOTIONAL_
+  // AFTERMATH_VOID, and CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 1136, same trigger paired
+  // with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) — this is the fifth
+  // checkAftermathVoid-based channel for this trigger.
+  {
+    const r1150a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1150a.fires) {
+      issues.push({
+        location: `${r1150a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1150a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1150a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the conflict's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded dialogue
+  // highlight, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath carries no
+  // standout line of dialogue, while such lines occur elsewhere. Distinct from CONFLICT_CLOCK_
+  // SUSPENSE_AFTERMATH_VOID (Wave 1108), CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1122),
+  // CONFLICT_CLOCK_EMOTIONAL_AFTERMATH_VOID, CONFLICT_CLOCK_RELATIONAL_AFTERMATH_VOID (Wave
+  // 1136), and CONFLICT_CLOCK_STAGING_AFTERMATH_VOID (this wave, same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts/visualBeats) — this is the
+  // sixth and final consequence channel for this trigger, completing full six-channel saturation.
+  {
+    const r1150b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1150b.fires) {
+      issues.push({
+        location: `${r1150b.triggerCount} clock-raise scene(s) — no dialogue highlight within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1150b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no standout line of dialogue, even though ${r1150b.aftermathCount} such lines occur elsewhere in the script. A deadline tightening without earning a memorable exchange in its wake leaves the conflict's clock registering as narrated urgency the dialogue itself never rises to meet.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a standout line that responds to the mounting pressure, so the deadline lands in what people say, not just in what happens.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from CONFLICT_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1108), CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_
+  // VOID, CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1122), and CONFLICT_REVELATION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1136, same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts) — this is the fifth checkAftermathVoid-
+  // based channel for this trigger.
+  {
+    const r1150c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1150c.fires) {
+      issues.push({
+        location: `${r1150c.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'CONFLICT_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1150c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1150c.aftermathCount} such scenes exist elsewhere in the script. A revelation that never earns a visually charged follow-through leaves the conflict layer's disclosures registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
       });
     }
   }
