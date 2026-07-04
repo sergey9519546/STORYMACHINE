@@ -537,6 +537,18 @@
 // standard channel). CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives payoffSetupIds a
 // fifth channel (previously paired with emotionalShift/relationshipShifts/suspenseDelta/
 // curiosityDelta, now also paired with dialogueHighlights).
+// Wave 1091 additions (closes the thirty-sixth rotation cycle, 1078-1091): CAUSALITY_PAYOFF_
+// STAGING_AFTERMATH_VOID gives payoffSetupIds its sixth and final channel (previously paired
+// with emotionalShift/relationshipShifts/suspenseDelta/curiosityDelta/dialogueHighlights, now
+// also paired with visualBeats), completing full six-channel saturation for all four of this
+// pass's main triggers (raise_stakes, seededClueIds, unresolvedClues-debt, payoffSetupIds). With
+// those exhausted, this wave introduces two genuinely fresh sequence/aftermath triggers — neither
+// clockRaised nor dramaticTurn has ever anchored the isTrigger side of a checkAftermathVoid check
+// in this file, though both are used extensively elsewhere (clockRaised: zone-cluster/drought-run/
+// zone-imbalance; dramaticTurn: zone-cluster/zone-imbalance/drought-run, plus as the AFTERMATH
+// side of STATED_BELIEF_DRAMATIC_TURN_AFTERMATH_VOID). CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID
+// pairs clockRaised with curiosityDelta; CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID pairs
+// dramaticTurn with suspenseDelta — each a first consequence channel for its trigger.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6345,6 +6357,84 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1077c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1077c.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the causal chain's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
         suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath has no heavily-staged scene, while such staging
+  // occurs elsewhere. Distinct from CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID, CAUSALITY_PAYOFF_
+  // RELATIONAL_AFTERMATH_VOID, CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID, CAUSALITY_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID, and CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same
+  // trigger paired with emotionalShift/relationshipShifts/suspenseDelta/curiosityDelta/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation for all four of this pass's main triggers.
+  {
+    const r1091a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1091a.fires) {
+      issues.push({
+        location: `${r1091a.triggerCount} payoff scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1091a.triggerCount} payoff scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1091a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a visually charged follow-through leaves the causal chain's payoffs registering as narrated closure rather than something the story visibly dwells on.`,
+        suggestedFix: `After at least one payoff, stage at least two concrete visual beats in one of the following two scenes, so the resolution registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised check in this
+  // file (CAUSALITY_CLOCK_ZONE_CLUSTER, CAUSALITY_CLOCK_DROUGHT_RUN, CAUSALITY_CLOCK_ZONE_
+  // IMBALANCE — all distribution/timing or run-based, none sequence/aftermath) — this is the
+  // first check to use clockRaised as a checkAftermathVoid trigger in this pass.
+  {
+    const r1091b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1091b.fires) {
+      issues.push({
+        location: `${r1091b.triggerCount} clock-raise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1091b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1091b.aftermathCount} such rises occur elsewhere. Time pressure that never reopens the field of questions right after it tightens leaves the causal chain's clock feeling like a countdown alone, disconnected from what the reader still wants to know.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface so the ticking clock also deepens curiosity, not just urgency.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while
+  // such rises occur elsewhere. Distinct from CAUSALITY_TURN_ZONE_CLUSTER and CAUSALITY_TURN_
+  // ZONE_IMBALANCE (distribution/timing, not sequence/aftermath) and from STATED_BELIEF_
+  // DRAMATIC_TURN_AFTERMATH_VOID (which uses dramaticTurn as the AFTERMATH signal for a
+  // dialogueHighlights trigger, the reverse causal direction) — this is the first check to use
+  // dramaticTurn as a checkAftermathVoid TRIGGER in this pass.
+  {
+    const r1091c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1091c.fires) {
+      issues.push({
+        location: `${r1091c.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1091c.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1091c.aftermathCount} such rises occur elsewhere. A pivot that never re-tightens tension right after it happens leaves the causal chain's turns registering as isolated events rather than links that keep pulling the story forward.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new tension rise so the pivot's consequences keep pressing on the story instead of settling immediately.`,
       });
     }
   }

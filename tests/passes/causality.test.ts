@@ -1247,6 +1247,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1091 — causalityPass: causality payoff-staging aftermath void, causality clock-curiosity aftermath void, causality turn-suspense aftermath void', async () => {
+    const runCA1091 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff has no heavily-staged scene within 2 scenes', async () => {
+      const recs1091a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1091(recs1091a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID'), 'CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by a heavily-staged scene within 2 scenes', async () => {
+      const recs1091an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1091(recs1091an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID'), 'CAUSALITY_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID fires when every clock-raise has no curiosity rise within 2 scenes', async () => {
+      const recs1091b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runCA1091(recs1091b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when a clock-raise is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1091bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runCA1091(recs1091bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn has no suspense rise within 2 scenes', async () => {
+      const recs1091c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runCA1091(recs1091c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID'), 'CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within 2 scenes', async () => {
+      const recs1091cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runCA1091(recs1091cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID'), 'CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1077 — causalityPass: causality seed-staging aftermath void, causality open-thread-staging aftermath void, causality payoff-dialogue-highlight aftermath void', async () => {
     const runCA1077 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
