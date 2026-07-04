@@ -438,6 +438,12 @@
 // introduced), STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta, distinct
 // from the boolean field above), and STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts
 // array, distinct from all previously audited arrays in this pass).
+// Wave 989 additions: STRUCTURE_SEED_ZONE_IMBALANCE (seededClueIds array) and STRUCTURE_TURN_ZONE_
+// IMBALANCE (dramaticTurn !== 'nothing') — the last two clean trio-complete zone-imbalance
+// candidates in this pass (STRUCTURE_STAGING was skipped: its cluster/drought predicates disagree,
+// >=2 vs >0 visualBeats). With zone-imbalance now down to just these two, this wave completes the
+// trio with one aftermath-void pairing: STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
+// curiosityDelta), the first use of raise_stakes as an aftermath-void trigger in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5470,6 +5476,78 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r975c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName975c} contains ${r975c.counts[r975c.bloatZoneIdx]} of them (${Math.round((r975c.counts[r975c.bloatZoneIdx] / r975c.totalCount) * 100)}%) while ${emptyNames975c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, leaving the story's architecture lopsided around where relationships move.`,
         suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames975c} — a relationship shift so the structure keeps carrying relational movement across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SEED_ZONE_IMBALANCE — Underweight/bloat × seededClueIds array × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seed scenes total,
+  // divided across four equal structural zones. Distinct from the existing 3-zone STRUCTURE_SEED_
+  // ZONE_CLUSTER and run-based STRUCTURE_SEED_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to this channel.
+  {
+    const r989a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r989a.fires) {
+      const emptyNames989a = r989a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName989a = FOUR_ZONE_NAMES[r989a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames989a} empty; ${bloatName989a} has ${r989a.counts[r989a.bloatZoneIdx]}/${r989a.totalCount} seed scenes`,
+        rule: 'STRUCTURE_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r989a.totalCount} clue-planting scenes are unevenly distributed across its four structural zones: ${bloatName989a} contains ${r989a.counts[r989a.bloatZoneIdx]} of them (${Math.round((r989a.counts[r989a.bloatZoneIdx] / r989a.totalCount) * 100)}%) while ${emptyNames989a} contains none. Foreshadowing bloats in one structural quarter and never plants in another, leaving the story's architecture lopsided around where future payoffs are seeded.`,
+        suggestedFix: `Redistribute foreshadowing: plant a clue in at least one scene inside the empty zone(s) — ${emptyNames989a} — so the structure keeps seeding future payoffs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // dramatic-turn scenes total, divided across four equal structural zones. Distinct from the
+  // existing 3-zone STRUCTURE_TURN_ZONE_CLUSTER and run-based STRUCTURE_TURN_DROUGHT_RUN — the
+  // last of this pass's two remaining clean trio-complete signals (STRUCTURE_STAGING was skipped:
+  // its cluster (visualBeats.length>=2) and drought-run (visualBeats.length>0) predicates
+  // disagree, so its "trio" doesn't actually audit one consistent signal).
+  {
+    const r989b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r989b.fires) {
+      const emptyNames989b = r989b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName989b = FOUR_ZONE_NAMES[r989b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames989b} empty; ${bloatName989b} has ${r989b.counts[r989b.bloatZoneIdx]}/${r989b.totalCount} dramatic-turn scenes`,
+        rule: 'STRUCTURE_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r989b.totalCount} dramatic-turn scenes are unevenly distributed across its four structural zones: ${bloatName989b} contains ${r989b.counts[r989b.bloatZoneIdx]} of them (${Math.round((r989b.counts[r989b.bloatZoneIdx] / r989b.totalCount) * 100)}%) while ${emptyNames989b} contains none. Pivots bloat in one structural quarter and never land in another, leaving the story's architecture lopsided around where reversals occur.`,
+        suggestedFix: `Redistribute pivots: give at least one scene inside the empty zone(s) — ${emptyNames989b} — a dramatic turn so the structure keeps pivoting across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now exhausted down to the two
+  // signals above, this wave completes the trio via the sequence/aftermath mode. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying stakes-raise scenes
+  // (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every stakes-raise's two-scene aftermath opens no new curiosity, while curiosity
+  // does occur elsewhere. The existing aftermath-void rules in this pass use payoffSetupIds,
+  // dramaticTurn, and unresolvedClues as triggers — this is the first use of raise_stakes.
+  {
+    const r989c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r989c.fires) {
+      issues.push({
+        location: `${r989c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r989c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r989c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger that never provokes a new uncertainty about what comes next leaves the story's architecture with an escalation beat that doesn't propel the next section forward.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps propelling the structure forward rather than sitting in a learnable void.`,
       });
     }
   }

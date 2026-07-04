@@ -1006,6 +1006,70 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 989 — structurePass: structure seed zone imbalance, structure turn zone imbalance, structure stakes-curiosity aftermath void', async () => {
+    const runST989 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('STRUCTURE_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seed scenes', async () => {
+      const recs989a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runST989(recs989a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_ZONE_IMBALANCE'), 'STRUCTURE_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_SEED_ZONE_IMBALANCE does not fire when seed scenes touch every zone', async () => {
+      const recs989an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runST989(recs989an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_ZONE_IMBALANCE'), 'STRUCTURE_SEED_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs989b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST989(recs989b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_ZONE_IMBALANCE'), 'STRUCTURE_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs989bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runST989(recs989bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_ZONE_IMBALANCE'), 'STRUCTURE_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: curiosity raised only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: curiosity raised at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs989c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST989(recs989c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs989cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST989(recs989cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 975 — structurePass: structure clock zone imbalance, structure clock delta zone imbalance, structure relationship zone imbalance', async () => {
     const runST975 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
