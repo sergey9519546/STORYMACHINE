@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1143 — structurePass: structure clock-staging aftermath void, structure turn-staging aftermath void, structure suspense-curiosity aftermath void', async () => {
+    const runST1143 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1143a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by a heavily-staged scene within its window', async () => {
+      const recs1143an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID'), 'STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1143b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_STAGING_AFTERMATH_VOID'), 'STRUCTURE_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a heavily-staged scene within its window', async () => {
+      const recs1143bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_STAGING_AFTERMATH_VOID'), 'STRUCTURE_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no curiosity rise', async () => {
+      const recs1143c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID does not fire when a suspense-rise is followed by a curiosity rise within its window', async () => {
+      const recs1143cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1143(recs1143cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1129 — structurePass: structure clock-suspense aftermath void, structure clock-relational aftermath void, structure clock-dialogue-highlight aftermath void', async () => {
     const runST1129 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

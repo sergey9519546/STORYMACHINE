@@ -519,6 +519,15 @@
 // STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_
 // VOID give it its third, fourth, and fifth channels (suspenseDelta, relationshipShifts,
 // dialogueHighlights).
+// Wave 1143 additions: clockRaised and dramaticTurn were each at five of six channels
+// (dramaticTurn's five spanning both legacy TURN_AFTERMATH_*_VOID and modern STRUCTURE_TURN_*
+// rule names for the same suspenseDelta/curiosityDelta/emotionalShift channels, plus
+// relationshipShifts and dialogueHighlights). STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID and
+// STRUCTURE_TURN_STAGING_AFTERMATH_VOID give each its sixth and final channel (visualBeats),
+// completing full saturation for both triggers. With every tracked trigger in this pass now
+// exhausted, STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID introduces suspenseDelta as a
+// genuinely fresh checkAftermathVoid trigger — it has only ever appeared as an aftermath
+// channel or isPresent condition in this file, never as the isTrigger side of a check.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6382,6 +6391,85 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1129c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no memorable line, even though ${r1129c.aftermathCount} such lines exist elsewhere in the script. A deadline that tightens without earning a line that reckons with it leaves the structure's clock voiced only in narration, never in what a character says.`,
         suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs, so the pressure registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from STRUCTURE_CLOCK_CURIOSITY_AFTERMATH_VOID,
+  // the hand-rolled CLOCK_AFTERMATH_EMOTION_VOID, STRUCTURE_CLOCK_SUSPENSE_AFTERMATH_VOID,
+  // STRUCTURE_CLOCK_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_CLOCK_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with curiosityDelta/emotionalShift/suspenseDelta/
+  // relationshipShifts/dialogueHighlights) — this is the sixth and final consequence channel
+  // for this trigger, completing full saturation.
+  {
+    const r1143a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1143a.fires) {
+      issues.push({
+        location: `${r1143a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'STRUCTURE_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1143a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1143a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the structure's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath has no heavily-staged scene, while
+  // such staging occurs elsewhere. Distinct from STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID,
+  // STRUCTURE_TURN_RELATIONAL_AFTERMATH_VOID, STRUCTURE_TURN_EMOTIONAL_AFTERMATH_VOID,
+  // STRUCTURE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, and STRUCTURE_TURN_SUSPENSE_AFTERMATH_
+  // VOID (same trigger paired with curiosityDelta/relationshipShifts/emotionalShift/
+  // dialogueHighlights/suspenseDelta) — this is the sixth and final consequence channel for
+  // this trigger, completing full saturation.
+  {
+    const r1143b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1143b.fires) {
+      issues.push({
+        location: `${r1143b.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'STRUCTURE_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1143b.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1143b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the structure's turns registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries
+  // no rise in curiosity, while such rises occur elsewhere. Distinct from every existing
+  // suspenseDelta check in this file (all aftermath-channel or zone/drought-run uses, none as a
+  // checkAftermathVoid trigger) — this is the first check to use suspenseDelta as a trigger in
+  // this pass.
+  {
+    const r1143c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1143c.fires) {
+      issues.push({
+        location: `${r1143c.triggerCount} suspense-spike scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1143c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1143c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the structure's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
       });
     }
   }
