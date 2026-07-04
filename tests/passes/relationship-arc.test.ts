@@ -1376,6 +1376,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 973 — relationshipArcPass: relational clock zone imbalance, relational clock delta zone imbalance, relational turn zone imbalance', async () => {
+    const runRA973 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('RELATIONAL_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs973a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 1, 2, 8, 9].includes(i) }));
+      const res = await runRA973(recs973a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_ZONE_IMBALANCE'), 'RELATIONAL_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs973an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 3, 5, 8].includes(i) }));
+      const res = await runRA973(recs973an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_ZONE_IMBALANCE'), 'RELATIONAL_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs973b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runRA973(recs973b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE'), 'RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs973bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runRA973(recs973bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE'), 'RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONAL_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs973c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runRA973(recs973c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_TURN_ZONE_IMBALANCE'), 'RELATIONAL_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs973cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runRA973(recs973cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_TURN_ZONE_IMBALANCE'), 'RELATIONAL_TURN_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 959 — relationshipArcPass: relational suspense zone imbalance, relational revelation zone imbalance, relational seed zone imbalance', async () => {
     const runRA959 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
