@@ -1247,6 +1247,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1007 — causalityPass: causality stakes-suspense aftermath void, causality seed-emotional aftermath void, causality payoff-relational aftermath void', async () => {
+    const runCA1007 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID fires when every stakes-raise has no rise in suspense within 2 scenes', async () => {
+      const recs1007a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runCA1007(recs1007a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID'), 'CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID does not fire when a stakes-raise is followed by rising suspense within 2 scenes', async () => {
+      const recs1007an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runCA1007(recs1007an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID'), 'CAUSALITY_STAKES_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID fires when every seed has no emotional shift within 2 scenes', async () => {
+      const recs1007b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runCA1007(recs1007b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID'), 'CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed is followed by an emotional shift within 2 scenes', async () => {
+      const recs1007bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runCA1007(recs1007bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID'), 'CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID fires when every payoff has no relationship shift within 2 scenes', async () => {
+      const recs1007c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runCA1007(recs1007c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within 2 scenes', async () => {
+      const recs1007cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runCA1007(recs1007cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 993 — causalityPass: causality clock zone imbalance, causality stakes curiosity aftermath void, causality payoff emotional aftermath void', async () => {
     const runCA993 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
