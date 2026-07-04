@@ -486,6 +486,16 @@
 // unresolvedClues). With those exhausted, THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and
 // THEME_STAGED_RELATIONAL_AFTERMATH_VOID extend the visualBeats(>=2)-as-trigger family (previously
 // paired only with curiosityDelta/emotionalShift/suspenseDelta) with its fourth and fifth channels.
+// Wave 1102 additions: THEME_STAGING_REPEAT_AFTERMATH_VOID gives the visualBeats(>=2)-as-trigger
+// family its sixth and final channel (previously paired with curiosityDelta/emotionalShift/
+// suspenseDelta/dialogueHighlights/relationshipShifts, now also paired with a further heavily-
+// staged scene elsewhere), completing full six-channel saturation for all four of this pass's
+// main triggers (raise_stakes, seededClueIds, unresolvedClues, visualBeats-staged). With those
+// exhausted, this wave introduces two triggers as fresh checkAftermathVoid subjects for the
+// first time in this pass — payoffSetupIds and clockRaised have only ever anchored zone-
+// imbalance/zone-cluster/drought-run checks here, never sequence/aftermath: THEME_PAYOFF_
+// CURIOSITY_AFTERMATH_VOID pairs payoffSetupIds with curiosityDelta, and THEME_CLOCK_SUSPENSE_
+// AFTERMATH_VOID pairs clockRaised with suspenseDelta.
 // Wave 1074 additions: raise_stakes and seededClueIds each reach full six-channel saturation:
 // THEME_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/
 // suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights, now also paired with
@@ -6264,6 +6274,83 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every heavily-staged scene (${r1088c.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1088c.aftermathCount} such scenes exist elsewhere in the script. Visual spectacle that never moves how characters stand with each other registers as scenery the theme doesn't get to act through.`,
         suggestedFix: `In the two scenes following at least one heavily-staged moment, let it shift how a pair of characters relate, so the theme's imagery has interpersonal consequence, not just visual weight.`,
+      });
+    }
+  }
+
+  // THEME_STAGING_REPEAT_AFTERMATH_VOID — Sequence/aftermath × visually-staged
+  // (visualBeats.length>=2) trigger → visualBeats (any, length>=2) absence. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying staged scenes
+  // (pos<n-2), ≥2 scenes anywhere with a heavily-staged visual beat, 2-scene lookahead. Fires
+  // when every heavily-staged scene's two-scene aftermath has no further heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from THEME_STAGING_CURIOSITY_AFTERMATH_VOID,
+  // THEME_STAGING_EMOTIONAL_AFTERMATH_VOID, THEME_STAGING_SUSPENSE_AFTERMATH_VOID, THEME_STAGED_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, and THEME_STAGED_RELATIONAL_AFTERMATH_VOID (same trigger
+  // paired with curiosityDelta/emotionalShift/suspenseDelta/dialogueHighlights/relationshipShifts
+  // respectively) — this is the sixth and final consequence channel for this trigger, completing
+  // full six-channel saturation for all four of this pass's main triggers.
+  {
+    const r1102a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1102a.fires) {
+      issues.push({
+        location: `${r1102a.triggerCount} heavily-staged scene(s) — no further heavily-staged scene within 2 scenes of any`,
+        rule: 'THEME_STAGING_REPEAT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every heavily-staged scene (${r1102a.triggerCount} instances) is followed by two scenes with no further heavily-staged visual beat, even though ${r1102a.aftermathCount} such scenes exist elsewhere in the script. A moment of visual spectacle that never echoes or builds toward another leaves the theme's imagery registering as an isolated flourish rather than a visual motif the story keeps returning to.`,
+        suggestedFix: `In the two scenes following at least one heavily-staged moment, stage another visually dense beat, so the theme's imagery accumulates into a recognizable visual motif rather than standing alone.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in curiosity, while such rises
+  // occur elsewhere. Distinct from every existing payoffSetupIds check in this file (all zone-
+  // imbalance/zone-cluster/drought-run, distribution/timing or run-based modes, none sequence/
+  // aftermath) — this is the first check to use payoffSetupIds as a checkAftermathVoid trigger
+  // in this pass.
+  {
+    const r1102b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1102b.fires) {
+      issues.push({
+        location: `${r1102b.triggerCount} payoff scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1102b.triggerCount} payoff scenes is followed by two scenes with no rise in curiosity, even though ${r1102b.aftermathCount} such rises occur elsewhere. A resolved setup that never reopens the field of questions right after it lands leaves the theme's payoffs feeling like closed loops rather than developments that keep generating new stakes.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new question surface so the theme's payoffs keep generating curiosity instead of settling into resolution.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised check in this
+  // file (all zone-imbalance/zone-cluster, distribution/timing modes, none sequence/aftermath) —
+  // this is the first check to use clockRaised as a checkAftermathVoid trigger in this pass.
+  {
+    const r1102c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1102c.fires) {
+      issues.push({
+        location: `${r1102c.triggerCount} clock-raise scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'THEME_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1102c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1102c.aftermathCount} such rises occur elsewhere. Time pressure that never re-tightens tension right after it fires leaves the theme's relationship with urgency feeling inert rather than consequential.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new tension rise so the theme's ticking clock keeps the story pressing forward instead of settling into calm.`,
       });
     }
   }

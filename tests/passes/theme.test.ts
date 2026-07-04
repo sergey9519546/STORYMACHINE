@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1102 — themePass: theme staging-repeat aftermath void, theme payoff-curiosity aftermath void, theme clock-suspense aftermath void', async () => {
+    const runT1102 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_STAGING_REPEAT_AFTERMATH_VOID fires when every heavily-staged scene is followed by two scenes with no further heavily-staged scene', async () => {
+      const recs1102a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat three', 'beat four'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAGING_REPEAT_AFTERMATH_VOID'), 'THEME_STAGING_REPEAT_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_STAGING_REPEAT_AFTERMATH_VOID does not fire when a heavily-staged scene is followed by another heavily-staged scene within its window', async () => {
+      const recs1102an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat three', 'beat four'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAGING_REPEAT_AFTERMATH_VOID'), 'THEME_STAGING_REPEAT_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when every payoff is followed by two scenes with no curiosity rise', async () => {
+      const recs1102b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by a curiosity rise within its window', async () => {
+      const recs1102bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_CLOCK_SUSPENSE_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no suspense rise', async () => {
+      const recs1102c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'THEME_CLOCK_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_CLOCK_SUSPENSE_AFTERMATH_VOID does not fire when a clock-raise is followed by a suspense rise within its window', async () => {
+      const recs1102cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1102(recs1102cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'THEME_CLOCK_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1088 — themePass: theme open-thread-staging aftermath void, theme staged-dialogue-highlight aftermath void, theme staged-relational aftermath void', async () => {
     const runT1088 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
