@@ -466,6 +466,13 @@
 // emotionalShift), and THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID gives the unresolvedClues.length
 // > 0 trigger a second channel (previously only paired with emotionalShift via THEME_OPEN_THREAD_
 // EMOTIONAL_AFTERMATH_VOID, now paired with curiosityDelta).
+// Wave 1046 additions: with raise_stakes and seededClueIds now at four channels each, this wave
+// targets the less-saturated triggers: THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID
+// (unresolvedClues.length > 0, previously paired with emotionalShift/curiosityDelta, now a third
+// channel with suspenseDelta), THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (unresolvedClues.length
+// > 0, now a fourth channel with relationshipShifts), and THEME_STAGING_EMOTIONAL_AFTERMATH_VOID
+// (visualBeats.length >= 2, previously only paired with curiosityDelta via THEME_STAGING_
+// CURIOSITY_AFTERMATH_VOID, now paired with emotionalShift for a second channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5927,6 +5934,80 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying an open thread (${r1032c.triggerCount} of them) is followed by two scenes with no rise in curiosity, even though ${r1032c.aftermathCount} such rises occur elsewhere. An unresolved question that never sharpens into fresh intrigue right after it leaves the theme's loose ends stalling rather than deepening the audience's engagement with what the story means.`,
         suggestedFix: `In the two scenes following an open-thread scene, let a new question sharpen the audience's curiosity so the theme's loose ends keep the story's meaning actively unfolding rather than sitting inert.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying open-thread scenes (pos<n-2, unresolvedClues.length>0), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath carries
+  // no suspense rise, while such rises occur elsewhere. Distinct from THEME_OPEN_THREAD_EMOTIONAL_
+  // AFTERMATH_VOID and THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift and curiosityDelta respectively) — this is the third consequence channel for
+  // this trigger.
+  {
+    const r1046a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1046a.fires) {
+      issues.push({
+        location: `${r1046a.triggerCount} open-thread aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an open thread (${r1046a.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1046a.aftermathCount} such rises occur elsewhere. An unresolved question that never tightens the felt sense of danger right after it leaves the theme's loose ends stalling rather than pressuring the story toward what it's really about.`,
+        suggestedFix: `In the two scenes following an open-thread scene, let the tension rise so the theme's unresolved questions keep pressuring the story forward, not just sitting as inert backlog.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying open-thread scenes (pos<n-2, unresolvedClues.length>0), ≥2 relationship-shift
+  // scenes anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath
+  // carries no bond change, while such changes occur elsewhere. Distinct from THEME_OPEN_THREAD_
+  // EMOTIONAL_AFTERMATH_VOID, THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and THEME_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta
+  // respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1046b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1046b.fires) {
+      issues.push({
+        location: `${r1046b.triggerCount} open-thread aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an open thread (${r1046b.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1046b.aftermathCount} such shifts occur elsewhere. An unresolved question that never bears on how characters treat each other nearby leaves the theme's loose ends purely informational rather than something straining the bonds the theme is meant to be examining.`,
+        suggestedFix: `In the two scenes following an open-thread scene, let the unresolved question strain or shift a relationship so the theme's uncertainty tests the characters' bonds, not just their plans.`,
+      });
+    }
+  }
+
+  // THEME_STAGING_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × visualBeats trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying visually-staged scenes (pos<n-2, visualBeats.length>=2), ≥2 emotionally-charged
+  // scenes anywhere, 2-scene lookahead. Fires when every staged scene's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from THEME_STAGING_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with curiosityDelta) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1046c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1046c.fires) {
+      issues.push({
+        location: `${r1046c.triggerCount} staging aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'THEME_STAGING_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every heavily-staged scene in the story (${r1046c.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1046c.aftermathCount} emotionally-charged scenes exist elsewhere. A visually dense moment that never registers as felt in the scenes right after it leaves the theme's imagery decorative rather than something that moves anyone.`,
+        suggestedFix: `In the two scenes following at least one heavily-staged moment, let someone's feelings register what was just visually established so the theme's imagery lands emotionally, not just visually.`,
       });
     }
   }
