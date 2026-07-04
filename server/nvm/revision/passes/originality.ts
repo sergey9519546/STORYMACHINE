@@ -544,6 +544,11 @@
 // ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID give revelation its first two channels
 // (curiosityDelta, suspenseDelta); ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID gives dramaticTurn
 // its first channel (emotionalShift).
+// Wave 1138 additions: revelation was at two of six channels (curiosityDelta, suspenseDelta)
+// and dramaticTurn at one (emotionalShift). ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID
+// gives revelation its third channel (emotionalShift); ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID
+// and ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID give dramaticTurn its second and third channels
+// (suspenseDelta, curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6850,6 +6855,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1124c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1124c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a pivot never registers on any character's felt state right after it happens — a predictable, avoidable absence that leaves the story's turns reading as plot mechanics rather than moments that cost or change anyone anything.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt and the story avoids training the audience to expect its turns to pass through characters untouched.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from ORIGINALITY_REVELATION_CURIOSITY_
+  // AFTERMATH_VOID and ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1124, same trigger
+  // paired with curiosityDelta/suspenseDelta) — this is the third consequence channel for this
+  // trigger.
+  {
+    const r1138a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1138a.fires) {
+      issues.push({
+        location: `${r1138a.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1138a.triggerCount} revelation scenes is followed by two scenes with no emotional shift, even though ${r1138a.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a discovery never registers on any character's felt state right after it lands — a predictable, avoidable absence that leaves each reveal reading as plot mechanics rather than something anyone actually feels.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the discovery lands as something felt, and the story avoids training the audience to expect its reveals to pass through characters untouched.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while
+  // such rises occur elsewhere. Distinct from ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID (Wave
+  // 1124, same trigger paired with emotionalShift) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1138b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1138b.fires) {
+      issues.push({
+        location: `${r1138b.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1138b.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1138b.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a pivot never sharpens danger or uncertainty right after it happens — a predictable, avoidable absence that leaves every turn reading as incident rather than escalation.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, sharpen what's now at risk, so the pivot compounds tension instead of resolving into a flat new normal and training the audience to expect nothing to follow from a reversal.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in curiosity, while
+  // such rises occur elsewhere. Distinct from ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID (Wave
+  // 1124) and ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID (this wave, same trigger paired with
+  // emotionalShift/suspenseDelta) — this is the third consequence channel for this trigger.
+  {
+    const r1138c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1138c.fires) {
+      issues.push({
+        location: `${r1138c.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1138c.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1138c.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a pivot never opens a fresh question right after it happens — a predictable, avoidable absence that leaves every turn registering as a closed event rather than a link that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface from the pivot, so the story keeps generating curiosity instead of settling into the new state of affairs every time.`,
       });
     }
   }
