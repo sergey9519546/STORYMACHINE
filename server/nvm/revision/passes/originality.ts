@@ -518,6 +518,16 @@
 // emotionalShift/curiosityDelta/suspenseDelta, now also paired with dialogueHighlights) and
 // ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (previously paired with curiosityDelta/
 // suspenseDelta/emotionalShift/relationshipShifts, now also paired with dialogueHighlights).
+// Wave 1096 additions: ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its sixth and
+// final channel (previously paired with relationshipShifts/emotionalShift/curiosityDelta/
+// suspenseDelta/dialogueHighlights, now also paired with visualBeats) and ORIGINALITY_SEED_
+// STAGING_AFTERMATH_VOID gives seededClueIds its sixth and final channel (previously paired with
+// curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights, now also
+// paired with visualBeats), completing full six-channel saturation for three of this pass's four
+// main triggers (raise_stakes, clockRaised, seededClueIds). ORIGINALITY_PAYOFF_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID gives payoffSetupIds a fifth channel (previously paired with
+// emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts, now also paired with
+// dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6587,6 +6597,86 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1082c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1082c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a planted clue never earns a memorable line right after it lands — a predictable, avoidable absence that leaves the seed purely mechanical.`,
         suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_
+  // VOID, ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID, ORIGINALITY_CLOCK_CURIOSITY_AFTERMATH_
+  // VOID, ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID, and ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with relationshipShifts/emotionalShift/curiosityDelta/
+  // suspenseDelta/dialogueHighlights respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1096a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1096a.fires) {
+      issues.push({
+        location: `${r1096a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ORIGINALITY_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1096a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1096a.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a clock raise never earns a visually charged follow-through — a predictable, avoidable absence that leaves the urgency registering as narrated pressure rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the ticking clock registers in image, not just in dialogue or plot state.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_SEED_
+  // SUSPENSE_AFTERMATH_VOID, ORIGINALITY_SEED_EMOTIONAL_AFTERMATH_VOID, ORIGINALITY_SEED_
+  // RELATIONAL_AFTERMATH_VOID, and ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same
+  // trigger paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1096b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1096b.fires) {
+      issues.push({
+        location: `${r1096b.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ORIGINALITY_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1096b.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1096b.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a planted clue never earns a visually charged follow-through — a predictable, avoidable absence that leaves the seed feeling like narrated information rather than something the camera dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains
+  // no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ORIGINALITY_
+  // PAYOFF_EMOTIONAL_AFTERMATH_VOID, ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_
+  // PAYOFF_SUSPENSE_AFTERMATH_VOID, and ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID (same
+  // trigger paired with emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1096c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1096c.fires) {
+      issues.push({
+        location: `${r1096c.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ORIGINALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1096c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1096c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a resolved setup never earns a memorable line right after it lands — a predictable, avoidable absence that leaves the payoff registering as structural closure without a voice confirming what it meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, so the payoff has a voice, not just a checked box.`,
       });
     }
   }
