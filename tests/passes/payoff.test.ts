@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1154 — payoffPass: payoff suspense-emotional aftermath void, payoff emotion-curiosity aftermath void, payoff clock-delta-emotional aftermath void', async () => {
+    const runPY1154 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no emotional shift', async () => {
+      const recs1154a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID does not fire when a suspense-rise is followed by an emotional shift within its window', async () => {
+      const recs1154an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID fires when every emotionally-charged scene is followed by two scenes with no curiosity rise', async () => {
+      const recs1154b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID does not fire when an emotionally-charged scene is followed by a curiosity rise within its window', async () => {
+      const recs1154bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID fires when every clock-delta shift is followed by two scenes with no emotional shift', async () => {
+      const recs1154c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-delta shift is followed by an emotional shift within its window', async () => {
+      const recs1154cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1154(recs1154cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1140 — payoffPass: payoff suspense-curiosity aftermath void, payoff emotion-relational aftermath void, payoff clock-delta-curiosity aftermath void', async () => {
     const runPY1140 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

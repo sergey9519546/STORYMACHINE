@@ -532,6 +532,11 @@
 // PAYOFF_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs suspenseDelta with curiosityDelta; PAYOFF_
 // EMOTION_RELATIONAL_AFTERMATH_VOID pairs emotionalShift with relationshipShifts; PAYOFF_CLOCK_
 // DELTA_CURIOSITY_AFTERMATH_VOID pairs clockDelta≠0 with curiosityDelta.
+// Wave 1154 additions: after Wave 1140, suspenseDelta, emotionalShift, and clockDelta≠0 were
+// each at exactly one of six channels. PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID gives
+// suspenseDelta its second channel (emotionalShift); PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID
+// gives emotionalShift its second channel (curiosityDelta); PAYOFF_CLOCK_DELTA_EMOTIONAL_
+// AFTERMATH_VOID gives clockDelta≠0 its second channel (emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6401,6 +6406,78 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1140c.triggerCount} scenes that move the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1140c.aftermathCount} such rises occur elsewhere. A deadline that shifts without opening a new question leaves the payoff machinery's clock registering as a number changing rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one clock-delta shift, let a new question surface from the changing pressure, so the deadline keeps generating curiosity, not just counting.`,
+      });
+    }
+  }
+
+  // PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a non-neutral
+  // emotional shift, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath
+  // registers no emotional shift, while such shifts occur elsewhere. Distinct from PAYOFF_
+  // SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 1140, same trigger paired with curiosityDelta) —
+  // this is the second consequence channel for this trigger.
+  {
+    const r1154a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1154a.fires) {
+      issues.push({
+        location: `${r1154a.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1154a.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1154a.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it lands leaves the payoff machinery's tension reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a character's emotional register shift in response to the danger, so the tension carries felt weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 curiosity-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every emotionally-charged scene's two-scene
+  // aftermath carries no rise in curiosity, while such rises occur elsewhere. Distinct from
+  // PAYOFF_EMOTION_RELATIONAL_AFTERMATH_VOID (Wave 1140, same trigger paired with
+  // relationshipShifts) — this is the second consequence channel for this trigger.
+  {
+    const r1154b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1154b.fires) {
+      issues.push({
+        location: `${r1154b.triggerCount} emotionally-charged scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1154b.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in curiosity, even though ${r1154b.aftermathCount} such rises occur elsewhere. A strong feeling that never opens a fresh question right after it lands leaves the payoff machinery's emotional beats registering as closed moments rather than links that pull the audience forward.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let a new question surface from what the character now feels, so the emotion keeps generating curiosity, not just internal state.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-delta scenes (pos<n-2), ≥2 scenes anywhere with a non-neutral emotional
+  // shift, 2-scene lookahead. Fires when every clock-delta's two-scene aftermath registers no
+  // emotional shift, while such shifts occur elsewhere. Distinct from PAYOFF_CLOCK_DELTA_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1140, same trigger paired with curiosityDelta) — this is
+  // the second consequence channel for this trigger.
+  {
+    const r1154c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1154c.fires) {
+      issues.push({
+        location: `${r1154c.triggerCount} clock-delta scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1154c.triggerCount} scenes that move the ticking clock is followed by two scenes with no emotional shift, even though ${r1154c.aftermathCount} such shifts occur elsewhere. A deadline that shifts without ever registering on a character's felt state leaves the payoff machinery's clock reading as a number changing rather than pressure anyone visibly feels.`,
+        suggestedFix: `In the two scenes following at least one clock-delta shift, let a character's emotional register respond to the changing pressure, so the deadline carries felt weight, not just arithmetic.`,
       });
     }
   }
