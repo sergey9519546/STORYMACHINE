@@ -506,6 +506,11 @@
 // not windowed aftermaths). BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID, BELIEF_REVELATION_
 // SUSPENSE_AFTERMATH_VOID, and BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID give this fresh
 // trigger its first three consequence channels.
+// Wave 1104 additions: BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID, BELIEF_REVELATION_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID, and BELIEF_REVELATION_STAGING_AFTERMATH_VOID give revelation its
+// remaining three channels (emotionalShift, dialogueHighlights, visualBeats respectively),
+// completing full six-channel saturation for all five of this pass's main triggers
+// (raise_stakes, payoffSetupIds, seededClueIds, unresolvedClues-debt, revelation).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6174,6 +6179,84 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1090c.triggerCount} revelation scenes is followed by two scenes with no recorded relationship shift, even though ${r1090c.aftermathCount} such shifts occur elsewhere. A discovery that never moves how characters stand with each other right after it lands leaves the belief layer's revelations registering as private facts rather than something that ripples through the story's relationships.`,
         suggestedFix: `In the two scenes following at least one revelation, let it shift how a pair of characters relate, so the discovery has interpersonal consequence, not just informational weight.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 emotionally-charged scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // emotional shift, while such shifts occur elsewhere. Distinct from BELIEF_REVELATION_
+  // CURIOSITY_AFTERMATH_VOID, BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID, and BELIEF_REVELATION_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // relationshipShifts) — this is the fourth consequence channel for this trigger.
+  {
+    const r1104a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1104a.fires) {
+      issues.push({
+        location: `${r1104a.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1104a.triggerCount} revelation scenes is followed by two scenes with no emotional shift, even though ${r1104a.aftermathCount} such shifts occur elsewhere. A truth that surfaces without registering emotionally right after it lands leaves the belief layer's revelations feeling procedural — information delivered without anyone visibly reacting to what it means.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a character's emotional register shift in response, so the belief layer's discoveries carry felt weight, not just informational weight.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // (non-null) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere
+  // with a highlighted line of dialogue, 2-scene lookahead. Fires when every revelation's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from BELIEF_REVELATION_CURIOSITY_AFTERMATH_VOID, BELIEF_REVELATION_SUSPENSE_
+  // AFTERMATH_VOID, BELIEF_REVELATION_RELATIONAL_AFTERMATH_VOID, and BELIEF_REVELATION_
+  // EMOTIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // relationshipShifts/emotionalShift) — this is the fifth consequence channel for this trigger.
+  {
+    const r1104b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1104b.fires) {
+      issues.push({
+        location: `${r1104b.triggerCount} revelation scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1104b.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1104b.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a memorable line right after it lands leaves the belief layer's revelations unvoiced — no character's speech processes what was just learned.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered, so the belief layer's reckoning with new information registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // BELIEF_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from BELIEF_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID, BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID, BELIEF_REVELATION_RELATIONAL_AFTERMATH_
+  // VOID, and BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID, BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/relationshipShifts/
+  // emotionalShift/dialogueHighlights) — this is the sixth and final consequence channel for
+  // this trigger, completing full saturation.
+  {
+    const r1104c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation !== null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1104c.fires) {
+      issues.push({
+        location: `${r1104c.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'BELIEF_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1104c.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1104c.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a visually charged follow-through leaves the belief layer's revelations registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the discovery registers in image, not just in plot bookkeeping.`,
       });
     }
   }

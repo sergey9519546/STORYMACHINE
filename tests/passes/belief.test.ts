@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1104 — beliefPass: belief revelation-emotional aftermath void, belief revelation-dialogue-highlight aftermath void, belief revelation-staging aftermath void', async () => {
+    const runBF1104 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation has no emotional shift within 2 scenes', async () => {
+      const recs1104a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1104(recs1104a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within 2 scenes', async () => {
+      const recs1104an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1104(recs1104an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every revelation has no highlighted dialogue within 2 scenes', async () => {
+      const recs1104b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1104(recs1104b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a revelation is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1104bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1104(recs1104bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_REVELATION_STAGING_AFTERMATH_VOID fires when every revelation has no heavily-staged scene within 2 scenes', async () => {
+      const recs1104c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1104(recs1104c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_STAGING_AFTERMATH_VOID'), 'BELIEF_REVELATION_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_REVELATION_STAGING_AFTERMATH_VOID does not fire when a revelation is followed by a heavily-staged scene within 2 scenes', async () => {
+      const recs1104cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'the truth about the letter' } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1104(recs1104cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_REVELATION_STAGING_AFTERMATH_VOID'), 'BELIEF_REVELATION_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1090 — beliefPass: belief revelation-curiosity aftermath void, belief revelation-suspense aftermath void, belief revelation-relational aftermath void', async () => {
     const runBF1090 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
