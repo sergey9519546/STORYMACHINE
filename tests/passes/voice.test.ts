@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 1117 — voicePass: voice payoff-dialogue-highlight aftermath void, voice payoff-staging aftermath void, voice revelation-curiosity aftermath void', async () => {
+    const runV1117 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every payoff is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1117a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a payoff is followed by highlighted dialogue within its window', async () => {
+      const recs1117an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1117b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_STAGING_AFTERMATH_VOID'), 'VOICE_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by a heavily-staged scene within its window', async () => {
+      const recs1117bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_STAGING_AFTERMATH_VOID'), 'VOICE_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID fires when every revelation is followed by two scenes with no curiosity rise', async () => {
+      const recs1117c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when a revelation is followed by a curiosity rise within its window', async () => {
+      const recs1117cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1117(recs1117cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1103 — voicePass: voice seed-staging aftermath void, voice stakes-staging aftermath void, voice turn-dialogue-highlight aftermath void', async () => {
     const runV1103 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

@@ -487,6 +487,14 @@
 // and VOICE_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn its remaining channel
 // (dialogueHighlights) — completing full six-channel saturation for three more of this pass's
 // main triggers (clockRaised was already complete as of Wave 1075).
+// Wave 1117 additions: VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and VOICE_PAYOFF_STAGING_
+// AFTERMATH_VOID give payoffSetupIds its fifth and sixth channels (previously paired with
+// relationshipShifts/curiosityDelta/emotionalShift/suspenseDelta, now also paired with
+// dialogueHighlights and visualBeats respectively), completing full six-channel saturation for
+// all five of this pass's tracked triggers. With those exhausted, this wave introduces
+// revelation as a genuinely fresh checkAftermathVoid trigger — it has only ever anchored
+// distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/aftermath:
+// VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6641,6 +6649,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1103c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1103c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a memorable line right after it lands leaves the voice's turns registering as plot mechanics without a voice confirming what changed.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a character voice what just changed — a line worth remembering, not just a structural pivot passing silently.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from VOICE_PAYOFF_
+  // RELATIONAL_AFTERMATH_VOID, VOICE_PAYOFF_CURIOSITY_AFTERMATH_VOID, and VOICE_PAYOFF_
+  // EMOTIONAL_AFTERMATH_VOID, VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID (same trigger paired with
+  // relationshipShifts/curiosityDelta/emotionalShift/suspenseDelta respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1117a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1117a.fires) {
+      issues.push({
+        location: `${r1117a.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1117a.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1117a.aftermathCount} such scenes exist elsewhere. A resolved setup that never earns a memorable line right after it lands leaves the voice's payoffs registering as structural closure without a voice confirming what it meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, so the payoff has a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from VOICE_PAYOFF_RELATIONAL_AFTERMATH_VOID, VOICE_
+  // PAYOFF_CURIOSITY_AFTERMATH_VOID, VOICE_PAYOFF_EMOTIONAL_AFTERMATH_VOID, VOICE_PAYOFF_
+  // SUSPENSE_AFTERMATH_VOID, and VOICE_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger
+  // paired with relationshipShifts/curiosityDelta/emotionalShift/suspenseDelta/
+  // dialogueHighlights respectively) — this is the sixth and final consequence channel for this
+  // trigger, completing full saturation.
+  {
+    const r1117b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1117b.fires) {
+      issues.push({
+        location: `${r1117b.triggerCount} payoff scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'VOICE_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1117b.triggerCount} payoff scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1117b.aftermathCount} such scenes exist elsewhere. A resolved setup that never earns a visually charged follow-through leaves the voice's payoffs registering as narrated closure rather than something the story visibly dwells on.`,
+        suggestedFix: `After at least one payoff, stage at least two concrete visual beats in one of the following two scenes, so the resolution registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing revelation check in this file
+  // (all zone-imbalance/zone-cluster, distribution/timing modes, none sequence/aftermath) —
+  // this is the first check to use revelation as a checkAftermathVoid trigger in this pass.
+  {
+    const r1117c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1117c.fires) {
+      issues.push({
+        location: `${r1117c.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1117c.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1117c.aftermathCount} such rises occur elsewhere. A truth that surfaces without reopening the field of questions right after it lands leaves the voice's reckoning with new information feeling like a closed fact rather than a development that keeps generating new stakes.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface so the voice's discoveries keep generating curiosity instead of settling the matter entirely.`,
       });
     }
   }
