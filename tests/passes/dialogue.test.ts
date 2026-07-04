@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1120 — dialoguePass: dialogue clock-suspense aftermath void, dialogue clock-highlight aftermath void, dialogue turn-emotional aftermath void', async () => {
+    const makeRec1120 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1120 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1120 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no suspense rise', async () => {
+      const records1120a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1120(i, { suspenseDelta: 1 });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID does not fire when a clock-raise is followed by a suspense rise within its window', async () => {
+      const records1120an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1120(i, { suspenseDelta: 1 });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const records1120b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1120(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const records1120bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1120(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no emotional shift', async () => {
+      const records1120c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1120(i, { emotionalShift: 'positive' });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by an emotional shift within its window', async () => {
+      const records1120cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1120(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1120(i, { emotionalShift: 'positive' });
+        return makeRec1120(i);
+      });
+      const res = await runD1120(buildScenes1120(10), records1120cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1106 — dialoguePass: dialogue clock-emotional aftermath void, dialogue clock-relational aftermath void, dialogue turn-curiosity aftermath void', async () => {
     const makeRec1106 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

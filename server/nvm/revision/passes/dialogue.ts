@@ -534,6 +534,12 @@
 // emotionalShift and relationshipShifts respectively (second and third channels for this
 // trigger), and DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with curiosityDelta
 // (second channel for this trigger).
+// Wave 1120 additions (opens the thirty-ninth rotation cycle for this pass): clockRaised is now
+// three channels deep (curiosityDelta/emotionalShift/relationshipShifts) and dramaticTurn two
+// (suspenseDelta/curiosityDelta) -- this wave advances both toward saturation.
+// DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID pairs clockRaised with suspenseDelta (fourth channel)
+// and DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID pairs it with dialogueHighlights (fifth channel);
+// DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID pairs dramaticTurn with emotionalShift (third channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6555,6 +6561,81 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1106c.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1106c.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question right after it happens leaves the dialogue layer's turns registering as closed events rather than links that generate the next thing to wonder about.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface -- in dialogue or event -- so the pivot keeps generating curiosity instead of settling into the new state of affairs.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID -- Sequence/aftermath x clockRaised trigger ->
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying clock-raise scenes (pos<n-2), >=2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1092), DIALOGUE_CLOCK_EMOTIONAL_AFTERMATH_VOID, and DIALOGUE_CLOCK_RELATIONAL_
+  // AFTERMATH_VOID (Wave 1106, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts) -- this is the fourth consequence channel for this trigger.
+  {
+    const r1120a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1120a.fires) {
+      issues.push({
+        location: `${r1120a.triggerCount} clock-raise scene(s) -- no suspense rise within 2 scenes of any`,
+        rule: 'DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1120a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1120a.aftermathCount} such rises occur elsewhere. A deadline that tightens without making the outcome feel more threatening leaves the dialogue layer's clock registering as a schedule rather than a source of dread the characters voice.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, sharpen what's at risk if the deadline is missed, so the tightening clock is felt as danger, not just noted as a fact.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID -- Sequence/aftermath x clockRaised trigger ->
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n>=8, >=2 qualifying clock-raise scenes (pos<n-2), >=2 highlighted-dialogue scenes anywhere,
+  // 2-scene lookahead. Fires when every clock-raise's two-scene aftermath has no memorable line,
+  // while such lines occur elsewhere. Distinct from DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID,
+  // DIALOGUE_CLOCK_EMOTIONAL_AFTERMATH_VOID, DIALOGUE_CLOCK_RELATIONAL_AFTERMATH_VOID, and
+  // DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift/relationshipShifts/suspenseDelta) -- this is the fifth consequence channel for
+  // this trigger, and the first that pairs clockRaised with this pass's own central signal.
+  {
+    const r1120b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1120b.fires) {
+      issues.push({
+        location: `${r1120b.triggerCount} clock-raise scene(s) -- no highlighted dialogue within 2 scenes of any`,
+        rule: 'DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1120b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no memorable line, even though ${r1120b.aftermathCount} such lines exist elsewhere in the script. A deadline that tightens without earning a line that reckons with it leaves the clock voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs, so the pressure registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID -- Sequence/aftermath x dramaticTurn trigger ->
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying dramatic-turn scenes (pos<n-2), >=2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no emotional shift, while such
+  // shifts occur elsewhere. Distinct from DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1092) and
+  // DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1106, same trigger paired with suspenseDelta/
+  // curiosityDelta) -- this is the third consequence channel for this trigger.
+  {
+    const r1120c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1120c.fires) {
+      issues.push({
+        location: `${r1120c.triggerCount} dramatic-turn aftermath(s) -- no emotional shift within 2 scenes`,
+        rule: 'DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1120c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1120c.aftermathCount} such shifts occur elsewhere. A pivot that never registers on any character's felt emotional state leaves the dialogue layer's turns reading as plot mechanics rather than moments that change how someone feels.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt, not just something that happened.`,
       });
     }
   }
