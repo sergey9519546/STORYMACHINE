@@ -456,6 +456,11 @@
 // question-raising delta beside Wave 942's suspense one), ORIGINALITY_OPEN_THREAD_ZONE_IMBALANCE
 // (unresolvedClues.length > 0 — an open-thread array beside 942's payoff one), and ORIGINALITY_
 // REVELATION_ZONE_IMBALANCE (revelation != null — the revelation string field, a new class).
+// Wave 970 additions: auditing the three remaining trio-complete signals in this pass, spanning three
+// distinct classes: ORIGINALITY_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array), ORIGINALITY_
+// CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta distinct from the curiosity/suspense ones
+// audited in Wave 942/956), and ORIGINALITY_EMOTION_ZONE_IMBALANCE (emotionalShift !== 'neutral' —
+// the any-direction valence signal, distinct from the separate positive/negative-emotion rules).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5855,6 +5860,79 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r956c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName956c} contains ${r956c.counts[r956c.bloatZoneIdx]} of them (${Math.round((r956c.counts[r956c.bloatZoneIdx] / r956c.totalCount) * 100)}%) while ${emptyNames956c} contains none — a predictable disclosure rhythm the audience can learn to anticipate rather than revelations distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames956c} — so where new truth surfaces stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // ORIGINALITY_RELATIONSHIP_ZONE_CLUSTER and run-based ORIGINALITY_RELATIONSHIP_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the relationshipShifts array field.
+  {
+    const r970a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r970a.fires) {
+      const emptyNames970a = r970a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName970a = FOUR_ZONE_NAMES[r970a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames970a} empty; ${bloatName970a} has ${r970a.counts[r970a.bloatZoneIdx]}/${r970a.totalCount} relationship-shift scenes`,
+        rule: 'ORIGINALITY_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r970a.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName970a} contains ${r970a.counts[r970a.bloatZoneIdx]} of them (${Math.round((r970a.counts[r970a.bloatZoneIdx] / r970a.totalCount) * 100)}%) while ${emptyNames970a} contains none — a predictable relational shape the audience can learn to anticipate rather than bond-changes distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames970a} — a relationship shift so where bonds change stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta !== 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-moving scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockDelta !== 0 predicate as the existing
+  // 3-zone ORIGINALITY_CLOCK_DELTA_ZONE_CLUSTER and run-based ORIGINALITY_CLOCK_DELTA_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this delta signal.
+  {
+    const r970b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r970b.fires) {
+      const emptyNames970b = r970b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName970b = FOUR_ZONE_NAMES[r970b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames970b} empty; ${bloatName970b} has ${r970b.counts[r970b.bloatZoneIdx]}/${r970b.totalCount} clock-moving scenes`,
+        rule: 'ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r970b.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName970b} contains ${r970b.counts[r970b.bloatZoneIdx]} of them (${Math.round((r970b.counts[r970b.bloatZoneIdx] / r970b.totalCount) * 100)}%) while ${emptyNames970b} contains none — a predictable urgency shape the audience can learn to anticipate rather than deadline pressure distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames970b} — so where deadline pressure moves stays less predictable across the story's whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_EMOTION_ZONE_IMBALANCE — Underweight/bloat × (emotionalShift !== 'neutral') × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 emotionally
+  // charged scenes total (positive or negative), divided across four equal structural zones. Fires
+  // only when one zone has zero such scenes while another holds ≥50% of the total. Uses the same
+  // emotionalShift !== 'neutral' predicate as the existing 3-zone ORIGINALITY_EMOTION_ZONE_CLUSTER and
+  // run-based ORIGINALITY_EMOTION_DROUGHT_RUN — the any-direction valence signal, distinct from the
+  // separate POSITIVE_EMOTION and NEGATIVE_EMOTION zone-imbalance rules already covering each direction.
+  {
+    const r970c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r970c.fires) {
+      const emptyNames970c = r970c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName970c = FOUR_ZONE_NAMES[r970c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames970c} empty; ${bloatName970c} has ${r970c.counts[r970c.bloatZoneIdx]}/${r970c.totalCount} emotionally-charged scenes`,
+        rule: 'ORIGINALITY_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r970c.totalCount} emotionally-charged scenes are unevenly distributed across its four structural zones: ${bloatName970c} contains ${r970c.counts[r970c.bloatZoneIdx]} of them (${Math.round((r970c.counts[r970c.bloatZoneIdx] / r970c.totalCount) * 100)}%) while ${emptyNames970c} contains none — a predictable emotional rhythm the audience can learn to anticipate rather than feeling distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute feeling: give at least one scene inside the empty zone(s) — ${emptyNames970c} — an emotional shift (positive or negative) so where the story carries feeling stays less predictable across its whole shape.`,
       });
     }
   }
