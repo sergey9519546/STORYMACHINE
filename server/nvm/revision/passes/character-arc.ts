@@ -487,6 +487,16 @@
 // distinct from the existing suspense → curiosity pairing), ARC_CLOCK_STAGING_AFTERMATH_VOID (clock →
 // staging, distinct from clock → curiosity/relational), and ARC_PAYOFF_STAGING_AFTERMATH_VOID (payoff
 // → staging, distinct from payoff → curiosity/emotional).
+// Wave 995 additions: re-auditing the cluster/drought inventory turned up two consistent-predicate
+// trio-complete signals that Wave 967's saturation claim missed — ARC_CLOCK (clockRaised===true,
+// used identically by the hand-rolled ARC_CLOCK_DROUGHT_RUN and ARC_CLOCK_ZONE_CLUSTER) and
+// ARC_HIGHLIGHT (dialogueHighlights.length>0, identical in both). ARC_CLOCK_ZONE_IMBALANCE and
+// ARC_HIGHLIGHT_ZONE_IMBALANCE complete their trios with the 4-zone bloat+empty-zone mode.
+// (ARC_STAGING was checked and excluded: its cluster rule uses visualBeats.length>=2 while its
+// drought rule uses >0 — an inconsistent pair, same class of issue seen elsewhere in this
+// rotation.) With zone-imbalance now genuinely exhausted, ARC_STAKES_CURIOSITY_AFTERMATH_VOID
+// completes the trio: raise_stakes, already paired with relationshipShifts (Wave 917), now paired
+// with curiosityDelta for the first time in this pass's ~17-rule aftermath-void family.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5630,6 +5640,79 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r981c.triggerCount} cashed-in setups) is followed by two visually inert scenes, even though ${r981c.aftermathCount} scenes elsewhere do carry substantial staging. Cashing in a setup should usually register physically as well as narratively — a look, a gesture, a beat played in the body. When every payoff's aftermath is visually flat, the arc's callbacks land as information rather than lived moments.`,
         suggestedFix: `Let at least one payoff provoke visible staging in its aftermath: in the scene or two after a setup pays off, let the moment register physically — a gesture, a changed posture, a beat played through the body rather than only through what's said.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_ZONE_IMBALANCE — Underweight/bloat × clockRaised boolean × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising scenes
+  // total, divided across four equal structural zones. Uses the same clockRaised === true
+  // predicate as the hand-rolled ARC_CLOCK_ZONE_CLUSTER and ARC_CLOCK_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this channel, recovered from Wave 967's
+  // overly hasty exhaustion claim.
+  {
+    const r995a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r995a.fires) {
+      const emptyNames995a = r995a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName995a = FOUR_ZONE_NAMES[r995a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames995a} empty; ${bloatName995a} has ${r995a.counts[r995a.bloatZoneIdx]}/${r995a.totalCount} clock-raising scenes`,
+        rule: 'ARC_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r995a.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName995a} contains ${r995a.counts[r995a.bloatZoneIdx]} of them (${Math.round((r995a.counts[r995a.bloatZoneIdx] / r995a.totalCount) * 100)}%) while ${emptyNames995a} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the character's arc races against a deadline in only part of the story.`,
+        suggestedFix: `Redistribute clock-raising beats: move or add a scene that starts a ticking clock into the empty zone(s) — ${emptyNames995a} — so time pressure shapes the arc across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // ARC_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 highlighted-
+  // dialogue scenes total, divided across four equal structural zones. Distinct from the existing
+  // 3-zone ARC_HIGHLIGHT_ZONE_CLUSTER and run-based ARC_HIGHLIGHT_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this channel, the second signal this wave
+  // recovers from Wave 967's exhaustion claim.
+  {
+    const r995b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r995b.fires) {
+      const emptyNames995b = r995b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName995b = FOUR_ZONE_NAMES[r995b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames995b} empty; ${bloatName995b} has ${r995b.counts[r995b.bloatZoneIdx]}/${r995b.totalCount} highlighted-dialogue scenes`,
+        rule: 'ARC_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r995b.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName995b} contains ${r995b.counts[r995b.bloatZoneIdx]} of them (${Math.round((r995b.counts[r995b.bloatZoneIdx] / r995b.totalCount) * 100)}%) while ${emptyNames995b} contains none. Memorable dialogue bloats in one structural quarter and never lands in another, so the character's arc speaks most articulately in only part of the story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames995b} — a standout line of dialogue so the arc's most articulate moments land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ARC_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now genuinely exhausted, this wave
+  // completes the trio via the sequence/aftermath mode. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying stakes-raise scenes (purpose === 'raise_stakes',
+  // pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every stakes-
+  // raise's two-scene aftermath opens no new curiosity, while curiosity does occur elsewhere.
+  // Distinct from ARC_STAKES_RELATIONAL_AFTERMATH_VOID (Wave 917, same trigger paired with
+  // relationshipShifts) — this pairs raise_stakes with curiosityDelta for the first time in this
+  // pass's aftermath-void family.
+  {
+    const r995c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r995c.fires) {
+      issues.push({
+        location: `${r995c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'ARC_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r995c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r995c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke new uncertainty about what the character will do next; when every stakes-raise's aftermath opens no curiosity, the arc's escalation sits inert rather than propelling the audience forward.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps propelling the character's arc forward rather than sitting in a learnable void.`,
       });
     }
   }

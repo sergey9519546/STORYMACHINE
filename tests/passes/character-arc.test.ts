@@ -1080,6 +1080,81 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 995 — characterArcPass: arc clock zone imbalance, arc highlight zone imbalance, arc stakes-curiosity aftermath void', async () => {
+    const makeRec995 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc995 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ARC_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs995a = Array.from({ length: 10 }, (_, i) =>
+        makeRec995(i, [0, 1, 2, 8, 9].includes(i) ? { clockRaised: true } : {}));
+      const res = await runArc995(recs995a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_ZONE_IMBALANCE'), 'ARC_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs995an = Array.from({ length: 10 }, (_, i) =>
+        makeRec995(i, [0, 3, 5, 8].includes(i) ? { clockRaised: true } : {}));
+      const res = await runArc995(recs995an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_ZONE_IMBALANCE'), 'ARC_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+
+    it('ARC_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs995b = Array.from({ length: 10 }, (_, i) =>
+        makeRec995(i, [0, 1, 2, 8, 9].includes(i) ? { dialogueHighlights: ['line'] } : {}));
+      const res = await runArc995(recs995b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_HIGHLIGHT_ZONE_IMBALANCE'), 'ARC_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('ARC_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs995bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec995(i, [0, 3, 5, 8].includes(i) ? { dialogueHighlights: ['line'] } : {}));
+      const res = await runArc995(recs995bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_HIGHLIGHT_ZONE_IMBALANCE'), 'ARC_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs995c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec995(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec995(i, { curiosityDelta: 1 });
+        return makeRec995(i);
+      });
+      const res = await runArc995(recs995c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_STAKES_CURIOSITY_AFTERMATH_VOID'), 'ARC_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs995cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec995(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec995(i, { curiosityDelta: 1 });
+        return makeRec995(i);
+      });
+      const res = await runArc995(recs995cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_STAKES_CURIOSITY_AFTERMATH_VOID'), 'ARC_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 981 — characterArcPass: arc suspense relational aftermath void, arc clock staging aftermath void, arc payoff staging aftermath void', async () => {
     const makeRec981 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
