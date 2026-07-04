@@ -473,6 +473,11 @@
 // paired with visualBeats/curiosityDelta, now paired with relationshipShifts), and PAYOFF_
 // REVELATION_EMOTIONAL_AFTERMATH_VOID (revelation, previously paired with relationshipShifts/
 // curiosityDelta, now paired with emotionalShift).
+// Wave 1042 additions: three less-saturated triggers each get a curiosityDelta channel for the
+// first time: PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID (seededClueIds, previously paired with
+// dialogueHighlights/emotionalShift), PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID (dramaticTurn,
+// previously paired with dialogueHighlights/suspenseDelta), and PAYOFF_OPEN_THREAD_CURIOSITY_
+// AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with suspenseDelta/emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5728,6 +5733,79 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every revelation in the story (${r1028c.triggerCount} discoveries) is followed by two emotionally neutral scenes, even though ${r1028c.aftermathCount} emotionally-charged scenes exist elsewhere. A discovery that never registers as felt in the scenes right after it leaves the payoff informationally significant but emotionally inert — knowledge delivered without anyone visibly reckoning with it.`,
         suggestedFix: `In the two scenes following at least one revelation, let someone's feelings register the new knowledge so the payoff lands emotionally, not only informationally.`,
+      });
+    }
+  }
+
+  // PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no curiosity rise, while such rises occur
+  // elsewhere. Distinct from the original seededClueIds → dialogueHighlights rule and PAYOFF_SEED_
+  // EMOTIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights and emotionalShift
+  // respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1042a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1042a.fires) {
+      issues.push({
+        location: `${r1042a.triggerCount} seed aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1042a.triggerCount} plants) is followed by two scenes with no rise in curiosity, even though ${r1042a.aftermathCount} such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the payoff machinery's groundwork buried rather than voiced as something the audience is now wondering about.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the plant's groundwork registers as a live question, not just an inert deposit awaiting its eventual payoff.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no curiosity rise, while such
+  // rises occur elsewhere. Distinct from the original dramaticTurn → dialogueHighlights rule and
+  // PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID (same trigger paired with dialogueHighlights and
+  // suspenseDelta respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1042b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1042b.fires) {
+      issues.push({
+        location: `${r1042b.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1042b.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1042b.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question right after it leaves the payoff machinery's turns registering as closed events rather than developments that generate the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question arise from the pivot so the payoff machinery's turns keep generating curiosity, not just resolving the immediate moment.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath carries
+  // no curiosity rise, while such rises occur elsewhere. Distinct from PAYOFF_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID and PAYOFF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with suspenseDelta and emotionalShift respectively) — this is the third consequence channel
+  // for this trigger.
+  {
+    const r1042c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1042c.fires) {
+      issues.push({
+        location: `${r1042c.triggerCount} heavy clue-debt scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'PAYOFF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1042c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1042c.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog awaiting payoff; when every heavy-debt scene's aftermath opens nothing new, the payoff machinery's uncertainty stalls instead of deepening.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull before its eventual payoff.`,
       });
     }
   }
