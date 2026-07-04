@@ -472,6 +472,15 @@
 // with suspenseDelta/relationshipShifts/curiosityDelta, now also paired with emotionalShift).
 // VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID gives payoffSetupIds a fourth channel (previously paired
 // with relationshipShifts/curiosityDelta/emotionalShift, now also paired with suspenseDelta).
+// Wave 1089 additions: with clockRaised now fully saturated (Wave 1075), this wave spreads
+// coverage across three other under-channeled triggers instead of exhausting one at a time:
+// VOICE_SEED_RELATIONAL_AFTERMATH_VOID gives seededClueIds a fifth channel (previously paired
+// with dialogueHighlights/emotionalShift/curiosityDelta/suspenseDelta, now also paired with
+// relationshipShifts). VOICE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives raise_stakes a
+// fifth channel (previously paired with curiosityDelta/suspenseDelta/emotionalShift/
+// relationshipShifts, now also paired with dialogueHighlights). VOICE_TURN_STAGING_AFTERMATH_
+// VOID gives dramaticTurn a fifth channel (previously paired with suspenseDelta/
+// relationshipShifts/curiosityDelta/emotionalShift, now also paired with visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6472,6 +6481,82 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1075c.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1075c.aftermathCount} such rises occur elsewhere. A resolved setup that never re-tightens tension right after it lands leaves the voice's payoffs registering as a closed loop with nothing new pressing on the reader.`,
         suggestedFix: `In the two scenes following at least one payoff, let a new tension rise so resolution doesn't flatten the voice's forward pressure entirely.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship shift,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. Distinct from VOICE_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, VOICE_SEED_CURIOSITY_AFTERMATH_VOID, and VOICE_SEED_SUSPENSE_AFTERMATH_VOID
+  // (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta respectively) — this
+  // is the fifth consequence channel for this trigger.
+  {
+    const r1089a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1089a.fires) {
+      issues.push({
+        location: `${r1089a.triggerCount} seed scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'VOICE_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1089a.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1089a.aftermathCount} such shifts occur elsewhere. A plant that never moves how characters stand with each other right after it lands leaves the voice's seeds registering as inert plot mechanics rather than something that touches how people relate.`,
+        suggestedFix: `In the two scenes following at least one seeding moment, let it shift how a pair of characters relate, so the voice's plants carry interpersonal weight, not just narrative setup.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath carries no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from VOICE_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, VOICE_STAKES_SUSPENSE_AFTERMATH_VOID, VOICE_STAKES_EMOTIONAL_
+  // AFTERMATH_VOID, and VOICE_STAKES_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1089b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1089b.fires) {
+      issues.push({
+        location: `${r1089b.triggerCount} stakes-raise(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'VOICE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1089b.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1089b.aftermathCount} such lines occur elsewhere. Stakes that never earn a memorable line right after they rise leave the voice's escalation registering as event rather than something anyone says out loud.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, give a character a line that names what's now at risk, so the voice speaks to the escalation rather than only staging it.`,
+      });
+    }
+  }
+
+  // VOICE_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥2 heavily-staged scenes anywhere, 2-scene lookahead. Fires
+  // when every turn's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from VOICE_TURN_SUSPENSE_AFTERMATH_VOID, VOICE_TURN_RELATIONAL_
+  // AFTERMATH_VOID, VOICE_TURN_CURIOSITY_AFTERMATH_VOID, and VOICE_TURN_EMOTIONAL_AFTERMATH_VOID
+  // (same trigger paired with suspenseDelta/relationshipShifts/curiosityDelta/emotionalShift
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1089c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1089c.fires) {
+      issues.push({
+        location: `${r1089c.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'VOICE_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1089c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1089c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a visually charged follow-through leaves the voice's turns registering as plot mechanics rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot registers in image, not just as a structural beat.`,
       });
     }
   }
