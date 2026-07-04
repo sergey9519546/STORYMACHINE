@@ -528,6 +528,14 @@
 // HIGHLIGHT_AFTERMATH_VOID gives payoffSetupIds a fifth channel (previously paired with
 // emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts, now also paired with
 // dialogueHighlights).
+// Wave 1110 additions: ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID gives payoffSetupIds its sixth
+// and final channel (previously paired with emotionalShift/curiosityDelta/suspenseDelta/
+// relationshipShifts/dialogueHighlights, now also paired with visualBeats), completing full
+// saturation for all four of this pass's main triggers. ORIGINALITY_OPEN_THREAD_RELATIONAL_
+// AFTERMATH_VOID and ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID give heavy unresolvedClues
+// debt its fifth and sixth channels (previously paired with dialogueHighlights/curiosityDelta/
+// suspenseDelta/emotionalShift, now also paired with relationshipShifts and visualBeats
+// respectively), completing full saturation for this trigger too.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6677,6 +6685,88 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1096c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1096c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a resolved setup never earns a memorable line right after it lands — a predictable, avoidable absence that leaves the payoff registering as structural closure without a voice confirming what it meant.`,
         suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, so the payoff has a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID,
+  // ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID,
+  // ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID, and ORIGINALITY_PAYOFF_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta/
+  // relationshipShifts/dialogueHighlights respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1110a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1110a.fires) {
+      issues.push({
+        location: `${r1110a.triggerCount} payoff scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1110a.triggerCount} payoff scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1110a.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a resolved setup never earns a visually charged follow-through — a predictable, avoidable absence that leaves the payoff registering as narrated closure rather than something the story visibly dwells on.`,
+        suggestedFix: `After at least one payoff, stage at least two concrete visual beats in one of the following two scenes, so the resolution registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → relationshipShifts absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // scenes anywhere with a recorded relationship shift, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath carries no relationship movement, while such movement
+  // occurs elsewhere. Distinct from ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID,
+  // ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_OPEN_THREAD_SUSPENSE_
+  // AFTERMATH_VOID, and ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with dialogueHighlights/curiosityDelta/suspenseDelta/emotionalShift respectively) — this is
+  // the fifth consequence channel for this trigger.
+  {
+    const r1110b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1110b.fires) {
+      issues.push({
+        location: `${r1110b.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1110b.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1110b.aftermathCount} such shifts exist elsewhere in the script. Once the audience notices the pattern, they learn that accumulated mystery never moves how characters stand with each other — a predictable, avoidable absence that leaves the debt isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let it shift how a pair of characters relate, so the accumulating mystery carries interpersonal weight, not just internal suspense.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 visually-dense
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // has no heavily-staged scene, while such staging occurs elsewhere. Distinct from
+  // ORIGINALITY_OPEN_THREAD_HIGHLIGHT_AFTERMATH_VOID, ORIGINALITY_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID, ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, ORIGINALITY_OPEN_THREAD_
+  // EMOTIONAL_AFTERMATH_VOID, and ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (same
+  // trigger paired with dialogueHighlights/curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts respectively) — this is the sixth and final consequence channel for this
+  // trigger, completing full saturation.
+  {
+    const r1110c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1110c.fires) {
+      issues.push({
+        location: `${r1110c.triggerCount} heavy clue-debt scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1110c.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1110c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that accumulated mystery never earns a visually charged follow-through — a predictable, avoidable absence that leaves the debt feeling like narrated backlog rather than something the camera dwells on.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, stage at least two concrete visual beats, so the accumulating mystery has a tangible presence, not just narrative backlog.`,
       });
     }
   }

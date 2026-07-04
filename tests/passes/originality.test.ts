@@ -1210,6 +1210,110 @@ He sits at his desk.
   });
 
 
+  describe('Wave 1110 — originalityPass: originality payoff-staging aftermath void, originality open-thread-relational aftermath void, originality open-thread-staging aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/1082/1096 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (payoffSetupIds array / unresolvedClues array length>=3) never overlap the filler purpose
+    // pool, so cycling never contaminates a fixture.
+    const PURPOSE_POOL_1110 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_1110 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor1110 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec1110 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor1110(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_1110[idx % PURPOSE_POOL_1110.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain1110 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor1110(i)}\n\n${SENTENCE_POOL_1110[i % SENTENCE_POOL_1110.length]}`).join('\n\n');
+    const runO1110 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain1110(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff is followed by two scenes with no visually dense scene', async () => {
+      const recs1110a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1110(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by a visually dense scene within its window', async () => {
+      const recs1110an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1110(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no relationship shift', async () => {
+      const recs1110b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1110(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a relationship shift within its window', async () => {
+      const recs1110bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1110(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no visually dense scene', async () => {
+      const recs1110c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1110(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a visually dense scene within its window', async () => {
+      const recs1110cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1110(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1110(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1110(i);
+      });
+      const res = await runO1110(recs1110cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1096 — originalityPass: originality clock-staging aftermath void, originality seed-staging aftermath void, originality payoff-dialogue-highlight aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/1068/1082 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
