@@ -482,6 +482,11 @@
 // EMOTIONAL_AFTERMATH_VOID (revelation → emotional), ARC_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes
 // → relational), and ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoff → emotional) — each a distinct
 // trigger/output pairing proving decoupling (trigger present, aftermath absent in a 2-scene window).
+// Wave 981 additions: continuing the aftermath-void mode with three trigger/output pairings absent
+// from the pass's now-~17-rule family: ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID (suspense → relational,
+// distinct from the existing suspense → curiosity pairing), ARC_CLOCK_STAGING_AFTERMATH_VOID (clock →
+// staging, distinct from clock → curiosity/relational), and ARC_PAYOFF_STAGING_AFTERMATH_VOID (payoff
+// → staging, distinct from payoff → curiosity/emotional).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5545,6 +5550,86 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r967c.triggerCount} cashed-in setups) is followed by two scenes in which the protagonist's emotional state does not shift, even though ${r967c.aftermathCount} scenes elsewhere do carry an emotional charge. Paying off a planted setup should land emotionally in its wake — the satisfaction of a promise kept, the cost of a debt come due. When every payoff's aftermath is emotionally flat, the arc's callbacks are mechanically satisfying but hollow: the plot's threads close without the character feeling their closure.`,
         suggestedFix: `Let at least one payoff move the protagonist emotionally in its aftermath: in the scene or two after a setup pays off, show what it costs or gives them — the ache of a victory that came too late, the release of a fear finally answered. A payoff whose aftermath shifts the emotional register earns its callback rather than merely completing it.`,
+      });
+    }
+  }
+
+  // ── Wave 981: continuing the sequence/aftermath mode this pass pivoted to in Wave 967, this wave
+  // adds three more trigger→aftermath pairings that no existing rule in this ~17-rule aftermath-void
+  // family has combined: suspense→relational (suspense has only ever been paired with curiosity),
+  // clock→staging, and payoff→staging (both staging pairings are novel — staging has only ever been
+  // paired with open-thread). Each fires only when the trigger genuinely occurs (≥2, full 2-scene
+  // lookahead) AND the aftermath signal genuinely occurs somewhere (≥2), but NO trigger's window
+  // contains it — proving decoupling, not mere absence. ─────────────────────────────────────────
+
+  // ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID — suspense trigger × relational aftermath. Every
+  // suspense-raising scene is followed by two scenes with no relationship shift, even though bonds
+  // do move elsewhere. Rising tension usually strains or tests who the protagonist can rely on; when
+  // every suspense spike's aftermath leaves all bonds untouched, the arc's tension is impersonal —
+  // dangerous but never relational. Distinct from ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID (suspense
+  // trigger × curiosity channel, Wave 469) — this is the same trigger paired with the RELATIONAL
+  // channel instead, a distinct output.
+  {
+    const r981a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r981a.fires) {
+      issues.push({
+        location: `${r981a.triggerCount} suspense-rise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every suspense-raising scene (${r981a.triggerCount} tension rises) is followed by two scenes in which no relationship shifts, even though ${r981a.aftermathCount} scenes elsewhere do move a bond. Rising tension should usually test who the protagonist can rely on — an ally's loyalty questioned, a bond strained by the danger. When every suspense spike's aftermath leaves all bonds untouched, the arc's tension is dangerous but impersonal.`,
+        suggestedFix: `Let at least one suspense rise move a bond in its aftermath: in the scene or two after tension spikes, have the danger test or realign a relationship — trust wavering under pressure, an alliance forged out of necessity.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_STAGING_AFTERMATH_VOID — clock trigger × staging aftermath. Every scene that raises a
+  // ticking clock is followed by two scenes with no substantial visual staging, even though staging
+  // does occur elsewhere. A deadline usually sharpens how a scene is physically played — urgency
+  // shows in movement, action, the body under pressure; when every clock's aftermath is visually
+  // inert, the arc's ticking clocks are announced but never physically dramatized. Distinct from
+  // ARC_CLOCK_CURIOSITY_AFTERMATH_VOID and ARC_CLOCK_RELATIONAL_AFTERMATH_VOID (clock trigger paired
+  // with curiosity/relational channels) — this is the clock trigger × STAGING channel, a new pairing.
+  {
+    const r981b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r981b.fires) {
+      issues.push({
+        location: `${r981b.triggerCount} clock aftermath(s) — no substantial staging within 2 scenes`,
+        rule: 'ARC_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r981b.triggerCount} deadlines) is followed by two visually inert scenes, even though ${r981b.aftermathCount} scenes elsewhere do carry substantial staging. A deadline should usually sharpen how urgency plays out physically — hurried movement, a body straining against time; when every clock's aftermath is visually flat, the arc announces pressure without letting the audience see it in the body.`,
+        suggestedFix: `Let at least one ticking clock provoke visible staging in its aftermath: in the scene or two after a deadline is raised, show urgency in physical action — someone moving faster, working against the clock in a way the camera can see.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_STAGING_AFTERMATH_VOID — payoff trigger × staging aftermath. Every payoff scene is
+  // followed by two scenes with no substantial visual staging, even though staging occurs elsewhere.
+  // Cashing in a setup should usually register physically — a beat lands in gesture or movement, not
+  // only in information; when every payoff's aftermath is visually inert, the arc's callbacks are
+  // narratively complete but staged flat. Distinct from ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID and
+  // ARC_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoff trigger paired with curiosity/emotional channels) —
+  // this is the payoff trigger × STAGING channel, a new pairing.
+  {
+    const r981c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r981c.fires) {
+      issues.push({
+        location: `${r981c.triggerCount} payoff aftermath(s) — no substantial staging within 2 scenes`,
+        rule: 'ARC_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r981c.triggerCount} cashed-in setups) is followed by two visually inert scenes, even though ${r981c.aftermathCount} scenes elsewhere do carry substantial staging. Cashing in a setup should usually register physically as well as narratively — a look, a gesture, a beat played in the body. When every payoff's aftermath is visually flat, the arc's callbacks land as information rather than lived moments.`,
+        suggestedFix: `Let at least one payoff provoke visible staging in its aftermath: in the scene or two after a setup pays off, let the moment register physically — a gesture, a changed posture, a beat played through the body rather than only through what's said.`,
       });
     }
   }

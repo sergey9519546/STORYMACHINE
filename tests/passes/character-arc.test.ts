@@ -1080,6 +1080,73 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 981 — characterArcPass: arc suspense relational aftermath void, arc clock staging aftermath void, arc payoff staging aftermath void', async () => {
+    const makeRec981 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc981 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID fires when every suspense rise has no relationship shift within 2 scenes', async () => {
+      const recs981a = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runArc981(recs981a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID'), 'ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID does not fire when a suspense rise is followed by a relationship shift within 2 scenes', async () => {
+      const recs981an = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runArc981(recs981an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID'), 'ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_CLOCK_STAGING_AFTERMATH_VOID fires when every clock has no substantial staging within 2 scenes', async () => {
+      const recs981b = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runArc981(recs981b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_STAGING_AFTERMATH_VOID'), 'ARC_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock is followed by substantial staging within 2 scenes', async () => {
+      const recs981bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runArc981(recs981bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_STAGING_AFTERMATH_VOID'), 'ARC_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_PAYOFF_STAGING_AFTERMATH_VOID fires when every payoff has no substantial staging within 2 scenes', async () => {
+      const recs981c = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runArc981(recs981c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_STAGING_AFTERMATH_VOID'), 'ARC_PAYOFF_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_PAYOFF_STAGING_AFTERMATH_VOID does not fire when a payoff is followed by substantial staging within 2 scenes', async () => {
+      const recs981cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec981(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runArc981(recs981cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_STAGING_AFTERMATH_VOID'), 'ARC_PAYOFF_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 967 — characterArcPass: arc revelation emotional aftermath void, arc stakes relational aftermath void, arc payoff emotional aftermath void', async () => {
     const makeRec967 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
