@@ -476,6 +476,17 @@
 // PACING_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID close that gap, giving both triggers full
 // six-channel saturation. The third check, PACING_OPEN_THREAD_STAGING_AFTERMATH_VOID, pairs the
 // isHeavyDebt607 predicate with visualBeats — a channel it has never carried before.
+// Wave 1083 additions: with revelation/seededClueIds/payoffSetupIds/dramaticTurn/clockRaised/
+// raise_stakes now all fully saturated (six channels each via mixed hand-rolled and
+// checkAftermathVoid mechanisms), this wave gives heavy unresolvedClues debt its sixth and final
+// channel — PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (previously paired with
+// relationshipShifts/visualBeats/suspenseDelta/curiosityDelta/emotionalShift, now also paired
+// with dialogueHighlights) — and introduces clockDelta ≠ 0 as a genuinely fresh sequence/
+// aftermath trigger, distinct from the clockRaised boolean already exhausted across all six
+// channels: PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID and PACING_CLOCK_DELTA_CURIOSITY_
+// AFTERMATH_VOID pair the numeric clock-delta signal with suspenseDelta and curiosityDelta for
+// the first time via this mode (clockDelta already has drought-run, zone-cluster, zone-imbalance,
+// and peak-uncaused coverage, but never sequence/aftermath).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6113,6 +6124,84 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1069c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1069c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the pacing's open threads feeling abstract rather than lodged in the world.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, PACING_OPEN_
+  // THREAD_STAGING_AFTERMATH_VOID, and the hand-rolled OPEN_THREAD_AFTERMATH_SUSPENSE/CURIOSITY/
+  // EMOTION_FLAT family (same trigger paired with relationshipShifts/visualBeats/suspenseDelta/
+  // curiosityDelta/emotionalShift respectively) — this is the sixth and final standard-channel
+  // pairing for this trigger, completing full saturation.
+  {
+    const r1083a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1083a.fires) {
+      issues.push({
+        location: `${r1083a.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1083a.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1083a.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the pacing's open threads voiceless rather than felt in what characters say to each other.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-delta scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-delta scene's two-scene aftermath carries no rise in
+  // suspense, while such rises occur elsewhere. clockDelta already has drought-run, zone-cluster,
+  // zone-imbalance, and peak-uncaused coverage in this pass (PACING_CLOCK_DELTA_DROUGHT_RUN,
+  // PACING_CLOCK_DELTA_ZONE_CLUSTER, PACING_CLOCK_DELTA_ZONE_IMBALANCE, PACING_CLOCK_DELTA_PEAK_
+  // UNCAUSED) but has never been audited in sequence/aftermath mode — this is the first pairing,
+  // and distinct from the clockRaised boolean's own six-channel-saturated suspenseDelta pairing
+  // (a different field entirely: numeric delta vs boolean presence).
+  {
+    const r1083b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1083b.fires) {
+      issues.push({
+        location: `${r1083b.triggerCount} clock-delta scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1083b.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1083b.aftermathCount} such rises occur elsewhere. A ticking deadline that changes its numeric weight without tightening tension in the scenes right after it leaves the pacing's clock mechanics registering as bookkeeping rather than felt urgency.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let suspense visibly climb so the deadline's changing weight keeps generating danger, not just tracked as a number.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-delta scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-delta scene's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from PACING_CLOCK_DELTA_SUSPENSE_
+  // AFTERMATH_VOID (this wave, same clockDelta≠0 trigger paired with suspenseDelta) — this is the
+  // second sequence/aftermath channel for this numeric trigger.
+  {
+    const r1083c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1083c.fires) {
+      issues.push({
+        location: `${r1083c.triggerCount} clock-delta scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1083c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1083c.aftermathCount} such rises occur elsewhere. A changing deadline that never opens a fresh question right after it shifts leaves the pacing's clock mechanics registering as a closed adjustment rather than a development that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let a new question arise from the change so the pacing's clock mechanics keep generating curiosity, not just tracking a number.`,
       });
     }
   }

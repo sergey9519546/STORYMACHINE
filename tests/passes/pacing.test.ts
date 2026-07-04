@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1083 — pacingPass: pacing open-thread-dialogue-highlight aftermath void, pacing clock-delta-suspense aftermath void, pacing clock-delta-curiosity aftermath void', async () => {
+    const runP1083 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1083a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by highlighted dialogue within its window', async () => {
+      const recs1083an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PACING_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID fires when every clock-delta scene is followed by two scenes with no suspense rise', async () => {
+      const recs1083b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 2 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID'), 'PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID does not fire when a clock-delta scene is followed by a suspense rise within its window', async () => {
+      const recs1083bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 2 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID'), 'PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID fires when every clock-delta scene is followed by two scenes with no curiosity rise', async () => {
+      const recs1083c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 2 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID'), 'PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID does not fire when a clock-delta scene is followed by a curiosity rise within its window', async () => {
+      const recs1083cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockDelta: 2 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1083(recs1083cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID'), 'PACING_CLOCK_DELTA_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1069 — pacingPass: pacing payoff-dialogue-highlight aftermath void, pacing stakes-dialogue-highlight aftermath void, pacing open-thread-staging aftermath void', async () => {
     const runP1069 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
