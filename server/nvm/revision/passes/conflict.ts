@@ -518,6 +518,15 @@
 // VOID from Wave 590) — CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID (emotionalShift),
 // CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID (relationshipShifts), and CONFLICT_SEED_STAGING_
 // AFTERMATH_VOID (visualBeats) give this trigger three fresh channels.
+// Wave 1108 additions: CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives seededClueIds its
+// sixth and final channel (previously paired with curiosityDelta/emotionalShift/
+// relationshipShifts/visualBeats, plus the hand-rolled Wave-590 suspenseDelta pairing, now also
+// paired with dialogueHighlights), completing full saturation for all five of this pass's
+// tracked triggers. With those exhausted, this wave introduces two triggers as fresh
+// checkAftermathVoid subjects for the first time — revelation and clockRaised have only ever
+// anchored distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/
+// aftermath: CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta,
+// and CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID pairs clockRaised with suspenseDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6433,6 +6442,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1094c.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1094c.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the conflict's foreshadowing registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every seed's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CONFLICT_SEED_
+  // CURIOSITY_AFTERMATH_VOID, CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID, CONFLICT_SEED_RELATIONAL_
+  // AFTERMATH_VOID, CONFLICT_SEED_STAGING_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/emotionalShift/relationshipShifts/visualBeats), and CONFLICT_SEED_SUSPENSE_
+  // AFTERMATH_VOID (Wave 590, hand-rolled, suspenseDelta) — this is the sixth and final
+  // checkAftermathVoid-based channel for this trigger, completing full saturation.
+  {
+    const r1108a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1108a.fires) {
+      issues.push({
+        location: `${r1108a.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CONFLICT_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1108a.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1108a.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands leaves the conflict's foreshadowing registering as inert plot mechanics rather than something a character's voice gives weight to.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a character's line acknowledge or react to what was just planted, so the seed registers in speech, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing revelation check in this file
+  // (all distribution/timing modes, none sequence/aftermath) — this is the first check to use
+  // revelation as a checkAftermathVoid trigger in this pass.
+  {
+    const r1108b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1108b.fires) {
+      issues.push({
+        location: `${r1108b.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1108b.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1108b.aftermathCount} such rises occur elsewhere. A discovery that never reopens the field of questions right after it lands leaves the conflict's reckoning with new information feeling like a closed loop rather than a development that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface so the conflict's discoveries keep generating curiosity instead of settling the matter entirely.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised check in this
+  // file (all distribution/timing modes, none sequence/aftermath) — this is the first check to
+  // use clockRaised as a checkAftermathVoid trigger in this pass.
+  {
+    const r1108c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1108c.fires) {
+      issues.push({
+        location: `${r1108c.triggerCount} clock-raise scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1108c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1108c.aftermathCount} such rises occur elsewhere. Time pressure that never re-tightens tension right after it fires leaves the conflict's relationship with urgency feeling inert rather than consequential.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new tension rise so the conflict's ticking clock keeps the story pressing forward instead of settling into calm.`,
       });
     }
   }
