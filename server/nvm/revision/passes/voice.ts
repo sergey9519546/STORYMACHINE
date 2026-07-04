@@ -465,6 +465,13 @@
 // also paired with suspenseDelta). VOICE_STAKES_RELATIONAL_AFTERMATH_VOID gives raise_stakes a
 // fourth channel (previously paired with curiosityDelta/suspenseDelta/emotionalShift, now also
 // paired with relationshipShifts).
+// Wave 1075 additions: VOICE_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its sixth and final
+// standard channel (previously paired with dialogueHighlights/curiosityDelta/relationshipShifts/
+// suspenseDelta/emotionalShift, now also paired with visualBeats, completing full saturation).
+// VOICE_TURN_EMOTIONAL_AFTERMATH_VOID gives dramaticTurn a fourth channel (previously paired
+// with suspenseDelta/relationshipShifts/curiosityDelta, now also paired with emotionalShift).
+// VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID gives payoffSetupIds a fourth channel (previously paired
+// with relationshipShifts/curiosityDelta/emotionalShift, now also paired with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6388,6 +6395,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1061c.triggerCount} stakes-raising scenes is followed by two scenes with no shift in any relationship, even though ${r1061c.aftermathCount} such shifts occur elsewhere. Raised stakes that never bear on how characters treat each other right after they land leave the voice's mounting cost registering as an isolated plot fact.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, let a relationship shift so the raised cost registers interpersonally in the voice, not just as a plot escalation.`,
+      });
+    }
+  }
+
+  // VOICE_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no visually
+  // dense scene, while such scenes occur elsewhere. Distinct from CLOCK_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID, VOICE_CLOCK_CURIOSITY_AFTERMATH_VOID, VOICE_CLOCK_RELATIONAL_AFTERMATH_VOID,
+  // VOICE_CLOCK_SUSPENSE_AFTERMATH_VOID, and VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID (same trigger
+  // paired with dialogueHighlights/curiosityDelta/relationshipShifts/suspenseDelta/emotionalShift
+  // respectively) — this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1075a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1075a.fires) {
+      issues.push({
+        location: `${r1075a.triggerCount} clock-raise aftermath(s) — no visually dense scene within 2 scenes`,
+        rule: 'VOICE_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1075a.triggerCount} of them) is followed by two scenes with no substantial physical staging, even though ${r1075a.aftermathCount} such scenes exist elsewhere in the script. A ticking deadline gains weight when the world briefly holds physical attention around it, but that opportunity consistently passes unstaged in the scenes immediately following every clock-raise.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let substantial physical staging carry some of the weight — an action or gesture that gives the deadline a physical anchor in the voice.`,
+      });
+    }
+  }
+
+  // VOICE_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no emotional shift, while such
+  // shifts occur elsewhere. Distinct from VOICE_TURN_SUSPENSE_AFTERMATH_VOID, VOICE_TURN_
+  // RELATIONAL_AFTERMATH_VOID, and VOICE_TURN_CURIOSITY_AFTERMATH_VOID (same trigger paired with
+  // suspenseDelta/relationshipShifts/curiosityDelta respectively) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1075b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1075b.fires) {
+      issues.push({
+        location: `${r1075b.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'VOICE_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1075b.triggerCount} pivots) is followed by two scenes registering no emotional shift, even though ${r1075b.aftermathCount} such shifts occur elsewhere. A pivot that never lands emotionally right after it happens leaves the voice's turns registering as plot mechanics rather than something anyone feels.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, register an emotional shift so the pivot is felt in the voice, not just executed as a structural beat.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID, VOICE_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID, and VOICE_PAYOFF_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // relationshipShifts/curiosityDelta/emotionalShift respectively) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1075c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1075c.fires) {
+      issues.push({
+        location: `${r1075c.triggerCount} payoff scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1075c.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1075c.aftermathCount} such rises occur elsewhere. A resolved setup that never re-tightens tension right after it lands leaves the voice's payoffs registering as a closed loop with nothing new pressing on the reader.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise so resolution doesn't flatten the voice's forward pressure entirely.`,
       });
     }
   }

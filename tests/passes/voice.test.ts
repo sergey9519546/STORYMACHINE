@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 1075 — voicePass: voice clock-staging aftermath void, voice turn-emotional aftermath void, voice payoff-suspense aftermath void', async () => {
+    const runV1075 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no visually dense scene', async () => {
+      const recs1075a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_STAGING_AFTERMATH_VOID'), 'VOICE_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by a visually dense scene within its window', async () => {
+      const recs1075an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_STAGING_AFTERMATH_VOID'), 'VOICE_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_TURN_EMOTIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no emotional shift', async () => {
+      const recs1075b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURN_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by an emotional shift within its window', async () => {
+      const recs1075bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURN_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID fires when every payoff is followed by two scenes with no suspense rise', async () => {
+      const recs1075c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when a payoff is followed by a suspense rise within its window', async () => {
+      const recs1075cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1075(recs1075cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'VOICE_PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1061 — voicePass: voice clock-emotional aftermath void, voice seed-suspense aftermath void, voice stakes-relational aftermath void', async () => {
     const runV1061 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
