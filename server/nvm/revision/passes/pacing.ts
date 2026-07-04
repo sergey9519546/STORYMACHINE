@@ -516,6 +516,12 @@
 // fourth channel (dialogueHighlights); PACING_EMOTION_SUSPENSE_AFTERMATH_VOID and PACING_
 // EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID give emotionalShift its third and fourth channels
 // (suspenseDelta, dialogueHighlights).
+// Wave 1153 additions: after Wave 1139, suspenseDelta>0 and emotionalShift were each at four of
+// six channels (curiosityDelta, emotionalShift/suspenseDelta cross-pair, relationshipShifts,
+// dialogueHighlights). PACING_SUSPENSE_STAGING_AFTERMATH_VOID and PACING_EMOTION_STAGING_
+// AFTERMATH_VOID give each trigger its fifth channel (visualBeats); PACING_SUSPENSE_RECURRENCE_
+// AFTERMATH_VOID adds the self-referential sixth channel for suspenseDelta (another suspense
+// rise elsewhere), completing full six-channel saturation for this trigger.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6536,6 +6542,87 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1139c.triggerCount} emotionally-charged scenes is followed by two scenes with no highlighted dialogue, even though ${r1139c.aftermathCount} such scenes exist elsewhere in the script. A strong feeling that never earns a memorable line right after it lands leaves the pacing's emotional beats unvoiced — no character's speech processes what was just felt.`,
         suggestedFix: `In the two scenes following at least one emotionally-charged moment, give a character a line that names what they're feeling, so the pacing's emotional beats register in speech, not just in internal state.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_STAGING_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath has no heavily-staged
+  // scene, while such staging occurs elsewhere. Distinct from PACING_SUSPENSE_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1111), PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID, PACING_SUSPENSE_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1125), and PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID (Wave 1139, same trigger paired with curiosityDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights) — this is the fifth consequence channel for this trigger.
+  {
+    const r1153a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1153a.fires) {
+      issues.push({
+        location: `${r1153a.triggerCount} suspense-spike scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1153a.triggerCount} suspense-spike scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1153a.aftermathCount} such scenes exist elsewhere in the script. A tension spike that never earns a visually charged follow-through leaves the pacing's danger registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, stage at least two concrete visual beats, so the mounting danger registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_STAGING_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 visually-dense scenes anywhere,
+  // 2-scene lookahead. Fires when every emotionally-charged scene's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from PACING_EMOTION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1111), PACING_EMOTION_CURIOSITY_AFTERMATH_VOID (Wave 1125),
+  // PACING_EMOTION_SUSPENSE_AFTERMATH_VOID, and PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID (Wave 1139, same trigger paired with relationshipShifts/curiosityDelta/suspenseDelta/
+  // dialogueHighlights) — this is the fifth consequence channel for this trigger.
+  {
+    const r1153b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1153b.fires) {
+      issues.push({
+        location: `${r1153b.triggerCount} emotionally-charged scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PACING_EMOTION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1153b.triggerCount} emotionally-charged scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1153b.aftermathCount} such scenes exist elsewhere in the script. A strong feeling that never earns a visually charged follow-through leaves the pacing's emotional beats registering as internal state the story never dwells on in image.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, stage at least two concrete visual beats, so the pacing's emotional beats register in image, not just in what a character feels.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_RECURRENCE_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → suspenseDelta (self) absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 further suspense-rise scenes anywhere,
+  // 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries no further
+  // rise in suspense, while such rises occur elsewhere. This is the self-referential sixth
+  // channel for this trigger — distinct from PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1111), PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID, PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID
+  // (Wave 1125), PACING_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (Wave 1139), and PACING_
+  // SUSPENSE_STAGING_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift/relationshipShifts/dialogueHighlights/visualBeats) — completing full
+  // six-channel saturation for this trigger. A tension spike that never compounds into further
+  // rising danger reads as an isolated jolt rather than an escalating pattern.
+  {
+    const r1153c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1153c.fires) {
+      issues.push({
+        location: `${r1153c.triggerCount} suspense-spike scene(s) — no further suspense rise within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_RECURRENCE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1153c.triggerCount} suspense-spike scenes is followed by two scenes with no further rise in suspense, even though ${r1153c.aftermathCount} such rises occur elsewhere in the script. A tension spike that never compounds into a further escalation in its immediate aftermath reads as an isolated jolt rather than pacing that builds — danger flares and settles instead of accumulating toward something larger.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let the tension climb again rather than settle, so the pacing compounds danger into an escalating pattern instead of a series of disconnected jolts.`,
       });
     }
   }
