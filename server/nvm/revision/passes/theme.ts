@@ -480,6 +480,15 @@
 // emotionalShift/relationshipShifts, now also paired with dialogueHighlights).
 // THEME_STAGING_SUSPENSE_AFTERMATH_VOID gives the visualBeats trigger a third channel
 // (previously paired with curiosityDelta/emotionalShift, now also paired with suspenseDelta).
+// Wave 1074 additions: raise_stakes and seededClueIds each reach full six-channel saturation:
+// THEME_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/
+// suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights, now also paired with
+// visualBeats — its only remaining standard channel) and THEME_SEED_STAGING_AFTERMATH_VOID
+// (seededClueIds, previously paired with dialogueHighlights/curiosityDelta/relationshipShifts/
+// emotionalShift/suspenseDelta, now also paired with visualBeats — its only remaining standard
+// channel). THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives unresolvedClues.length>0 a
+// fifth channel (previously paired with emotionalShift/curiosityDelta/suspenseDelta/
+// relationshipShifts, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6091,6 +6100,86 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every heavily-staged scene in the story (${r1060c.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1060c.aftermathCount} such rises occur elsewhere. A visually dense moment that never tightens tension right after it lands leaves the theme's imagery inert rather than something the story keeps building pressure around.`,
         suggestedFix: `In the two scenes following at least one heavily-staged moment, let tension rise so the theme's imagery keeps pressuring the story rather than sitting as a static tableau.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no visually
+  // dense scene, while such scenes occur elsewhere. Distinct from THEME_STAKES_CURIOSITY_
+  // AFTERMATH_VOID, THEME_STAKES_SUSPENSE_AFTERMATH_VOID, THEME_STAKES_EMOTIONAL_AFTERMATH_VOID,
+  // THEME_STAKES_RELATIONAL_AFTERMATH_VOID, and THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1074a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1074a.fires) {
+      issues.push({
+        location: `${r1074a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'THEME_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1074a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1074a.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor in the world.`,
+      });
+    }
+  }
+
+  // THEME_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2), 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath contains no visually dense scene, while such
+  // scenes occur elsewhere. Distinct from THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, THEME_
+  // SEED_CURIOSITY_AFTERMATH_VOID, THEME_SEED_RELATIONAL_AFTERMATH_VOID, THEME_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, and THEME_SEED_SUSPENSE_AFTERMATH_VOID (same trigger paired with
+  // dialogueHighlights/curiosityDelta/relationshipShifts/emotionalShift/suspenseDelta
+  // respectively) — this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1074b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1074b.fires) {
+      issues.push({
+        location: `${r1074b.triggerCount} seed scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'THEME_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1074b.triggerCount} clue-planting scenes is followed by two scenes with no substantial physical staging, even though ${r1074b.aftermathCount} such scenes exist elsewhere in the script. A planted clue gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one clue-seeding moment, let one of the following two scenes carry substantial physical staging — the planted material or its surroundings given some visible presence before the theme moves on.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every open-thread scene's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, THEME_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID, THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, and THEME_OPEN_THREAD_RELATIONAL_
+  // AFTERMATH_VOID (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta/
+  // relationshipShifts respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1074c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1074c.fires) {
+      issues.push({
+        location: `${r1074c.triggerCount} open-thread scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1074c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1074c.aftermathCount} such scenes exist elsewhere in the script. An open question that never earns a memorable line right after it lingers registers as inert plot machinery rather than something a character's voice gives weight to.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, let a character voice the weight of what's unresolved, so the theme's lingering questions register in speech, not just as narrative backlog.`,
       });
     }
   }

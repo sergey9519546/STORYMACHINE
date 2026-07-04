@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1074 — themePass: theme stakes-staging aftermath void, theme seed-staging aftermath void, theme open-thread-dialogue-highlight aftermath void', async () => {
+    const runT1074 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_STAKES_STAGING_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no visually dense scene', async () => {
+      const recs1074a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAKES_STAGING_AFTERMATH_VOID'), 'THEME_STAKES_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_STAKES_STAGING_AFTERMATH_VOID does not fire when a stakes-raise is followed by a visually dense scene within its window', async () => {
+      const recs1074an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAKES_STAGING_AFTERMATH_VOID'), 'THEME_STAKES_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_SEED_STAGING_AFTERMATH_VOID fires when every seed is followed by two scenes with no visually dense scene', async () => {
+      const recs1074b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_STAGING_AFTERMATH_VOID'), 'THEME_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by a visually dense scene within its window', async () => {
+      const recs1074bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_STAGING_AFTERMATH_VOID'), 'THEME_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every open-thread scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1074c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when an open-thread scene is followed by highlighted dialogue within its window', async () => {
+      const recs1074cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1074(recs1074cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1060 — themePass: theme seed-suspense aftermath void, theme stakes-dialogue-highlight aftermath void, theme staging-suspense aftermath void', async () => {
     const runT1060 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
