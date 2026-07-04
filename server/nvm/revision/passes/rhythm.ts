@@ -504,6 +504,13 @@
 // RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives unresolvedClues its fourth channel
 // (relationshipShifts); RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID and RHYTHM_CLOCK_EMOTIONAL_
 // AFTERMATH_VOID give clockRaised its second and third channels (suspenseDelta, emotionalShift).
+// Wave 1156 additions: after Wave 1142, unresolvedClues was at four of six channels
+// (curiosityDelta, suspenseDelta, emotionalShift, relationshipShifts) and clockRaised at three
+// (curiosityDelta, suspenseDelta, emotionalShift). RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID and RHYTHM_OPEN_THREAD_STAGING_AFTERMATH_VOID give unresolvedClues its fifth
+// and sixth channels (dialogueHighlights, visualBeats), completing full six-channel saturation
+// for this trigger. RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID gives clockRaised its fourth channel
+// (relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5994,6 +6001,86 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1142c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1142c.aftermathCount} such shifts occur elsewhere. Time pressure that never registers on any character's felt state right after it tightens leaves the rhythm's clock reading as mechanics rather than something anyone actually feels the weight of.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the mounting pressure, so the rhythm's ticking clock carries felt weight, not just structural urgency.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 scenes anywhere
+  // with a highlighted line of dialogue, 2-scene lookahead. Fires when every open-thread scene's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (Wave 1114), RHYTHM_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID, RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (Wave 1128), and
+  // RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (Wave 1142, same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts) — this is the fifth
+  // consequence channel for this trigger.
+  {
+    const r1156a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1156a.fires) {
+      issues.push({
+        location: `${r1156a.triggerCount} open-thread scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1156a.triggerCount} scenes carrying an unresolved thread is followed by two scenes with no highlighted dialogue, even though ${r1156a.aftermathCount} such scenes exist elsewhere in the script. An open question that never earns a memorable line in its immediate wake leaves the rhythm's mystery unvoiced — no character's speech processes what's still hanging.`,
+        suggestedFix: `In the two scenes following at least one open-thread scene, give a character a line that reckons with what's still unresolved, so the rhythm's mystery registers in speech, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues (length>0)
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every open-thread scene's two-scene aftermath has no heavily-staged
+  // scene, while such staging occurs elsewhere. Distinct from RHYTHM_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1114), RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, RHYTHM_OPEN_THREAD_
+  // EMOTIONAL_AFTERMATH_VOID (Wave 1128), RHYTHM_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (Wave
+  // 1142), and RHYTHM_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (this wave, same trigger
+  // paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights) — this is the sixth and final consequence channel for this trigger,
+  // completing full six-channel saturation.
+  {
+    const r1156b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1156b.fires) {
+      issues.push({
+        location: `${r1156b.triggerCount} open-thread scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1156b.triggerCount} scenes carrying an unresolved thread is followed by two scenes with no heavily-staged visual beat, even though ${r1156b.aftermathCount} such scenes exist elsewhere in the script. An open question that never earns a visually charged follow-through leaves the rhythm's mystery registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one open-thread scene, stage at least two concrete visual beats, so the lingering mystery registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1128) and RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID /
+  // RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID (Wave 1142, same trigger paired with curiosityDelta/
+  // suspenseDelta/emotionalShift) — this is the fourth consequence channel for this trigger.
+  {
+    const r1156c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1156c.fires) {
+      issues.push({
+        location: `${r1156c.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1156c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1156c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the rhythm's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
       });
     }
   }
