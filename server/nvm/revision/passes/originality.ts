@@ -510,6 +510,14 @@
 // and ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes, previously paired with
 // curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift, now a fifth channel with
 // dialogueHighlights).
+// Wave 1082 additions: raise_stakes reaches full six-channel saturation — ORIGINALITY_STAKES_
+// STAGING_AFTERMATH_VOID (previously paired with curiosityDelta/suspenseDelta/relationshipShifts/
+// emotionalShift/dialogueHighlights, now also paired with visualBeats — its only remaining
+// standard channel). clockRaised and seededClueIds each get a fifth channel this wave too:
+// ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (previously paired with relationshipShifts/
+// emotionalShift/curiosityDelta/suspenseDelta, now also paired with dialogueHighlights) and
+// ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (previously paired with curiosityDelta/
+// suspenseDelta/emotionalShift/relationshipShifts, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6500,6 +6508,85 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1068c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1068c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that raised stakes never earn a memorable line right after they land — a predictable, avoidable absence that leaves the escalation registering as plot mechanics rather than something voiced.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the raised stakes are voiced, not just structurally raised.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from ORIGINALITY_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID, ORIGINALITY_STAKES_
+  // RELATIONAL_AFTERMATH_VOID, ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID, and ORIGINALITY_
+  // STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // suspenseDelta/relationshipShifts/emotionalShift/dialogueHighlights respectively) — this is
+  // the sixth and final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1082a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1082a.fires) {
+      issues.push({
+        location: `${r1082a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'ORIGINALITY_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1082a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1082a.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that raised stakes never gain a physical presence around them right after they land — a predictable, avoidable absence that leaves the escalation feeling abstract rather than lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID, ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_
+  // VOID, ORIGINALITY_CLOCK_CURIOSITY_AFTERMATH_VOID, and ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_
+  // VOID (same trigger paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1082b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1082b.fires) {
+      issues.push({
+        location: `${r1082b.triggerCount} clock-raise aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'ORIGINALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1082b.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1082b.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a ticking deadline never earns a memorable line right after it's introduced — a predictable, avoidable absence that leaves the pressure stated but never voiced.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character deliver a memorable line naming the deadline's weight, so the pressure is voiced, not just ticking in the background.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every seed's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ORIGINALITY_SEED_
+  // CURIOSITY_AFTERMATH_VOID, ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID, ORIGINALITY_SEED_
+  // EMOTIONAL_AFTERMATH_VOID, and ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID (same trigger
+  // paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts respectively) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1082c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1082c.fires) {
+      issues.push({
+        location: `${r1082c.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ORIGINALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1082c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1082c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that a planted clue never earns a memorable line right after it lands — a predictable, avoidable absence that leaves the seed purely mechanical.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
       });
     }
   }
