@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1000 — payoffPass: payoff clock-curiosity aftermath void, payoff turn-suspense aftermath void, payoff seed-emotional aftermath void', async () => {
+    const runPY1000 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no new curiosity', async () => {
+      const recs1000a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when a clock-raise is followed by new curiosity within its window', async () => {
+      const recs1000an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no rise in suspense', async () => {
+      const recs1000b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by rising suspense within its window', async () => {
+      const recs1000bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID fires when every seed is followed by two scenes with no emotional shift', async () => {
+      const recs1000c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed is followed by an emotional shift within its window', async () => {
+      const recs1000cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1000(recs1000cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID'), 'PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 986 — payoffPass: payoff stakes-curiosity aftermath void, payoff open-thread-suspense aftermath void, payoff revelation-relationship aftermath void', async () => {
     const runPY986 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
