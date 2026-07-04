@@ -1352,6 +1352,71 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 969 — intentionPass: intention relationship zone imbalance, intention turn zone imbalance, intention clock delta zone imbalance', async () => {
+    const makeRec969 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN969 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('INTENTION_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs969a = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 1, 2, 8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runIN969(recs969a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_ZONE_IMBALANCE'), 'INTENTION_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs969an = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 3, 5, 8].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {}));
+      const res = await runIN969(recs969an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_ZONE_IMBALANCE'), 'INTENTION_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs969b = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 1, 2, 8, 9].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runIN969(recs969b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_ZONE_IMBALANCE'), 'INTENTION_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs969bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 3, 5, 8].includes(i) ? { dramaticTurn: 'reversal' } : {}));
+      const res = await runIN969(recs969bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_ZONE_IMBALANCE'), 'INTENTION_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    it('INTENTION_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs969c = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 1, 2, 8, 9].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runIN969(recs969c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_ZONE_IMBALANCE'), 'INTENTION_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('INTENTION_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs969cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec969(i, [0, 3, 5, 8].includes(i) ? { clockDelta: 1 } : {}));
+      const res = await runIN969(recs969cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_ZONE_IMBALANCE'), 'INTENTION_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 955 — intentionPass: intention negative emotion zone imbalance, intention curiosity zone imbalance, intention seed zone imbalance', async () => {
     const makeRec955 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

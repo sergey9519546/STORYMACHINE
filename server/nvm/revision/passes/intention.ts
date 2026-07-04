@@ -434,6 +434,11 @@
 // 'negative', the negative-valence mirror of 941's positive one), INTENTION_CURIOSITY_ZONE_IMBALANCE
 // (curiosityDelta > 0 — the question-raising delta beside 941's suspense one), and INTENTION_SEED_
 // ZONE_IMBALANCE (seededClueIds.length > 0 — the seed array beside 941's payoff one).
+// Wave 969 additions: auditing the three remaining trio-complete signals in this pass, spanning three
+// distinct classes: INTENTION_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array, distinct from the
+// payoff/seed arrays audited in Waves 941/955), INTENTION_TURN_ZONE_IMBALANCE (dramaticTurn !==
+// 'nothing' categorical), and INTENTION_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta
+// distinct from the suspense/curiosity ones audited in Waves 941/955).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5515,6 +5520,80 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r955c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName955c} contains ${r955c.counts[r955c.bloatZoneIdx]} of them (${Math.round((r955c.counts[r955c.bloatZoneIdx] / r955c.totalCount) * 100)}%) while ${emptyNames955c} contains none. Setups bloat in one structural quarter and never get planted in another, so the character's pursuit of their goal lays groundwork in only part of the story.`,
         suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames955c} — so the character's intention keeps laying groundwork across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) ×
+  // four structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing 3-zone
+  // INTENTION_RELATIONSHIP_ZONE_CLUSTER and run-based INTENTION_RELATIONSHIP_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the relationshipShifts array field, distinct
+  // from the payoffSetupIds/seededClueIds arrays audited in Waves 941/955.
+  {
+    const r969a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r969a.fires) {
+      const emptyNames969a = r969a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName969a = FOUR_ZONE_NAMES[r969a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames969a} empty; ${bloatName969a} has ${r969a.counts[r969a.bloatZoneIdx]}/${r969a.totalCount} relationship-shift scenes`,
+        rule: 'INTENTION_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r969a.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName969a} contains ${r969a.counts[r969a.bloatZoneIdx]} of them (${Math.round((r969a.counts[r969a.bloatZoneIdx] / r969a.totalCount) * 100)}%) while ${emptyNames969a} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the character's pursuit of their goal reshapes their relationships in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames969a} — a relationship shift so the character's intention keeps reshaping their bonds across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes with a dramatic
+  // turn total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Uses the same dramaticTurn !== 'nothing' predicate
+  // as the existing 3-zone INTENTION_TURN_ZONE_CLUSTER and run-based INTENTION_TURN_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the dramatic-turn categorical signal.
+  {
+    const r969b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r969b.fires) {
+      const emptyNames969b = r969b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName969b = FOUR_ZONE_NAMES[r969b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames969b} empty; ${bloatName969b} has ${r969b.counts[r969b.bloatZoneIdx]}/${r969b.totalCount} dramatic-turn scenes`,
+        rule: 'INTENTION_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r969b.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName969b} contains ${r969b.counts[r969b.bloatZoneIdx]} of them (${Math.round((r969b.counts[r969b.bloatZoneIdx] / r969b.totalCount) * 100)}%) while ${emptyNames969b} contains none. Turns bloat in one structural quarter and never fire in another, so the character's pursuit of their goal is forced to change course in only part of the story.`,
+        suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames969b} — a dramatic turn so the character's intention keeps being forced to change course across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta !== 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-moving scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockDelta !== 0 predicate as the existing
+  // 3-zone INTENTION_CLOCK_DELTA_ZONE_CLUSTER and run-based INTENTION_CLOCK_DELTA_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to this delta signal, distinct from the
+  // suspense/curiosity deltas audited in Waves 941/955.
+  {
+    const r969c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r969c.fires) {
+      const emptyNames969c = r969c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName969c = FOUR_ZONE_NAMES[r969c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames969c} empty; ${bloatName969c} has ${r969c.counts[r969c.bloatZoneIdx]}/${r969c.totalCount} clock-moving scenes`,
+        rule: 'INTENTION_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r969c.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName969c} contains ${r969c.counts[r969c.bloatZoneIdx]} of them (${Math.round((r969c.counts[r969c.bloatZoneIdx] / r969c.totalCount) * 100)}%) while ${emptyNames969c} contains none. Deadline pressure bloats in one structural quarter and never moves in another, so the character pursues their goal under a running clock in only part of the story.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames969c} — so the character's intention operates under deadline pressure across every structural quarter, not only the quarter currently carrying most of it.`,
       });
     }
   }
