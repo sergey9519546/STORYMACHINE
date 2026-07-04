@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1076 — beliefPass: belief seed-staging aftermath void, belief open-thread-dialogue-highlight aftermath void, belief open-thread-staging aftermath void', async () => {
+    const runBF1076 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_SEED_STAGING_AFTERMATH_VOID fires when every seed has no visually dense scene within 2 scenes', async () => {
+      const recs1076a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1076(recs1076a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_STAGING_AFTERMATH_VOID'), 'BELIEF_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by a visually dense scene within 2 scenes', async () => {
+      const recs1076an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1076(recs1076an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_STAGING_AFTERMATH_VOID'), 'BELIEF_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every heavy clue-debt scene has no highlighted dialogue within 2 scenes', async () => {
+      const recs1076b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1', 'c2', 'c3'] } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1076(recs1076b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1076bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1', 'c2', 'c3'] } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1076(recs1076bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when every heavy clue-debt scene has no visually dense scene within 2 scenes', async () => {
+      const recs1076c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1', 'c2', 'c3'] } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1076(recs1076c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a visually dense scene within 2 scenes', async () => {
+      const recs1076cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1', 'c2', 'c3'] } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runBF1076(recs1076cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'BELIEF_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1062 — beliefPass: belief stakes-staging aftermath void, belief payoff-dialogue-highlight aftermath void, belief seed-dialogue-highlight aftermath void', async () => {
     const runBF1062 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
