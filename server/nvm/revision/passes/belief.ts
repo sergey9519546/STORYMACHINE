@@ -453,6 +453,13 @@
 // AFTERMATH_VOID (payoffSetupIds → relationshipShifts, first pairing of payoff with relational
 // consequence), and BELIEF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (heavy unresolvedClues debt,
 // threshold ≥3 distinct from CLUE_DEBT_CLOCK's >0 threshold, → curiosityDelta).
+// Wave 1006 additions: this pass's aftermath-void family is now large enough that every existing
+// trigger has at least one channel — this wave gives three of them a genuinely fresh third/second
+// channel: BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with
+// relationshipShifts and suspenseDelta, now paired with emotionalShift), BELIEF_SEED_SUSPENSE_
+// AFTERMATH_VOID (seededClueIds, previously only paired with emotionalShift, now paired with
+// suspenseDelta), and BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoffSetupIds, previously paired
+// with curiosityDelta and relationshipShifts, now paired with emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5588,6 +5595,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r992c.triggerCount} instances) is followed by two full scenes that raise no new curiosity, even though ${r992c.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the belief-tracking layer's mystery stalls instead of deepening.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID — raise-stakes trigger × emotionalShift aftermath.
+  // Every stakes-raising scene is followed by two emotionally neutral scenes, even though charged
+  // scenes do occur elsewhere. Escalating danger should usually carry some felt weight for the
+  // characters living through it; when every stakes-raise's aftermath is affectively flat, the
+  // belief-tracking layer's escalation reads as a stated fact rather than a threat anyone feels.
+  // Distinct from BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID (Wave 978, relationshipShifts) and
+  // BELIEF_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 992, suspenseDelta) — this is the third
+  // consequence channel for this trigger in this pass.
+  {
+    const r1006a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1006a.fires) {
+      issues.push({
+        location: `${r1006a.triggerCount} stakes-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1006a.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r1006a.aftermathCount} emotionally-charged scenes exist elsewhere. Escalating danger should usually carry felt weight for the characters living through it; when every stakes-raise's aftermath is affectively flat, the belief-tracking layer's escalation reads as a stated fact rather than a threat anyone feels.`,
+        suggestedFix: `Let at least one stakes-raise carry feeling in its aftermath: in the scene or two after the danger sharpens, show someone reacting to it emotionally — fear, resolve, dread.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_SUSPENSE_AFTERMATH_VOID — seed trigger × suspenseDelta aftermath. Every clue-
+  // seeding scene is followed by two scenes with no rise in tension, even though tension does rise
+  // elsewhere. A planted clue should usually tighten tension as its implications sink in; when
+  // every seed's aftermath registers no suspense, the belief-tracking layer's groundwork sits flat
+  // rather than compounding. Distinct from BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID (Wave 978, same
+  // trigger paired with emotionalShift) — this pairs seededClueIds with suspenseDelta for the
+  // first time in this pass.
+  {
+    const r1006b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1006b.fires) {
+      issues.push({
+        location: `${r1006b.triggerCount} seed aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'BELIEF_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1006b.triggerCount} plants) is followed by two scenes with no rise in tension, even though ${r1006b.aftermathCount} such rises occur elsewhere. A planted clue should usually tighten tension as its implications sink in; when every seed's aftermath registers no suspense, the belief-tracking layer's groundwork sits flat rather than compounding.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, raise the tension — a ticking complication or a near-miss tied to the new information — so the mystery keeps compounding rather than idling.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID — payoff trigger × emotionalShift aftermath. Every
+  // payoff scene is followed by two emotionally neutral scenes, even though charged scenes occur
+  // elsewhere. A callback should usually carry some feeling — relief, cost, vindication; when
+  // every payoff's aftermath is affectively flat, the belief-tracking layer's resolutions land as
+  // pure mechanics. Distinct from BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 978, curiosityDelta)
+  // and BELIEF_PAYOFF_RELATIONSHIP_AFTERMATH_VOID (Wave 992, relationshipShifts) — this is the
+  // third consequence channel for this trigger in this pass.
+  {
+    const r1006c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1006c.fires) {
+      issues.push({
+        location: `${r1006c.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r1006c.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r1006c.aftermathCount} emotionally-charged scenes exist elsewhere. A callback usually carries some feeling for whoever collects on it; when every payoff's aftermath is affectively flat, the belief-tracking layer's resolutions register as pure mechanics with no felt weight.`,
+        suggestedFix: `Let at least one payoff carry feeling in its aftermath: in the scene or two after a setup pays off, show someone reacting to it emotionally — relief, grief, triumph.`,
       });
     }
   }
