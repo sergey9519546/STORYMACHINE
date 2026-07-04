@@ -532,6 +532,11 @@
 // script). RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID and RELATIONSHIP_REVELATION_
 // AFTERMATH_VOID give revelation its third and fourth channels (emotionalShift,
 // relationshipShifts).
+// Wave 1141 additions: clockRaised was at four of six channels and revelation at four.
+// RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and RELATIONSHIP_CLOCK_STAGING_
+// AFTERMATH_VOID give clockRaised its fifth and sixth channels (dialogueHighlights,
+// visualBeats), completing full saturation for this trigger. RELATIONSHIP_REVELATION_
+// DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives revelation its fifth channel (dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6613,6 +6618,86 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1127c.triggerCount} revelation scenes is followed by two scenes with no recorded relationship shift, even though ${r1127c.aftermathCount} such shifts exist elsewhere in the script. A truth that surfaces without moving how any two characters stand with each other treats the discovery as private information rather than something that reshapes the relational world it lands in.`,
         suggestedFix: `In the two scenes following at least one revelation, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the discovery registers between characters, not just within one.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene
+  // aftermath has no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1099), RELATIONSHIP_CLOCK_SUSPENSE_
+  // AFTERMATH_VOID, RELATIONSHIP_CLOCK_EMOTIONAL_AFTERMATH_VOID (Wave 1113), and RELATIONSHIP_
+  // CLOCK_AFTERMATH_VOID (Wave 1127, same trigger paired with curiosityDelta/suspenseDelta/
+  // emotionalShift/relationshipShifts) — this is the fifth consequence channel for this trigger.
+  {
+    const r1141a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1141a.fires) {
+      issues.push({
+        location: `${r1141a.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1141a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no highlighted dialogue, even though ${r1141a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a memorable line right after it leaves the relational arc's clock voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs a relationship, so the pressure registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1099), RELATIONSHIP_CLOCK_SUSPENSE_AFTERMATH_VOID, RELATIONSHIP_CLOCK_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 1113), RELATIONSHIP_CLOCK_AFTERMATH_VOID (Wave 1127), and
+  // RELATIONSHIP_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (this wave, same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights) — this is
+  // the sixth and final consequence channel for this trigger, completing full saturation.
+  {
+    const r1141b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1141b.fires) {
+      issues.push({
+        location: `${r1141b.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1141b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1141b.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the relational arc's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath ×
+  // revelation (non-null) trigger → dialogueHighlights absence. Built on checkAftermathVoid
+  // from the shared checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes
+  // anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // revelation's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1099), RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1113), RELATIONSHIP_
+  // REVELATION_EMOTIONAL_AFTERMATH_VOID, and RELATIONSHIP_REVELATION_AFTERMATH_VOID (Wave 1127,
+  // same trigger paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1141c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1141c.fires) {
+      issues.push({
+        location: `${r1141c.triggerCount} revelation scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RELATIONSHIP_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1141c.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1141c.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a memorable line right after it lands leaves the relational arc's revelations unvoiced — no character's speech processes what was just learned about someone else.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered about the relationship, so the reckoning with new information registers in speech, not just in plot state.`,
       });
     }
   }
