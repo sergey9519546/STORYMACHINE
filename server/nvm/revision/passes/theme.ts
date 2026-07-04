@@ -445,6 +445,13 @@
 // vs >0 visualBeats). With zone-imbalance now down to just these two, this wave completes the trio
 // with one aftermath-void pairing: THEME_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
 // curiosityDelta), the first use of raise_stakes as an aftermath-void trigger in this pass.
+// Wave 1004 additions: THEME_STAGING re-checked and re-excluded (same predicate mismatch). With
+// zone-imbalance still exhausted, this wave gives three existing aftermath-void triggers a fresh
+// consequence channel: THEME_STAKES_SUSPENSE_AFTERMATH_VOID (raise_stakes, previously only paired
+// with curiosityDelta, now paired with suspenseDelta), THEME_SEED_CURIOSITY_AFTERMATH_VOID
+// (seededClueIds, previously only paired with dialogueHighlights, now paired with curiosityDelta),
+// and THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (unresolvedClues, previously only paired with the
+// theme-resonance keyword channel, now paired with the standard emotionalShift signal).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5688,6 +5695,78 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r990c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r990c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger that never provokes a new uncertainty about what comes next leaves the theme untested by the story's own rising pressure in the beats immediately following.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps testing the theme rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath raises no tension, while
+  // tension does rise elsewhere. Distinct from THEME_STAKES_CURIOSITY_AFTERMATH_VOID (same
+  // trigger paired with curiosityDelta) — this pairs raise_stakes with suspenseDelta for the first
+  // time in this pass.
+  {
+    const r1004a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1004a.fires) {
+      issues.push({
+        location: `${r1004a.triggerCount} stakes-raise aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'THEME_STAKES_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1004a.triggerCount} escalations) is followed by two scenes with no rise in tension, even though ${r1004a.aftermathCount} such rises occur elsewhere. Escalating danger that never tightens the felt sense of jeopardy in the beats right after it leaves the theme untested by a threat the audience actually feels.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, tighten the tension — a ticking complication or a near-miss — so escalating danger registers as felt, not just stated.`,
+      });
+    }
+  }
+
+  // THEME_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath opens no new curiosity, while curiosity does occur
+  // elsewhere. Distinct from THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired
+  // with dialogueHighlights) — this pairs seededClueIds with curiosityDelta for the first time in
+  // this pass.
+  {
+    const r1004b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1004b.fires) {
+      issues.push({
+        location: `${r1004b.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'THEME_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1004b.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r1004b.aftermathCount} scenes elsewhere do open fresh questions. A planted clue that never compounds into a further question leaves the theme's groundwork inert rather than deepening the audience's investment in what it will mean.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question tied to the theme.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying open-thread scenes (unresolvedClues.length>0, pos<n-2), ≥2 emotionally-charged
+  // scenes anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath is
+  // emotionally flat, while charged scenes occur elsewhere. This pass's existing hasDebt598 trigger
+  // has only ever been paired with the theme-resonance keyword channel (isResonant598) — this is
+  // the first pairing with the standard emotionalShift signal.
+  {
+    const r1004c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1004c.fires) {
+      issues.push({
+        location: `${r1004c.triggerCount} open-thread scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene leaving a thread unresolved (${r1004c.triggerCount} open questions) is followed by two emotionally neutral scenes, even though ${r1004c.aftermathCount} emotionally-charged scenes exist elsewhere. Unresolved material that never registers as felt weight in the scenes right after it leaves the theme's uncertainty inert rather than pressing on anyone.`,
+        suggestedFix: `In the two scenes following at least one open thread, show a character reacting emotionally to what's still unresolved so the theme's uncertainty presses on the story rather than sitting as inert backlog.`,
       });
     }
   }
