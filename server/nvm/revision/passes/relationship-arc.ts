@@ -477,6 +477,11 @@
 // unresolvedClues debt as trigger with relationshipShifts as channel, a combination neither this
 // pass's OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED (co-occurrence mode, not aftermath) nor any
 // other rule here has audited.
+// Wave 1043 additions: with raise_stakes/seededClueIds/unresolvedClues all now at four
+// checkAftermathVoid channels each, this wave gives each a fifth: RELATIONAL_STAKES_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID (raise_stakes, first pairing with dialogueHighlights), RELATIONAL_SEED_
+// SUSPENSE_AFTERMATH_VOID (seededClueIds, first pairing with suspenseDelta), and RELATIONAL_OPEN_
+// THREAD_SUSPENSE_AFTERMATH_VOID (heavy unresolvedClues debt, first pairing with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6001,6 +6006,83 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1029c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1029c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the relational arc's uncertainty purely informational rather than something straining the bond.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the arc's open threads register interpersonally, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying raise_stakes scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from RELATIONAL_STAKES_AFTERMATH_VOID, RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID, RELATIONAL_
+  // STAKES_SUSPENSE_AFTERMATH_VOID, and RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID (same trigger
+  // paired with relationshipShifts/curiosityDelta/suspenseDelta/emotionalShift respectively) —
+  // this is the fifth consequence channel for this trigger in this pass.
+  {
+    const r1043a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1043a.fires) {
+      issues.push({
+        location: `${r1043a.triggerCount} raise-stakes aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'RELATIONAL_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1043a.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1043a.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the relational arc's stakes registering structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath carries no suspense rise, while such rises occur
+  // elsewhere. Distinct from RELATIONAL_SEED_STAGING_AFTERMATH_VOID, RELATIONAL_SEED_CURIOSITY_
+  // AFTERMATH_VOID, RELATIONAL_SEED_EMOTIONAL_AFTERMATH_VOID, and RELATIONAL_SEED_AFTERMATH_VOID
+  // (same trigger paired with visualBeats/curiosityDelta/emotionalShift/relationshipShifts
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1043b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1043b.fires) {
+      issues.push({
+        location: `${r1043b.triggerCount} seed aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1043b.triggerCount} plants) is followed by two scenes with no rise in suspense, even though ${r1043b.aftermathCount} such rises occur elsewhere. A planted clue that never generates tension in its immediate wake leaves the relational arc's groundwork feeling inert rather than something actively pressuring the bonds it's meant to complicate.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the tension rise so the planted material feels like it's pressuring the relationship, not just informing the plot.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 suspense-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no suspense rise, while such rises occur elsewhere. Distinct from RELATIONAL_OPEN_
+  // THREAD_STAGING_AFTERMATH_VOID, RELATIONAL_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, RELATIONAL_
+  // OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and RELATIONAL_OPEN_THREAD_AFTERMATH_VOID (same trigger
+  // paired with visualBeats/emotionalShift/curiosityDelta/relationshipShifts respectively) — this
+  // is the fifth consequence channel for this trigger.
+  {
+    const r1043c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1043c.fires) {
+      issues.push({
+        location: `${r1043c.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RELATIONAL_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1043c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1043c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the relational arc's uncertainty stalling instead of pressuring the bonds it's meant to complicate.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the relationship rather than sitting in a learnable lull.`,
       });
     }
   }
