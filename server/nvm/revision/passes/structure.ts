@@ -490,6 +490,15 @@
 // AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with dialogueHighlights/
 // emotionalShift/curiosityDelta/relationshipShifts/visualBeats, now also paired with
 // suspenseDelta — its only remaining standard channel).
+// Wave 1087 additions: raise_stakes reaches full six-channel saturation — STRUCTURE_STAKES_
+// DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and STRUCTURE_STAKES_STAGING_AFTERMATH_VOID (previously
+// paired with curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift, now also paired
+// with dialogueHighlights and visualBeats respectively — its last two remaining standard
+// channels). With all four boolean triggers now fully saturated, the third check introduces
+// revelation as a genuinely fresh sequence/aftermath trigger — STRUCTURE_REVELATION_CURIOSITY_
+// AFTERMATH_VOID — distinct from this pass's existing revelation-curiosity co-occurrence/
+// decoupling check (Wave 443), which audits same-scene co-occurrence rather than a windowed
+// aftermath.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6046,6 +6055,85 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1073c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1073c.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of tension right after it leaves the structure's uncertainty stalling instead of pressuring the story forward.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the structure rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID, STRUCTURE_STAKES_SUSPENSE_AFTERMATH_VOID,
+  // STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_STAKES_EMOTIONAL_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1087a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1087a.fires) {
+      issues.push({
+        location: `${r1087a.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'STRUCTURE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1087a.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1087a.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the structure's stakes registering mechanically, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the structure's escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains
+  // no visually dense scene, while such scenes occur elsewhere. Distinct from STRUCTURE_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, STRUCTURE_STAKES_SUSPENSE_AFTERMATH_VOID, STRUCTURE_STAKES_
+  // RELATIONAL_AFTERMATH_VOID, STRUCTURE_STAKES_EMOTIONAL_AFTERMATH_VOID, and STRUCTURE_STAKES_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // relationshipShifts/emotionalShift/dialogueHighlights respectively) — this is the sixth and
+  // final standard-channel pairing for this trigger, completing full saturation for all four
+  // boolean triggers in this pass.
+  {
+    const r1087b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1087b.fires) {
+      issues.push({
+        location: `${r1087b.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'STRUCTURE_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1087b.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1087b.aftermathCount} such scenes exist elsewhere in the script. Escalating danger gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor in the world.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from this pass's existing revelation-curiosity
+  // co-occurrence/decoupling check (Wave 443, which audits whether curiosityDelta is positive in
+  // the SAME scene as the revelation, not in the 2-scene aftermath that follows it) — this is the
+  // first sequence/aftermath pairing of revelation in this pass.
+  {
+    const r1087c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1087c.fires) {
+      issues.push({
+        location: `${r1087c.triggerCount} revelation aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1087c.triggerCount} discoveries) is followed by two scenes with no rise in curiosity, even though ${r1087c.aftermathCount} such rises occur elsewhere. A truth that lands without opening a fresh question right after it leaves the structure's revelations registering as closed events rather than developments that generate the next thing to wonder about.`,
+        suggestedFix: `After at least one revelation, let one of the following two scenes carry a new open question — what the discovery implies, or what it costs — so the structure's revelations keep generating curiosity, not just delivering closure.`,
       });
     }
   }
