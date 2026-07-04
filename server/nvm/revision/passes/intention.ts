@@ -493,6 +493,17 @@
 // wave: INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (previously paired with payoffSetupIds/
 // curiosityDelta/emotionalShift/suspenseDelta, now also paired with relationshipShifts) and
 // INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID (now also paired with visualBeats).
+// Wave 1095 additions: INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives heavy
+// unresolvedClues debt its sixth and final standard channel (previously paired with
+// payoffSetupIds/curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts/visualBeats, now
+// also paired with dialogueHighlights), completing full six-channel saturation for all four of
+// this pass's main triggers (raise_stakes, seededClueIds, clockRaised, unresolvedClues-debt).
+// With those exhausted, this wave introduces two triggers as fresh checkAftermathVoid subjects
+// for the first time in this pass: INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID pairs
+// payoffSetupIds with curiosityDelta (payoffSetupIds has only ever anchored zone-cluster/
+// drought-run/peak-uncaused/zone-imbalance checks here), and INTENTION_TURN_SUSPENSE_
+// AFTERMATH_VOID pairs dramaticTurn with suspenseDelta (dramaticTurn has only ever anchored
+// zone-cluster/zone-imbalance/drought-run checks here).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6253,6 +6264,88 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1081c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1081c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the character's intention pursuing an abstraction rather than something lodged in the world.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from OPEN_THREAD_PAYOFF_AFTERMATH_VOID, INTENTION_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID, INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, INTENTION_OPEN_
+  // THREAD_SUSPENSE_AFTERMATH_VOID, INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, and
+  // INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID (same trigger paired with payoffSetupIds/
+  // curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts/visualBeats respectively) —
+  // this is the sixth and final standard-channel pairing for this trigger, completing full
+  // saturation for all four of this pass's main triggers (raise_stakes, seededClueIds,
+  // clockRaised, unresolvedClues-debt).
+  {
+    const r1095a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1095a.fires) {
+      issues.push({
+        location: `${r1095a.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1095a.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1095a.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the character's intention pursuing an abstraction rather than something voiced.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so the intention's pursuit registers in speech, not just as narrative backlog.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in curiosity, while such rises
+  // occur elsewhere. Distinct from INTENTION_PAYOFF_ZONE_CLUSTER, INTENTION_PAYOFF_PEAK_UNCAUSED,
+  // INTENTION_PAYOFF_DROUGHT_RUN, and INTENTION_PAYOFF_ZONE_IMBALANCE (distribution/timing,
+  // backward-cause, and run-based modes, none sequence/aftermath) and from
+  // OPEN_THREAD_PAYOFF_AFTERMATH_VOID (which uses payoffSetupIds as the AFTERMATH signal for an
+  // unresolvedClues trigger, the reverse causal direction) — this is the first check to use
+  // payoffSetupIds as a checkAftermathVoid TRIGGER in this pass.
+  {
+    const r1095b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1095b.fires) {
+      issues.push({
+        location: `${r1095b.triggerCount} payoff scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1095b.triggerCount} payoff scenes is followed by two scenes with no rise in curiosity, even though ${r1095b.aftermathCount} such rises occur elsewhere. A resolved setup that never reopens the field of questions right after it lands leaves the character's intention feeling like a closed loop rather than a pursuit that keeps generating new stakes.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new question surface so the intention's arc keeps generating curiosity instead of settling into resolution.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while
+  // such rises occur elsewhere. Distinct from INTENTION_TURN_DROUGHT_RUN, INTENTION_TURN_ZONE_
+  // CLUSTER, and INTENTION_TURN_ZONE_IMBALANCE (run-based and distribution/timing modes, not
+  // sequence/aftermath) — this is the first check to use dramaticTurn as a checkAftermathVoid
+  // trigger in this pass.
+  {
+    const r1095c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1095c.fires) {
+      issues.push({
+        location: `${r1095c.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'INTENTION_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1095c.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1095c.aftermathCount} such rises occur elsewhere. A pivot that never re-tightens tension right after it happens leaves the character's intention registering as an isolated reversal rather than a hinge that keeps pulling their pursuit forward.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new tension rise so the character's intention keeps facing pressure instead of settling immediately after the pivot.`,
       });
     }
   }

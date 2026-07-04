@@ -1352,6 +1352,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1095 — intentionPass: intention open-thread-dialogue-highlight aftermath void, intention payoff-curiosity aftermath void, intention turn-suspense aftermath void', async () => {
+    const makeRec1095 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1095 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1095a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1095(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by highlighted dialogue within its window', async () => {
+      const recs1095an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1095(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'INTENTION_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when every payoff is followed by two scenes with no curiosity rise', async () => {
+      const recs1095b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1095(i, { curiosityDelta: 1 });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by a curiosity rise within its window', async () => {
+      const recs1095bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1095(i, { curiosityDelta: 1 });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const recs1095c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1095(i, { suspenseDelta: 1 });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const recs1095cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1095(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1095(i, { suspenseDelta: 1 });
+        return makeRec1095(i);
+      });
+      const res = await runIN1095(recs1095cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1081 — intentionPass: intention stakes-dialogue-highlight aftermath void, intention open-thread-relational aftermath void, intention open-thread-staging aftermath void', async () => {
     const makeRec1081 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
