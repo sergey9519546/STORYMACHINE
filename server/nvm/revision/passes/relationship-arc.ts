@@ -499,6 +499,14 @@
 // variant (already covering relational/curiosity/suspense/emotional via a mix of hand-rolled and
 // checkAftermathVoid mechanisms) gets its fifth channel with RELATIONSHIP_SHIFT_STAGING_
 // AFTERMATH_VOID (visualBeats).
+// Wave 1085 additions: continuing the relationshipShifts-as-trigger family — the |amount|≥0.3
+// magnitude variant (previously paired with dialogueHighlights/visualBeats/emotionalShift) gets
+// two more channels: RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID and RELATIONSHIP_
+// SHIFT_MAGNITUDE_SUSPENSE_AFTERMATH_VOID (curiosityDelta and suspenseDelta respectively). The
+// length>0 variant (already at relational/curiosity/suspense/emotional/staging) reaches full
+// six-channel saturation with RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID (dialogueHighlights —
+// its only remaining standard channel, distinct from the magnitude variant's own dialogueHighlights
+// pairing at RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6263,6 +6271,94 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every relationship-shift scene with room after it (${r1071c.triggerCount} in total) is followed by two scenes with no substantial physical staging, even though ${r1071c.aftermathCount} such scenes exist elsewhere. A bond that changes gains texture when the world briefly holds physical attention right after it, but that opportunity consistently passes unstaged in the scenes immediately following every shift.`,
         suggestedFix: `In the two scenes following at least one relationship shift, let substantial physical staging carry some of the weight — an action or gesture that gives the changed bond a physical anchor before the story moves on.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath ×
+  // relationshipShifts (|amount|≥0.3 magnitude) trigger → curiosityDelta absence. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying shift scenes
+  // (|amount|≥0.3, pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead. Fires when
+  // every shift's two-scene aftermath carries no rise in curiosity, while such rises occur
+  // elsewhere. Distinct from RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  // RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID, and RELATIONSHIP_SHIFT_MAGNITUDE_
+  // EMOTIONAL_AFTERMATH_VOID (same |amount|≥0.3 trigger paired with dialogueHighlights/
+  // visualBeats/emotionalShift respectively) — this is the fourth consequence channel for this
+  // magnitude-gated trigger variant, distinct from the length>0 variant's own hand-rolled
+  // RELATIONSHIP_SHIFT_CURIOSITY_VOID/RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID (a materially
+  // looser trigger predicate).
+  {
+    const r1085a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1085a.fires) {
+      issues.push({
+        location: `${r1085a.triggerCount} relationship-shift scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1085a.triggerCount} significant relationship-shift scenes is followed by two scenes with no rise in curiosity, even though ${r1085a.aftermathCount} such rises occur elsewhere. A bond that has just meaningfully shifted opens no fresh question about what happens next, leaving the change registering as a settled fact rather than a live development.`,
+        suggestedFix: `In the two scenes following at least one significant relationship shift, plant a new open question — what the changed bond will cost, or whether it will hold — so the shift keeps propelling curiosity forward rather than closing the matter.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_MAGNITUDE_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath ×
+  // relationshipShifts (|amount|≥0.3 magnitude) trigger → suspenseDelta absence. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying shift scenes
+  // (|amount|≥0.3, pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires when
+  // every shift's two-scene aftermath carries no rise in suspense, while such rises occur
+  // elsewhere. Distinct from RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, RELATIONSHIP_
+  // SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID, RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_
+  // VOID, and RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID (this wave, same |amount|≥0.3
+  // trigger paired with dialogueHighlights/visualBeats/emotionalShift/curiosityDelta
+  // respectively) — this is the fifth consequence channel for this magnitude-gated trigger
+  // variant, distinct from the length>0 variant's own hand-rolled RELATIONSHIP_SHIFT_SUSPENSE_
+  // AFTERMATH_VOID (a materially looser trigger predicate).
+  {
+    const r1085b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1085b.fires) {
+      issues.push({
+        location: `${r1085b.triggerCount} relationship-shift scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_MAGNITUDE_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1085b.triggerCount} significant relationship-shift scenes is followed by two scenes with no rise in suspense, even though ${r1085b.aftermathCount} such rises occur elsewhere. A bond that has just meaningfully shifted doesn't tighten the felt sense of tension right after it changes, leaving the shift registering as emotionally contained rather than dramatically consequential.`,
+        suggestedFix: `After at least one significant relationship shift, let one of the following two scenes escalate tension — the broken bond exposes a vulnerability, or the repaired alliance raises a new threat — so the story's temperature moves with the bond.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × relationshipShifts
+  // (length>0) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying shift scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every shift's two-scene aftermath
+  // contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // RELATIONSHIP_SHIFT_AFTERMATH_VOID, RELATIONSHIP_SHIFT_CURIOSITY_VOID/RELATIONSHIP_SHIFT_
+  // CURIOSITY_AFTERMATH_VOID, RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID, RELATIONSHIP_SHIFT_
+  // EMOTIONAL_AFTERMATH_VOID, and RELATIONSHIP_SHIFT_STAGING_AFTERMATH_VOID (same length>0
+  // trigger paired with relationshipShifts/curiosityDelta/suspenseDelta/emotionalShift/
+  // visualBeats respectively) — this is the sixth and final consequence channel for this trigger
+  // variant, completing full saturation, and distinct from the |amount|≥0.3 magnitude variant's
+  // own dialogueHighlights channel at RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (a
+  // materially stricter trigger predicate).
+  {
+    const r1085c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1085c.fires) {
+      issues.push({
+        location: `${r1085c.triggerCount} relationship-shift aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every relationship-shift scene with room after it (${r1085c.triggerCount} in total) is followed by two scenes with no highlighted dialogue, even though ${r1085c.aftermathCount} such scenes exist elsewhere. A bond that changes carries into the next beat; when that aftermath never carries a memorable line, the new dynamic goes unvoiced — no character's speech confirms what changed or what it costs.`,
+        suggestedFix: `In the two scenes following at least one relationship shift, let one of them carry a line worth remembering — a character naming what changed between them, so the new dynamic is voiced, not just structurally recorded.`,
       });
     }
   }
