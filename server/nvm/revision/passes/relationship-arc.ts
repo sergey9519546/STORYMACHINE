@@ -507,6 +507,17 @@
 // six-channel saturation with RELATIONSHIP_SHIFT_HIGHLIGHT_AFTERMATH_VOID (dialogueHighlights —
 // its only remaining standard channel, distinct from the magnitude variant's own dialogueHighlights
 // pairing at RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID).
+// Wave 1099 additions: RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID gives the
+// |amount|≥0.3 magnitude variant its sixth and final channel (previously paired with
+// dialogueHighlights/visualBeats/emotionalShift/curiosityDelta/suspenseDelta, now also paired
+// with a further relationshipShifts entry elsewhere), completing full six-channel saturation for
+// both relationshipShifts-trigger variants and all three of this pass's other main triggers
+// (raise_stakes, seededClueIds, unresolvedClues-debt). With every existing trigger exhausted,
+// this wave introduces two triggers as fresh checkAftermathVoid subjects for the first time in
+// this pass — clockRaised and revelation have only ever anchored distribution/timing (zone-
+// imbalance/zone-cluster) checks here, never sequence/aftermath: RELATIONSHIP_CLOCK_CURIOSITY_
+// AFTERMATH_VOID pairs clockRaised with curiosityDelta, and RELATIONSHIP_REVELATION_SUSPENSE_
+// AFTERMATH_VOID pairs revelation with suspenseDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6359,6 +6370,85 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every relationship-shift scene with room after it (${r1085c.triggerCount} in total) is followed by two scenes with no highlighted dialogue, even though ${r1085c.aftermathCount} such scenes exist elsewhere. A bond that changes carries into the next beat; when that aftermath never carries a memorable line, the new dynamic goes unvoiced — no character's speech confirms what changed or what it costs.`,
         suggestedFix: `In the two scenes following at least one relationship shift, let one of them carry a line worth remembering — a character naming what changed between them, so the new dynamic is voiced, not just structurally recorded.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath ×
+  // relationshipShifts (|amount|≥0.3 magnitude) trigger → relationshipShifts (any, length>0)
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // magnitude-shift scenes (pos<n-2), ≥2 scenes anywhere carrying any recorded relationship
+  // shift, 2-scene lookahead. Fires when every significant shift's two-scene aftermath carries no
+  // further relationship movement of any size, while such movement occurs elsewhere. Distinct
+  // from RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, RELATIONSHIP_SHIFT_MAGNITUDE_
+  // STAGING_AFTERMATH_VOID, RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID,
+  // RELATIONSHIP_SHIFT_MAGNITUDE_CURIOSITY_AFTERMATH_VOID, and RELATIONSHIP_SHIFT_MAGNITUDE_
+  // SUSPENSE_AFTERMATH_VOID (same trigger paired with dialogueHighlights/visualBeats/
+  // emotionalShift/curiosityDelta/suspenseDelta respectively) — this is the sixth and final
+  // consequence channel for this trigger variant, completing full saturation for both
+  // relationshipShifts-trigger variants.
+  {
+    const r1099a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1099a.fires) {
+      issues.push({
+        location: `${r1099a.triggerCount} significant relationship-shift scene(s) — no further relationship movement within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_MAGNITUDE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1099a.triggerCount} significant relationship-shift scenes is followed by two scenes with no further recorded relationship movement, even though ${r1099a.aftermathCount} such movements exist elsewhere in the script. A bond that has just meaningfully shifted stalls immediately afterward — the change registers once and then the relational arc moves on, instead of the new dynamic rippling into how characters continue to relate.`,
+        suggestedFix: `After at least one significant relationship shift, let one of the following two scenes carry a further beat of relational movement — even a small one — so the shift's consequences continue to unfold rather than closing off after a single scene.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised check in this file
+  // (all zone-imbalance/zone-cluster, distribution/timing modes, none sequence/aftermath) — this
+  // is the first check to use clockRaised as a checkAftermathVoid trigger in this pass.
+  {
+    const r1099b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1099b.fires) {
+      issues.push({
+        location: `${r1099b.triggerCount} clock-raise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1099b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1099b.aftermathCount} such rises occur elsewhere. Time pressure that never reopens the field of questions right after it tightens leaves the relational arc's sense of urgency disconnected from what the reader still wants to know about these bonds.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface about how the deadline will affect a relationship, so the ticking clock deepens curiosity about the bonds, not just urgency about the plot.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // (non-null) trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // rise in suspense, while such rises occur elsewhere. Distinct from every existing revelation
+  // check in this file (all zone-imbalance/zone-cluster, distribution/timing modes, none
+  // sequence/aftermath) — this is the first check to use revelation as a checkAftermathVoid
+  // trigger in this pass.
+  {
+    const r1099c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1099c.fires) {
+      issues.push({
+        location: `${r1099c.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1099c.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1099c.aftermathCount} such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the relational arc's reckoning with new information feeling inert rather than consequential to the bonds it should complicate.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new tension rise in how characters relate to each other, so the discovery's relational fallout keeps pressing on the story instead of resolving into calm.`,
       });
     }
   }
