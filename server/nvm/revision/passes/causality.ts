@@ -527,6 +527,16 @@
 // HIGHLIGHT_AFTERMATH_VOID and CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID each give
 // seededClueIds and heavy unresolvedClues debt a fifth channel using dialogueHighlights — a field
 // only previously paired with raise_stakes (Wave 1049) in this pass.
+// Wave 1077 additions (closes the thirty-fifth rotation cycle, 1064-1077): seededClueIds and
+// heavy unresolvedClues debt each reach full six-channel saturation — CAUSALITY_SEED_STAGING_
+// AFTERMATH_VOID (seededClueIds, previously paired with curiosityDelta/emotionalShift/
+// suspenseDelta/relationshipShifts/dialogueHighlights, now also paired with visualBeats — its
+// only remaining standard channel) and CAUSALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID (heavy
+// unresolvedClues debt, previously paired with suspenseDelta/emotionalShift/relationshipShifts/
+// curiosityDelta/dialogueHighlights, now also paired with visualBeats — its only remaining
+// standard channel). CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives payoffSetupIds a
+// fifth channel (previously paired with emotionalShift/relationshipShifts/suspenseDelta/
+// curiosityDelta, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6254,6 +6264,87 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying unresolved clue-debt (${r1063c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1063c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the causal chain's open threads voiceless rather than felt in what characters say to each other.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from CAUSALITY_SEED_CURIOSITY_AFTERMATH_
+  // VOID, CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID, CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID,
+  // CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID, and CAUSALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID (same trigger paired with curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1077a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1077a.fires) {
+      issues.push({
+        location: `${r1077a.triggerCount} seed scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CAUSALITY_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1077a.triggerCount} clue-planting scenes is followed by two scenes with no substantial physical staging, even though ${r1077a.aftermathCount} such scenes exist elsewhere in the script. A planted clue gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every seed.`,
+        suggestedFix: `After at least one clue-seeding moment, let one of the following two scenes carry substantial physical staging — the planted material or its surroundings given some visible presence before the causal chain moves on.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2), ≥2 visually-dense scenes anywhere
+  // (visualBeats length≥2), 2-scene lookahead. Fires when every heavy-debt scene's two-scene
+  // aftermath contains no visually dense scene, while such scenes occur elsewhere. Distinct from
+  // CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_
+  // VOID, CAUSALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID, and CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger
+  // paired with suspenseDelta/emotionalShift/relationshipShifts/curiosityDelta/dialogueHighlights
+  // respectively) — this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1077b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1077b.fires) {
+      issues.push({
+        location: `${r1077b.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CAUSALITY_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying unresolved clue-debt (${r1077b.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1077b.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the causal chain's open threads feeling abstract rather than lodged in the world.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted
+  // line of dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains
+  // no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CAUSALITY_
+  // PAYOFF_EMOTIONAL_AFTERMATH_VOID, CAUSALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID, CAUSALITY_
+  // PAYOFF_SUSPENSE_AFTERMATH_VOID, and CAUSALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID (same trigger
+  // paired with emotionalShift/relationshipShifts/suspenseDelta/curiosityDelta respectively) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1077c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1077c.fires) {
+      issues.push({
+        location: `${r1077c.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CAUSALITY_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1077c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1077c.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the causal chain's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
       });
     }
   }
