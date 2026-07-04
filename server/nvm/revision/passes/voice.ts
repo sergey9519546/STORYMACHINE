@@ -423,6 +423,15 @@
 // respectively), spanning three distinct classes: VOICE_EMOTION_ZONE_IMBALANCE (emotionalShift !==
 // 'neutral' — the any-direction valence signal), VOICE_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights
 // array), and VOICE_SEED_ZONE_IMBALANCE (seededClueIds array, distinct from the audited payoff array).
+// Wave 991 additions: zone-imbalance is now fully exhausted in this pass — the only remaining
+// cluster+drought pair, VOICE_REVELATION (revelation != null) and VOICE_RELATIONSHIP
+// (relationshipShifts.length > 0), both duplicate signals already audited by REVELATION_ZONE_
+// IMBALANCE and VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE respectively (confirmed again this wave;
+// same finding as Wave 977). This wave pivots entirely to the sequence/aftermath mode with three
+// fresh trigger/aftermath pairings, none reusing the CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID or
+// VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID combinations: VOICE_STAKES_CURIOSITY_AFTERMATH_VOID
+// (raise_stakes → curiosityDelta), VOICE_TURN_SUSPENSE_AFTERMATH_VOID (dramatic turn → suspense),
+// and VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID (payoffSetupIds → relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5902,6 +5911,81 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r977c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName977c} contains ${r977c.counts[r977c.bloatZoneIdx]} of them (${Math.round((r977c.counts[r977c.bloatZoneIdx] / r977c.totalCount) * 100)}%) while ${emptyNames977c} contains none. Setups bloat in one structural quarter and never get planted in another, giving the voice's register of foreshadowing an uneven structural rhythm.`,
         suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames977c} — so the voice's register of foreshadowing recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now fully exhausted in this pass
+  // (the only remaining cluster+drought pair, VOICE_REVELATION/VOICE_RELATIONSHIP, both duplicate
+  // signals already audited under different rule names), this wave pivots entirely to the
+  // sequence/aftermath mode. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising
+  // scenes anywhere, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath opens
+  // no new curiosity, while curiosity does occur elsewhere. First use of raise_stakes as an
+  // aftermath-void trigger in this pass — distinct from the clock/seed triggers already paired
+  // with dialogueHighlights.
+  {
+    const r991a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r991a.fires) {
+      issues.push({
+        location: `${r991a.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'VOICE_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r991a.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r991a.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger that never provokes a new uncertainty about what comes next leaves the voice's register of tension without a corresponding register of wonder in the beats right after.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation feeds a voice of curiosity rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // VOICE_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → suspenseDelta
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene lookahead. Fires
+  // when every turn's two-scene aftermath raises no tension, while tension does rise elsewhere.
+  // First pairing of dramaticTurn with suspenseDelta as an aftermath-void combination in this pass
+  // — a pivot that fires without a rise in tension reads as a reversal the voice treats as inert
+  // rather than consequential.
+  {
+    const r991b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r991b.fires) {
+      issues.push({
+        location: `${r991b.triggerCount} dramatic-turn aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'VOICE_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r991b.triggerCount} pivots) is followed by two scenes with no rise in tension, even though ${r991b.aftermathCount} such rises occur elsewhere. A pivot that never tightens tension in the scenes right after it lands as a plot beat the voice registers flatly rather than a turn that reshapes what the audience fears or hopes for next.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, raise the tension — a ticking complication or a near-miss — so the voice registers the pivot's consequence rather than moving past it inertly.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. First use of payoffSetupIds as an aftermath-void trigger in this
+  // pass, and the first pairing of any trigger with relationshipShifts as the aftermath signal —
+  // a callback that never bears on how characters treat each other nearby is a payoff the voice
+  // leaves interpersonally silent.
+  {
+    const r991c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r991c.fires) {
+      issues.push({
+        location: `${r991c.triggerCount} payoff aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r991c.triggerCount} callbacks) is followed by two scenes with no shift in any relationship, even though ${r991c.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as information completing without interpersonal consequence.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the collected setup strain or shift a relationship so the callback pays off interpersonally, not only structurally.`,
       });
     }
   }

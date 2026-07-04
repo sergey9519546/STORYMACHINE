@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 991 — voicePass: voice stakes-curiosity aftermath void, voice turn-suspense aftermath void, voice payoff-relationship aftermath void', async () => {
+    const runV991 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs991a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'VOICE_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs991an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAKES_CURIOSITY_AFTERMATH_VOID'), 'VOICE_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no rise in suspense', async () => {
+      const recs991b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_TURN_SUSPENSE_AFTERMATH_VOID'), 'VOICE_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by rising suspense within its window', async () => {
+      const recs991bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_TURN_SUSPENSE_AFTERMATH_VOID'), 'VOICE_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID fires when every payoff is followed by two scenes with no relationship shift', async () => {
+      const recs991c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within its window', async () => {
+      const recs991cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV991(recs991cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID'), 'VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 977 — voicePass: voice emotion zone imbalance, voice highlight zone imbalance, voice seed zone imbalance', async () => {
     const runV977 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
