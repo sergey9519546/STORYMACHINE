@@ -1376,6 +1376,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1155 — relationshipArcPass: relationship revelation-staging aftermath void, relationship turn-curiosity aftermath void, relationship payoff-suspense aftermath void', async () => {
+    const runRA1155 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID fires when every revelation is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1155a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID does not fire when a revelation is followed by a heavily-staged scene within its window', async () => {
+      const recs1155an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID'), 'RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no curiosity rise', async () => {
+      const recs1155b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID'), 'RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by a curiosity rise within its window', async () => {
+      const recs1155bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID'), 'RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID fires when every payoff is followed by two scenes with no suspense rise', async () => {
+      const recs1155c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when a payoff is followed by a suspense rise within its window', async () => {
+      const recs1155cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1155(recs1155cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1141 — relationshipArcPass: relationship clock-dialogue-highlight aftermath void, relationship clock-staging aftermath void, relationship revelation-dialogue-highlight aftermath void', async () => {
     const runRA1141 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');

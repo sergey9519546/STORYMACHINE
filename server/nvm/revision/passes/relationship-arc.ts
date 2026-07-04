@@ -537,6 +537,14 @@
 // AFTERMATH_VOID give clockRaised its fifth and sixth channels (dialogueHighlights,
 // visualBeats), completing full saturation for this trigger. RELATIONSHIP_REVELATION_
 // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives revelation its fifth channel (dialogueHighlights).
+// Wave 1155 additions: RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID gives revelation its
+// sixth and final channel (visualBeats), completing full six-channel saturation for every
+// existing trigger in this pass. With those exhausted, this wave introduces dramaticTurn and
+// payoffSetupIds as fresh checkAftermathVoid triggers — both have only ever appeared as
+// aftermath channels for the relationshipShifts trigger (RELATIONSHIP_SHIFT_DRAMATIC_TURN_
+// AFTERMATH_VOID, RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID), never as the trigger itself.
+// RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with curiosityDelta;
+// RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID pairs payoffSetupIds with suspenseDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6698,6 +6706,87 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1141c.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1141c.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a memorable line right after it lands leaves the relational arc's revelations unvoiced — no character's speech processes what was just learned about someone else.`,
         suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered about the relationship, so the reckoning with new information registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null)
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from RELATIONSHIP_REVELATION_SUSPENSE_
+  // AFTERMATH_VOID (Wave 1099), RELATIONSHIP_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1113),
+  // RELATIONSHIP_REVELATION_EMOTIONAL_AFTERMATH_VOID, RELATIONSHIP_REVELATION_AFTERMATH_VOID
+  // (Wave 1127), and RELATIONSHIP_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (Wave 1141, same
+  // trigger paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights) — this is the sixth and final consequence channel for this trigger,
+  // completing full six-channel saturation.
+  {
+    const r1155a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1155a.fires) {
+      issues.push({
+        location: `${r1155a.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'RELATIONSHIP_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1155a.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1155a.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a visually charged follow-through leaves the relational arc's revelations registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information about a relationship registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in curiosity, while
+  // such rises occur elsewhere. Distinct from every other rule in this file: dramaticTurn has
+  // only ever appeared as an aftermath channel for the relationshipShifts trigger
+  // (RELATIONSHIP_SHIFT_DRAMATIC_TURN_AFTERMATH_VOID) — this is the first check to use
+  // dramaticTurn as the trigger itself in this pass. A pivot that never opens a fresh question
+  // about how a relationship will now bend leaves the turn structurally present but relationally
+  // inert.
+  {
+    const r1155b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1155b.fires) {
+      issues.push({
+        location: `${r1155b.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1155b.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1155b.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question about what it means for how two characters now stand with each other leaves the turn's relational consequences unexamined — the story moves on without the audience wondering what changed between people.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface about a relationship — will this alliance hold, has this trust broken — so the pivot keeps generating curiosity about the relational stakes, not just the plot.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from every other rule in this file: payoffSetupIds has only ever
+  // appeared as an aftermath channel for the relationshipShifts trigger (RELATIONSHIP_SHIFT_
+  // PAYOFF_AFTERMATH_VOID) — this is the first check to use payoffSetupIds as the trigger itself
+  // in this pass. A resolved thread that never leaves any tension in its relational wake reads
+  // as a bond that settles rather than one still under pressure.
+  {
+    const r1155c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1155c.fires) {
+      issues.push({
+        location: `${r1155c.triggerCount} payoff scene(s) — no suspense rise within 2 scenes`,
+        rule: 'RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1155c.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1155c.aftermathCount} such rises occur elsewhere in the script. A resolved thread that leaves no tension in its immediate aftermath reads as a relationship settling into calm rather than one that remains under some new pressure once the old promise is spent.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolution introduce a fresh source of tension in a relationship, so the payoff's aftermath keeps some pressure alive rather than closing the relational stakes entirely.`,
       });
     }
   }
