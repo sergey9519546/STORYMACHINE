@@ -499,6 +499,12 @@
 // AFTERMATH_VOID — distinct from this pass's existing revelation-curiosity co-occurrence/
 // decoupling check (Wave 443), which audits same-scene co-occurrence rather than a windowed
 // aftermath.
+// Wave 1101 additions: with all four main boolean triggers already fully saturated, this wave
+// continues building out revelation's checkAftermathVoid channel set (currently just
+// curiosityDelta, established Wave 1087) — STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID
+// (emotionalShift), STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID (suspenseDelta), and
+// STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID (relationshipShifts) give this trigger three
+// fresh channels.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6134,6 +6140,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every revelation in the story (${r1087c.triggerCount} discoveries) is followed by two scenes with no rise in curiosity, even though ${r1087c.aftermathCount} such rises occur elsewhere. A truth that lands without opening a fresh question right after it leaves the structure's revelations registering as closed events rather than developments that generate the next thing to wonder about.`,
         suggestedFix: `After at least one revelation, let one of the following two scenes carry a new open question — what the discovery implies, or what it costs — so the structure's revelations keep generating curiosity, not just delivering closure.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1087, same trigger paired with curiosityDelta) — this is the second
+  // checkAftermathVoid-based channel for this trigger.
+  {
+    const r1101a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1101a.fires) {
+      issues.push({
+        location: `${r1101a.triggerCount} revelation aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1101a.triggerCount} discoveries) is followed by two scenes with no emotional shift, even though ${r1101a.aftermathCount} such shifts occur elsewhere. A truth that lands without registering emotionally right after it leaves the structure's revelations feeling procedural — information delivered without anyone visibly reacting to what it means.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a character's emotional register shift in response, so the structure's discoveries carry felt weight, not just informational weight.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from STRUCTURE_REVELATION_CURIOSITY_AFTERMATH_VOID
+  // and STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift) — this is the third checkAftermathVoid-based channel for this trigger.
+  {
+    const r1101b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1101b.fires) {
+      issues.push({
+        location: `${r1101b.triggerCount} revelation aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1101b.triggerCount} discoveries) is followed by two scenes with no rise in suspense, even though ${r1101b.aftermathCount} such rises occur elsewhere. A truth that lands without re-tightening tension right after it leaves the structure's revelations feeling inert rather than consequential to what follows.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new tension rise from the discovery, so the structure's revelations keep the story pressing forward instead of settling into calm.`,
+      });
+    }
+  }
+
+  // STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // relationship movement, while such movement occurs elsewhere. Distinct from STRUCTURE_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID, STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID, and
+  // STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta) — this is the fourth checkAftermathVoid-based channel for this
+  // trigger.
+  {
+    const r1101c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1101c.fires) {
+      issues.push({
+        location: `${r1101c.triggerCount} revelation aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1101c.triggerCount} discoveries) is followed by two scenes with no recorded relationship shift, even though ${r1101c.aftermathCount} such shifts occur elsewhere. A truth that lands without moving how characters stand with each other leaves the structure's revelations registering as private facts rather than developments that ripple through the story's relationships.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it shift how a pair of characters relate, so the structure's discoveries carry interpersonal weight, not just informational weight.`,
       });
     }
   }

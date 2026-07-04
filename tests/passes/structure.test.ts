@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1101 — structurePass: structure revelation-emotional aftermath void, structure revelation-suspense aftermath void, structure revelation-relational aftermath void', async () => {
+    const runST1101 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1101a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1101an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID fires when every revelation is followed by two scenes with no suspense rise', async () => {
+      const recs1101b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID does not fire when a revelation is followed by a suspense rise within its window', async () => {
+      const recs1101bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const recs1101c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const recs1101cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1101(recs1101cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1087 — structurePass: structure stakes-dialogue-highlight aftermath void, structure stakes-staging aftermath void, structure revelation-curiosity aftermath void', async () => {
     const runST1087 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
