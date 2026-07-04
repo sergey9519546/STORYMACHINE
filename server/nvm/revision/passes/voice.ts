@@ -439,6 +439,13 @@
 // VOID (seededClueIds, previously only paired with dialogueHighlights, now paired with
 // emotionalShift), and VOICE_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn, previously only paired
 // with suspenseDelta, now paired with relationshipShifts).
+// Wave 1019 additions: two more existing triggers get a fresh channel — VOICE_STAKES_SUSPENSE_
+// AFTERMATH_VOID (raise_stakes, previously only paired with curiosityDelta, now paired with
+// suspenseDelta) and VOICE_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds, previously only paired
+// with relationshipShifts, now paired with curiosityDelta) — plus one genuinely fresh pairing never
+// used in this pass before: VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID (unresolvedClues.length >= 3,
+// a trigger never used for aftermath-void in this file, paired with visualBeats, a channel never
+// used as an aftermath consequence in this file).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6065,6 +6072,81 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1005c.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1005c.aftermathCount} such shifts occur elsewhere. A pivot that never bears on how characters treat each other in the scenes right after it lands as a plot beat the voice registers structurally rather than interpersonally.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let the pivot strain or shift a relationship so the voice registers the turn's interpersonal consequence, not only its plot mechanics.`,
+      });
+    }
+  }
+
+  // VOICE_STAKES_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger → suspenseDelta
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // raise_stakes scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every stakes-raise's two-scene aftermath carries no suspense rise, while such rises occur
+  // elsewhere. Distinct from VOICE_STAKES_CURIOSITY_AFTERMATH_VOID (Wave 991: same trigger paired
+  // with curiosityDelta) — this pairs raise_stakes with suspenseDelta for the first time in this pass.
+  {
+    const r1019a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1019a.fires) {
+      issues.push({
+        location: `${r1019a.triggerCount} raise-stakes aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'VOICE_STAKES_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1019a.triggerCount} of them) is followed by two scenes with no rise in suspense at all, even though ${r1019a.aftermathCount} such rises occur elsewhere. Raising the stakes without the tension actually climbing in its immediate aftermath leaves the voice announcing danger it doesn't yet make felt.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the tension visibly climb so the voice's declared danger is matched by rising suspense.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff-setup scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every setup's two-scene aftermath carries no curiosity rise, while such
+  // rises occur elsewhere. Distinct from VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID (Wave 991: same
+  // trigger paired with relationshipShifts) — this pairs payoffSetupIds with curiosityDelta for the
+  // first time in this pass.
+  {
+    const r1019b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1019b.fires) {
+      issues.push({
+        location: `${r1019b.triggerCount} payoff-setup aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'VOICE_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff-setup scene in the story (${r1019b.triggerCount} plants) is followed by two scenes with no rise in curiosity, even though ${r1019b.aftermathCount} such rises occur elsewhere. Planting a setup without the audience's curiosity visibly sharpening right after it lets the voice bury its own groundwork.`,
+        suggestedFix: `In the two scenes following at least one payoff setup, let curiosity visibly sharpen so the voice's groundwork registers as something the audience is now wondering about.`,
+      });
+    }
+  }
+
+  // VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying scenes with 3+ open threads (pos<n-2), ≥2 visually-staged scenes anywhere, 2-scene
+  // lookahead. Fires when every such heavily-unresolved scene's two-scene aftermath carries no
+  // staged visual beat, while staged beats occur elsewhere. Distinctness: unresolvedClues has never
+  // been used as an aftermath-void trigger in this pass (only as a zone/drought-run presence
+  // signal via UNRESOLVED_CLUE_DROUGHT_RUN and VOICE_OPEN_THREAD_ZONE_CLUSTER/DROUGHT_RUN/
+  // ZONE_IMBALANCE), and visualBeats has never been used as an aftermath-void consequence channel
+  // in this pass (only as its own trigger/presence signal via VOICE_STAGING_* and VOICE_STAGING_
+  // PEAK_UNCAUSED) — both halves of this pairing are genuinely new territory for the sequence/
+  // aftermath mode in this file.
+  {
+    const r1019c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length > 0,
+    });
+    if (r1019c.fires) {
+      issues.push({
+        location: `${r1019c.triggerCount} heavily-unresolved aftermath(s) — no staged visual beat within 2 scenes`,
+        rule: 'VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying three or more unresolved threads (${r1019c.triggerCount} of them) is followed by two scenes with no staged visual beat, even though ${r1019c.aftermathCount} such beats occur elsewhere. A pile-up of open questions that never earns a visually staged moment right after it leaves the voice's mounting uncertainty unseen rather than embodied.`,
+        suggestedFix: `In the two scenes following a heavily-unresolved scene, stage at least one deliberate visual beat so the voice's accumulating open threads become something the audience can actually see, not just track.`,
       });
     }
   }
