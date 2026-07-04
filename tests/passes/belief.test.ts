@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1146 — beliefPass: belief clock-dialogue-highlight aftermath void, belief turn-curiosity aftermath void, belief turn-emotional aftermath void', async () => {
+    const runBF1146 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise has no highlighted dialogue within 2 scenes', async () => {
+      const recs1146a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1146(recs1146a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1146an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runBF1146(recs1146an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn has no curiosity rise within 2 scenes', async () => {
+      const recs1146b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reveal' } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1146(recs1146b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURN_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1146bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reveal' } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1146(recs1146bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURN_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID fires when every dramatic turn has no emotional shift within 2 scenes', async () => {
+      const recs1146c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reveal' } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1146(recs1146c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by an emotional shift within 2 scenes', async () => {
+      const recs1146cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reveal' } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1146(recs1146cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1132 — beliefPass: belief clock-emotional aftermath void, belief clock-relational aftermath void, belief turn-suspense aftermath void', async () => {
     const runBF1132 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
