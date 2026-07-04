@@ -1247,6 +1247,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1147 — causalityPass: causality turn-dialogue-highlight aftermath void, causality revelation-curiosity aftermath void, causality suspense-emotional aftermath void', async () => {
+    const runCA1147 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every dramatic turn has no highlighted dialogue within 2 scenes', async () => {
+      const recs1147a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runCA1147(recs1147a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a dramatic turn is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1147an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runCA1147(recs1147an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID fires when every revelation has no curiosity rise within 2 scenes', async () => {
+      const recs1147b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runCA1147(recs1147b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when a revelation is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1147bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runCA1147(recs1147bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID fires when every suspense-rise has no emotional shift within 2 scenes', async () => {
+      const recs1147c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runCA1147(recs1147c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID does not fire when a suspense-rise is followed by an emotional shift within 2 scenes', async () => {
+      const recs1147cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runCA1147(recs1147cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1133 — causalityPass: causality clock-staging aftermath void, causality turn-relational aftermath void, causality turn-staging aftermath void', async () => {
     const runCA1133 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

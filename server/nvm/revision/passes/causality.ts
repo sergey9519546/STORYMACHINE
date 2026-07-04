@@ -569,6 +569,14 @@
 // for this trigger. CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID and CAUSALITY_TURN_STAGING_
 // AFTERMATH_VOID give dramaticTurn its fourth and fifth channels (relationshipShifts,
 // visualBeats).
+// Wave 1147 additions: CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn its
+// sixth and final channel (dialogueHighlights), completing full six-channel saturation for
+// every one of this pass's six tracked triggers (raise_stakes, seededClueIds, payoffSetupIds,
+// unresolvedClues-debt, clockRaised, dramaticTurn). With those exhausted, this wave introduces
+// two genuinely fresh checkAftermathVoid triggers — revelation and suspenseDelta have never
+// anchored the isTrigger side of a check in this file. CAUSALITY_REVELATION_CURIOSITY_
+// AFTERMATH_VOID pairs revelation with curiosityDelta; CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_
+// VOID pairs suspenseDelta with emotionalShift.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6682,6 +6690,83 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1133c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1133c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the causal chain's turns registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath
+  // contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1091), CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1105), CAUSALITY_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1119), and CAUSALITY_TURN_
+  // RELATIONAL_AFTERMATH_VOID / CAUSALITY_TURN_STAGING_AFTERMATH_VOID (Wave 1133, same trigger
+  // paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts/visualBeats) —
+  // this is the sixth and final consequence channel for this trigger, completing full
+  // six-channel saturation for every tracked trigger in this pass.
+  {
+    const r1147a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1147a.fires) {
+      issues.push({
+        location: `${r1147a.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'CAUSALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1147a.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1147a.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it happens leaves the causal chain's turns unvoiced — no character's speech processes what the reversal just changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a line that reckons with what just changed, so the pivot registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing revelation reference in this
+  // file (none — revelation has never anchored a checkAftermathVoid trigger here) — this is the
+  // first check to use revelation as a checkAftermathVoid trigger in this pass.
+  {
+    const r1147b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1147b.fires) {
+      issues.push({
+        location: `${r1147b.triggerCount} revelation scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CAUSALITY_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1147b.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1147b.aftermathCount} such rises occur elsewhere. A truth that surfaces without reopening the field of questions right after it lands leaves the causal chain's reckoning with new information feeling like a closed fact rather than a link that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one revelation, let a new question surface so the causal chain keeps generating curiosity instead of settling the matter entirely.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes
+  // anywhere, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries
+  // no emotional shift, while such shifts occur elsewhere. Distinct from every existing
+  // suspenseDelta reference in this file (all aftermath-channel uses, none as a
+  // checkAftermathVoid trigger) — this is the first check to use suspenseDelta as a trigger in
+  // this pass.
+  {
+    const r1147c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1147c.fires) {
+      issues.push({
+        location: `${r1147c.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1147c.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1147c.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it leaves the causal chain's tension reading as mechanics rather than something anyone carries forward.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it visibly shift a character's emotional register, so the danger is felt, not just noted.`,
       });
     }
   }
