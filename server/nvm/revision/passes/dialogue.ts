@@ -546,6 +546,14 @@
 // completing full six-channel saturation for this trigger. DIALOGUE_TURN_RELATIONAL_AFTERMATH_
 // VOID and DIALOGUE_TURN_STAGING_AFTERMATH_VOID give dramaticTurn its fourth and fifth channels
 // (relationshipShifts, visualBeats).
+// Wave 1148 additions: DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn its sixth and
+// final channel (dialogueHighlights), completing full six-channel saturation for every one of
+// this pass's six tracked triggers (raise_stakes, unresolvedClues-debt, relationshipShifts-
+// magnitude, seededClueIds, clockRaised, dramaticTurn). With those exhausted, this wave
+// introduces revelation and suspenseDelta as genuinely fresh checkAftermathVoid triggers --
+// neither has ever anchored the isTrigger side of a check in this file. DIALOGUE_REVELATION_
+// CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta; DIALOGUE_SUSPENSE_EMOTIONAL_
+// AFTERMATH_VOID pairs suspenseDelta with emotionalShift.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6721,6 +6729,86 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1134c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1134c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the dialogue layer's turns registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID -- Sequence/aftermath x dramaticTurn trigger ->
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n>=8, >=2 qualifying dramatic-turn scenes (pos<n-2), >=2 scenes anywhere with a recorded
+  // dialogue highlight, 2-scene lookahead. Fires when every turn's two-scene aftermath carries
+  // no standout line of dialogue, while such lines occur elsewhere. Distinct from DIALOGUE_
+  // TURN_SUSPENSE_AFTERMATH_VOID (Wave 1092), DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1106), DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1120), DIALOGUE_TURN_RELATIONAL_
+  // AFTERMATH_VOID, and DIALOGUE_TURN_STAGING_AFTERMATH_VOID (Wave 1134, same trigger paired
+  // with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts/visualBeats) -- this is
+  // the sixth and final consequence channel for this trigger, completing full saturation.
+  {
+    const r1148a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1148a.fires) {
+      issues.push({
+        location: `${r1148a.triggerCount} dramatic-turn aftermath(s) -- no dialogue highlight within 2 scenes`,
+        rule: 'DIALOGUE_TURN_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1148a.triggerCount} pivots) is followed by two scenes with no standout line of dialogue, even though ${r1148a.aftermathCount} such lines occur elsewhere in the script. A pivot that never earns a memorable exchange in its wake leaves the turn registering as a plot event the dialogue itself never rises to meet.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a standout line that responds to what just changed, so the pivot lands in what people say, not just in what happens.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_CURIOSITY_AFTERMATH_VOID -- Sequence/aftermath x revelation trigger ->
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying revelation scenes (pos<n-2, revelation non-null), >=2 scenes anywhere with a
+  // positive curiosity delta, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath has no rise in curiosity, while such rises occur elsewhere. Distinct from every
+  // other rule in this file: revelation has never anchored an isTrigger side of a check here --
+  // prior rules treat it only incidentally, if at all. A disclosed fact that fails to seed any
+  // fresh question in what immediately follows means the dialogue layer is spending information
+  // without buying intrigue in return.
+  {
+    const r1148b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1148b.fires) {
+      issues.push({
+        location: `${r1148b.triggerCount} revelation scene(s) -- no rise in curiosity within 2 scenes`,
+        rule: 'DIALOGUE_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1148b.triggerCount} scenes that reveal something is followed by two scenes with no rise in curiosity, even though ${r1148b.aftermathCount} such rises occur elsewhere in the script. A revelation that closes a question without opening a new one spends the dialogue layer's information budget without renewing the audience's appetite to keep listening.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information provoke a fresh question, so disclosure keeps generating curiosity instead of only resolving it.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID -- Sequence/aftermath x suspenseDelta trigger ->
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying suspense-rise scenes (pos<n-2, suspenseDelta>0), >=2 scenes anywhere with a
+  // non-neutral emotional shift, 2-scene lookahead. Fires when every suspense rise's two-scene
+  // aftermath registers no emotional shift on any character, while such shifts occur elsewhere.
+  // Distinct from every other rule in this file: suspenseDelta has never anchored the isTrigger
+  // side of a check here -- prior rules use it only as an aftermath channel for other triggers
+  // (clockRaised, dramaticTurn, seededClueIds, unresolvedClues, relationshipShifts). Tension that
+  // rises without ever landing as a felt emotional beat leaves the dialogue layer's suspense
+  // registering as mechanical pressure rather than something a character visibly feels.
+  {
+    const r1148c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1148c.fires) {
+      issues.push({
+        location: `${r1148c.triggerCount} suspense-rise scene(s) -- no emotional shift within 2 scenes`,
+        rule: 'DIALOGUE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1148c.triggerCount} scenes that raise suspense is followed by two scenes with no emotional shift, even though ${r1148c.aftermathCount} such shifts occur elsewhere in the script. Tension that mounts without ever registering on a character's felt state leaves the dialogue layer's suspense as plot pressure the audience tracks but no one on screen seems to feel.`,
+        suggestedFix: `In the two scenes following at least one suspense rise, let it visibly shift a character's emotional register, so the tension lands as something felt, not just something ticking.`,
       });
     }
   }
