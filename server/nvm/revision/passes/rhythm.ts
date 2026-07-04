@@ -470,6 +470,17 @@
 // also paired with dialogueHighlights). RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
 // raise_stakes a fifth channel (previously paired with curiosityDelta/suspenseDelta/
 // relationshipShifts/emotionalShift, now also paired with dialogueHighlights).
+// Wave 1086 additions: dramaticTurn and raise_stakes each reach full six-channel saturation —
+// RHYTHM_TURN_STAGING_AFTERMATH_VOID (dramaticTurn, previously paired with relationshipShifts/
+// emotionalShift/curiosityDelta/suspenseDelta/dialogueHighlights, now also paired with
+// visualBeats — its only remaining standard channel) and RHYTHM_STAKES_STAGING_AFTERMATH_VOID
+// (raise_stakes, previously paired with curiosityDelta/suspenseDelta/relationshipShifts/
+// emotionalShift/dialogueHighlights, now also paired with visualBeats — its only remaining
+// standard channel). With all four boolean triggers (revelation/dramaticTurn/payoffSetupIds/
+// raise_stakes) now fully saturated, the third check introduces seededClueIds as a genuinely
+// fresh sequence/aftermath trigger — RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID — distinct from this
+// pass's existing seededClueIds coverage (zone-imbalance, drought-run, zone-cluster, and
+// peak-uncaused modes have all been applied, but never sequence/aftermath).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5584,6 +5595,84 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1072c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1072c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes that never earn a memorable line right after they land leave the rhythm's escalation registering as plot mechanics, with no voice naming what's now at risk.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the raised stakes are voiced, not just structurally raised.`,
+      });
+    }
+  }
+
+  // RHYTHM_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every turn's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from RHYTHM_TURN_RELATIONAL_AFTERMATH_
+  // VOID, RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID, RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID, RHYTHM_
+  // TURN_SUSPENSE_AFTERMATH_VOID, and RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same
+  // trigger paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1086a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1086a.fires) {
+      issues.push({
+        location: `${r1086a.triggerCount} dramatic-turn aftermath(s) — no visually dense scene within 2 scenes`,
+        rule: 'RHYTHM_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1086a.triggerCount} pivots) is followed by two scenes with no substantial physical staging, even though ${r1086a.aftermathCount} such scenes exist elsewhere in the script. A pivot gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every dramatic turn.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the pivot a physical anchor before the rhythm moves on.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from RHYTHM_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID, RHYTHM_STAKES_RELATIONAL_
+  // AFTERMATH_VOID, RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID, and RHYTHM_STAKES_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/suspenseDelta/
+  // relationshipShifts/emotionalShift/dialogueHighlights respectively) — this is the sixth and
+  // final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1086b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1086b.fires) {
+      issues.push({
+        location: `${r1086b.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'RHYTHM_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1086b.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1086b.aftermathCount} such scenes exist elsewhere in the script. Escalating danger gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — the new danger given some visible presence before the rhythm moves on.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no rise in curiosity, while such rises
+  // occur elsewhere. seededClueIds already has zone-imbalance, drought-run, zone-cluster, and
+  // peak-uncaused coverage in this pass, but has never been audited in sequence/aftermath mode —
+  // this is the first pairing.
+  {
+    const r1086c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1086c.fires) {
+      issues.push({
+        location: `${r1086c.triggerCount} seed scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1086c.triggerCount} clue-planting scenes is followed by two scenes with no rise in curiosity, even though ${r1086c.aftermathCount} such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the rhythm's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the rhythm's foreshadowing keeps generating curiosity, not just sitting as inert setup.`,
       });
     }
   }

@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1086 — rhythmPass: rhythm turn-staging aftermath void, rhythm stakes-staging aftermath void, rhythm seed-curiosity aftermath void', async () => {
+    const runR1086 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn has no visually dense scene within 2 scenes', async () => {
+      const recs1086a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1086(recs1086a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_STAGING_AFTERMATH_VOID'), 'RHYTHM_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a visually dense scene within 2 scenes', async () => {
+      const recs1086an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1086(recs1086an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_STAGING_AFTERMATH_VOID'), 'RHYTHM_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_STAKES_STAGING_AFTERMATH_VOID fires when every stakes-raise has no visually dense scene within 2 scenes', async () => {
+      const recs1086b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1086(recs1086b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_STAGING_AFTERMATH_VOID'), 'RHYTHM_STAKES_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_STAKES_STAGING_AFTERMATH_VOID does not fire when a stakes-raise is followed by a visually dense scene within 2 scenes', async () => {
+      const recs1086bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1086(recs1086bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_STAGING_AFTERMATH_VOID'), 'RHYTHM_STAKES_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID fires when every seed has no curiosity rise within 2 scenes', async () => {
+      const recs1086c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1086(recs1086c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID does not fire when a seed is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1086cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1086(recs1086cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1072 — rhythmPass: rhythm payoff-staging aftermath void, rhythm turn-dialogue-highlight aftermath void, rhythm stakes-dialogue-highlight aftermath void', async () => {
     const runR1072 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
