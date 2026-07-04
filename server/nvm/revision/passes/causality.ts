@@ -520,6 +520,13 @@
 // emotionalShift/relationshipShifts, now paired with curiosityDelta). The third check, CAUSALITY_
 // STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, pairs raise_stakes with dialogueHighlights — a field
 // that has never been used as a checkAftermathVoid consequence channel anywhere in this pass.
+// Wave 1063 additions (closes the thirty-fourth rotation cycle, 1050-1063): CAUSALITY_STAKES_
+// STAGING_AFTERMATH_VOID gives raise_stakes its sixth and final standard channel (previously
+// paired with emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts/dialogueHighlights,
+// now also paired with visualBeats, completing full saturation). CAUSALITY_SEED_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID and CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID each give
+// seededClueIds and heavy unresolvedClues debt a fifth channel using dialogueHighlights — a field
+// only previously paired with raise_stakes (Wave 1049) in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6167,6 +6174,86 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene in the story (${r1049c.triggerCount} of them) is followed by two scenes with no highlighted dialogue, even though ${r1049c.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the causal chain's stakes registering structurally, never in a line anyone remembers.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the causal chain's escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from CAUSALITY_STAKES_
+  // EMOTIONAL_AFTERMATH_VOID, CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID, CAUSALITY_STAKES_
+  // SUSPENSE_AFTERMATH_VOID, CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID, and CAUSALITY_STAKES_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with emotionalShift/curiosityDelta/
+  // suspenseDelta/relationshipShifts/dialogueHighlights respectively) — this is the sixth and
+  // final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1063a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1063a.fires) {
+      issues.push({
+        location: `${r1063a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'CAUSALITY_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1063a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1063a.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the causal chain's escalation abstract rather than lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line
+  // of dialogue, 2-scene lookahead. Fires when every seed's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CAUSALITY_SEED_
+  // CURIOSITY_AFTERMATH_VOID, CAUSALITY_SEED_EMOTIONAL_AFTERMATH_VOID, CAUSALITY_SEED_SUSPENSE_
+  // AFTERMATH_VOID, and CAUSALITY_SEED_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1063b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1063b.fires) {
+      issues.push({
+        location: `${r1063b.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CAUSALITY_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1063b.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1063b.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands registers as inert plot machinery rather than something a character's voice gives weight to.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2), ≥2 scenes anywhere
+  // with a highlighted line of dialogue, 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from CAUSALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_EMOTIONAL_
+  // AFTERMATH_VOID, CAUSALITY_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, and CAUSALITY_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with suspenseDelta/emotionalShift/
+  // relationshipShifts/curiosityDelta respectively) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1063c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1063c.fires) {
+      issues.push({
+        location: `${r1063c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'CAUSALITY_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying unresolved clue-debt (${r1063c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1063c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the causal chain's open threads voiceless rather than felt in what characters say to each other.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
       });
     }
   }
