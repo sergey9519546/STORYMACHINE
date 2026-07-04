@@ -427,6 +427,13 @@
 // bloat+empty-zone mode. (CLOCK_SIGNAL was checked and excluded: its cluster/drought rules audit
 // two different fields — clockDelta > 0 vs clockRaised === true — under the same name prefix, so
 // it isn't a real trio.)
+// Wave 1002 additions: CLOCK_SIGNAL re-checked and re-excluded (confirmed same two-field mismatch
+// as Wave 988). With zone-imbalance still exhausted, this wave gives three existing aftermath-void
+// triggers a fresh consequence channel: RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID (raise_stakes,
+// previously only paired with curiosityDelta, now paired with suspenseDelta), RHYTHM_REVELATION_
+// RELATIONAL_AFTERMATH_VOID (revelation, previously only paired with emotionalShift, now paired
+// with relationshipShifts), and RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds, previously
+// only paired with emotionalShift, now paired with curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5091,6 +5098,79 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r988c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName988c} contains ${r988c.counts[r988c.bloatZoneIdx]} of them (${Math.round((r988c.counts[r988c.bloatZoneIdx] / r988c.totalCount) * 100)}%) while ${emptyNames988c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the rhythm's relational beats concentrate in only part of the story.`,
         suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames988c} — a relationship shift so the rhythm's relational beats land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath raises no tension, while
+  // tension does rise elsewhere. Distinct from RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID (same
+  // trigger paired with curiosityDelta) — this pairs raise_stakes with suspenseDelta for the first
+  // time in this pass.
+  {
+    const r1002a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1002a.fires) {
+      issues.push({
+        location: `${r1002a.triggerCount} stakes-raise aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1002a.triggerCount} escalations) is followed by two scenes with no rise in tension, even though ${r1002a.aftermathCount} such rises occur elsewhere. Escalating danger should usually tighten the felt sense of jeopardy in the beats right after it; when every stakes-raise's aftermath registers no suspense, the rhythm's escalation reads as a stated fact rather than a threat the audience feels.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, tighten the tension — a ticking complication or a near-miss — so escalating danger registers as felt, not just stated.`,
+      });
+    }
+  }
+
+  // RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (revelation != null, pos<n-2), ≥2 relationship-shift scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // relationship shift, while such shifts occur elsewhere. Distinct from REVELATION_SIGNAL_
+  // AFTERMATH_FLAT (same trigger paired with emotionalShift) — this pairs revelation with
+  // relationshipShifts for the first time in this pass.
+  {
+    const r1002b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1002b.fires) {
+      issues.push({
+        location: `${r1002b.triggerCount} revelation aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1002b.triggerCount} disclosures) is followed by two scenes with no shift in any relationship, even though ${r1002b.aftermathCount} such shifts occur elsewhere. A disclosure that never bears on how characters treat each other in the scenes right after it lands as information without interpersonal consequence, leaving the rhythm's beat of discovery isolated from the relational rhythm.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information strain or shift a relationship so the rhythm's discovery beats carry interpersonal weight, not only informational weight.`,
+      });
+    }
+  }
+
+  // RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath opens no new curiosity, while curiosity does
+  // occur elsewhere. Distinct from PAYOFF_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift) — this pairs payoffSetupIds with curiosityDelta for the first time in this
+  // pass's aftermath-void family (PAYOFF_SIGNAL_ZONE_IMBALANCE from Wave 988 audits payoff's own
+  // distribution, a different mode).
+  {
+    const r1002c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1002c.fires) {
+      issues.push({
+        location: `${r1002c.triggerCount} payoff aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r1002c.triggerCount} cashed-in setups) is followed by two scenes that raise no new curiosity, even though ${r1002c.aftermathCount} scenes elsewhere do open fresh questions. A payoff usually clears the way for the next question the rhythm will chase; when every payoff's aftermath opens nothing new, threads close without replacing themselves and the rhythm's engine of anticipation stalls right after delivering.`,
+        suggestedFix: `Let at least one payoff open a new question in its aftermath: in the scene or two after a setup pays off, plant a fresh uncertainty so the rhythm keeps moving forward instead of settling.`,
       });
     }
   }

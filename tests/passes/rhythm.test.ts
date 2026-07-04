@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1002 — rhythmPass: rhythm stakes-suspense aftermath void, rhythm revelation-relational aftermath void, rhythm payoff-curiosity aftermath void', async () => {
+    const runR1002 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID fires when every stakes-raise has no rise in suspense within 2 scenes', async () => {
+      const recs1002a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1002(recs1002a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID does not fire when a stakes-raise is followed by rising suspense within 2 scenes', async () => {
+      const recs1002an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { suspenseDelta: 1 } : {})));
+      const res = await runR1002(recs1002an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID'), 'RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation has no relationship shift within 2 scenes', async () => {
+      const recs1002b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1002(recs1002b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within 2 scenes', async () => {
+      const recs1002bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1002(recs1002bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when every payoff has no curiosity raised within 2 scenes', async () => {
+      const recs1002c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1002(recs1002c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by new curiosity within 2 scenes', async () => {
+      const recs1002cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1002(recs1002cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 988 — rhythmPass: dialogue signal zone imbalance, payoff signal zone imbalance, relational signal zone imbalance', async () => {
     const runR988 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
