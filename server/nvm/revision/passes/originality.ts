@@ -495,6 +495,13 @@
 // suspenseDelta, now a third channel with emotionalShift), and ORIGINALITY_PAYOFF_SUSPENSE_
 // AFTERMATH_VOID (payoffSetupIds, previously paired with emotionalShift/curiosityDelta, now a
 // third channel with suspenseDelta).
+// Wave 1054 additions: ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID gives the heavy-
+// unresolvedClues-debt trigger a third channel (previously paired with dialogueHighlights/
+// curiosityDelta, now paired with suspenseDelta), ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID gives
+// clockRaised a fourth channel (previously paired with relationshipShifts/emotionalShift/
+// curiosityDelta, now paired with suspenseDelta), and ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID
+// gives seededClueIds a fourth channel (previously paired with curiosityDelta/suspenseDelta/
+// emotionalShift, now paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6333,6 +6340,81 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r1040c.triggerCount} cashed-in setups) is followed by two scenes with no rise in suspense, even though ${r1040c.aftermathCount} such rises occur elsewhere. A resolution that closes cleanly with no fresh tension in its wake becomes a formula the audience learns — every payoff settles the story rather than also keeping it building.`,
         suggestedFix: `In the two scenes following at least one payoff, let the tension rise so the story's resolutions keep generating momentum instead of only closing threads.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 suspense-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no suspense rise, while such rises occur elsewhere. Distinct from the original
+  // unresolvedClues → dialogueHighlights rule and ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID
+  // (same trigger paired with dialogueHighlights and curiosityDelta respectively) — this is the
+  // third consequence channel for this trigger.
+  {
+    const r1054a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1054a.fires) {
+      issues.push({
+        location: `${r1054a.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1054a.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1054a.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that accumulated mystery never tightens the felt sense of danger — a predictable, avoidable absence that flattens the story's mounting uncertainty into inert backlog.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the story forward rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no suspense rise, while
+  // such rises occur elsewhere. Distinct from ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID,
+  // ORIGINALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID, and ORIGINALITY_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (same trigger paired with relationshipShifts/emotionalShift/curiosityDelta respectively) —
+  // this is the fourth consequence channel for this trigger.
+  {
+    const r1054b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1054b.fires) {
+      issues.push({
+        location: `${r1054b.triggerCount} clock-raise aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ORIGINALITY_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene (${r1054b.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1054b.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a ticking deadline never tightens the felt sense of danger — a predictable, avoidable absence that flattens the pressure into pure mechanics.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the tension visibly climb so the ticking deadline keeps generating danger, not just urgency.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no bond change, while such changes occur
+  // elsewhere. Distinct from ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_SEED_
+  // SUSPENSE_AFTERMATH_VOID, and ORIGINALITY_SEED_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with curiosityDelta/suspenseDelta/emotionalShift respectively) — this is the fourth
+  // consequence channel for this trigger.
+  {
+    const r1054c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1054c.fires) {
+      issues.push({
+        location: `${r1054c.triggerCount} seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1054c.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1054c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a planted clue never bears on how characters treat each other nearby — a predictable, avoidable absence that leaves the seed purely mechanical.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the seed carries interpersonal weight, not just narrative function.`,
       });
     }
   }
