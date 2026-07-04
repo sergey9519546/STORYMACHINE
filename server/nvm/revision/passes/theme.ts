@@ -473,6 +473,13 @@
 // > 0, now a fourth channel with relationshipShifts), and THEME_STAGING_EMOTIONAL_AFTERMATH_VOID
 // (visualBeats.length >= 2, previously only paired with curiosityDelta via THEME_STAGING_
 // CURIOSITY_AFTERMATH_VOID, now paired with emotionalShift for a second channel).
+// Wave 1060 additions: THEME_SEED_SUSPENSE_AFTERMATH_VOID gives seededClueIds a fifth channel
+// (previously paired with dialogueHighlights/curiosityDelta/relationshipShifts/emotionalShift,
+// now also paired with suspenseDelta). THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
+// raise_stakes a fifth channel (previously paired with curiosityDelta/suspenseDelta/
+// emotionalShift/relationshipShifts, now also paired with dialogueHighlights).
+// THEME_STAGING_SUSPENSE_AFTERMATH_VOID gives the visualBeats trigger a third channel
+// (previously paired with curiosityDelta/emotionalShift, now also paired with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6008,6 +6015,82 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every heavily-staged scene in the story (${r1046c.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1046c.aftermathCount} emotionally-charged scenes exist elsewhere. A visually dense moment that never registers as felt in the scenes right after it leaves the theme's imagery decorative rather than something that moves anyone.`,
         suggestedFix: `In the two scenes following at least one heavily-staged moment, let someone's feelings register what was just visually established so the theme's imagery lands emotionally, not just visually.`,
+      });
+    }
+  }
+
+  // THEME_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath carries no rise in suspense, while such rises occur
+  // elsewhere. Distinct from THEME_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, THEME_SEED_CURIOSITY_
+  // AFTERMATH_VOID, THEME_SEED_RELATIONAL_AFTERMATH_VOID, and THEME_SEED_EMOTIONAL_AFTERMATH_VOID
+  // (same trigger paired with dialogueHighlights/curiosityDelta/relationshipShifts/emotionalShift
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1060a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1060a.fires) {
+      issues.push({
+        location: `${r1060a.triggerCount} seed scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'THEME_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1060a.triggerCount} clue-planting scenes is followed by two scenes with no rise in suspense, even though ${r1060a.aftermathCount} such rises occur elsewhere. A planted thread that never tightens the felt sense of tension right after it lands registers as inert setup rather than a thematic seed the story keeps pressuring.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let suspense tighten so the theme's planted material feels actively watched, not just recorded and forgotten.`,
+      });
+    }
+  }
+
+  // THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from THEME_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, THEME_STAKES_SUSPENSE_AFTERMATH_VOID, THEME_STAKES_EMOTIONAL_
+  // AFTERMATH_VOID, and THEME_STAKES_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1060b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1060b.fires) {
+      issues.push({
+        location: `${r1060b.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1060b.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1060b.aftermathCount} such scenes exist elsewhere in the script. Raised stakes that never earn a memorable line right after they land leave the theme's mounting cost registering only as plot mechanics, with no voice naming what's now at risk.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the theme's stakes are voiced, not just structurally raised.`,
+      });
+    }
+  }
+
+  // THEME_STAGING_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × visualBeats trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying visually-staged scenes (pos<n-2, visualBeats.length>=2), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every staged scene's two-scene aftermath carries no
+  // rise in suspense, while such rises occur elsewhere. Distinct from THEME_STAGING_CURIOSITY_
+  // AFTERMATH_VOID and THEME_STAGING_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta and emotionalShift respectively) — this is the third consequence channel for
+  // this trigger.
+  {
+    const r1060c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1060c.fires) {
+      issues.push({
+        location: `${r1060c.triggerCount} staging aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'THEME_STAGING_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every heavily-staged scene in the story (${r1060c.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1060c.aftermathCount} such rises occur elsewhere. A visually dense moment that never tightens tension right after it lands leaves the theme's imagery inert rather than something the story keeps building pressure around.`,
+        suggestedFix: `In the two scenes following at least one heavily-staged moment, let tension rise so the theme's imagery keeps pressuring the story rather than sitting as a static tableau.`,
       });
     }
   }
