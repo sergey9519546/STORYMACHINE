@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1044 — rhythmPass: rhythm turn-curiosity aftermath void, rhythm payoff-relational aftermath void, rhythm revelation-dialogue-highlight aftermath void', async () => {
+    const runR1044 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn has no curiosity raised within 2 scenes', async () => {
+      const recs1044a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1044(recs1044a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by new curiosity within 2 scenes', async () => {
+      const recs1044an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1044(recs1044an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID fires when every payoff has no relationship shift within 2 scenes', async () => {
+      const recs1044b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1044(recs1044b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within 2 scenes', async () => {
+      const recs1044bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['p1'] } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runR1044(recs1044bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every revelation has no highlighted dialogue within 2 scenes', async () => {
+      const recs1044c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runR1044(recs1044c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a revelation is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1044cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { revelation: 'a hidden truth surfaces' } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runR1044(recs1044cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RHYTHM_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1030 — rhythmPass: rhythm stakes-emotional aftermath void, rhythm payoff-suspense aftermath void, rhythm revelation-suspense aftermath void', async () => {
     const runR1030 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
