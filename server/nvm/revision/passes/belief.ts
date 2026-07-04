@@ -511,6 +511,13 @@
 // remaining three channels (emotionalShift, dialogueHighlights, visualBeats respectively),
 // completing full six-channel saturation for all five of this pass's main triggers
 // (raise_stakes, payoffSetupIds, seededClueIds, unresolvedClues-debt, revelation).
+// Wave 1118 additions: with all five main triggers fully saturated, this wave introduces two
+// genuinely fresh sequence/aftermath triggers, both previously used in this file only via
+// zone-imbalance/drought-run checks (isPresent), never as a checkAftermathVoid isTrigger or
+// isAftermath: clockRaised (r.clockRaised === true) and dramaticTurn (non-'nothing').
+// BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID and BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID give
+// clockRaised its first two consequence channels; BELIEF_TURN_RELATIONAL_AFTERMATH_VOID gives
+// dramaticTurn its first channel.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6257,6 +6264,83 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1104c.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1104c.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a visually charged follow-through leaves the belief layer's revelations registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the discovery registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised (true) trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raised scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no curiosity uptick,
+  // while such uptick occurs elsewhere. Distinct from every prior belief.ts rule: clockRaised
+  // has never anchored a checkAftermathVoid trigger or aftermath side in this file — it has
+  // only appeared as an isPresent condition inside zone-imbalance checks (lines 3931, 4563).
+  // A deadline that tightens without deepening the audience's hunger to know what happens next
+  // treats the clock as plot mechanics rather than a belief-layer stake worth wondering about.
+  {
+    const r1118a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1118a.fires) {
+      issues.push({
+        location: `${r1118a.triggerCount} clock-raised scene(s) — no curiosity uptick within 2 scenes of any`,
+        rule: 'BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1118a.triggerCount} clock-raised scenes is followed by two scenes with no rise in curiosity, even though ${r1118a.aftermathCount} such scenes exist elsewhere in the script. A tightening deadline that doesn't make the audience wonder what happens next reduces the clock to bookkeeping instead of a belief the story is asking us to hold.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, seed a question the audience wants answered, so the deadline registers as something worth wondering about, not just a countdown.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised (true) trigger →
+  // suspenseDelta absence. Same shared helper and thresholds as above, second channel for this
+  // fresh trigger. Distinct from BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID (curiosityDelta is a
+  // "want to know" measure; suspenseDelta is a "fear what happens" measure — a clock can raise
+  // one without the other, e.g. an intellectual mystery deadline vs. a physical-danger deadline).
+  // A tightening clock with no rise in suspense suggests the stakes attached to the deadline
+  // were not sold as a genuine threat.
+  {
+    const r1118b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1118b.fires) {
+      issues.push({
+        location: `${r1118b.triggerCount} clock-raised scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1118b.triggerCount} clock-raised scenes is followed by two scenes with no rise in suspense, even though ${r1118b.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without making the outcome feel more threatening lets the belief layer's clock pass by unfelt.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, sharpen the sense of what's at risk if the deadline is missed, so the tightening clock is felt as danger, not just noted as a fact.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn (non-'nothing')
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere,
+  // 2-scene lookahead. Fires when every dramatic turn's two-scene aftermath carries no
+  // relationship shift, while such shifts occur elsewhere. Distinct from every prior belief.ts
+  // rule: dramaticTurn has never anchored a checkAftermathVoid trigger or aftermath side in
+  // this file — it has only appeared as an isPresent condition inside zone-imbalance checks
+  // (lines 4021, 4406, 5485). A dramatic turn that reshapes the scene without reshaping any
+  // relationship in its wake suggests the turn is plot-mechanical rather than belief-altering
+  // between characters.
+  {
+    const r1118c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1118c.fires) {
+      issues.push({
+        location: `${r1118c.triggerCount} dramatic-turn scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'BELIEF_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1118c.triggerCount} dramatic-turn scenes is followed by two scenes with no recorded relationship shift, even though ${r1118c.aftermathCount} such shifts exist elsewhere in the script. A turn that changes the situation without changing how any two characters read each other treats the turn as plot event rather than a shift in what someone believes about someone else.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the turn registers between characters, not just in the plot.`,
       });
     }
   }
