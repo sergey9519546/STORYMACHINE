@@ -480,6 +480,12 @@
 // emotionalShift/relationshipShifts, now also paired with dialogueHighlights).
 // THEME_STAGING_SUSPENSE_AFTERMATH_VOID gives the visualBeats trigger a third channel
 // (previously paired with curiosityDelta/emotionalShift, now also paired with suspenseDelta).
+// Wave 1088 additions: THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID gives unresolvedClues its sixth
+// and final consequence channel (visualBeats), completing full six-channel saturation for all
+// three of this pass's fully-tracked boolean/length triggers (raise_stakes, seededClueIds,
+// unresolvedClues). With those exhausted, THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and
+// THEME_STAGED_RELATIONAL_AFTERMATH_VOID extend the visualBeats(>=2)-as-trigger family (previously
+// paired only with curiosityDelta/emotionalShift/suspenseDelta) with its fourth and fifth channels.
 // Wave 1074 additions: raise_stakes and seededClueIds each reach full six-channel saturation:
 // THEME_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/
 // suspenseDelta/emotionalShift/relationshipShifts/dialogueHighlights, now also paired with
@@ -6180,6 +6186,84 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying an unresolved thread (${r1074c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1074c.aftermathCount} such scenes exist elsewhere in the script. An open question that never earns a memorable line right after it lingers registers as inert plot machinery rather than something a character's voice gives weight to.`,
         suggestedFix: `In the two scenes following at least one open-thread moment, let a character voice the weight of what's unresolved, so the theme's lingering questions register in speech, not just as narrative backlog.`,
+      });
+    }
+  }
+
+  // THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues (length>0)
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 scenes anywhere with ≥2 staged visual
+  // beats, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from
+  // THEME_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, THEME_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID,
+  // THEME_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, THEME_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID, and
+  // THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts/dialogueHighlights) — this is
+  // the sixth and final consequence channel for unresolvedClues, completing full saturation.
+  {
+    const r1088a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1088a.fires) {
+      issues.push({
+        location: `${r1088a.triggerCount} open-thread scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'THEME_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1088a.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1088a.aftermathCount} such scenes exist elsewhere in the script. An open question that never earns a visually charged follow-through registers as inert plot machinery rather than a thread the story visibly keeps its eye on.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, stage at least two concrete visual beats, so the theme's lingering questions register in image, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × visually-staged
+  // (visualBeats.length>=2) trigger → dialogueHighlights absence. Built on checkAftermathVoid.
+  // n≥8, ≥2 qualifying staged scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every heavily-staged scene's two-scene aftermath
+  // contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // THEME_STAGED_CURIOSITY_AFTERMATH_VOID, THEME_STAGED_EMOTIONAL_AFTERMATH_VOID, and
+  // THEME_STAGED_SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta) — this is the fourth consequence channel for this trigger.
+  {
+    const r1088b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1088b.fires) {
+      issues.push({
+        location: `${r1088b.triggerCount} heavily-staged scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every heavily-staged scene (${r1088b.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1088b.aftermathCount} such scenes exist elsewhere in the script. Visual spectacle that never earns a memorable line right after it registers as pageantry the theme doesn't get to speak about.`,
+        suggestedFix: `In the two scenes following at least one heavily-staged moment, give a character a line that names what the imagery meant, so the theme moves from picture to voice.`,
+      });
+    }
+  }
+
+  // THEME_STAGED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × visually-staged
+  // (visualBeats.length>=2) trigger → relationshipShifts absence. Built on checkAftermathVoid.
+  // n≥8, ≥2 qualifying staged scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every heavily-staged scene's two-scene aftermath has no
+  // relationship movement, while such movement occurs elsewhere. Distinct from
+  // THEME_STAGED_CURIOSITY_AFTERMATH_VOID, THEME_STAGED_EMOTIONAL_AFTERMATH_VOID,
+  // THEME_STAGED_SUSPENSE_AFTERMATH_VOID, and THEME_STAGED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/emotionalShift/suspenseDelta/dialogueHighlights) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1088c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.visualBeats ?? []).length >= 2,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1088c.fires) {
+      issues.push({
+        location: `${r1088c.triggerCount} heavily-staged scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'THEME_STAGED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every heavily-staged scene (${r1088c.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1088c.aftermathCount} such scenes exist elsewhere in the script. Visual spectacle that never moves how characters stand with each other registers as scenery the theme doesn't get to act through.`,
+        suggestedFix: `In the two scenes following at least one heavily-staged moment, let it shift how a pair of characters relate, so the theme's imagery has interpersonal consequence, not just visual weight.`,
       });
     }
   }
