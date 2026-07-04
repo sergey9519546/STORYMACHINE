@@ -478,6 +478,13 @@
 // dialogueHighlights/emotionalShift), PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID (dramaticTurn,
 // previously paired with dialogueHighlights/suspenseDelta), and PAYOFF_OPEN_THREAD_CURIOSITY_
 // AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with suspenseDelta/emotionalShift).
+// Wave 1056 additions: three triggers each get a fourth consequence channel, none reusing a
+// combination already covered above: PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID (seededClueIds,
+// previously paired with dialogueHighlights/emotionalShift/curiosityDelta, now also paired with
+// suspenseDelta), PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID (clockRaised, previously paired with
+// visualBeats/curiosityDelta/relationshipShifts, now also paired with emotionalShift), and
+// PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn, previously paired with
+// dialogueHighlights/suspenseDelta/curiosityDelta, now also paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5806,6 +5813,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1042c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1042c.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog awaiting payoff; when every heavy-debt scene's aftermath opens nothing new, the payoff machinery's uncertainty stalls instead of deepening.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull before its eventual payoff.`,
+      });
+    }
+  }
+
+  // PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying seed scenes (pos<n-2), >=2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every clue-seeding scene's two-scene aftermath carries no rise in suspense, while
+  // such rises occur elsewhere. Distinct from PAYOFF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  // PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID, and PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID (same trigger
+  // paired with dialogueHighlights, emotionalShift, and curiosityDelta respectively) — this is the
+  // fourth consequence channel for this trigger.
+  {
+    const r1056a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1056a.fires) {
+      issues.push({
+        location: `${r1056a.triggerCount} clue-seeding scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that seeds a clue (${r1056a.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1056a.aftermathCount} such rises occur elsewhere. A planted clue that never tightens suspense right after it lands registers as inert setup rather than a seed the payoff machinery is actively watching.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let suspense tighten so the seed feels like it's being watched, not just planted and forgotten.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying clock-raising scenes (pos<n-2), >=2 emotionally-charged scenes anywhere,
+  // 2-scene lookahead. Fires when every clock-raising scene's two-scene aftermath carries no
+  // emotional shift, while such shifts occur elsewhere. Distinct from PAYOFF_CLOCK_STAGING_
+  // AFTERMATH_VOID, PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID, and PAYOFF_CLOCK_RELATIONAL_
+  // AFTERMATH_VOID (same trigger paired with visualBeats, curiosityDelta, and relationshipShifts
+  // respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1056b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1056b.fires) {
+      issues.push({
+        location: `${r1056b.triggerCount} clock-raising scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1056b.triggerCount} instances) is followed by two scenes registering no emotional shift, even though ${r1056b.aftermathCount} such shifts occur elsewhere. A deadline that never lands emotionally right after it's introduced reads as a mechanical constraint rather than something the payoff machinery's characters actually feel.`,
+        suggestedFix: `In the two scenes following at least one clock-raising moment, register an emotional shift so the deadline feels felt, not just ticking in the background.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying dramatic-turn scenes (pos<n-2), >=2 relationship-shifting scenes anywhere,
+  // 2-scene lookahead. Fires when every turn's two-scene aftermath carries no relationship shift,
+  // while such shifts occur elsewhere. Distinct from PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID,
+  // PAYOFF_TURN_SUSPENSE_AFTERMATH_VOID, and PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID (same trigger
+  // paired with dialogueHighlights, suspenseDelta, and curiosityDelta respectively) — this is the
+  // fourth consequence channel for this trigger.
+  {
+    const r1056c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1056c.fires) {
+      issues.push({
+        location: `${r1056c.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1056c.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1056c.aftermathCount} such shifts occur elsewhere. A pivot that never moves how two characters stand with each other leaves the payoff machinery's turns registering as plot events isolated from the relational fabric they should be testing.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a relationship shift so the pivot registers relationally, not just as an isolated plot event.`,
       });
     }
   }
