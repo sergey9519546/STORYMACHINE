@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1122 — conflictPass: conflict revelation-emotional aftermath void, conflict revelation-suspense aftermath void, conflict clock-curiosity aftermath void', async () => {
+    const makeRec1122 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1122 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1122a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeRec1122(i, { emotionalShift: 'positive' });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1122an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeRec1122(i, { emotionalShift: 'positive' });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID fires when every revelation is followed by two scenes with no suspense rise', async () => {
+      const recs1122b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeRec1122(i, { suspenseDelta: 1 });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID does not fire when a revelation is followed by a suspense rise within its window', async () => {
+      const recs1122bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeRec1122(i, { suspenseDelta: 1 });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID'), 'CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no curiosity rise', async () => {
+      const recs1122c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1122(i, { curiosityDelta: 1 });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when a clock-raise is followed by a curiosity rise within its window', async () => {
+      const recs1122cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1122(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1122(i, { curiosityDelta: 1 });
+        return makeRec1122(i);
+      });
+      const res = await runCF1122(recs1122cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1108 — conflictPass: conflict seed-dialogue-highlight aftermath void, conflict revelation-curiosity aftermath void, conflict clock-suspense aftermath void', async () => {
     const makeRec1108 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

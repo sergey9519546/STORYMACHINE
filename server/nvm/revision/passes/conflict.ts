@@ -527,6 +527,14 @@
 // anchored distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/
 // aftermath: CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta,
 // and CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID pairs clockRaised with suspenseDelta.
+// Wave 1122 additions: revelation and clockRaised each had exactly one checkAftermathVoid
+// channel as of Wave 1108. CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID and CONFLICT_
+// REVELATION_SUSPENSE_AFTERMATH_VOID give revelation its second and third channels
+// (emotionalShift, suspenseDelta); CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID gives clockRaised
+// its second channel (curiosityDelta) — distinct from the non-standard hand-rolled
+// CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: compound negative-conflict-signal channel, not a
+// positive curiosityDelta rise) and CONFLICT_CLOCK_TURN_AFTERMATH_VOID (Wave 590:
+// dramaticTurn as the aftermath channel, not curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6517,6 +6525,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1108c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in suspense, even though ${r1108c.aftermathCount} such rises occur elsewhere. Time pressure that never re-tightens tension right after it fires leaves the conflict's relationship with urgency feeling inert rather than consequential.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a new tension rise so the conflict's ticking clock keeps the story pressing forward instead of settling into calm.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from CONFLICT_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1108, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1122a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1122a.fires) {
+      issues.push({
+        location: `${r1122a.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1122a.triggerCount} revelation scenes is followed by two scenes with no emotional shift, even though ${r1122a.aftermathCount} such shifts occur elsewhere. A discovery that never registers on any character's felt state right after it lands leaves the conflict's reckoning with new information reading as plot mechanics rather than something anyone actually feels.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the discovery lands as something felt, not just something learned.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from CONFLICT_REVELATION_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1108) and CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger
+  // paired with curiosityDelta/emotionalShift) — this is the third consequence channel for this
+  // trigger.
+  {
+    const r1122b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1122b.fires) {
+      issues.push({
+        location: `${r1122b.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1122b.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1122b.aftermathCount} such rises occur elsewhere. A discovery that never sharpens danger or uncertainty right after it lands leaves the conflict's reckoning with new information feeling settled rather than newly charged.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm.`,
+      });
+    }
+  }
+
+  // CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from CONFLICT_CLOCK_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1108, same trigger paired with suspenseDelta), the non-standard hand-rolled
+  // CONFLICT_CLOCK_AFTERMATH_VOID (Wave 450: compound negative-conflict-signal channel), and
+  // CONFLICT_CLOCK_TURN_AFTERMATH_VOID (Wave 590: dramaticTurn as the aftermath channel) — this
+  // is the second checkAftermathVoid-based channel for this trigger.
+  {
+    const r1122c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1122c.fires) {
+      issues.push({
+        location: `${r1122c.triggerCount} clock-raise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CONFLICT_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1122c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1122c.aftermathCount} such rises occur elsewhere. A deadline that tightens without opening a new question leaves the conflict's clock registering as a schedule rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface from the mounting pressure, so the deadline keeps generating curiosity, not just counting down.`,
       });
     }
   }
