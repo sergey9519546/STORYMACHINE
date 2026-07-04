@@ -934,6 +934,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 971 — pacingPass: pacing clock delta zone imbalance, pacing relationship zone imbalance, pacing revelation zone imbalance', async () => {
+    const runP971 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PACING_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs971a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runP971(recs971a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_ZONE_IMBALANCE'), 'PACING_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs971an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runP971(recs971an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_CLOCK_DELTA_ZONE_IMBALANCE'), 'PACING_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs971b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runP971(recs971b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_ZONE_IMBALANCE'), 'PACING_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs971bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runP971(recs971bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_RELATIONSHIP_ZONE_IMBALANCE'), 'PACING_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_REVELATION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of revelation scenes', async () => {
+      const recs971c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 1, 2, 8, 9].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runP971(recs971c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_REVELATION_ZONE_IMBALANCE'), 'PACING_REVELATION_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_REVELATION_ZONE_IMBALANCE does not fire when revelation scenes touch every zone', async () => {
+      const recs971cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { revelation: [0, 3, 5, 8].includes(i) ? 'a hidden truth surfaces' : null }));
+      const res = await runP971(recs971cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_REVELATION_ZONE_IMBALANCE'), 'PACING_REVELATION_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 957 — pacingPass: pacing positive emotion zone imbalance, pacing suspense zone imbalance, pacing payoff zone imbalance', async () => {
     const runP957 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

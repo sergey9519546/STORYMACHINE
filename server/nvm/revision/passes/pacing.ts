@@ -423,6 +423,12 @@
 // 'positive', the positive-valence mirror of Wave 929's negative one), PACING_SUSPENSE_ZONE_IMBALANCE
 // (suspenseDelta > 0 — the tension delta beside 943's curiosity one), and PACING_PAYOFF_ZONE_IMBALANCE
 // (payoffSetupIds.length > 0 — the payoff array beside 943's seed one).
+// Wave 971 additions: auditing the three remaining trio-complete signals in this pass, spanning three
+// distinct classes: PACING_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta distinct from the
+// suspense/curiosity ones audited in Waves 943/957), PACING_RELATIONSHIP_ZONE_IMBALANCE
+// (relationshipShifts array, distinct from the seed/payoff arrays), and PACING_REVELATION_ZONE_
+// IMBALANCE (revelation != null — the revelation string field, distinct from the purpose-enum
+// PACING_REVELATION_PURPOSE one).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5459,6 +5465,80 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r957c.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName957c} contains ${r957c.counts[r957c.bloatZoneIdx]} of them (${Math.round((r957c.counts[r957c.bloatZoneIdx] / r957c.totalCount) * 100)}%) while ${emptyNames957c} contains none. Payoffs bloat in one structural quarter and never land in another, so pacing gets the lift of a cashed-in setup in only part of the story.`,
         suggestedFix: `Redistribute payoffs: move at least one scene that pays off an earlier setup (non-empty payoffSetupIds) into the empty zone(s) — ${emptyNames957c} — so pacing keeps getting the lift of resolved threads across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta !== 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-moving scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockDelta !== 0 predicate as the existing
+  // 3-zone PACING_CLOCK_DELTA_ZONE_CLUSTER and run-based PACING_CLOCK_DELTA_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this delta signal, distinct from the suspense/
+  // curiosity deltas already audited (Waves 943, 957).
+  {
+    const r971a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r971a.fires) {
+      const emptyNames971a = r971a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName971a = FOUR_ZONE_NAMES[r971a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames971a} empty; ${bloatName971a} has ${r971a.counts[r971a.bloatZoneIdx]}/${r971a.totalCount} clock-moving scenes`,
+        rule: 'PACING_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r971a.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName971a} contains ${r971a.counts[r971a.bloatZoneIdx]} of them (${Math.round((r971a.counts[r971a.bloatZoneIdx] / r971a.totalCount) * 100)}%) while ${emptyNames971a} contains none. Deadline pressure bloats in one structural quarter and never moves in another, so pacing runs against a clock in only part of the story.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames971a} — so pacing keeps racing a deadline across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // PACING_RELATIONSHIP_ZONE_IMBALANCE — Underweight/bloat × (relationshipShifts.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a relationship shift total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone PACING_RELATIONSHIP_ZONE_CLUSTER and run-based PACING_RELATIONSHIP_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the relationshipShifts array field.
+  {
+    const r971b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r971b.fires) {
+      const emptyNames971b = r971b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName971b = FOUR_ZONE_NAMES[r971b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames971b} empty; ${bloatName971b} has ${r971b.counts[r971b.bloatZoneIdx]}/${r971b.totalCount} relationship-shift scenes`,
+        rule: 'PACING_RELATIONSHIP_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r971b.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName971b} contains ${r971b.counts[r971b.bloatZoneIdx]} of them (${Math.round((r971b.counts[r971b.bloatZoneIdx] / r971b.totalCount) * 100)}%) while ${emptyNames971b} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so pacing carries relational movement in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames971b} — a relationship shift so pacing keeps carrying relational movement across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_ZONE_IMBALANCE — Underweight/bloat × (revelation != null) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 revelation scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Distinct from the existing 3-zone PACING_REVELATION_ZONE_
+  // CLUSTER and run-based PACING_REVELATION_DROUGHT_RUN — the first application of the 4-zone bloat+
+  // empty-zone mode to the revelation STRING field (revelation != null), and distinct from PACING_
+  // REVELATION_PURPOSE_ZONE_IMBALANCE (Wave 943), which audits the purpose === 'revelation' enum.
+  {
+    const r971c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.revelation != null,
+    });
+    if (r971c.fires) {
+      const emptyNames971c = r971c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName971c = FOUR_ZONE_NAMES[r971c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames971c} empty; ${bloatName971c} has ${r971c.counts[r971c.bloatZoneIdx]}/${r971c.totalCount} revelation scenes`,
+        rule: 'PACING_REVELATION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r971c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName971c} contains ${r971c.counts[r971c.bloatZoneIdx]} of them (${Math.round((r971c.counts[r971c.bloatZoneIdx] / r971c.totalCount) * 100)}%) while ${emptyNames971c} contains none. Disclosures bloat in one structural quarter and never land in another, so pacing surges with new information in only part of the story.`,
+        suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames971c} — so pacing keeps surging with new information across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }
