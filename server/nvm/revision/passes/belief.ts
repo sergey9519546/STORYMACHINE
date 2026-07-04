@@ -460,6 +460,12 @@
 // AFTERMATH_VOID (seededClueIds, previously only paired with emotionalShift, now paired with
 // suspenseDelta), and BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_VOID (payoffSetupIds, previously paired
 // with curiosityDelta and relationshipShifts, now paired with emotionalShift).
+// Wave 1020 additions: three more fresh channels for existing triggers: BELIEF_STAKES_CURIOSITY_
+// AFTERMATH_VOID (raise_stakes, previously paired with relationshipShifts/suspenseDelta/
+// emotionalShift, now a fourth channel with curiosityDelta), BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID
+// (payoffSetupIds, previously paired with curiosityDelta/relationshipShifts/emotionalShift, now a
+// fourth channel with suspenseDelta), and BELIEF_SEED_RELATIONAL_AFTERMATH_VOID (seededClueIds,
+// previously paired with emotionalShift/suspenseDelta, now a third channel with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5668,6 +5674,79 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r1006c.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r1006c.aftermathCount} emotionally-charged scenes exist elsewhere. A callback usually carries some feeling for whoever collects on it; when every payoff's aftermath is affectively flat, the belief-tracking layer's resolutions register as pure mechanics with no felt weight.`,
         suggestedFix: `Let at least one payoff carry feeling in its aftermath: in the scene or two after a setup pays off, show someone reacting to it emotionally — relief, grief, triumph.`,
+      });
+    }
+  }
+
+  // BELIEF_STAKES_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no curiosity rise,
+  // while such rises occur elsewhere. Distinct from BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID
+  // (Wave 978, relationshipShifts), BELIEF_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 992,
+  // suspenseDelta), and BELIEF_STAKES_EMOTIONAL_AFTERMATH_VOID (Wave 1006, emotionalShift) — this
+  // is the fourth consequence channel for this trigger in this pass.
+  {
+    const r1020a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1020a.fires) {
+      issues.push({
+        location: `${r1020a.triggerCount} raise-stakes aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'BELIEF_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1020a.triggerCount} of them) is followed by two scenes with no rise in curiosity, even though ${r1020a.aftermathCount} such rises occur elsewhere. Raising the stakes without sharpening what the audience wonders about right after leaves the belief-tracking layer's escalation registering as declaration rather than genuine intrigue.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let curiosity visibly sharpen so the escalation reads as a question the audience now needs answered, not just a stated fact.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff-setup scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every setup's two-scene aftermath carries no suspense rise, while such
+  // rises occur elsewhere. Distinct from BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 978),
+  // BELIEF_PAYOFF_RELATIONSHIP_AFTERMATH_VOID (Wave 992), and BELIEF_PAYOFF_EMOTIONAL_AFTERMATH_
+  // VOID (Wave 1006) — this is the fourth consequence channel for this trigger in this pass.
+  {
+    const r1020b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1020b.fires) {
+      issues.push({
+        location: `${r1020b.triggerCount} payoff-setup aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff-setup scene in the story (${r1020b.triggerCount} plants) is followed by two scenes with no rise in suspense, even though ${r1020b.aftermathCount} such rises occur elsewhere. Planting a setup without the tension visibly climbing right after it leaves the belief-tracking layer's groundwork feeling inert rather than loaded.`,
+        suggestedFix: `In the two scenes following at least one payoff setup, let the tension visibly climb so the audience feels the setup is now armed and waiting to go off.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clue-seeding scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every seed's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID (Wave 978) and
+  // BELIEF_SEED_SUSPENSE_AFTERMATH_VOID (Wave 1006) — this is the third consequence channel for
+  // this trigger in this pass.
+  {
+    const r1020c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1020c.fires) {
+      issues.push({
+        location: `${r1020c.triggerCount} clue-seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'BELIEF_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1020c.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1020c.aftermathCount} such shifts occur elsewhere. Planting a clue without it ever bearing on how characters treat each other right after leaves the belief-tracking layer's groundwork purely informational, never interpersonal.`,
+        suggestedFix: `In the two scenes following at least one clue seed, let the new information strain or shift a relationship so the belief-tracking layer's groundwork lands interpersonally, not just as plot data.`,
       });
     }
   }
