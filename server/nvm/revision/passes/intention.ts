@@ -504,6 +504,11 @@
 // drought-run/peak-uncaused/zone-imbalance checks here), and INTENTION_TURN_SUSPENSE_
 // AFTERMATH_VOID pairs dramaticTurn with suspenseDelta (dramaticTurn has only ever anchored
 // zone-cluster/zone-imbalance/drought-run checks here).
+// Wave 1109 additions: this wave gives payoffSetupIds and dramaticTurn further channels —
+// INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID and INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID pair
+// payoffSetupIds with emotionalShift and relationshipShifts respectively (second and third
+// channels for this trigger), and INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID pairs dramaticTurn
+// with emotionalShift (second channel for this trigger).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6346,6 +6351,79 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1095c.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1095c.aftermathCount} such rises occur elsewhere. A pivot that never re-tightens tension right after it happens leaves the character's intention registering as an isolated reversal rather than a hinge that keeps pulling their pursuit forward.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a new tension rise so the character's intention keeps facing pressure instead of settling immediately after the pivot.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no emotional shift, while
+  // such shifts occur elsewhere. Distinct from INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1095, same trigger paired with curiosityDelta) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1109a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1109a.fires) {
+      issues.push({
+        location: `${r1109a.triggerCount} payoff scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1109a.triggerCount} payoff scenes is followed by two scenes with no emotional shift, even though ${r1109a.aftermathCount} such shifts occur elsewhere. A resolved setup that never registers emotionally right after it lands leaves the character's intention feeling procedurally closed rather than felt.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a character's emotional register shift in response, so the intention's resolution carries felt weight, not just structural closure.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every payoff's two-scene aftermath carries no
+  // relationship movement, while such movement occurs elsewhere. Distinct from INTENTION_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID and INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with curiosityDelta/emotionalShift) — this is the third consequence channel for this
+  // trigger.
+  {
+    const r1109b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1109b.fires) {
+      issues.push({
+        location: `${r1109b.triggerCount} payoff scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1109b.triggerCount} payoff scenes is followed by two scenes with no recorded relationship shift, even though ${r1109b.aftermathCount} such shifts occur elsewhere. A resolved setup that never moves how characters stand with each other leaves the character's intention feeling isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one payoff, let it shift how a pair of characters relate, so the intention's resolution carries interpersonal weight, not just narrative closure.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no emotional shift, while
+  // such shifts occur elsewhere. Distinct from INTENTION_TURN_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1095, same trigger paired with suspenseDelta) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1109c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1109c.fires) {
+      issues.push({
+        location: `${r1109c.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1109c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1109c.aftermathCount} such shifts occur elsewhere. A pivot that never lands emotionally right after it happens leaves the character's intention registering as plot mechanics rather than something anyone feels.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, register an emotional shift so the pivot is felt in the character's pursuit, not just executed as a structural beat.`,
       });
     }
   }
