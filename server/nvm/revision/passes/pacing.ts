@@ -460,6 +460,10 @@
 // dialogueHighlights — a field that (per grep) has never been used as a checkAftermathVoid
 // consequence channel anywhere in this 107-rule pass, only as its own presence signal in the
 // PACING_HIGHLIGHT_ZONE_* family.
+// Wave 1041 additions: this wave extends the dialogueHighlights consequence channel Wave 1027
+// introduced to three more triggers that have never carried it: PACING_REVELATION_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID (revelation), PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+// (clockRaised), and PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (dramaticTurn).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5868,6 +5872,80 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1027c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1027c.aftermathCount} such scenes exist elsewhere in the script. Seeds gain texture when a memorable line lands nearby, but that opportunity consistently passes in the scenes immediately following every seed.`,
         suggestedFix: `After at least one seed, let one of the following two scenes carry a line worth remembering — a character circling the planted material, or a reaction that gives it verbal presence before the pacing moves on.`,
+      });
+    }
+  }
+
+  // PACING_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every revelation's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from the revelation →
+  // visualBeats and → relationshipShifts rules — this pairs revelation with dialogueHighlights,
+  // the channel introduced in Wave 1027, for the first time in this pass.
+  {
+    const r1041a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1041a.fires) {
+      issues.push({
+        location: `${r1041a.triggerCount} revelation aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'PACING_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r1041a.triggerCount} discoveries) is followed by two scenes with no highlighted dialogue, even though ${r1041a.aftermathCount} such scenes exist elsewhere in the script. A truth that lands without anyone saying anything memorable about it in the immediate aftermath leaves the discovery unprocessed in speech, its weight registering only structurally rather than in a line worth remembering.`,
+        suggestedFix: `After at least one revelation, let one of the following two scenes carry a memorable line — a character naming what the truth means, or reacting to it in words worth remembering.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from the clockRaised →
+  // relationshipShifts and → visualBeats rules, and the avg-based CLOCK_AFTERMATH_* family
+  // (suspense/curiosity/emotion) — this pairs clockRaised with dialogueHighlights for the first
+  // time in this pass.
+  {
+    const r1041b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1041b.fires) {
+      issues.push({
+        location: `${r1041b.triggerCount} clock-raise aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1041b.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1041b.aftermathCount} such scenes exist elsewhere in the script. A deadline that lands without a single memorable line reacting to it in the immediate aftermath leaves the urgency felt only through structure, never through what anyone actually says about the time running out.`,
+        suggestedFix: `After at least one clock-raise, let one of the following two scenes carry a memorable line — a character naming the pressure of the deadline, or reacting to it in words worth remembering.`,
+      });
+    }
+  }
+
+  // PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from the dramaticTurn →
+  // relationshipShifts and → visualBeats rules, and the avg-based TURN_AFTERMATH_* family
+  // (suspense/curiosity/emotion) — this pairs dramaticTurn with dialogueHighlights for the first
+  // time in this pass.
+  {
+    const r1041c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1041c.fires) {
+      issues.push({
+        location: `${r1041c.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1041c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1041c.aftermathCount} such scenes exist elsewhere in the script. A pivot that lands without a single memorable line reacting to it in the immediate aftermath leaves the turn registering only structurally, never in a line the audience carries forward.`,
+        suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry a memorable line — a character naming what changed, or reacting to it in words worth remembering.`,
       });
     }
   }
