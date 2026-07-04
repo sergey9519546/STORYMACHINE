@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1009 — characterArcPass: arc clock-emotional aftermath void, arc payoff-relational aftermath void, arc seed-curiosity aftermath void', async () => {
+    const makeRec1009 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1009 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1009a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1009(i, { emotionalShift: 'positive' });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by an emotional shift within its window', async () => {
+      const recs1009an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1009(i, { emotionalShift: 'positive' });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID fires when every payoff is followed by two scenes with no relationship shift', async () => {
+      const recs1009b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeRec1009(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within its window', async () => {
+      const recs1009bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeRec1009(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_SEED_CURIOSITY_AFTERMATH_VOID fires when every seed is followed by two scenes with no new curiosity', async () => {
+      const recs1009c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1009(i, { curiosityDelta: 1 });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SEED_CURIOSITY_AFTERMATH_VOID'), 'ARC_SEED_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_SEED_CURIOSITY_AFTERMATH_VOID does not fire when a seed is followed by new curiosity within its window', async () => {
+      const recs1009cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1009(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1009(i, { curiosityDelta: 1 });
+        return makeRec1009(i);
+      });
+      const res = await runArc1009(recs1009cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SEED_CURIOSITY_AFTERMATH_VOID'), 'ARC_SEED_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 995 — characterArcPass: arc clock zone imbalance, arc highlight zone imbalance, arc stakes-curiosity aftermath void', async () => {
     const makeRec995 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

@@ -497,6 +497,12 @@
 // rotation.) With zone-imbalance now genuinely exhausted, ARC_STAKES_CURIOSITY_AFTERMATH_VOID
 // completes the trio: raise_stakes, already paired with relationshipShifts (Wave 917), now paired
 // with curiosityDelta for the first time in this pass's ~17-rule aftermath-void family.
+// Wave 1009 additions: this pass's aftermath-void family now covers most triggers across 2-3
+// channels each (clock: curiosity/relational/staging; payoff: curiosity/emotional/staging; seed:
+// dialogueHighlights/emotional). This wave completes clock and payoff's remaining channel and adds
+// seed's third: ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID (clockRaised, the last of its four channels),
+// ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID (payoffSetupIds, the last of its four channels), and
+// ARC_SEED_CURIOSITY_AFTERMATH_VOID (seededClueIds, its third channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5713,6 +5719,78 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r995c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r995c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke new uncertainty about what the character will do next; when every stakes-raise's aftermath opens no curiosity, the arc's escalation sits inert rather than propelling the audience forward.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation keeps propelling the character's arc forward rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → emotionalShift
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying clock-
+  // raising scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead. Fires
+  // when every clock-raising scene's two-scene aftermath is emotionally flat, while charged scenes
+  // occur elsewhere. Distinct from ARC_CLOCK_CURIOSITY_AFTERMATH_VOID, ARC_CLOCK_RELATIONAL_
+  // AFTERMATH_VOID, and ARC_CLOCK_STAGING_AFTERMATH_VOID — this is the fourth and last consequence
+  // channel for this trigger in this pass.
+  {
+    const r1009a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1009a.fires) {
+      issues.push({
+        location: `${r1009a.triggerCount} clock-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1009a.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1009a.aftermathCount} emotionally-charged scenes exist elsewhere. A deadline should usually carry felt weight for the character racing it; when every clock-raise's aftermath is affectively flat, the arc announces urgency without letting the audience feel what it costs.`,
+        suggestedFix: `Let at least one ticking clock provoke felt weight in its aftermath: in the scene or two after a deadline is raised, show the character reacting emotionally to the pressure — dread, resolve, exhaustion.`,
+      });
+    }
+  }
+
+  // ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. Distinct from ARC_PAYOFF_CURIOSITY_AFTERMATH_VOID, ARC_PAYOFF_
+  // EMOTIONAL_AFTERMATH_VOID, and ARC_PAYOFF_STAGING_AFTERMATH_VOID — this is the fourth and last
+  // consequence channel for this trigger in this pass.
+  {
+    const r1009b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1009b.fires) {
+      issues.push({
+        location: `${r1009b.triggerCount} payoff aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ARC_PAYOFF_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r1009b.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r1009b.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as narrative bookkeeping rather than a beat that ripples through the arc's relationships.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolved setup strain or shift a relationship so the callback pays off interpersonally, not only structurally.`,
+      });
+    }
+  }
+
+  // ARC_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath opens no new curiosity, while curiosity does occur
+  // elsewhere. Distinct from ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and ARC_SEED_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 505) — this is the third consequence channel for this trigger in this
+  // pass.
+  {
+    const r1009c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1009c.fires) {
+      issues.push({
+        location: `${r1009c.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'ARC_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1009c.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r1009c.aftermathCount} scenes elsewhere do open fresh questions. A planted clue that never compounds into a further question about the character's arc leaves the groundwork inert rather than deepening the audience's investment in what it will mean.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question tied to the character's arc.`,
       });
     }
   }
