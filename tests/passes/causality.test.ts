@@ -1247,6 +1247,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1133 — causalityPass: causality clock-staging aftermath void, causality turn-relational aftermath void, causality turn-staging aftermath void', async () => {
+    const runCA1133 = async (records: ScreenplaySceneRecord[]) => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      return causalityPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise has no heavily-staged scene within 2 scenes', async () => {
+      const recs1133a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1133(recs1133a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID'), 'CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by a heavily-staged scene within 2 scenes', async () => {
+      const recs1133an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { clockRaised: true } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1133(recs1133an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID'), 'CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID fires when every dramatic turn has no relationship shift within 2 scenes', async () => {
+      const recs1133b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runCA1133(recs1133b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID'), 'CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by a relationship shift within 2 scenes', async () => {
+      const recs1133bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runCA1133(recs1133bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID'), 'CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CAUSALITY_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn has no heavily-staged scene within 2 scenes', async () => {
+      const recs1133c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1133(recs1133c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_STAGING_AFTERMATH_VOID'), 'CAUSALITY_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('CAUSALITY_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a heavily-staged scene within 2 scenes', async () => {
+      const recs1133cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { dramaticTurn: 'reversal' } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runCA1133(recs1133cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CAUSALITY_TURN_STAGING_AFTERMATH_VOID'), 'CAUSALITY_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1119 — causalityPass: causality clock-suspense aftermath void, causality clock-dialogue-highlight aftermath void, causality turn-emotional aftermath void', async () => {
     const runCA1119 = async (records: ScreenplaySceneRecord[]) => {
       const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');

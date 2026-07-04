@@ -562,6 +562,13 @@
 // and CAUSALITY_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID pairs it with dialogueHighlights (fifth
 // channel); CAUSALITY_TURN_EMOTIONAL_AFTERMATH_VOID pairs dramaticTurn with emotionalShift (third
 // channel).
+// Wave 1133 additions (closes rotation cycle 40, belief.ts Wave 1132 - causality.ts Wave 1133):
+// CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its sixth and final channel
+// (previously paired with curiosityDelta/emotionalShift/relationshipShifts/suspenseDelta/
+// dialogueHighlights, now also paired with visualBeats), completing full six-channel saturation
+// for this trigger. CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID and CAUSALITY_TURN_STAGING_
+// AFTERMATH_VOID give dramaticTurn its fourth and fifth channels (relationshipShifts,
+// visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6596,6 +6603,85 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1119c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1119c.aftermathCount} such shifts occur elsewhere. A pivot that never registers on any character's felt emotional state leaves the causal chain's turns reading as plot mechanics rather than moments that change how someone feels.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt, not just something that happened.`,
+      });
+    }
+  }
+
+  // CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from CAUSALITY_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1091), CAUSALITY_CLOCK_EMOTIONAL_AFTERMATH_VOID, CAUSALITY_CLOCK_RELATIONAL_AFTERMATH_
+  // VOID (Wave 1105), CAUSALITY_CLOCK_SUSPENSE_AFTERMATH_VOID, and CAUSALITY_CLOCK_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (Wave 1119, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta/dialogueHighlights) — this is the sixth and final
+  // consequence channel for this trigger, completing full saturation.
+  {
+    const r1133a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1133a.fires) {
+      issues.push({
+        location: `${r1133a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'CAUSALITY_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1133a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1133a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the causal chain's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every turn's two-scene aftermath carries
+  // no relationship movement, while such movement occurs elsewhere. Distinct from CAUSALITY_
+  // TURN_SUSPENSE_AFTERMATH_VOID (Wave 1091), CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1105), and CAUSALITY_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1119, same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift) — this is the fourth consequence channel for
+  // this trigger.
+  {
+    const r1133b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1133b.fires) {
+      issues.push({
+        location: `${r1133b.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1133b.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1133b.aftermathCount} such shifts occur elsewhere. A pivot that never moves how any two characters stand with each other treats the turn as an isolated plot event rather than a link in the causal chain that reshapes the relational world.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the turn registers between characters, not just in the plot.`,
+      });
+    }
+  }
+
+  // CAUSALITY_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath has no heavily-staged scene, while
+  // such staging occurs elsewhere. Distinct from CAUSALITY_TURN_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1091), CAUSALITY_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1105), CAUSALITY_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 1119), and CAUSALITY_TURN_RELATIONAL_AFTERMATH_VOID (this wave, same
+  // trigger paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) — this
+  // is the fifth consequence channel for this trigger.
+  {
+    const r1133c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1133c.fires) {
+      issues.push({
+        location: `${r1133c.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'CAUSALITY_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1133c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1133c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the causal chain's turns registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
       });
     }
   }
