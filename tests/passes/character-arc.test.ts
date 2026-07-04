@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1121 — characterArcPass: arc suspense-staging aftermath void, arc turn-curiosity aftermath void, arc turn-suspense aftermath void', async () => {
+    const makeRec1121 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1121 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_SUSPENSE_STAGING_AFTERMATH_VOID fires when every suspense spike is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1121a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeRec1121(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_STAGING_AFTERMATH_VOID'), 'ARC_SUSPENSE_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_SUSPENSE_STAGING_AFTERMATH_VOID does not fire when a suspense spike is followed by a heavily-staged scene within its window', async () => {
+      const recs1121an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeRec1121(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_SUSPENSE_STAGING_AFTERMATH_VOID'), 'ARC_SUSPENSE_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no curiosity rise', async () => {
+      const recs1121b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1121(i, { curiosityDelta: 1 });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_CURIOSITY_AFTERMATH_VOID'), 'ARC_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by a curiosity rise within its window', async () => {
+      const recs1121bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1121(i, { curiosityDelta: 1 });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_CURIOSITY_AFTERMATH_VOID'), 'ARC_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const recs1121c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1121(i, { suspenseDelta: 1 });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_TURN_SUSPENSE_AFTERMATH_VOID'), 'ARC_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const recs1121cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1121(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1121(i, { suspenseDelta: 1 });
+        return makeRec1121(i);
+      });
+      const res = await runArc1121(recs1121cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_TURN_SUSPENSE_AFTERMATH_VOID'), 'ARC_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1107 — characterArcPass: arc revelation-staging aftermath void, arc seed-relational aftermath void, arc seed-staging aftermath void', async () => {
     const makeRec1107 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
