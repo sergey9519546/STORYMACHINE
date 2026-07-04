@@ -518,6 +518,11 @@
 // BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID and BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID give
 // clockRaised its first two consequence channels; BELIEF_TURN_RELATIONAL_AFTERMATH_VOID gives
 // dramaticTurn its first channel.
+// Wave 1132 additions: clockRaised was at two of six channels (curiosityDelta/suspenseDelta)
+// and dramaticTurn at one (relationshipShifts). BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID and
+// BELIEF_CLOCK_RELATIONAL_AFTERMATH_VOID give clockRaised its third and fourth channels
+// (emotionalShift, relationshipShifts); BELIEF_TURN_SUSPENSE_AFTERMATH_VOID gives dramaticTurn
+// its second channel (suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6341,6 +6346,80 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1118c.triggerCount} dramatic-turn scenes is followed by two scenes with no recorded relationship shift, even though ${r1118c.aftermathCount} such shifts exist elsewhere in the script. A turn that changes the situation without changing how any two characters read each other treats the turn as plot event rather than a shift in what someone believes about someone else.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the turn registers between characters, not just in the plot.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID and
+  // BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave 1118, same trigger paired with curiosityDelta/
+  // suspenseDelta) — this is the third consequence channel for this trigger.
+  {
+    const r1132a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1132a.fires) {
+      issues.push({
+        location: `${r1132a.triggerCount} clock-raised scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1132a.triggerCount} clock-raised scenes is followed by two scenes with no emotional shift, even though ${r1132a.aftermathCount} such shifts occur elsewhere. A deadline that tightens without registering on any character's felt state right after leaves the belief layer's clock reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the mounting pressure, so the belief layer's ticking clock carries felt weight, not just structural urgency.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID, BELIEF_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave 1118),
+  // and BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift) — this is the fourth consequence channel for
+  // this trigger.
+  {
+    const r1132b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1132b.fires) {
+      issues.push({
+        location: `${r1132b.triggerCount} clock-raised scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'BELIEF_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1132b.triggerCount} clock-raised scenes is followed by two scenes with no recorded relationship shift, even though ${r1132b.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the belief layer's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn (non-'nothing')
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere,
+  // 2-scene lookahead. Fires when every dramatic turn's two-scene aftermath carries no rise in
+  // suspense, while such rises occur elsewhere. Distinct from BELIEF_TURN_RELATIONAL_AFTERMATH_
+  // VOID (Wave 1118, same trigger paired with relationshipShifts) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1132c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1132c.fires) {
+      issues.push({
+        location: `${r1132c.triggerCount} dramatic-turn scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'BELIEF_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1132c.triggerCount} dramatic-turn scenes is followed by two scenes with no rise in suspense, even though ${r1132c.aftermathCount} such rises occur elsewhere. A pivot that never makes the situation feel more dangerous or uncertain right after it happens leaves the belief layer's turns registering as incident rather than escalation.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, sharpen what's now at risk, so the pivot compounds tension rather than resolving into a flat new normal.`,
       });
     }
   }
