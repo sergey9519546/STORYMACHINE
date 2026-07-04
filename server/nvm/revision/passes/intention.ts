@@ -509,6 +509,12 @@
 // payoffSetupIds with emotionalShift and relationshipShifts respectively (second and third
 // channels for this trigger), and INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID pairs dramaticTurn
 // with emotionalShift (second channel for this trigger).
+// Wave 1123 additions: payoffSetupIds was at three of six standard channels (curiosityDelta/
+// emotionalShift/relationshipShifts) and dramaticTurn at two (suspenseDelta/emotionalShift) —
+// this wave advances both. INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID gives payoffSetupIds its
+// fourth channel (suspenseDelta); INTENTION_TURN_CURIOSITY_AFTERMATH_VOID and INTENTION_TURN_
+// RELATIONAL_AFTERMATH_VOID give dramaticTurn its third and fourth channels (curiosityDelta,
+// relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6424,6 +6430,80 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1109c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1109c.aftermathCount} such shifts occur elsewhere. A pivot that never lands emotionally right after it happens leaves the character's intention registering as plot mechanics rather than something anyone feels.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, register an emotional shift so the pivot is felt in the character's pursuit, not just executed as a structural beat.`,
+      });
+    }
+  }
+
+  // INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from INTENTION_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 1090),
+  // INTENTION_PAYOFF_EMOTIONAL_AFTERMATH_VOID, and INTENTION_PAYOFF_RELATIONAL_AFTERMATH_VOID
+  // (Wave 1109, same trigger paired with curiosityDelta/emotionalShift/relationshipShifts) —
+  // this is the fourth consequence channel for this trigger.
+  {
+    const r1123a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1123a.fires) {
+      issues.push({
+        location: `${r1123a.triggerCount} payoff scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1123a.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1123a.aftermathCount} such rises occur elsewhere. A resolved intention that never leaves fresh tension in its wake leaves the character's pursuit feeling settled rather than opening onto the next thing at risk.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise from what the resolution cost or changed, so the character's intention keeps generating stakes instead of closing the matter entirely.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in curiosity, while
+  // such rises occur elsewhere. Distinct from INTENTION_TURN_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1095) and INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1109, same trigger paired with
+  // suspenseDelta/emotionalShift) — this is the third consequence channel for this trigger.
+  {
+    const r1123b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1123b.fires) {
+      issues.push({
+        location: `${r1123b.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'INTENTION_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1123b.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1123b.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question about the character's pursuit leaves the intention layer's turns registering as closed events rather than links that generate the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface about what the character wants now, so the pivot keeps the intention layer generating curiosity instead of settling into the new state of affairs.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere,
+  // 2-scene lookahead. Fires when every turn's two-scene aftermath carries no relationship
+  // shift, while such shifts occur elsewhere. Distinct from INTENTION_TURN_SUSPENSE_AFTERMATH_
+  // VOID (Wave 1095), INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1109), and INTENTION_TURN_
+  // CURIOSITY_AFTERMATH_VOID (this wave, same trigger paired with suspenseDelta/emotionalShift/
+  // curiosityDelta) — this is the fourth consequence channel for this trigger.
+  {
+    const r1123c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1123c.fires) {
+      issues.push({
+        location: `${r1123c.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'INTENTION_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1123c.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1123c.aftermathCount} such shifts exist elsewhere in the script. A pivot that never moves how the character stands with anyone else treats the turn as an internal recalibration of intention rather than something that reshapes the relational world the pursuit plays out in.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a relationship — an ally reassessing the character's motives, a bond strained or strengthened by the pivot — so the turn registers between characters, not just within one.`,
       });
     }
   }

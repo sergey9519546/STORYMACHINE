@@ -1352,6 +1352,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1123 — intentionPass: intention payoff-suspense aftermath void, intention turn-curiosity aftermath void, intention turn-relational aftermath void', async () => {
+    const makeRec1123 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1123 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID fires when every payoff is followed by two scenes with no suspense rise', async () => {
+      const recs1123a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1123(i, { suspenseDelta: 1 });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID does not fire when a payoff is followed by a suspense rise within its window', async () => {
+      const recs1123an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1123(i, { suspenseDelta: 1 });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID'), 'INTENTION_PAYOFF_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no curiosity rise', async () => {
+      const recs1123b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1123(i, { curiosityDelta: 1 });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by a curiosity rise within its window', async () => {
+      const recs1123bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1123(i, { curiosityDelta: 1 });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_TURN_RELATIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no relationship shift', async () => {
+      const recs1123c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1123(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_RELATIONAL_AFTERMATH_VOID'), 'INTENTION_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by a relationship shift within its window', async () => {
+      const recs1123cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1123(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1123(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1123(i);
+      });
+      const res = await runIN1123(recs1123cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_RELATIONAL_AFTERMATH_VOID'), 'INTENTION_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1109 — intentionPass: intention payoff-emotional aftermath void, intention payoff-relational aftermath void, intention turn-emotional aftermath void', async () => {
     const makeRec1109 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
