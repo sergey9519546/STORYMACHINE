@@ -1006,6 +1006,61 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 975 — structurePass: structure clock zone imbalance, structure clock delta zone imbalance, structure relationship zone imbalance', async () => {
+    const runST975 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('STRUCTURE_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs975a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 1, 2, 8, 9].includes(i) }));
+      const res = await runST975(recs975a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_ZONE_IMBALANCE'), 'STRUCTURE_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs975an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 3, 5, 8].includes(i) }));
+      const res = await runST975(recs975an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_ZONE_IMBALANCE'), 'STRUCTURE_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs975b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runST975(recs975b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE'), 'STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs975bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runST975(recs975bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE'), 'STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs975c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runST975(recs975c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE'), 'STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE should fire');
+    });
+
+    it('STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs975cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runST975(recs975cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE'), 'STRUCTURE_RELATIONSHIP_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 961 — structurePass: structure curiosity zone imbalance, structure payoff zone imbalance, structure revelation zone imbalance', async () => {
     const runST961 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
