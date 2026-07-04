@@ -418,6 +418,15 @@
 // RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID (dramatic-turn → relational), RHYTHM_PAYOFF_EMOTIONAL_
 // AFTERMATH_VOID (payoff → emotional), and RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
 // curiosity) — each a distinct trigger/output pairing proving decoupling.
+// Wave 988 additions: re-auditing the zone-cluster/drought-run rule inventory turned up three
+// consistent-predicate trio-complete signals that Wave 974's exhaustion claim missed — they carry
+// this pass's generic "_SIGNAL" naming (DIALOGUE_SIGNAL, PAYOFF_SIGNAL, RELATIONAL_SIGNAL) rather
+// than a descriptive prefix, so they didn't surface in that wave's search. DIALOGUE_SIGNAL_ZONE_
+// IMBALANCE (dialogueHighlights array), PAYOFF_SIGNAL_ZONE_IMBALANCE (payoffSetupIds array), and
+// RELATIONAL_SIGNAL_ZONE_IMBALANCE (relationshipShifts array) complete their trios with the 4-zone
+// bloat+empty-zone mode. (CLOCK_SIGNAL was checked and excluded: its cluster/drought rules audit
+// two different fields — clockDelta > 0 vs clockRaised === true — under the same name prefix, so
+// it isn't a real trio.)
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5008,6 +5017,80 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r974c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r974c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger usually provokes new uncertainty — how will this be survived, who will pay for it, what happens next. When every stakes-raise's aftermath opens no curiosity, the rhythm's escalation beats land flat rather than propelling the audience forward.`,
         suggestedFix: `Let at least one stakes-raise open a new question in its aftermath: in the scene or two after the danger sharpens, plant a fresh uncertainty — an unknown consequence, an unresolved choice, a threat whose shape isn't yet clear. A stakes-raise whose aftermath provokes curiosity keeps the rhythm propulsive, not just tense.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SIGNAL_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // highlighted-dialogue scenes total, divided across four equal structural zones. Fires only when
+  // one zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone DIALOGUE_SIGNAL_ZONE_CLUSTER and run-based DIALOGUE_SIGNAL_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this channel. This trio-complete signal was
+  // overlooked when this pass's zone-imbalance mode was declared exhausted (Wave 974): it carries
+  // the pass's generic "_SIGNAL" naming rather than a descriptive rule prefix.
+  {
+    const r988a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r988a.fires) {
+      const emptyNames988a = r988a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName988a = FOUR_ZONE_NAMES[r988a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames988a} empty; ${bloatName988a} has ${r988a.counts[r988a.bloatZoneIdx]}/${r988a.totalCount} highlighted-dialogue scenes`,
+        rule: 'DIALOGUE_SIGNAL_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r988a.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName988a} contains ${r988a.counts[r988a.bloatZoneIdx]} of them (${Math.round((r988a.counts[r988a.bloatZoneIdx] / r988a.totalCount) * 100)}%) while ${emptyNames988a} contains none. Memorable dialogue bloats in one structural quarter and never lands in another, so the rhythm's verbal beats concentrate in only part of the story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames988a} — a standout line of dialogue so the rhythm's verbal beats land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_SIGNAL_ZONE_IMBALANCE — Underweight/bloat × payoffSetupIds array × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 payoff scenes
+  // total, divided across four equal structural zones. Distinct from the existing 3-zone PAYOFF_
+  // SIGNAL_ZONE_CLUSTER and run-based PAYOFF_SIGNAL_DROUGHT_RUN — the first application of the
+  // 4-zone bloat+empty-zone mode to this channel, and the second signal this wave recovers from
+  // Wave 974's overly hasty exhaustion claim.
+  {
+    const r988b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r988b.fires) {
+      const emptyNames988b = r988b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName988b = FOUR_ZONE_NAMES[r988b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames988b} empty; ${bloatName988b} has ${r988b.counts[r988b.bloatZoneIdx]}/${r988b.totalCount} payoff scenes`,
+        rule: 'PAYOFF_SIGNAL_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r988b.totalCount} payoff scenes are unevenly distributed across its four structural zones: ${bloatName988b} contains ${r988b.counts[r988b.bloatZoneIdx]} of them (${Math.round((r988b.counts[r988b.bloatZoneIdx] / r988b.totalCount) * 100)}%) while ${emptyNames988b} contains none. Callbacks bloat in one structural quarter and never land in another, so the rhythm's payoff beats concentrate in only part of the story.`,
+        suggestedFix: `Redistribute callbacks: land a payoff in at least one scene inside the empty zone(s) — ${emptyNames988b} — so the rhythm's payoff beats land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SIGNAL_ZONE_IMBALANCE — Underweight/bloat × relationshipShifts array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // relationship-shift scenes total, divided across four equal structural zones. Distinct from the
+  // existing 3-zone RELATIONAL_SIGNAL_ZONE_CLUSTER and run-based RELATIONAL_SIGNAL_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this channel, and the third and
+  // last signal this wave recovers from Wave 974's overly hasty exhaustion claim.
+  {
+    const r988c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r988c.fires) {
+      const emptyNames988c = r988c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName988c = FOUR_ZONE_NAMES[r988c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames988c} empty; ${bloatName988c} has ${r988c.counts[r988c.bloatZoneIdx]}/${r988c.totalCount} relationship-shift scenes`,
+        rule: 'RELATIONAL_SIGNAL_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r988c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName988c} contains ${r988c.counts[r988c.bloatZoneIdx]} of them (${Math.round((r988c.counts[r988c.bloatZoneIdx] / r988c.totalCount) * 100)}%) while ${emptyNames988c} contains none. Bonds change in a bloated cluster in one structural quarter and stay static in another, so the rhythm's relational beats concentrate in only part of the story.`,
+        suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) — ${emptyNames988c} — a relationship shift so the rhythm's relational beats land across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

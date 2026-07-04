@@ -1136,6 +1136,61 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 988 — rhythmPass: dialogue signal zone imbalance, payoff signal zone imbalance, relational signal zone imbalance', async () => {
+    const runR988 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_SIGNAL_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs988a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['line'] : [] }));
+      const res = await runR988(recs988a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_ZONE_IMBALANCE'), 'DIALOGUE_SIGNAL_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_SIGNAL_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs988an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['line'] : [] }));
+      const res = await runR988(recs988an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SIGNAL_ZONE_IMBALANCE'), 'DIALOGUE_SIGNAL_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_SIGNAL_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of payoff scenes', async () => {
+      const recs988b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 1, 2, 8, 9].includes(i) ? ['setup1'] : [] }));
+      const res = await runR988(recs988b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_ZONE_IMBALANCE'), 'PAYOFF_SIGNAL_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_SIGNAL_ZONE_IMBALANCE does not fire when payoff scenes touch every zone', async () => {
+      const recs988bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { payoffSetupIds: [0, 3, 5, 8].includes(i) ? ['setup1'] : [] }));
+      const res = await runR988(recs988bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SIGNAL_ZONE_IMBALANCE'), 'PAYOFF_SIGNAL_ZONE_IMBALANCE should not fire');
+    });
+
+    it('RELATIONAL_SIGNAL_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of relationship-shift scenes', async () => {
+      const recs988c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 1, 2, 8, 9].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runR988(recs988c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_ZONE_IMBALANCE'), 'RELATIONAL_SIGNAL_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_SIGNAL_ZONE_IMBALANCE does not fire when relationship-shift scenes touch every zone', async () => {
+      const recs988cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { relationshipShifts: [0, 3, 5, 8].includes(i) ? [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] : [] }));
+      const res = await runR988(recs988cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_SIGNAL_ZONE_IMBALANCE'), 'RELATIONAL_SIGNAL_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 974 — rhythmPass: rhythm turn relational aftermath void, rhythm payoff emotional aftermath void, rhythm stakes curiosity aftermath void', async () => {
     const runR974 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
