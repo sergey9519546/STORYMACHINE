@@ -486,6 +486,13 @@
 // only remaining standard channel). INTENTION_STAKES_STAGING_AFTERMATH_VOID gives raise_stakes a
 // fifth channel (previously paired with curiosityDelta/suspenseDelta/relationshipShifts/
 // emotionalShift, now also paired with visualBeats).
+// Wave 1081 additions: raise_stakes reaches full six-channel saturation — INTENTION_STAKES_
+// DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (previously paired with curiosityDelta/suspenseDelta/
+// relationshipShifts/emotionalShift/visualBeats, now also paired with dialogueHighlights — its
+// only remaining standard channel). Heavy unresolvedClues debt gets two fresh channels this
+// wave: INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (previously paired with payoffSetupIds/
+// curiosityDelta/emotionalShift/suspenseDelta, now also paired with relationshipShifts) and
+// INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID (now also paired with visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6166,6 +6173,86 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1067c.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1067c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the character's intention pursuing an abstraction rather than something lodged in the world.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID, INTENTION_STAKES_SUSPENSE_AFTERMATH_VOID,
+  // INTENTION_STAKES_RELATIONAL_AFTERMATH_VOID, INTENTION_STAKES_EMOTIONAL_AFTERMATH_VOID, and
+  // INTENTION_STAKES_STAGING_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // suspenseDelta/relationshipShifts/emotionalShift/visualBeats respectively) — this is the sixth
+  // and final standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1081a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1081a.fires) {
+      issues.push({
+        location: `${r1081a.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'INTENTION_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1081a.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1081a.aftermathCount} such scenes exist elsewhere in the script. Escalating danger that lands without a single memorable line reacting to it in the immediate aftermath leaves the character's intention registering the stakes structurally, never in a line anyone remembers.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let a character deliver a memorable line naming or reacting to the new danger so the intention's escalation registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // relationship-shift scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath carries no bond change, while such changes occur elsewhere. Distinct from
+  // OPEN_THREAD_PAYOFF_AFTERMATH_VOID, INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID,
+  // INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, and INTENTION_OPEN_THREAD_SUSPENSE_
+  // AFTERMATH_VOID (same trigger paired with payoffSetupIds/curiosityDelta/emotionalShift/
+  // suspenseDelta respectively) — this is the fourth standard-channel pairing for this trigger.
+  {
+    const r1081b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1081b.fires) {
+      issues.push({
+        location: `${r1081b.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1081b.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1081b.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the character's intention facing uncertainty that's purely informational rather than something straining the bonds it's meant to be tracking.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the intention's pursuit feels the pressure interpersonally, not only structurally.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 visually-dense
+  // scenes anywhere (visualBeats length≥2), 2-scene lookahead. Fires when every heavy-debt
+  // scene's two-scene aftermath contains no visually dense scene, while such scenes occur
+  // elsewhere. Distinct from OPEN_THREAD_PAYOFF_AFTERMATH_VOID, INTENTION_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID, INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, INTENTION_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID, and INTENTION_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (same trigger
+  // paired with payoffSetupIds/curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts
+  // respectively) — this is the fifth standard-channel pairing for this trigger.
+  {
+    const r1081c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1081c.fires) {
+      issues.push({
+        location: `${r1081c.triggerCount} heavy clue-debt scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1081c.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1081c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the character's intention pursuing an abstraction rather than something lodged in the world.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight — a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
       });
     }
   }
