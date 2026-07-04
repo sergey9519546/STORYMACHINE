@@ -465,6 +465,13 @@
 // channel with relationshipShifts), and STRUCTURE_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds,
 // previously paired with dialogueHighlights/relationshipShifts/emotionalShift, now a fourth
 // channel with curiosityDelta).
+// Wave 1045 additions: with raise_stakes and payoffSetupIds now at four channels each, this wave
+// targets dramaticTurn and unresolvedClues instead: STRUCTURE_TURN_EMOTIONAL_AFTERMATH_VOID
+// (dramaticTurn, previously paired with visualBeats/curiosityDelta/relationshipShifts, now a
+// fourth channel with emotionalShift), STRUCTURE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID (heavy
+// unresolvedClues debt, previously paired with dialogueHighlights/emotionalShift, now a third
+// channel with curiosityDelta), and STRUCTURE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (heavy
+// unresolvedClues debt, now a fourth channel with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5787,6 +5794,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene in the story (${r1031c.triggerCount} cashed-in setups) is followed by two scenes with no rise in curiosity, even though ${r1031c.aftermathCount} such rises occur elsewhere. A resolution that closes cleanly with no fresh question in its wake leaves the structure's payoff beats feeling terminal rather than generative of the next stretch of story.`,
         suggestedFix: `In the two scenes following at least one payoff, let a new question rise so the structure keeps generating curiosity instead of only closing threads.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no emotional shift, while such
+  // shifts occur elsewhere. Distinct from the original dramaticTurn → visualBeats rule,
+  // STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID, and STRUCTURE_TURN_RELATIONAL_AFTERMATH_VOID (same
+  // trigger paired with visualBeats/curiosityDelta/relationshipShifts respectively) — this is the
+  // fourth consequence channel for this trigger in this pass.
+  {
+    const r1045a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1045a.fires) {
+      issues.push({
+        location: `${r1045a.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'STRUCTURE_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1045a.triggerCount} pivots) is followed by two emotionally neutral scenes, even though ${r1045a.aftermathCount} emotionally-charged scenes exist elsewhere. A pivot that never registers as felt in the scenes right after it lands as a structural beat the story tracks mechanically rather than something anyone visibly carries.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let someone's feelings visibly register the pivot so the structure's turn lands emotionally, not only structurally.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 curiosity-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no curiosity rise, while such rises occur elsewhere. Distinct from the original
+  // unresolvedClues → dialogueHighlights rule and the unresolvedClues → emotionalShift rule (same
+  // trigger paired with dialogueHighlights and emotionalShift respectively) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1045b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1045b.fires) {
+      issues.push({
+        location: `${r1045b.triggerCount} heavy clue-debt scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'STRUCTURE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1045b.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1045b.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the structure's uncertainty stalls instead of deepening.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // STRUCTURE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 relationship-shift
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no bond change, while such changes occur elsewhere. Distinct from STRUCTURE_OPEN_
+  // THREAD_CURIOSITY_AFTERMATH_VOID (this wave) and the original unresolvedClues → dialogueHighlights
+  // and → emotionalShift rules — this is the fourth consequence channel for this trigger.
+  {
+    const r1045c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1045c.fires) {
+      issues.push({
+        location: `${r1045c.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'STRUCTURE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1045c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1045c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the structure's uncertainty purely informational rather than something straining the bonds it's meant to be tracking.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the structure's open threads register interpersonally, not just as plot backlog.`,
       });
     }
   }
