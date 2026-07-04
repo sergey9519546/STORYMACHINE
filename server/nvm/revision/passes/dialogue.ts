@@ -467,6 +467,12 @@
 // paired with curiosityDelta for the first time) and DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID
 // (seededClueIds → suspenseDelta, the first use of either field as a checkAftermathVoid channel in
 // this pass).
+// Wave 1008 additions: this wave gives three existing aftermath-void triggers a fresh consequence
+// channel: DIALOGUE_STAKES_EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with
+// dialogueHighlights and curiosityDelta, now paired with emotionalShift), DIALOGUE_OPEN_THREAD_
+// CURIOSITY_AFTERMATH_VOID (heavy unresolvedClues debt, previously only paired with
+// dialogueHighlights, now paired with curiosityDelta), and DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID
+// (seededClueIds, previously only paired with suspenseDelta, now paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5876,6 +5882,79 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clue-seeding scene (${r994c.triggerCount} plants) is followed by two scenes with no rise in tension, even though ${r994c.aftermathCount} such rises occur elsewhere. A planted clue should usually tighten tension as its implications sink in; when every seed's aftermath registers no suspense, the mystery sits flat rather than compounding.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, raise the tension -- a ticking complication or a near-miss tied to the new information -- so the mystery keeps compounding rather than idling.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAKES_EMOTIONAL_AFTERMATH_VOID -- Sequence/aftermath x raise_stakes trigger ->
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying stakes-raise scenes (pos<n-2), >=2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath is emotionally flat, while
+  // charged scenes occur elsewhere. Distinct from DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID (Wave
+  // 994, curiosityDelta) and RAISE_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (dialogueHighlights) --
+  // this is the third consequence channel for this trigger in this pass.
+  {
+    const r1008a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1008a.fires) {
+      issues.push({
+        location: `${r1008a.triggerCount} stakes-raise aftermath(s) -- no emotional shift within 2 scenes`,
+        rule: 'DIALOGUE_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1008a.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r1008a.aftermathCount} emotionally-charged scenes exist elsewhere. Escalating danger should usually carry felt weight for the characters living through it; when every stakes-raise's aftermath is affectively flat, dialogue never voices what the escalation costs anyone.`,
+        suggestedFix: `Let at least one stakes-raise carry feeling in its aftermath: in the scene or two after the danger sharpens, give a character a line that voices fear, resolve, or dread.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID -- Sequence/aftermath x heavy unresolved-clue-
+  // debt trigger -> curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n>=8, >=2 qualifying heavy-debt scenes (unresolvedClues.length>=3, pos<n-2), >=2
+  // curiosity-raising scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath opens no new curiosity, while curiosity does occur elsewhere. Distinct
+  // from OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // dialogueHighlights) -- this pairs heavy clue-debt with curiosityDelta for the first time in
+  // this pass.
+  {
+    const r1008b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1008b.fires) {
+      issues.push({
+        location: `${r1008b.triggerCount} heavy clue-debt scene(s) -- no curiosity raised within 2 scenes of any`,
+        rule: 'DIALOGUE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1008b.triggerCount} instances) is followed by two full scenes that raise no new curiosity, even though ${r1008b.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, dialogue never voices the next question the debt provokes.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, give a character a line that raises a new question so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID -- Sequence/aftermath x seededClueIds trigger ->
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying seed scenes (pos<n-2), >=2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every seed's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. Distinct from DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID (same
+  // trigger paired with suspenseDelta) -- this pairs seededClueIds with relationshipShifts for the
+  // first time in this pass.
+  {
+    const r1008c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1008c.fires) {
+      issues.push({
+        location: `${r1008c.triggerCount} seed aftermath(s) -- no relationship shift within 2 scenes`,
+        rule: 'DIALOGUE_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1008c.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1008c.aftermathCount} such shifts occur elsewhere. A planted clue that never bears on how characters treat each other nearby leaves the seed purely mechanical, disconnected from what's actually said between people.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so dialogue carries interpersonal weight alongside its narrative function.`,
       });
     }
   }
