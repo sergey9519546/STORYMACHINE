@@ -528,6 +528,12 @@
 // exhausted, STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID introduces suspenseDelta as a
 // genuinely fresh checkAftermathVoid trigger — it has only ever appeared as an aftermath
 // channel or isPresent condition in this file, never as the isTrigger side of a check.
+// Wave 1157 additions: suspenseDelta had only its one Wave-1143 channel. STRUCTURE_SUSPENSE_
+// EMOTIONAL_AFTERMATH_VOID and STRUCTURE_SUSPENSE_RELATIONAL_AFTERMATH_VOID give it its second
+// and third channels (emotionalShift, relationshipShifts). This wave also introduces
+// seededClueIds as a genuinely fresh checkAftermathVoid trigger — it has never anchored the
+// isTrigger side of any check in this file: STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID pairs it
+// with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6470,6 +6476,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1143c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1143c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the structure's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes
+  // anywhere, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries
+  // no emotional shift, while such shifts occur elsewhere. Distinct from STRUCTURE_SUSPENSE_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1143, same trigger paired with curiosityDelta) — this is the
+  // second consequence channel for this trigger.
+  {
+    const r1157a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1157a.fires) {
+      issues.push({
+        location: `${r1157a.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'STRUCTURE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1157a.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1157a.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it lands leaves the structure's tension reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a character's emotional register shift in response to the danger, so the tension carries felt weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a
+  // recorded relationship shift, 2-scene lookahead. Fires when every suspense-spike's two-scene
+  // aftermath carries no relationship movement, while such movement occurs elsewhere. Distinct
+  // from STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 1143) and STRUCTURE_SUSPENSE_
+  // EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/emotionalShift)
+  // — this is the third consequence channel for this trigger.
+  {
+    const r1157b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1157b.fires) {
+      issues.push({
+        location: `${r1157b.triggerCount} suspense-spike scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'STRUCTURE_SUSPENSE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1157b.triggerCount} suspense-spike scenes is followed by two scenes with no recorded relationship shift, even though ${r1157b.aftermathCount} such shifts occur elsewhere. A spike in danger that never moves how a pair of characters stand with each other right after it lands leaves the structure's tension isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it shift a relationship — an alliance strengthened or a bond strained by the danger — so the tension carries interpersonal weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no rise in curiosity, while such rises
+  // occur elsewhere. Distinct from every other rule in this file: seededClueIds has never
+  // anchored the isTrigger side of a check here — this is the first check to use it as a
+  // checkAftermathVoid trigger in this pass. A planted clue that never provokes a fresh question
+  // in its immediate wake leaves the seed structurally present but inert as a source of intrigue.
+  {
+    const r1157c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1157c.fires) {
+      issues.push({
+        location: `${r1157c.triggerCount} seed scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1157c.triggerCount} scenes that plant a clue is followed by two scenes with no rise in curiosity, even though ${r1157c.aftermathCount} such rises occur elsewhere. A planted clue that never provokes a fresh question in its immediate aftermath leaves the seed structurally present but inert — the story sets something up without letting the audience feel the pull of wondering what it means.`,
+        suggestedFix: `In the two scenes following at least one seed, let a new question surface from what was just planted, so the clue generates curiosity rather than passing unnoticed until its eventual payoff.`,
       });
     }
   }
