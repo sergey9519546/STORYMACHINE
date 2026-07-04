@@ -1210,6 +1210,110 @@ He sits at his desk.
   });
 
 
+  describe('Wave 1068 — originalityPass: originality payoff-relational aftermath void, originality open-thread-emotional aftermath void, originality stakes-dialogue-highlight aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/1040/1054 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (payoffSetupIds array / unresolvedClues array / purpose==='raise_stakes') never overlap the
+    // filler purpose pool, so cycling never contaminates a fixture.
+    const PURPOSE_POOL_1068 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_1068 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor1068 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec1068 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor1068(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_1068[idx % PURPOSE_POOL_1068.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain1068 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor1068(i)}\n\n${SENTENCE_POOL_1068[i % SENTENCE_POOL_1068.length]}`).join('\n\n');
+    const runO1068 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain1068(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID fires when every payoff is followed by two scenes with no relationship shift', async () => {
+      const recs1068a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1068(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID does not fire when a payoff is followed by a relationship shift within its window', async () => {
+      const recs1068an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1068(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no emotional shift', async () => {
+      const recs1068b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1068(i, { emotionalShift: 'positive' });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by an emotional shift within its window', async () => {
+      const recs1068bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1068(i, { emotionalShift: 'positive' });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID'), 'ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1068c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1068(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a stakes-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1068cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1068(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1068(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1068(i);
+      });
+      const res = await runO1068(recs1068cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1054 — originalityPass: originality open-thread-suspense aftermath void, originality clock-suspense aftermath void, originality seed-relational aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/1026/1040 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these

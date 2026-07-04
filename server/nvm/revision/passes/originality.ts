@@ -502,6 +502,14 @@
 // curiosityDelta, now paired with suspenseDelta), and ORIGINALITY_SEED_RELATIONAL_AFTERMATH_VOID
 // gives seededClueIds a fourth channel (previously paired with curiosityDelta/suspenseDelta/
 // emotionalShift, now paired with relationshipShifts).
+// Wave 1068 additions: this wave targets the two least-saturated triggers plus raise_stakes'
+// fifth channel: ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID (payoffSetupIds, previously paired
+// with emotionalShift/curiosityDelta/suspenseDelta, now a fourth channel with relationshipShifts),
+// ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (heavy unresolvedClues debt, previously paired
+// with dialogueHighlights/curiosityDelta/suspenseDelta, now a fourth channel with emotionalShift),
+// and ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes, previously paired with
+// curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift, now a fifth channel with
+// dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6415,6 +6423,83 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clue-seeding scene (${r1054c.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1054c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a planted clue never bears on how characters treat each other nearby — a predictable, avoidable absence that leaves the seed purely mechanical.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the seed carries interpersonal weight, not just narrative function.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID,
+  // ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID, and ORIGINALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID
+  // (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta respectively) — this is
+  // the fourth consequence channel for this trigger.
+  {
+    const r1068a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1068a.fires) {
+      issues.push({
+        location: `${r1068a.triggerCount} payoff scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'ORIGINALITY_PAYOFF_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1068a.triggerCount} payoff scenes is followed by two scenes with no shift in any relationship, even though ${r1068a.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that a resolved setup never bears on how characters treat each other nearby — a predictable, avoidable absence that leaves the payoff purely mechanical.`,
+        suggestedFix: `After at least one payoff, let the resolution strain or shift a relationship in one of the following two scenes so it carries interpersonal weight, not just narrative closure.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 emotionally-charged
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from ORIGINALITY_OPEN_
+  // THREAD_HIGHLIGHT_AFTERMATH_VOID, ORIGINALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and
+  // ORIGINALITY_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID (same trigger paired with dialogueHighlights/
+  // curiosityDelta/suspenseDelta respectively) — this is the fourth consequence channel for this
+  // trigger.
+  {
+    const r1068b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1068b.fires) {
+      issues.push({
+        location: `${r1068b.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'ORIGINALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1068b.triggerCount} instances) is followed by two scenes registering no emotional shift, even though ${r1068b.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that accumulated mystery never lands emotionally right after it compounds — a predictable, avoidable absence that leaves the open threads feeling like inert backlog rather than something felt.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, register an emotional shift so accumulated mystery lands as something felt, not just tracked.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID,
+  // ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID, and ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1068c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1068c.fires) {
+      issues.push({
+        location: `${r1068c.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ORIGINALITY_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1068c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1068c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, they learn that raised stakes never earn a memorable line right after they land — a predictable, avoidable absence that leaves the escalation registering as plot mechanics rather than something voiced.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the raised stakes are voiced, not just structurally raised.`,
       });
     }
   }
