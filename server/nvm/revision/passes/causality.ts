@@ -497,6 +497,13 @@
 // previously only paired with curiosityDelta, now paired with emotionalShift), and CAUSALITY_
 // PAYOFF_RELATIONAL_AFTERMATH_VOID (payoffSetupIds, previously only paired with emotionalShift,
 // now paired with relationshipShifts).
+// Wave 1021 additions (closes the thirty-first rotation cycle, 1008-1021): three more fresh
+// channels for existing triggers: CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes,
+// previously paired with emotionalShift/curiosityDelta/suspenseDelta, now a fourth channel with
+// relationshipShifts), CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID (payoffSetupIds, previously paired
+// with emotionalShift/relationshipShifts, now a third channel with suspenseDelta), and CAUSALITY_
+// OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (unresolvedClues, previously only paired with suspenseDelta,
+// now a second channel with emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5922,6 +5929,79 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene (${r1007c.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r1007c.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as narrative bookkeeping rather than a beat that ripples through the causal chain's relationships.`,
         suggestedFix: `In the two scenes following at least one payoff, let the resolved setup strain or shift a relationship so the callback pays off interpersonally, not only causally.`,
+      });
+    }
+  }
+
+  // CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying raise_stakes scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no bond change, while
+  // such changes occur elsewhere. Distinct from CAUSALITY_STAKES_CURIOSITY_AFTERMATH_VOID (Wave
+  // 993), the original raise_stakes → emotionalShift rule, and CAUSALITY_STAKES_SUSPENSE_
+  // AFTERMATH_VOID (Wave 1007) — this is the fourth consequence channel for this trigger in this
+  // pass.
+  {
+    const r1021a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1021a.fires) {
+      issues.push({
+        location: `${r1021a.triggerCount} raise-stakes aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'CAUSALITY_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1021a.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1021a.aftermathCount} such shifts occur elsewhere. Raising the stakes without it ever bearing on how characters treat each other in the scenes right after leaves the causal chain's escalation registering as plot mechanics rather than interpersonal consequence.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the new danger strain or shift a relationship so the escalation ripples through the causal chain's relationships, not just its plot.`,
+      });
+    }
+  }
+
+  // CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no suspense rise, while such rises occur
+  // elsewhere. Distinct from CAUSALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID (Wave 993) and CAUSALITY_
+  // PAYOFF_RELATIONAL_AFTERMATH_VOID (Wave 1007) — this is the third consequence channel for this
+  // trigger in this pass.
+  {
+    const r1021b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1021b.fires) {
+      issues.push({
+        location: `${r1021b.triggerCount} payoff aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'CAUSALITY_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1021b.triggerCount} cashed-in setups) is followed by two scenes with no rise in suspense, even though ${r1021b.aftermathCount} such rises occur elsewhere. A callback that closes cleanly with no fresh tension in its immediate wake leaves the causal chain feeling settled rather than still building toward what comes next.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise so the causal chain keeps building rather than going slack right after a resolution.`,
+      });
+    }
+  }
+
+  // CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues trigger
+  // → emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying scenes with an open thread (pos<n-2), ≥2 emotionally-charged scenes anywhere,
+  // 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath carries no
+  // emotional shift, while such shifts occur elsewhere. Distinct from CAUSALITY_OPEN_THREAD_
+  // SUSPENSE_AFTERMATH_VOID (Wave 993, same trigger paired with suspenseDelta) — this pairs
+  // unresolvedClues with emotionalShift for the first time in this pass.
+  {
+    const r1021c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1021c.fires) {
+      issues.push({
+        location: `${r1021c.triggerCount} open-thread aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'CAUSALITY_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an open thread (${r1021c.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1021c.aftermathCount} emotionally-charged scenes exist elsewhere. An unresolved question that never registers as felt in the scenes right after it leaves the causal chain's loose ends purely intellectual rather than something anyone visibly carries.`,
+        suggestedFix: `In the two scenes following an open-thread scene, let someone's feelings register the unresolved question — unease, curiosity, quiet worry — so the causal chain's loose end lands emotionally, not just informationally.`,
       });
     }
   }
