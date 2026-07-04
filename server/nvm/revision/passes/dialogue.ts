@@ -453,6 +453,11 @@
 // DIALOGUE_REVELATION_ZONE_IMBALANCE (revelation != null -- the revelation string field, distinct from
 // the purpose-enum DIALOGUE_REVELATION_PURPOSE one), and DIALOGUE_RELATIONSHIP_ZONE_IMBALANCE
 // (relationshipShifts.length > 0 -- a relationshipShifts array distinct from 952's open-thread one).
+// Wave 980 additions (opens the twenty-ninth rotation cycle): auditing three more trio-complete
+// signals in this pass, spanning three distinct classes: DIALOGUE_EMOTION_ZONE_IMBALANCE
+// (emotionalShift !== 'neutral' -- the any-direction valence signal), DIALOGUE_SEED_ZONE_IMBALANCE
+// (seededClueIds array), and DIALOGUE_CLOCK_ZONE_IMBALANCE (clockRaised boolean -- the split-name
+// DIALOGUE_CLOCK/DIALOGUE_CLOCK_RAISED cluster+drought pair, both keyed on the same field).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5716,6 +5721,79 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r966c.totalCount} scenes with a relationship shift are unevenly distributed across its four structural zones: ${bloatName966c} contains ${r966c.counts[r966c.bloatZoneIdx]} of them (${Math.round((r966c.counts[r966c.bloatZoneIdx] / r966c.totalCount) * 100)}%) while ${emptyNames966c} contains none. Bonds change in a bloated cluster in one quarter and stay static in another, so the dialogue that turns relationships is confined to part of the story.`,
         suggestedFix: `Redistribute relational change: give at least one scene inside the empty zone(s) -- ${emptyNames966c} -- a relationship shift so dialogue keeps turning bonds across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_EMOTION_ZONE_IMBALANCE -- Underweight/bloat x (emotionalShift !== 'neutral') x four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4
+  // emotionally charged scenes total (positive or negative), divided across four equal structural
+  // zones. Fires only when one zone has zero such scenes while another holds >=50% of the total.
+  // Uses the same emotionalShift !== 'neutral' predicate as the existing 3-zone DIALOGUE_EMOTION_
+  // ZONE_CLUSTER and run-based DIALOGUE_EMOTION_DROUGHT_RUN -- the any-direction valence signal,
+  // distinct from the separate DIALOGUE_POSITIVE_EMOTION and DIALOGUE_NEGATIVE_EMOTION rules.
+  {
+    const r980a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r980a.fires) {
+      const emptyNames980a = r980a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName980a = FOUR_ZONE_NAMES[r980a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames980a} empty; ${bloatName980a} has ${r980a.counts[r980a.bloatZoneIdx]}/${r980a.totalCount} emotionally-charged scenes`,
+        rule: 'DIALOGUE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r980a.totalCount} emotionally-charged scenes are unevenly distributed across its four structural zones: ${bloatName980a} contains ${r980a.counts[r980a.bloatZoneIdx]} of them (${Math.round((r980a.counts[r980a.bloatZoneIdx] / r980a.totalCount) * 100)}%) while ${emptyNames980a} contains none. Feeling bloats in one quarter and never registers in another, giving dialogue's felt register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute feeling: give at least one scene inside the empty zone(s) -- ${emptyNames980a} -- an emotional shift (positive or negative) so dialogue's felt register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SEED_ZONE_IMBALANCE -- Underweight/bloat x (seededClueIds.length > 0) x four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4 seeding scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds >=50% of the total. Distinct from the existing 3-zone DIALOGUE_SEED_ZONE_
+  // CLUSTER and run-based DIALOGUE_SEED_DROUGHT_RUN -- the first application of the 4-zone bloat+
+  // empty-zone mode to the seededClueIds array field.
+  {
+    const r980b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r980b.fires) {
+      const emptyNames980b = r980b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName980b = FOUR_ZONE_NAMES[r980b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames980b} empty; ${bloatName980b} has ${r980b.counts[r980b.bloatZoneIdx]}/${r980b.totalCount} seeding scenes`,
+        rule: 'DIALOGUE_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r980b.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName980b} contains ${r980b.counts[r980b.bloatZoneIdx]} of them (${Math.round((r980b.counts[r980b.bloatZoneIdx] / r980b.totalCount) * 100)}%) while ${emptyNames980b} contains none. Setups bloat in one quarter and never get planted in another, giving dialogue's register of foreshadowing an uneven structural rhythm.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) -- ${emptyNames980b} -- so dialogue's register of foreshadowing recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_ZONE_IMBALANCE -- Underweight/bloat x (clockRaised === true) x four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n>=10, >=4 clock-raising
+  // scenes total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds >=50% of the total. Uses the same clockRaised === true predicate as
+  // the existing 3-zone DIALOGUE_CLOCK_RAISED_ZONE_CLUSTER and run-based DIALOGUE_CLOCK_DROUGHT_RUN
+  // -- the first application of the 4-zone bloat+empty-zone mode to the clockRaised BOOLEAN field.
+  {
+    const r980c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r980c.fires) {
+      const emptyNames980c = r980c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName980c = FOUR_ZONE_NAMES[r980c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames980c} empty; ${bloatName980c} has ${r980c.counts[r980c.bloatZoneIdx]}/${r980c.totalCount} clock-raising scenes`,
+        rule: 'DIALOGUE_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r980c.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName980c} contains ${r980c.counts[r980c.bloatZoneIdx]} of them (${Math.round((r980c.counts[r980c.bloatZoneIdx] / r980c.totalCount) * 100)}%) while ${emptyNames980c} contains none. Ticking clocks bloat in one quarter and are never introduced in another, giving dialogue's register of urgency an uneven structural rhythm.`,
+        suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) -- ${emptyNames980c} -- so dialogue's register of urgency recurs across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

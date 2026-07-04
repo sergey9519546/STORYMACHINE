@@ -1598,6 +1598,73 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 980 — dialoguePass: dialogue emotion zone imbalance, dialogue seed zone imbalance, dialogue clock zone imbalance', async () => {
+    const makeRec980 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes980 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD980 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('DIALOGUE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of emotionally-charged scenes', async () => {
+      const records980a = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 1, 2, 8, 9].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runD980(buildScenes980(10), records980a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_EMOTION_ZONE_IMBALANCE does not fire when emotionally-charged scenes touch every zone', async () => {
+      const records980an = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 3, 5, 8].includes(i) ? { emotionalShift: 'positive' } : {}));
+      const res = await runD980(buildScenes980(10), records980an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_EMOTION_ZONE_IMBALANCE'), 'DIALOGUE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const records980b = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 1, 2, 8, 9].includes(i) ? { seededClueIds: ['c1'] } : {}));
+      const res = await runD980(buildScenes980(10), records980b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_ZONE_IMBALANCE'), 'DIALOGUE_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const records980bn = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 3, 5, 8].includes(i) ? { seededClueIds: ['c1'] } : {}));
+      const res = await runD980(buildScenes980(10), records980bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SEED_ZONE_IMBALANCE'), 'DIALOGUE_SEED_ZONE_IMBALANCE should not fire');
+    });
+
+    it('DIALOGUE_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const records980c = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 1, 2, 8, 9].includes(i) ? { clockRaised: true } : {}));
+      const res = await runD980(buildScenes980(10), records980c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_ZONE_IMBALANCE'), 'DIALOGUE_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('DIALOGUE_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const records980cn = Array.from({ length: 10 }, (_, i) =>
+        makeRec980(i, [0, 3, 5, 8].includes(i) ? { clockRaised: true } : {}));
+      const res = await runD980(buildScenes980(10), records980cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_ZONE_IMBALANCE'), 'DIALOGUE_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 966 — dialoguePass: dialogue curiosity zone imbalance, dialogue revelation zone imbalance, dialogue relationship zone imbalance', async () => {
     const makeRec966 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
