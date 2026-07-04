@@ -451,6 +451,12 @@
 // audited payoff/open-thread arrays), CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta > 0 — a delta
 // distinct from Wave 940's curiosity one), and CONFLICT_CLOCK_ZONE_IMBALANCE (clockRaised boolean —
 // whether a ticking clock is introduced at all, distinct from the numeric clockDelta above).
+// Wave 982 additions: auditing the last two clean zone-imbalance candidates in this pass —
+// CONFLICT_EMOTION_ZONE_IMBALANCE (emotionalShift !== 'neutral', any-direction valence) and
+// CONFLICT_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) — plus, since the zone-imbalance mode
+// is now all but exhausted, one aftermath-void pairing via the shared checkAftermathVoid helper:
+// CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes → curiosity), the first use of raise_stakes
+// as an aftermath-void TRIGGER in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5689,6 +5695,80 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r968c.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName968c} contains ${r968c.counts[r968c.bloatZoneIdx]} of them (${Math.round((r968c.counts[r968c.bloatZoneIdx] / r968c.totalCount) * 100)}%) while ${emptyNames968c} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the conflict is put on a deadline in only part of the story.`,
         suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) — ${emptyNames968c} — so the conflict operates under a deadline across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_EMOTION_ZONE_IMBALANCE — Underweight/bloat × (emotionalShift !== 'neutral') × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // emotionally charged scenes total (positive or negative), divided across four equal structural
+  // zones. Fires only when one zone has zero such scenes while another holds ≥50% of the total.
+  // Uses the same emotionalShift !== 'neutral' predicate as the existing 3-zone CONFLICT_EMOTION_
+  // ZONE_CLUSTER and run-based CONFLICT_EMOTION_DROUGHT_RUN — the any-direction valence signal,
+  // distinct from the separate CONFLICT_POSITIVE_EMOTION and CONFLICT_NEGATIVE_EMOTION rules.
+  {
+    const r982a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r982a.fires) {
+      const emptyNames982a = r982a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName982a = FOUR_ZONE_NAMES[r982a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames982a} empty; ${bloatName982a} has ${r982a.counts[r982a.bloatZoneIdx]}/${r982a.totalCount} emotionally-charged scenes`,
+        rule: 'CONFLICT_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r982a.totalCount} emotionally-charged scenes are unevenly distributed across its four structural zones: ${bloatName982a} contains ${r982a.counts[r982a.bloatZoneIdx]} of them (${Math.round((r982a.counts[r982a.bloatZoneIdx] / r982a.totalCount) * 100)}%) while ${emptyNames982a} contains none. Feeling bloats in one structural quarter and never registers in another, so the conflict's felt weight is confined to part of the story.`,
+        suggestedFix: `Redistribute feeling: give at least one scene inside the empty zone(s) — ${emptyNames982a} — an emotional shift (positive or negative) so the conflict keeps carrying felt weight across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × (dialogueHighlights.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a dialogue highlight total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone CONFLICT_HIGHLIGHT_ZONE_CLUSTER and run-based CONFLICT_HIGHLIGHT_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the dialogueHighlights array field.
+  {
+    const r982b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r982b.fires) {
+      const emptyNames982b = r982b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName982b = FOUR_ZONE_NAMES[r982b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames982b} empty; ${bloatName982b} has ${r982b.counts[r982b.bloatZoneIdx]}/${r982b.totalCount} dialogue-highlight scenes`,
+        rule: 'CONFLICT_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r982b.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName982b} contains ${r982b.counts[r982b.bloatZoneIdx]} of them (${Math.round((r982b.counts[r982b.bloatZoneIdx] / r982b.totalCount) * 100)}%) while ${emptyNames982b} contains none. Memorable lines bloat in one structural quarter and never land in another, so the conflict's sharpest exchanges are confined to part of the story.`,
+        suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames982b} — a dialogue highlight so the conflict's sharpest exchanges land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID — with the zone-imbalance mode all but exhausted for
+  // this pass (only two clean trio-complete signals remain, both audited above), this check pivots
+  // to the sequence/aftermath mode via the shared checkAftermathVoid helper: raise-stakes trigger ×
+  // curiosity aftermath. Every stakes-raising scene is followed by two scenes that raise no new
+  // curiosity, even though fresh questions do open elsewhere. Escalating danger should usually
+  // provoke a new question — what happens next, who pays for this; when every stakes-raise's
+  // aftermath opens no curiosity, the conflict's escalations sit inert rather than propelling the
+  // audience forward. First use of raise_stakes as an aftermath-void TRIGGER in this pass.
+  {
+    const r982c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r982c.fires) {
+      issues.push({
+        location: `${r982c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r982c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r982c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke a new uncertainty — what happens next, who pays for this, how it will be survived. When every stakes-raise's aftermath opens no curiosity, the conflict's escalations sit inert rather than propelling the audience forward.`,
+        suggestedFix: `Let at least one stakes-raise open a new question in its aftermath: in the scene or two after the danger sharpens, plant an uncertainty about what comes next. A stakes-raise whose aftermath opens curiosity keeps the conflict propulsive, not just tense.`,
       });
     }
   }
