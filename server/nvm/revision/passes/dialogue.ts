@@ -504,6 +504,16 @@
 // DIALOGUE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives heavy unresolvedClues debt a fifth channel
 // (previously paired with dialogueHighlights/curiosityDelta/emotionalShift/suspenseDelta, now also
 // paired with relationshipShifts).
+// Wave 1078 additions: raise_stakes and heavy unresolvedClues debt each reach full six-channel
+// saturation -- DIALOGUE_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously paired with
+// dialogueHighlights/curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts, now also
+// paired with visualBeats -- its only remaining standard channel) and DIALOGUE_OPEN_THREAD_
+// STAGING_AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with dialogueHighlights/
+// curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts, now also paired with
+// visualBeats -- its only remaining standard channel). DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID
+// gives the |amount|>=0.3 relationshipShifts magnitude trigger a fifth channel (previously paired
+// with visualBeats/curiosityDelta/suspenseDelta/emotionalShift, now also paired with
+// dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6287,6 +6297,87 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1064c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1064c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the dialogue's uncertainty purely informational rather than something straining the bonds it's meant to be tracking.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the open threads register interpersonally, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // DIALOGUE_STAKES_STAGING_AFTERMATH_VOID -- Sequence/aftermath x raise_stakes trigger ->
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying stakes-raising scenes (pos<n-2), >=2 visually-dense scenes anywhere (visualBeats
+  // length>=2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains
+  // no visually dense scene, while such scenes occur elsewhere. Distinct from RAISE_STAKES_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, DIALOGUE_STAKES_CURIOSITY_AFTERMATH_VOID, DIALOGUE_STAKES_
+  // EMOTIONAL_AFTERMATH_VOID, DIALOGUE_STAKES_SUSPENSE_AFTERMATH_VOID, and DIALOGUE_STAKES_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights/curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts respectively) -- this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1078a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1078a.fires) {
+      issues.push({
+        location: `${r1078a.triggerCount} stakes-raising scene(s) -- no visually dense scene within 2 scenes of any`,
+        rule: 'DIALOGUE_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1078a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1078a.aftermathCount} such scenes exist elsewhere in the script. Escalating danger gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging -- an action or gesture that gives the raised stakes a physical anchor in the world.`,
+      });
+    }
+  }
+
+  // DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID -- Sequence/aftermath x heavy unresolvedClues
+  // debt trigger -> visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n>=8, >=2 qualifying heavy-debt scenes (pos<n-2, threshold>=3), >=2 visually-dense
+  // scenes anywhere (visualBeats length>=2), 2-scene lookahead. Fires when every heavy-debt
+  // scene's two-scene aftermath contains no visually dense scene, while such scenes occur
+  // elsewhere. Distinct from OPEN_THREAD_DIALOGUE_AFTERMATH_VOID, DIALOGUE_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID, DIALOGUE_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, DIALOGUE_OPEN_THREAD_SUSPENSE_
+  // AFTERMATH_VOID, and DIALOGUE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // dialogueHighlights/curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts
+  // respectively) -- this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1078b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1078b.fires) {
+      issues.push({
+        location: `${r1078b.triggerCount} heavy clue-debt scene(s) -- no visually dense scene within 2 scenes of any`,
+        rule: 'DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1078b.triggerCount} instances) is followed by two scenes with no substantial physical staging, even though ${r1078b.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never gets a physical presence around it right after it compounds leaves the dialogue's open threads feeling abstract rather than lodged in the world.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let substantial physical staging carry some of the weight -- a scene where the unresolved material has a tangible presence, not just narrative backlog.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID -- Sequence/aftermath x relationshipShifts
+  // (|amount|>=0.3 magnitude) trigger -> dialogueHighlights absence. Built on checkAftermathVoid
+  // from the shared checks library. n>=8, >=2 qualifying shift scenes (|amount|>=0.3, pos<n-2),
+  // >=2 scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // shift's two-scene aftermath contains no highlighted dialogue, while such dialogue occurs
+  // elsewhere. Distinct from DIALOGUE_SHIFT_STAGING_AFTERMATH_VOID, DIALOGUE_SHIFT_CURIOSITY_
+  // AFTERMATH_VOID, DIALOGUE_SHIFT_SUSPENSE_AFTERMATH_VOID, and DIALOGUE_SHIFT_EMOTIONAL_
+  // AFTERMATH_VOID (same trigger paired with visualBeats/curiosityDelta/suspenseDelta/
+  // emotionalShift respectively) -- this is the fifth consequence channel for this trigger.
+  {
+    const r1078c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1078c.fires) {
+      issues.push({
+        location: `${r1078c.triggerCount} relationship-shift scene(s) -- no highlighted dialogue within 2 scenes of any`,
+        rule: 'DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1078c.triggerCount} significant relationship-shift scenes is followed by two scenes with no highlighted dialogue, even though ${r1078c.aftermathCount} such scenes exist elsewhere in the script. A bond that has just meaningfully shifted carries into the next beat; when that aftermath never carries a memorable line, the new dynamic goes unvoiced -- no character's speech confirms what changed or what it costs.`,
+        suggestedFix: `After at least one significant relationship shift, let one of the following two scenes carry a line worth remembering -- a character naming what changed between them, so the new dynamic is voiced, not just structurally recorded.`,
       });
     }
   }

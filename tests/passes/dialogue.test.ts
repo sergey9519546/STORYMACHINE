@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1078 — dialoguePass: dialogue stakes-staging aftermath void, dialogue open-thread-staging aftermath void, dialogue shift-highlight aftermath void', async () => {
+    const makeRec1078 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1078 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1078 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_STAKES_STAGING_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no visually dense scene', async () => {
+      const records1078a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1078(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_STAGING_AFTERMATH_VOID'), 'DIALOGUE_STAKES_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_STAKES_STAGING_AFTERMATH_VOID does not fire when a stakes-raise is followed by a visually dense scene within its window', async () => {
+      const records1078an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1078(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_STAKES_STAGING_AFTERMATH_VOID'), 'DIALOGUE_STAKES_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no visually dense scene', async () => {
+      const records1078b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1078(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a visually dense scene within its window', async () => {
+      const records1078bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1078(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID'), 'DIALOGUE_OPEN_THREAD_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID fires when every significant shift is followed by two scenes with no highlighted dialogue', async () => {
+      const records1078c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 8 || i === 9) return makeRec1078(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID does not fire when a significant shift is followed by highlighted dialogue within its window', async () => {
+      const records1078cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1078(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 1 || i === 9) return makeRec1078(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1078(i);
+      });
+      const res = await runD1078(buildScenes1078(10), records1078cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1064 — dialoguePass: dialogue seed-highlight aftermath void, dialogue stakes-relational aftermath void, dialogue open-thread-relational aftermath void', async () => {
     const makeRec1064 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
