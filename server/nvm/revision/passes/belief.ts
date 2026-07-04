@@ -480,6 +480,15 @@
 // (per grep) have never been used as checkAftermathVoid consequence channels anywhere in this
 // pass: BELIEF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (raise_stakes) and BELIEF_PAYOFF_STAGING_
 // AFTERMATH_VOID (payoffSetupIds).
+// Wave 1062 additions: raise_stakes and payoffSetupIds each reach full six-channel saturation:
+// BELIEF_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously paired with relationshipShifts/
+// suspenseDelta/emotionalShift/curiosityDelta/dialogueHighlights, now also paired with
+// visualBeats — its only remaining standard channel) and BELIEF_PAYOFF_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID (payoffSetupIds, previously paired with curiosityDelta/relationshipShifts/
+// emotionalShift/suspenseDelta/visualBeats, now also paired with dialogueHighlights — its only
+// remaining standard channel). BELIEF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives seededClueIds
+// a fifth channel (previously paired with emotionalShift/suspenseDelta/relationshipShifts/
+// curiosityDelta, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5910,6 +5919,86 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene in the story (${r1048c.triggerCount} cashed-in setups) is followed by two scenes with no substantial physical staging, even though ${r1048c.aftermathCount} such scenes exist elsewhere in the script. A resolved setup gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
         suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — the aftermath of the resolution given some visible presence before the belief-tracking layer moves on.`,
+      });
+    }
+  }
+
+  // BELIEF_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raising scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats
+  // length≥2), 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from BELIEF_STAKES_
+  // RELATIONSHIP_AFTERMATH_VOID, BELIEF_STAKES_SUSPENSE_AFTERMATH_VOID, BELIEF_STAKES_EMOTIONAL_
+  // AFTERMATH_VOID, BELIEF_STAKES_CURIOSITY_AFTERMATH_VOID, and BELIEF_STAKES_DIALOGUE_HIGHLIGHT_
+  // AFTERMATH_VOID (same trigger paired with relationshipShifts/suspenseDelta/emotionalShift/
+  // curiosityDelta/dialogueHighlights respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1062a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1062a.fires) {
+      issues.push({
+        location: `${r1062a.triggerCount} stakes-raising scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'BELIEF_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1062a.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1062a.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise, leaving the belief-tracking layer's escalation abstract rather than lodged in the world.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying payoff scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from BELIEF_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID, BELIEF_PAYOFF_RELATIONSHIP_AFTERMATH_VOID, BELIEF_PAYOFF_EMOTIONAL_
+  // AFTERMATH_VOID, BELIEF_PAYOFF_SUSPENSE_AFTERMATH_VOID, and BELIEF_PAYOFF_STAGING_AFTERMATH_
+  // VOID (same trigger paired with curiosityDelta/relationshipShifts/emotionalShift/suspenseDelta/
+  // visualBeats respectively) — this is the sixth and final standard-channel pairing for this
+  // trigger, completing full saturation.
+  {
+    const r1062b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1062b.fires) {
+      issues.push({
+        location: `${r1062b.triggerCount} payoff scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'BELIEF_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1062b.triggerCount} cashed-in setups) is followed by two scenes with no highlighted dialogue, even though ${r1062b.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the belief-tracking layer's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of dialogue,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while such dialogue occurs elsewhere. Distinct from BELIEF_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, BELIEF_SEED_SUSPENSE_AFTERMATH_VOID, BELIEF_SEED_RELATIONAL_AFTERMATH_VOID,
+  // and BELIEF_SEED_CURIOSITY_AFTERMATH_VOID (same trigger paired with emotionalShift/
+  // suspenseDelta/relationshipShifts/curiosityDelta respectively) — this is the fifth consequence
+  // channel for this trigger.
+  {
+    const r1062c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1062c.fires) {
+      issues.push({
+        location: `${r1062c.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'BELIEF_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1062c.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1062c.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands registers as inert plot machinery rather than something a character's voice gives weight to.`,
+        suggestedFix: `After at least one seed, let one of the following two scenes carry a memorable line — a character naming or reacting to what was just planted, so the seed's presence is voiced, not just recorded.`,
       });
     }
   }
