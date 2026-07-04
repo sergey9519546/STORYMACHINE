@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1098 — payoffPass: payoff clock-dialogue-highlight aftermath void, payoff seed-staging aftermath void, payoff turn-staging aftermath void', async () => {
+    const runPY1098 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1098a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1098an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_SEED_STAGING_AFTERMATH_VOID fires when every seed is followed by two scenes with no visually dense scene', async () => {
+      const recs1098b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_STAGING_AFTERMATH_VOID'), 'PAYOFF_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by a visually dense scene within its window', async () => {
+      const recs1098bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_SEED_STAGING_AFTERMATH_VOID'), 'PAYOFF_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no visually dense scene', async () => {
+      const recs1098c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_STAGING_AFTERMATH_VOID'), 'PAYOFF_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a visually dense scene within its window', async () => {
+      const recs1098cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1098(recs1098cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_TURN_STAGING_AFTERMATH_VOID'), 'PAYOFF_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1084 — payoffPass: payoff seed-relational aftermath void, payoff clock-suspense aftermath void, payoff turn-emotional aftermath void', async () => {
     const runPY1084 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

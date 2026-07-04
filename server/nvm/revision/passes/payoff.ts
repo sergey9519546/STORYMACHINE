@@ -500,6 +500,16 @@
 // suspenseDelta), and PAYOFF_TURN_EMOTIONAL_AFTERMATH_VOID (dramaticTurn, previously paired
 // with dialogueHighlights/suspenseDelta/curiosityDelta/relationshipShifts, now also paired with
 // emotionalShift).
+// Wave 1098 additions: PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives clockRaised its
+// sixth and final channel (previously paired with visualBeats/curiosityDelta/relationshipShifts/
+// emotionalShift/suspenseDelta, now also paired with dialogueHighlights). PAYOFF_SEED_STAGING_
+// AFTERMATH_VOID gives seededClueIds its sixth and final channel (previously paired with
+// dialogueHighlights/emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts, now also
+// paired with visualBeats). PAYOFF_TURN_STAGING_AFTERMATH_VOID gives dramaticTurn its sixth and
+// final channel (previously paired with dialogueHighlights/suspenseDelta/curiosityDelta/
+// relationshipShifts/emotionalShift, now also paired with visualBeats). Together these complete
+// full six-channel saturation for all six of this pass's main triggers (raise_stakes,
+// unresolvedClues-debt, revelation, clockRaised, seededClueIds, dramaticTurn).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6053,6 +6063,86 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1084c.triggerCount} pivots) is followed by two scenes registering no emotional shift, even though ${r1084c.aftermathCount} such shifts occur elsewhere. A pivot that never lands emotionally right after it happens leaves the payoff machinery's turns registering as plot mechanics rather than something anyone feels.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, register an emotional shift so the pivot is felt in the payoff machinery, not just executed as a structural beat.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from CLOCK_STAGING_
+  // AFTERMATH_VOID, PAYOFF_CLOCK_CURIOSITY_AFTERMATH_VOID, PAYOFF_CLOCK_RELATIONAL_AFTERMATH_
+  // VOID, PAYOFF_CLOCK_EMOTIONAL_AFTERMATH_VOID, and PAYOFF_CLOCK_SUSPENSE_AFTERMATH_VOID (same
+  // trigger paired with visualBeats/curiosityDelta/relationshipShifts/emotionalShift/
+  // suspenseDelta respectively) — this is the sixth and final standard-channel pairing for this
+  // trigger, completing full saturation.
+  {
+    const r1098a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1098a.fires) {
+      issues.push({
+        location: `${r1098a.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1098a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no highlighted dialogue, even though ${r1098a.aftermathCount} such scenes exist elsewhere in the script. Time pressure that never earns a memorable line right after it tightens leaves the payoff machinery's relationship with urgency unvoiced.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs them, so the payoff machinery's urgency is voiced, not just staged.`,
+      });
+    }
+  }
+
+  // PAYOFF_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires when every
+  // seed's two-scene aftermath has no heavily-staged scene, while such staging occurs elsewhere.
+  // Distinct from SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, PAYOFF_SEED_EMOTIONAL_AFTERMATH_VOID,
+  // PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID, PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID, and PAYOFF_SEED_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights/emotionalShift/
+  // curiosityDelta/suspenseDelta/relationshipShifts respectively) — this is the sixth and final
+  // standard-channel pairing for this trigger, completing full saturation.
+  {
+    const r1098b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1098b.fires) {
+      issues.push({
+        location: `${r1098b.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PAYOFF_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1098b.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1098b.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the payoff machinery's setups registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // PAYOFF_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every turn's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from PAYOFF_TURN_HIGHLIGHT_AFTERMATH_VOID, PAYOFF_TURN_SUSPENSE_
+  // AFTERMATH_VOID, PAYOFF_TURN_CURIOSITY_AFTERMATH_VOID, PAYOFF_TURN_RELATIONAL_AFTERMATH_VOID,
+  // and PAYOFF_TURN_EMOTIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights/
+  // suspenseDelta/curiosityDelta/relationshipShifts/emotionalShift respectively) — this is the
+  // sixth and final standard-channel pairing for this trigger, completing full saturation for all
+  // six of this pass's main triggers.
+  {
+    const r1098c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1098c.fires) {
+      issues.push({
+        location: `${r1098c.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'PAYOFF_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1098c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1098c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a visually charged follow-through leaves the payoff machinery's turns registering as plot mechanics rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot registers in image, not just as a structural beat.`,
       });
     }
   }
