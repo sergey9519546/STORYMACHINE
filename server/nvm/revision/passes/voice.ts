@@ -452,6 +452,12 @@
 // previously paired with dialogueHighlights/curiosityDelta, now paired with relationshipShifts for
 // a third channel), and VOICE_TURN_CURIOSITY_AFTERMATH_VOID (dramaticTurn, previously paired with
 // suspenseDelta/relationshipShifts, now paired with curiosityDelta for a third channel).
+// Wave 1047 additions: VOICE_SEED_CURIOSITY_AFTERMATH_VOID gives seededClueIds a third channel
+// (previously paired with dialogueHighlights/emotionalShift, now paired with curiosityDelta),
+// VOICE_PAYOFF_EMOTIONAL_AFTERMATH_VOID gives payoffSetupIds a third channel (previously paired
+// with relationshipShifts/curiosityDelta, now paired with emotionalShift), and VOICE_CLOCK_
+// SUSPENSE_AFTERMATH_VOID gives clockRaised a fourth channel (previously paired with
+// dialogueHighlights/curiosityDelta/relationshipShifts, now paired with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6226,6 +6232,79 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1033c.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1033c.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question in the scenes right after it leaves the voice's turns registering as closed events rather than developments that deepen the audience's engagement.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a new question arise from the pivot so the voice's turns keep generating curiosity, not just resolving the immediate moment.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no curiosity rise, while such rises occur
+  // elsewhere. Distinct from the original seededClueIds → dialogueHighlights rule and VOICE_SEED_
+  // EMOTIONAL_AFTERMATH_VOID (same trigger paired with dialogueHighlights and emotionalShift
+  // respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1047a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1047a.fires) {
+      issues.push({
+        location: `${r1047a.triggerCount} seed aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'VOICE_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1047a.triggerCount} plants) is followed by two scenes with no rise in curiosity, even though ${r1047a.aftermathCount} such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the voice's groundwork buried rather than voiced as a live question the audience carries forward.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as something the voice keeps returning to.`,
+      });
+    }
+  }
+
+  // VOICE_PAYOFF_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no emotional shift, while such shifts
+  // occur elsewhere. Distinct from VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID and VOICE_PAYOFF_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with relationshipShifts and curiosityDelta
+  // respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1047b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1047b.fires) {
+      issues.push({
+        location: `${r1047b.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'VOICE_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1047b.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r1047b.aftermathCount} emotionally-charged scenes exist elsewhere. A callback that closes cleanly without anyone visibly feeling anything about it leaves the voice's resolutions registering as pure mechanics rather than moments that land.`,
+        suggestedFix: `In the two scenes following at least one payoff, let someone's feelings register the resolution — relief, grief, triumph — so the voice's callbacks carry emotional weight, not just narrative closure.`,
+      });
+    }
+  }
+
+  // VOICE_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no suspense rise, while
+  // such rises occur elsewhere. Distinct from the original clockRaised → dialogueHighlights rule,
+  // VOICE_CLOCK_CURIOSITY_AFTERMATH_VOID, and VOICE_CLOCK_RELATIONAL_AFTERMATH_VOID (same trigger
+  // paired with dialogueHighlights/curiosityDelta/relationshipShifts respectively) — this is the
+  // fourth consequence channel for this trigger.
+  {
+    const r1047c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1047c.fires) {
+      issues.push({
+        location: `${r1047c.triggerCount} clock-raise aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'VOICE_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1047c.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1047c.aftermathCount} such rises occur elsewhere. A ticking deadline that doesn't tighten the felt sense of urgency right after it leaves the voice's pressure registering as a stated fact rather than something anyone visibly feels bearing down.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the tension visibly climb so the ticking deadline presses on the voice, not just the plot.`,
       });
     }
   }
