@@ -472,6 +472,11 @@
 // visualBeats/curiosityDelta/emotionalShift, now a fourth channel with suspenseDelta), and
 // INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID (clockRaised, previously paired with visualBeats/
 // emotionalShift/curiosityDelta, now a fourth channel with suspenseDelta).
+// Wave 1053 additions: INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID gives the heavy-
+// unresolvedClues-debt trigger a fourth channel (previously paired with payoffSetupIds/
+// curiosityDelta/emotionalShift, now paired with suspenseDelta), and INTENTION_SEED_RELATIONAL_
+// AFTERMATH_VOID / INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID extend seededClueIds and clockRaised
+// (both already at four channels) to a fifth with relationshipShifts.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5995,6 +6000,83 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clock-raise scene in the story (${r1039c.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1039c.aftermathCount} such rises occur elsewhere. A ticking deadline that doesn't tighten the felt sense of urgency right after it leaves the character's intention facing a stated pressure rather than something they visibly feel bearing down on them.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let the tension visibly climb so the ticking deadline presses on the character's pursuit, not just their situation.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 suspense-rising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no suspense rise, while such rises occur elsewhere. Distinct from the original
+  // unresolvedClues → payoffSetupIds rule, INTENTION_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and
+  // INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (same trigger paired with payoffSetupIds/
+  // curiosityDelta/emotionalShift respectively) — this is the fourth consequence channel for this
+  // trigger.
+  {
+    const r1053a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1053a.fires) {
+      issues.push({
+        location: `${r1053a.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1053a.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1053a.aftermathCount} such rises occur elsewhere. Accumulated mystery that never tightens the felt sense of danger right after it leaves the character's intention facing stalled uncertainty rather than mounting pressure.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the character's intention rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no bond change, while such changes occur
+  // elsewhere. Distinct from the original seededClueIds → visualBeats rule, INTENTION_SEED_
+  // CURIOSITY_AFTERMATH_VOID, INTENTION_SEED_EMOTIONAL_AFTERMATH_VOID, and INTENTION_SEED_
+  // SUSPENSE_AFTERMATH_VOID (same trigger paired with visualBeats/curiosityDelta/emotionalShift/
+  // suspenseDelta respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1053b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1053b.fires) {
+      issues.push({
+        location: `${r1053b.triggerCount} clue-seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'INTENTION_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1053b.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1053b.aftermathCount} such shifts occur elsewhere. A planted clue that never bears on how characters treat each other nearby leaves the character's intention purely informational, disconnected from the relationships driving them forward.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the seed carries interpersonal weight alongside its narrative function.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no bond change, while
+  // such changes occur elsewhere. Distinct from the original clockRaised → visualBeats rule,
+  // INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID, INTENTION_CLOCK_CURIOSITY_AFTERMATH_VOID, and
+  // INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID (same trigger paired with visualBeats/emotionalShift/
+  // curiosityDelta/suspenseDelta respectively) — this is the fifth consequence channel for this
+  // trigger.
+  {
+    const r1053c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1053c.fires) {
+      issues.push({
+        location: `${r1053c.triggerCount} clock-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'INTENTION_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1053c.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1053c.aftermathCount} such shifts occur elsewhere. A ticking deadline that never bears on how characters treat each other in the scenes right after it leaves the character's intention facing pressure that's purely external, disconnected from the relationships shaping their pursuit.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the ticking deadline strain or shift a relationship so the character's intention feels the pressure interpersonally, not only temporally.`,
       });
     }
   }
