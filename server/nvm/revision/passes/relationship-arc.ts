@@ -444,6 +444,15 @@
 // introduced), RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta, distinct
 // from the boolean field above), and RELATIONAL_TURN_ZONE_IMBALANCE (dramaticTurn !== 'nothing' —
 // the dramatic-turn categorical signal).
+// Wave 987 additions: RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) — the last
+// clean trio-complete zone-imbalance candidate in this pass (RELATIONAL_STAGING was skipped: its
+// cluster/drought predicates disagree, >=2 vs >0 visualBeats). With zone-imbalance now exhausted,
+// this wave completes the trio with two aftermath-void checks: RELATIONSHIP_SHIFT_CURIOSITY_
+// AFTERMATH_VOID extends the RELATIONSHIP_SHIFT_* family (relationshipShifts as TRIGGER) to
+// curiosityDelta, the one major signal that family had never paired with an aftermath. RELATIONAL_
+// STAKES_AFTERMATH_VOID inverts the pattern — purpose === 'raise_stakes' as TRIGGER, relationshipShifts
+// as the AFTERMATH signal — the first time this pass audits relationshipShifts as a consequence
+// rather than a cause.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5674,6 +5683,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `The story's ${r973c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName973c} contains ${r973c.counts[r973c.bloatZoneIdx]} of them (${Math.round((r973c.counts[r973c.bloatZoneIdx] / r973c.totalCount) * 100)}%) while ${emptyNames973c} contains none. Turns bloat in one structural quarter and never fire in another, so the relationship is forced to pivot in only part of the story.`,
         suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames973c} — a dramatic turn so the relationship keeps being forced to pivot across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // highlighted-dialogue scenes total, divided across four equal structural zones. Distinct from
+  // the existing 3-zone RELATIONAL_HIGHLIGHT_ZONE_CLUSTER and run-based RELATIONAL_HIGHLIGHT_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this channel. This
+  // is the last clean trio-complete zone-imbalance candidate in this pass: RELATIONAL_STAGING was
+  // considered but skipped because its cluster (visualBeats.length>=2) and drought-run
+  // (visualBeats.length>0) predicates disagree, so its "trio" doesn't actually audit one signal.
+  {
+    const r987a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r987a.fires) {
+      const emptyNames987a = r987a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName987a = FOUR_ZONE_NAMES[r987a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames987a} empty; ${bloatName987a} has ${r987a.counts[r987a.bloatZoneIdx]}/${r987a.totalCount} highlighted-dialogue scenes`,
+        rule: 'RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r987a.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName987a} contains ${r987a.counts[r987a.bloatZoneIdx]} of them (${Math.round((r987a.counts[r987a.bloatZoneIdx] / r987a.totalCount) * 100)}%) while ${emptyNames987a} contains none. Memorable lines bloat in one structural quarter and never land in another, so the relationship's most quotable exchanges arrive in only part of the story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames987a} — a standout line of dialogue so the relationship's memorable exchanges land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID — extends the RELATIONSHIP_SHIFT_* aftermath-void
+  // family (Waves 427/469/483/497/511/525/…) to curiosityDelta, the one major aftermath signal
+  // that family had never paired with relationshipShifts as the trigger. Built on checkAftermathVoid
+  // from the shared checks library. n≥8, ≥2 qualifying shift scenes (pos<n-2), ≥2 curiosity-raising
+  // scenes anywhere, 2-scene lookahead. Fires when every shift's two-scene aftermath opens no new
+  // curiosity, while curiosity does occur elsewhere. A bond change that provokes no fresh question
+  // about what happens next reads as a settled fact rather than a live development.
+  {
+    const r987b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r987b.fires) {
+      issues.push({
+        location: `${r987b.triggerCount} relationship-shift aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every relationship-shift scene with room after it (${r987b.triggerCount} in total) is followed by two scenes that raise no new curiosity, even though ${r987b.aftermathCount} scenes elsewhere do open fresh questions. A bond that changes without provoking any new uncertainty about what the characters will do next reads as a settled fact rather than a live, ongoing development.`,
+        suggestedFix: `In the two scenes following at least one relationship shift, plant a new open question — what the changed bond will cost, or whether it will hold — so the shift keeps propelling curiosity forward rather than closing the matter.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_AFTERMATH_VOID — inverts the RELATIONSHIP_SHIFT_* pattern above: here
+  // relationshipShifts is the AFTERMATH signal rather than the trigger, the first time this pass
+  // audits it as a consequence instead of a cause. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying stakes-raise scenes (purpose === 'raise_stakes', pos<n-2),
+  // ≥2 relationship-shift scenes anywhere, 2-scene lookahead. Fires when every stakes-raise's
+  // two-scene aftermath carries no relationship shift, while such shifts occur elsewhere. Escalating
+  // danger that never bears on how characters treat each other nearby leaves the relational arc
+  // untouched by the story's own rising pressure.
+  {
+    const r987c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r987c.fires) {
+      issues.push({
+        location: `${r987c.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RELATIONAL_STAKES_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r987c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r987c.aftermathCount} such shifts occur elsewhere. Escalating danger that never strains or bends how characters treat each other in the scenes right after it leaves the relational arc untouched by the story's own rising pressure.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so rising pressure registers on the bonds between characters, not only on the plot.`,
       });
     }
   }

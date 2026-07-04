@@ -1376,6 +1376,78 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 987 — relationshipArcPass: relational highlight zone imbalance, relationship-shift curiosity aftermath void, relational stakes aftermath void', async () => {
+    const runRA987 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs987a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['line'] : [] }));
+      const res = await runRA987(recs987a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE'), 'RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs987an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['line'] : [] }));
+      const res = await runRA987(recs987an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE'), 'RELATIONAL_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID fires when every relationship shift is followed by two scenes with no new curiosity', async () => {
+      const recs987b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA987(recs987b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID does not fire when a relationship shift is followed by new curiosity within its window', async () => {
+      const recs987bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA987(recs987bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID'), 'RELATIONSHIP_SHIFT_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('RELATIONAL_STAKES_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs987c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA987(recs987c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_AFTERMATH_VOID'), 'RELATIONAL_STAKES_AFTERMATH_VOID should fire');
+    });
+
+    it('RELATIONAL_STAKES_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs987cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA987(recs987cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONAL_STAKES_AFTERMATH_VOID'), 'RELATIONAL_STAKES_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 973 — relationshipArcPass: relational clock zone imbalance, relational clock delta zone imbalance, relational turn zone imbalance', async () => {
     const runRA973 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
