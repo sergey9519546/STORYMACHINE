@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1125 — pacingPass: pacing suspense-emotional aftermath void, pacing suspense-relational aftermath void, pacing emotion-curiosity aftermath void', async () => {
+    const runP1125 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no emotional shift', async () => {
+      const recs1125a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID does not fire when a suspense-rise is followed by an emotional shift within its window', async () => {
+      const recs1125an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no relationship shift', async () => {
+      const recs1125b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID'), 'PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID does not fire when a suspense-rise is followed by a relationship shift within its window', async () => {
+      const recs1125bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID'), 'PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_EMOTION_CURIOSITY_AFTERMATH_VOID fires when every emotionally-charged scene is followed by two scenes with no curiosity rise', async () => {
+      const recs1125c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'PACING_EMOTION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_EMOTION_CURIOSITY_AFTERMATH_VOID does not fire when an emotionally-charged scene is followed by a curiosity rise within its window', async () => {
+      const recs1125cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1125(recs1125cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'PACING_EMOTION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1111 — pacingPass: pacing clock-delta-dialogue-highlight aftermath void, pacing suspense-curiosity aftermath void, pacing emotion-relational aftermath void', async () => {
     const runP1111 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

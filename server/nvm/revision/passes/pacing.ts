@@ -505,6 +505,11 @@
 // zone-imbalance). PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs suspenseDelta with
 // curiosityDelta; PACING_EMOTION_RELATIONAL_AFTERMATH_VOID pairs emotionalShift with
 // relationshipShifts.
+// Wave 1125 additions: suspenseDelta>0 and emotionalShift (non-neutral) each had exactly one
+// checkAftermathVoid channel as of Wave 1111. PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID and
+// PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID give suspenseDelta its second and third channels
+// (emotionalShift, relationshipShifts); PACING_EMOTION_CURIOSITY_AFTERMATH_VOID gives
+// emotionalShift its second channel (curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6375,6 +6380,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1111c.triggerCount} emotionally-charged scenes is followed by two scenes with no recorded relationship shift, even though ${r1111c.aftermathCount} such shifts occur elsewhere. A scene that registers strong feeling without moving how characters stand with each other right after leaves the pacing's emotional beats isolated from the relational stakes they should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one emotionally-charged moment, let it shift how a pair of characters relate, so the pacing's emotional beats carry interpersonal weight, not just internal feeling.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1111, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1125a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1125a.fires) {
+      issues.push({
+        location: `${r1125a.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1125a.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1125a.aftermathCount} such shifts occur elsewhere. A spike in tension that never lands on anyone's felt state right after it happens leaves the pacing's danger registering as mechanics rather than something the characters carry forward.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it visibly shift a character's emotional register — dread, resolve, or relief — so the tension is felt, not just noted.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 relationship-shift scenes anywhere,
+  // 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath carries no
+  // relationship shift, while such shifts occur elsewhere. Distinct from PACING_SUSPENSE_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1111) and PACING_SUSPENSE_EMOTIONAL_AFTERMATH_VOID (this
+  // wave, same trigger paired with curiosityDelta/emotionalShift) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1125b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1125b.fires) {
+      issues.push({
+        location: `${r1125b.triggerCount} suspense-spike scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1125b.triggerCount} suspense-spike scenes is followed by two scenes with no recorded relationship shift, even though ${r1125b.aftermathCount} such shifts occur elsewhere. Danger that never moves how a pair of characters stand with each other right after it rises leaves the pacing's tension isolated from the relational stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it shift a relationship — an alliance tested under pressure, a trust strained by the danger — so the tension carries interpersonal weight.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every emotionally-charged scene's two-scene aftermath
+  // carries no rise in curiosity, while such rises occur elsewhere. Distinct from PACING_EMOTION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1111, same trigger paired with relationshipShifts) — this is
+  // the second consequence channel for this trigger.
+  {
+    const r1125c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1125c.fires) {
+      issues.push({
+        location: `${r1125c.triggerCount} emotionally-charged scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'PACING_EMOTION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1125c.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in curiosity, even though ${r1125c.aftermathCount} such rises occur elsewhere. A strong feeling that never opens a fresh question right after it lands leaves the pacing's emotional beats registering as closed moments rather than links that pull the audience forward.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let a new question surface from what the character now feels, so the pacing's emotional beats keep generating curiosity, not just internal state.`,
       });
     }
   }
