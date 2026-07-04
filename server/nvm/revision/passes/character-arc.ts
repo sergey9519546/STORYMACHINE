@@ -554,6 +554,14 @@
 // HIGHLIGHT_AFTERMATH_VOID gives revelation a fifth channel (previously paired with
 // relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta, now also paired with
 // dialogueHighlights).
+// Wave 1107 additions: ARC_REVELATION_STAGING_AFTERMATH_VOID gives revelation its sixth and
+// final channel (previously paired with relationshipShifts/emotionalShift/curiosityDelta/
+// suspenseDelta/dialogueHighlights, now also paired with visualBeats), completing full
+// six-channel saturation for all six of this pass's main triggers. ARC_SEED_RELATIONAL_
+// AFTERMATH_VOID and ARC_SEED_STAGING_AFTERMATH_VOID give seededClueIds its fifth and sixth
+// channels (previously paired with emotionalShift/dialogueHighlights/curiosityDelta/
+// suspenseDelta, now also paired with relationshipShifts and visualBeats respectively),
+// completing full saturation for this trigger too.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6306,6 +6314,85 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1093c.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1093c.aftermathCount} such scenes exist elsewhere in the script. A discovery that never earns a memorable line right after it lands leaves the arc's confrontation with new information unvoiced — no character's speech processes what was just learned.`,
         suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered, so the arc's reckoning with new information registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation (non-null) trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead.
+  // Fires when every revelation's two-scene aftermath has no heavily-staged scene, while such
+  // staging occurs elsewhere. Distinct from ARC_REVELATION_RELATIONAL_AFTERMATH_VOID, ARC_
+  // REVELATION_EMOTIONAL_AFTERMATH_VOID, ARC_REVELATION_CURIOSITY_AFTERMATH_VOID, ARC_
+  // REVELATION_SUSPENSE_AFTERMATH_VOID, and ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (same trigger paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta/
+  // dialogueHighlights respectively) — this is the sixth and final consequence channel for this
+  // trigger, completing full six-channel saturation for all six of this pass's main triggers.
+  {
+    const r1107a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1107a.fires) {
+      issues.push({
+        location: `${r1107a.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ARC_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1107a.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1107a.aftermathCount} such scenes exist elsewhere in the script. A discovery that never earns a visually charged follow-through leaves the arc's confrontation with new information registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the discovery registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ARC_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship shift,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. Distinct from ARC_SEED_EMOTIONAL_AFTERMATH_
+  // VOID, ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, and ARC_SEED_CURIOSITY_AFTERMATH_VOID,
+  // ARC_SEED_SUSPENSE_AFTERMATH_VOID (same trigger paired with emotionalShift/dialogueHighlights/
+  // curiosityDelta/suspenseDelta respectively) — this is the fifth consequence channel for this
+  // trigger.
+  {
+    const r1107b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1107b.fires) {
+      issues.push({
+        location: `${r1107b.triggerCount} seed scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'ARC_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1107b.triggerCount} clue-planting scenes is followed by two scenes with no recorded relationship shift, even though ${r1107b.aftermathCount} such shifts occur elsewhere. A planted clue that never moves how characters stand with each other leaves the arc's foreshadowing isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let it shift how a pair of characters relate, so the plant has interpersonal consequence, not just narrative setup.`,
+      });
+    }
+  }
+
+  // ARC_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires when every
+  // seed's two-scene aftermath has no heavily-staged scene, while such staging occurs elsewhere.
+  // Distinct from ARC_SEED_EMOTIONAL_AFTERMATH_VOID, ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  // ARC_SEED_CURIOSITY_AFTERMATH_VOID, ARC_SEED_SUSPENSE_AFTERMATH_VOID, and ARC_SEED_
+  // RELATIONAL_AFTERMATH_VOID (same trigger paired with emotionalShift/dialogueHighlights/
+  // curiosityDelta/suspenseDelta/relationshipShifts respectively) — this is the sixth and final
+  // consequence channel for this trigger, completing full saturation.
+  {
+    const r1107c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1107c.fires) {
+      issues.push({
+        location: `${r1107c.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'ARC_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1107c.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1107c.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the arc's foreshadowing registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
       });
     }
   }
