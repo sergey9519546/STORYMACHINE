@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1024 — conflictPass: conflict stakes-relational aftermath void, conflict payoff-curiosity aftermath void, conflict turn-emotional aftermath void', async () => {
+    const makeRec1024 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1024 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1024a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec1024(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID'), 'CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1024an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec1024(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID'), 'CONFLICT_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when every payoff is followed by two scenes with no curiosity rise', async () => {
+      const recs1024b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { payoffSetupIds: ['p1'] });
+        if (i === 8 || i === 9) return makeRec1024(i, { curiosityDelta: 1 });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by a curiosity rise within its window', async () => {
+      const recs1024bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { payoffSetupIds: ['p1'] });
+        if (i === 1 || i === 9) return makeRec1024(i, { curiosityDelta: 1 });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no emotional shift', async () => {
+      const recs1024c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1024(i, { emotionalShift: 'positive' });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by an emotional shift within its window', async () => {
+      const recs1024cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1024(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1024(i, { emotionalShift: 'positive' });
+        return makeRec1024(i);
+      });
+      const res = await runCF1024(recs1024cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1010 — conflictPass: conflict turn-curiosity aftermath void, conflict payoff-suspense aftermath void, conflict stakes-emotional aftermath void', async () => {
     const makeRec1010 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
