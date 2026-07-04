@@ -481,6 +481,11 @@
 // fresh sequence/aftermath trigger — RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID — distinct from this
 // pass's existing seededClueIds coverage (zone-imbalance, drought-run, zone-cluster, and
 // peak-uncaused modes have all been applied, but never sequence/aftermath).
+// Wave 1100 additions: with all four boolean triggers already fully saturated, this wave
+// continues building out seededClueIds' checkAftermathVoid channel set (currently just
+// curiosityDelta) — RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID (emotionalShift), RHYTHM_SEED_
+// SUSPENSE_AFTERMATH_VOID (suspenseDelta), and RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID
+// (relationshipShifts) give this trigger three fresh channels.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5673,6 +5678,79 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1086c.triggerCount} clue-planting scenes is followed by two scenes with no rise in curiosity, even though ${r1086c.aftermathCount} such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the rhythm's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the rhythm's foreshadowing keeps generating curiosity, not just sitting as inert setup.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no emotional shift, while such shifts
+  // occur elsewhere. Distinct from RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID (Wave 1086, same trigger
+  // paired with curiosityDelta) — this is the second checkAftermathVoid-based channel for this
+  // trigger.
+  {
+    const r1100a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1100a.fires) {
+      issues.push({
+        location: `${r1100a.triggerCount} seed scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1100a.triggerCount} clue-planting scenes is followed by two scenes with no emotional shift, even though ${r1100a.aftermathCount} such shifts occur elsewhere. A planted clue that never registers emotionally right after it lands leaves the rhythm's foreshadowing feeling procedural — information delivered without anyone visibly reacting to what it implies.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a character's emotional register shift in response to what the clue implies, so the plant carries felt weight, not just informational weight.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID and RHYTHM_SEED_
+  // EMOTIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/emotionalShift) — this is
+  // the third checkAftermathVoid-based channel for this trigger.
+  {
+    const r1100b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1100b.fires) {
+      issues.push({
+        location: `${r1100b.triggerCount} seed scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1100b.triggerCount} clue-planting scenes is followed by two scenes with no rise in suspense, even though ${r1100b.aftermathCount} such rises occur elsewhere. A planted clue that never re-tightens tension right after it lands leaves the rhythm's foreshadowing registering as inert setup rather than a development that presses forward.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a new tension rise from the plant so the rhythm's foreshadowing keeps generating suspense, not just sitting as backlog.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship shift,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. Distinct from RHYTHM_SEED_CURIOSITY_
+  // AFTERMATH_VOID, RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID, and RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/emotionalShift/suspenseDelta) — this is the fourth
+  // checkAftermathVoid-based channel for this trigger.
+  {
+    const r1100c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1100c.fires) {
+      issues.push({
+        location: `${r1100c.triggerCount} seed scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1100c.triggerCount} clue-planting scenes is followed by two scenes with no recorded relationship shift, even though ${r1100c.aftermathCount} such shifts occur elsewhere. A planted clue that never moves how characters stand with each other leaves the rhythm's foreshadowing isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let it shift how a pair of characters relate, so the plant has interpersonal consequence, not just narrative setup.`,
       });
     }
   }
