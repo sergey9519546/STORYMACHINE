@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1018 — themePass: theme stakes-emotional aftermath void, theme seed-relational aftermath void, theme staging-curiosity aftermath void', async () => {
+    const runT1018 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_STAKES_EMOTIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1018a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'THEME_STAKES_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_STAKES_EMOTIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by an emotional shift within its window', async () => {
+      const recs1018an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAKES_EMOTIONAL_AFTERMATH_VOID'), 'THEME_STAKES_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_SEED_RELATIONAL_AFTERMATH_VOID fires when every seed is followed by two scenes with no relationship shift', async () => {
+      const recs1018b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_SEED_RELATIONAL_AFTERMATH_VOID'), 'THEME_SEED_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_SEED_RELATIONAL_AFTERMATH_VOID does not fire when a seed is followed by a relationship shift within its window', async () => {
+      const recs1018bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_SEED_RELATIONAL_AFTERMATH_VOID'), 'THEME_SEED_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_STAGING_CURIOSITY_AFTERMATH_VOID fires when every visually-dense scene is followed by two scenes with no new curiosity', async () => {
+      const recs1018c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_STAGING_CURIOSITY_AFTERMATH_VOID'), 'THEME_STAGING_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_STAGING_CURIOSITY_AFTERMATH_VOID does not fire when a visually-dense scene is followed by new curiosity within its window', async () => {
+      const recs1018cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1018(recs1018cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_STAGING_CURIOSITY_AFTERMATH_VOID'), 'THEME_STAGING_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1004 — themePass: theme stakes-suspense aftermath void, theme seed-curiosity aftermath void, theme open-thread-emotional aftermath void', async () => {
     const runT1004 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
