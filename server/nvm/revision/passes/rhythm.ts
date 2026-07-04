@@ -486,6 +486,14 @@
 // curiosityDelta) — RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID (emotionalShift), RHYTHM_SEED_
 // SUSPENSE_AFTERMATH_VOID (suspenseDelta), and RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID
 // (relationshipShifts) give this trigger three fresh channels.
+// Wave 1114 additions: RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and RHYTHM_SEED_STAGING_
+// AFTERMATH_VOID give seededClueIds its fifth and sixth channels (previously paired with
+// curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts, now also paired with
+// dialogueHighlights and visualBeats respectively), completing full six-channel saturation for
+// all five of this pass's tracked triggers. With those exhausted, this wave introduces
+// unresolvedClues (length>0) as a genuinely fresh checkAftermathVoid trigger — it has only ever
+// anchored distribution/timing (zone-imbalance) checks here, never sequence/aftermath:
+// RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5751,6 +5759,83 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1100c.triggerCount} clue-planting scenes is followed by two scenes with no recorded relationship shift, even though ${r1100c.aftermathCount} such shifts occur elsewhere. A planted clue that never moves how characters stand with each other leaves the rhythm's foreshadowing isolated from the interpersonal stakes it should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, let it shift how a pair of characters relate, so the plant has interpersonal consequence, not just narrative setup.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of dialogue,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath contains no highlighted
+  // dialogue, while such dialogue occurs elsewhere. Distinct from RHYTHM_SEED_CURIOSITY_
+  // AFTERMATH_VOID, RHYTHM_SEED_EMOTIONAL_AFTERMATH_VOID, RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID,
+  // and RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts respectively) — this is the fifth
+  // checkAftermathVoid-based channel for this trigger.
+  {
+    const r1114a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1114a.fires) {
+      issues.push({
+        location: `${r1114a.triggerCount} seed scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1114a.triggerCount} clue-planting scenes is followed by two scenes with no highlighted dialogue, even though ${r1114a.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a memorable line right after it lands leaves the rhythm's foreshadowing registering as inert plot mechanics rather than something a character's voice gives weight to.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a character's line acknowledge or react to what was just planted, so the seed registers in speech, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RHYTHM_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID, RHYTHM_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID, RHYTHM_SEED_RELATIONAL_AFTERMATH_VOID,
+  // and RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts/dialogueHighlights respectively) — this is
+  // the sixth and final consequence channel for this trigger, completing full saturation.
+  {
+    const r1114b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1114b.fires) {
+      issues.push({
+        location: `${r1114b.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'RHYTHM_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1114b.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1114b.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the rhythm's foreshadowing registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath
+  // carries no rise in curiosity, while such rises occur elsewhere. Distinct from every existing
+  // unresolvedClues check in this file (zone-imbalance, distribution/timing mode, none sequence/
+  // aftermath) — this is the first check to use unresolvedClues as a checkAftermathVoid trigger
+  // in this pass.
+  {
+    const r1114c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1114c.fires) {
+      issues.push({
+        location: `${r1114c.triggerCount} open-thread scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1114c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1114c.aftermathCount} such rises occur elsewhere in the script. An open question that never generates a fresh question right after it lingers registers as inert plot backlog rather than a thread the rhythm keeps actively developing.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, let a new question surface so the rhythm's lingering questions keep generating curiosity, not just accumulating as backlog.`,
       });
     }
   }

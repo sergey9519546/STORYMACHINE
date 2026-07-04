@@ -1136,6 +1136,62 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1114 — rhythmPass: rhythm seed-dialogue-highlight aftermath void, rhythm seed-staging aftermath void, rhythm open-thread-curiosity aftermath void', async () => {
+    const runR1114 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every seed has no highlighted dialogue within 2 scenes', async () => {
+      const recs1114a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runR1114(recs1114a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a seed is followed by highlighted dialogue within 2 scenes', async () => {
+      const recs1114an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { dialogueHighlights: ['a memorable line'] } : {})));
+      const res = await runR1114(recs1114an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'RHYTHM_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_SEED_STAGING_AFTERMATH_VOID fires when every seed has no visually dense scene within 2 scenes', async () => {
+      const recs1114b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1114(recs1114b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_STAGING_AFTERMATH_VOID'), 'RHYTHM_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by a visually dense scene within 2 scenes', async () => {
+      const recs1114bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { visualBeats: ['beat one', 'beat two'] } : {})));
+      const res = await runR1114(recs1114bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SEED_STAGING_AFTERMATH_VOID'), 'RHYTHM_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID fires when every open-thread scene has no curiosity rise within 2 scenes', async () => {
+      const recs1114c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1'] } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1114(recs1114c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID does not fire when an open-thread scene is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1114cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { unresolvedClues: ['c1'] } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runR1114(recs1114cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID'), 'RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1100 — rhythmPass: rhythm seed-emotional aftermath void, rhythm seed-suspense aftermath void, rhythm seed-relational aftermath void', async () => {
     const runR1100 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
