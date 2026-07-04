@@ -464,6 +464,13 @@
 // introduced to three more triggers that have never carried it: PACING_REVELATION_DIALOGUE_
 // HIGHLIGHT_AFTERMATH_VOID (revelation), PACING_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
 // (clockRaised), and PACING_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (dramaticTurn).
+// Wave 1055 additions: with revelation/seededClueIds/payoffSetupIds/dramaticTurn/clockRaised all
+// now fully saturated across the standard relationshipShifts/visualBeats/dialogueHighlights
+// boolean channels (on top of the avg-based suspense/curiosity/emotion triads), this wave targets
+// the two hand-rolled avg-based trigger families that have never been paired with the boolean
+// channels: PACING_STAKES_RELATIONAL_AFTERMATH_VOID and PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_
+// VOID pair the isStakesRaise593/isHeavyDebt607 predicates with relationshipShifts for the first
+// time, and PACING_STAKES_STAGING_AFTERMATH_VOID pairs isStakesRaise593 with visualBeats.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5946,6 +5953,81 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1041c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1041c.aftermathCount} such scenes exist elsewhere in the script. A pivot that lands without a single memorable line reacting to it in the immediate aftermath leaves the turn registering only structurally, never in a line the audience carries forward.`,
         suggestedFix: `After at least one dramatic turn, let one of the following two scenes carry a memorable line — a character naming what changed, or reacting to it in words worth remembering.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying raise_stakes scenes (pos<n-2, same predicate as the hand-rolled isStakesRaise593
+  // family), ≥2 relationship-shift scenes anywhere, 2-scene lookahead. Fires when every stakes-
+  // raise's two-scene aftermath carries no bond change, while such changes occur elsewhere.
+  // Distinct from the hand-rolled STAKES_AFTERMATH_SUSPENSE/CURIOSITY/EMOTION_FLAT family and the
+  // frozen duplicate PACING_STAKES_CURIOSITY_AFTERMATH_VOID (curiosityDelta channel) — this pairs
+  // raise_stakes with relationshipShifts for the first time in this pass.
+  {
+    const r1055a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1055a.fires) {
+      issues.push({
+        location: `${r1055a.triggerCount} raise-stakes aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PACING_STAKES_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1055a.triggerCount} of them) is followed by two scenes with no shift in any relationship, even though ${r1055a.aftermathCount} such shifts occur elsewhere. Escalating danger that never bears on how characters treat each other in the scenes right after it leaves the rhythm's pressure feeling external, disconnected from the bonds it should be straining.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let the new danger strain or shift a relationship so the escalation registers on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3, same predicate as the
+  // hand-rolled isHeavyDebt607 family), ≥2 relationship-shift scenes anywhere, 2-scene lookahead.
+  // Fires when every heavy-debt scene's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from the hand-rolled OPEN_THREAD_AFTERMATH_SUSPENSE/
+  // CURIOSITY/EMOTION_FLAT family — this pairs the heavy clue-debt trigger with relationshipShifts
+  // for the first time in this pass.
+  {
+    const r1055b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1055b.fires) {
+      issues.push({
+        location: `${r1055b.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1055b.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1055b.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the rhythm's uncertainty purely informational, disconnected from the relationships it's meant to be pressuring.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the rhythm's open threads register interpersonally, not just as plot backlog.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 scenes anywhere with substantial physical
+  // staging, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // visually dense scene, while such scenes occur elsewhere. Distinct from PACING_STAKES_
+  // RELATIONAL_AFTERMATH_VOID (this wave, relationshipShifts) and the hand-rolled STAKES_
+  // AFTERMATH_SUSPENSE/CURIOSITY/EMOTION_FLAT family — this pairs raise_stakes with visualBeats
+  // for the first time in this pass.
+  {
+    const r1055c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1055c.fires) {
+      issues.push({
+        location: `${r1055c.triggerCount} raise-stakes aftermath(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'PACING_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1055c.triggerCount} of them) is followed by two scenes with no substantial physical staging, even though ${r1055c.aftermathCount} such scenes exist elsewhere in the script. Escalating danger gains texture when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — the new danger given some visible presence before the pacing moves on.`,
       });
     }
   }

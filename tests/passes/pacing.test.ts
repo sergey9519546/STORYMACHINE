@@ -934,6 +934,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1055 — pacingPass: pacing stakes-relational aftermath void, pacing open-thread-relational aftermath void, pacing stakes-staging aftermath void', async () => {
+    const runP1055 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1055a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAKES_RELATIONAL_AFTERMATH_VOID'), 'PACING_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1055an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAKES_RELATIONAL_AFTERMATH_VOID'), 'PACING_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no relationship shift', async () => {
+      const recs1055b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a relationship shift within its window', async () => {
+      const recs1055bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'PACING_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('PACING_STAKES_STAGING_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no substantial staging', async () => {
+      const recs1055c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAKES_STAGING_AFTERMATH_VOID'), 'PACING_STAKES_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_STAKES_STAGING_AFTERMATH_VOID does not fire when a stakes-raise is followed by substantial staging within its window', async () => {
+      const recs1055cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat1', 'beat2'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1055(recs1055cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAKES_STAGING_AFTERMATH_VOID'), 'PACING_STAKES_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1041 — pacingPass: pacing revelation-dialogue-highlight aftermath void, pacing clock-dialogue-highlight aftermath void, pacing turn-dialogue-highlight aftermath void', async () => {
     const runP1041 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
