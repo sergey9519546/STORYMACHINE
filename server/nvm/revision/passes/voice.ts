@@ -417,6 +417,12 @@
 // ZONE_IMBALANCE (unresolvedClues.length > 0 — an array distinct from the audited seed/payoff/
 // relationship/visual arrays), and VOICE_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta
 // distinct from the audited suspense/curiosity deltas).
+// Wave 977 additions: auditing three more trio-complete signals on genuinely uncovered fields (the
+// revelation-purpose and relationshipShifts fields are already covered by VOICE_REVELATION_PURPOSE_
+// ZONE_IMBALANCE / REVELATION_ZONE_IMBALANCE and VOICE_RELATIONSHIP_SHIFT_ZONE_IMBALANCE
+// respectively), spanning three distinct classes: VOICE_EMOTION_ZONE_IMBALANCE (emotionalShift !==
+// 'neutral' — the any-direction valence signal), VOICE_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights
+// array), and VOICE_SEED_ZONE_IMBALANCE (seededClueIds array, distinct from the audited payoff array).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5821,6 +5827,81 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r963c.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName963c} contains ${r963c.counts[r963c.bloatZoneIdx]} of them (${Math.round((r963c.counts[r963c.bloatZoneIdx] / r963c.totalCount) * 100)}%) while ${emptyNames963c} contains none. Ticking-clock beats bloat in one structural quarter and never move in another, giving the voice's register of urgency an uneven structural rhythm.`,
         suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames963c} — so the voice's register of urgency recurs across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // VOICE_EMOTION_ZONE_IMBALANCE — Underweight/bloat × (emotionalShift !== 'neutral') × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // emotionally charged scenes total (positive or negative), divided across four equal structural
+  // zones. Fires only when one zone has zero such scenes while another holds ≥50% of the total.
+  // Uses the same emotionalShift !== 'neutral' predicate as the existing 3-zone VOICE_EMOTION_ZONE_
+  // CLUSTER and run-based VOICE_EMOTION_DROUGHT_RUN — the any-direction valence signal, distinct
+  // from the separate VOICE_POSITIVE_EMOTION and VOICE_NEGATIVE_EMOTION zone-imbalance rules already
+  // covering each direction.
+  {
+    const r977a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r977a.fires) {
+      const emptyNames977a = r977a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName977a = FOUR_ZONE_NAMES[r977a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames977a} empty; ${bloatName977a} has ${r977a.counts[r977a.bloatZoneIdx]}/${r977a.totalCount} emotionally-charged scenes`,
+        rule: 'VOICE_EMOTION_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r977a.totalCount} emotionally-charged scenes are unevenly distributed across its four structural zones: ${bloatName977a} contains ${r977a.counts[r977a.bloatZoneIdx]} of them (${Math.round((r977a.counts[r977a.bloatZoneIdx] / r977a.totalCount) * 100)}%) while ${emptyNames977a} contains none. Feeling bloats in one structural quarter and never registers in another, giving the voice's felt register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute feeling: give at least one scene inside the empty zone(s) — ${emptyNames977a} — an emotional shift (positive or negative) so the voice's felt register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × (dialogueHighlights.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a dialogue highlight total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone VOICE_HIGHLIGHT_ZONE_CLUSTER and run-based VOICE_HIGHLIGHT_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the dialogueHighlights array field.
+  {
+    const r977b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r977b.fires) {
+      const emptyNames977b = r977b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName977b = FOUR_ZONE_NAMES[r977b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames977b} empty; ${bloatName977b} has ${r977b.counts[r977b.bloatZoneIdx]}/${r977b.totalCount} dialogue-highlight scenes`,
+        rule: 'VOICE_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r977b.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName977b} contains ${r977b.counts[r977b.bloatZoneIdx]} of them (${Math.round((r977b.counts[r977b.bloatZoneIdx] / r977b.totalCount) * 100)}%) while ${emptyNames977b} contains none. Memorable lines bloat in one structural quarter and never land in another, giving the voice's quotable register an uneven structural rhythm.`,
+        suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames977b} — a dialogue highlight so the voice's quotable register recurs across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_ZONE_IMBALANCE — Underweight/bloat × (seededClueIds.length > 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 seeding scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such
+  // scenes while another holds ≥50% of the total. Distinct from the existing 3-zone VOICE_SEED_
+  // ZONE_CLUSTER and run-based VOICE_SEED_DROUGHT_RUN — the first application of the 4-zone
+  // bloat+empty-zone mode to the seededClueIds array field, distinct from the dialogueHighlights
+  // and payoffSetupIds arrays already audited in this pass.
+  {
+    const r977c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r977c.fires) {
+      const emptyNames977c = r977c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName977c = FOUR_ZONE_NAMES[r977c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames977c} empty; ${bloatName977c} has ${r977c.counts[r977c.bloatZoneIdx]}/${r977c.totalCount} seeding scenes`,
+        rule: 'VOICE_SEED_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r977c.totalCount} clue-seeding scenes are unevenly distributed across its four structural zones: ${bloatName977c} contains ${r977c.counts[r977c.bloatZoneIdx]} of them (${Math.round((r977c.counts[r977c.bloatZoneIdx] / r977c.totalCount) * 100)}%) while ${emptyNames977c} contains none. Setups bloat in one structural quarter and never get planted in another, giving the voice's register of foreshadowing an uneven structural rhythm.`,
+        suggestedFix: `Redistribute seeds: plant a clue (non-empty seededClueIds) in at least one scene inside the empty zone(s) — ${emptyNames977c} — so the voice's register of foreshadowing recurs across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

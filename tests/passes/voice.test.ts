@@ -1438,6 +1438,61 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 977 — voicePass: voice emotion zone imbalance, voice highlight zone imbalance, voice seed zone imbalance', async () => {
+    const runV977 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('VOICE_EMOTION_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of emotionally-charged scenes', async () => {
+      const recs977a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 1, 2, 8, 9].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runV977(recs977a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_EMOTION_ZONE_IMBALANCE'), 'VOICE_EMOTION_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_EMOTION_ZONE_IMBALANCE does not fire when emotionally-charged scenes touch every zone', async () => {
+      const recs977an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { emotionalShift: [0, 3, 5, 8].includes(i) ? 'positive' : 'neutral' }));
+      const res = await runV977(recs977an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_EMOTION_ZONE_IMBALANCE'), 'VOICE_EMOTION_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dialogue-highlight scenes', async () => {
+      const recs977b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runV977(recs977b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_ZONE_IMBALANCE'), 'VOICE_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_HIGHLIGHT_ZONE_IMBALANCE does not fire when dialogue-highlight scenes touch every zone', async () => {
+      const recs977bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runV977(recs977bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_HIGHLIGHT_ZONE_IMBALANCE'), 'VOICE_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('VOICE_SEED_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of seeding scenes', async () => {
+      const recs977c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 1, 2, 8, 9].includes(i) ? ['c1'] : [] }));
+      const res = await runV977(recs977c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SEED_ZONE_IMBALANCE'), 'VOICE_SEED_ZONE_IMBALANCE should fire');
+    });
+
+    it('VOICE_SEED_ZONE_IMBALANCE does not fire when seeding scenes touch every zone', async () => {
+      const recs977cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { seededClueIds: [0, 3, 5, 8].includes(i) ? ['c1'] : [] }));
+      const res = await runV977(recs977cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SEED_ZONE_IMBALANCE'), 'VOICE_SEED_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 963 — voicePass: voice turn zone imbalance, voice open thread zone imbalance, voice clock delta zone imbalance', async () => {
     const runV963 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
