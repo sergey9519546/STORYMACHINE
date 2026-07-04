@@ -517,6 +517,15 @@
 // suspenseDelta), and ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID gives the heavy-unresolvedClues-
 // debt trigger a third channel (previously paired with emotionalShift/visualBeats, now paired with
 // curiosityDelta).
+// Wave 1051 additions: with revelation, raise_stakes, payoffSetupIds, and clockRaised all now at
+// four channels each, this wave targets the less-saturated triggers instead: ARC_SEED_SUSPENSE_
+// AFTERMATH_VOID (seededClueIds, previously paired with emotionalShift/dialogueHighlights/
+// curiosityDelta, now a fourth channel with suspenseDelta), ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID (suspenseDelta as trigger, previously paired with curiosityDelta/
+// relationshipShifts/emotionalShift, now a fourth channel with dialogueHighlights — a field never
+// used as a checkAftermathVoid consequence channel by this trigger before), and ARC_OPEN_THREAD_
+// SUSPENSE_AFTERMATH_VOID (heavy unresolvedClues debt, previously paired with emotionalShift/
+// visualBeats/curiosityDelta, now a fourth channel with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5952,6 +5961,82 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1037c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1037c.aftermathCount} such rises occur elsewhere. Accumulated mystery about the protagonist's arc should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the arc's uncertainty stalls instead of deepening.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question tied to the protagonist's arc so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // ARC_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → suspenseDelta
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires when every
+  // seed's two-scene aftermath carries no suspense rise, while such rises occur elsewhere.
+  // Distinct from ARC_SEED_EMOTIONAL_AFTERMATH_VOID, ARC_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID,
+  // and ARC_SEED_CURIOSITY_AFTERMATH_VOID (same trigger paired with emotionalShift/
+  // dialogueHighlights/curiosityDelta respectively) — this is the fourth consequence channel for
+  // this trigger.
+  {
+    const r1051a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1051a.fires) {
+      issues.push({
+        location: `${r1051a.triggerCount} seed aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ARC_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1051a.triggerCount} plants) is followed by two scenes with no rise in suspense, even though ${r1051a.aftermathCount} such rises occur elsewhere. A planted clue that never generates any tension in its immediate wake leaves the arc's groundwork feeling inert rather than something actively pressuring the protagonist forward.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the tension rise so the planted material feels like it's pressuring the arc, not just informing it.`,
+      });
+    }
+  }
+
+  // ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying suspense-rise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every suspense-rise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. dialogueHighlights has never been
+  // used as a checkAftermathVoid consequence channel for this trigger before — distinct from ARC_
+  // SUSPENSE_CURIOSITY_AFTERMATH_VOID, ARC_SUSPENSE_RELATIONAL_AFTERMATH_VOID, and ARC_SUSPENSE_
+  // EMOTIONAL_AFTERMATH_VOID (same trigger paired with curiosityDelta/relationshipShifts/
+  // emotionalShift respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1051b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1051b.fires) {
+      issues.push({
+        location: `${r1051b.triggerCount} suspense-rise aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'ARC_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every suspense-raising scene in the story (${r1051b.triggerCount} tension rises) is followed by two scenes with no highlighted dialogue, even though ${r1051b.aftermathCount} such scenes exist elsewhere in the script. Rising tension that lands without a single memorable line reacting to it in the immediate aftermath leaves the arc's danger registering only structurally, never in a line the audience carries forward.`,
+        suggestedFix: `In the two scenes following at least one suspense rise, let the protagonist or another character deliver a memorable line naming or reacting to the danger so it registers in speech, not just in mounting pressure.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath carries
+  // no suspense rise, while such rises occur elsewhere. Distinct from the original unresolvedClues
+  // → emotionalShift rule, ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID, and ARC_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID (same trigger paired with emotionalShift/visualBeats/curiosityDelta
+  // respectively) — this is the fourth consequence channel for this trigger.
+  {
+    const r1051c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1051c.fires) {
+      issues.push({
+        location: `${r1051c.triggerCount} heavy clue-debt scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'ARC_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1051c.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1051c.aftermathCount} such rises occur elsewhere. Accumulated mystery about the protagonist's arc that never tightens the felt sense of danger right after it leaves the arc's uncertainty stalling instead of pressuring the protagonist forward.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the tension rise so accumulated mystery keeps pressuring the protagonist's arc rather than sitting in a learnable lull.`,
       });
     }
   }
