@@ -482,6 +482,12 @@
 // emotionalShift), and ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID (raise_stakes, previously
 // paired with curiosityDelta and suspenseDelta, now paired with relationshipShifts for a third
 // channel).
+// Wave 1026 additions: three more fresh channels for existing triggers: ORIGINALITY_STAKES_
+// EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/suspenseDelta/
+// relationshipShifts, now a fourth channel with emotionalShift), ORIGINALITY_SEED_SUSPENSE_
+// AFTERMATH_VOID (seededClueIds, previously only paired with curiosityDelta, now paired with
+// suspenseDelta), and ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds, previously
+// only paired with emotionalShift, now paired with curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6176,6 +6182,78 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r1012c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r1012c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that escalating danger never bears on how characters treat each other nearby — a predictable, avoidable absence.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so rising pressure registers on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID,
+  // ORIGINALITY_STAKES_SUSPENSE_AFTERMATH_VOID, and ORIGINALITY_STAKES_RELATIONAL_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta/relationshipShifts respectively) — this
+  // is the fourth consequence channel for this trigger in this pass.
+  {
+    const r1026a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1026a.fires) {
+      issues.push({
+        location: `${r1026a.triggerCount} raise-stakes aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'ORIGINALITY_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1026a.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r1026a.aftermathCount} emotionally-charged scenes exist elsewhere. Once the audience notices the pattern, they learn that escalating danger never registers as anything felt nearby — a predictable, avoidable absence that flattens the story's freshest turns into inert declarations.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let someone's feelings visibly register the new danger so escalating pressure lands emotionally, not only structurally.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath carries no suspense rise, while such rises occur
+  // elsewhere. Distinct from ORIGINALITY_SEED_CURIOSITY_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta) — this pairs seededClueIds with suspenseDelta for the first time in this pass.
+  {
+    const r1026b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1026b.fires) {
+      issues.push({
+        location: `${r1026b.triggerCount} seed aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1026b.triggerCount} plants) is followed by two scenes with no rise in suspense, even though ${r1026b.aftermathCount} such rises occur elsewhere. A planted clue that never generates any tension in its immediate wake becomes a predictable beat the audience learns to expect — information dropped without the story leaning into what it might cost.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the tension rise so the planted material feels consequential rather than a mechanical placeholder.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no curiosity rise, while such rises
+  // occur elsewhere. Distinct from ORIGINALITY_PAYOFF_EMOTIONAL_AFTERMATH_VOID (same trigger
+  // paired with emotionalShift) — this pairs payoffSetupIds with curiosityDelta for the first time
+  // in this pass.
+  {
+    const r1026c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1026c.fires) {
+      issues.push({
+        location: `${r1026c.triggerCount} payoff aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'ORIGINALITY_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r1026c.triggerCount} cashed-in setups) is followed by two scenes with no rise in curiosity, even though ${r1026c.aftermathCount} such rises occur elsewhere. A resolution that closes cleanly with no fresh question in its wake becomes a formula the audience learns — every payoff settles the story rather than also seeding the next thing to wonder about.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new question rise so the story's resolutions keep generating curiosity instead of only closing threads.`,
       });
     }
   }
