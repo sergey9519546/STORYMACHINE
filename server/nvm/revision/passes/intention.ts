@@ -520,6 +520,14 @@
 // VOID give payoffSetupIds its fifth and sixth channels (dialogueHighlights, visualBeats),
 // completing full saturation for this trigger. INTENTION_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_
 // VOID gives dramaticTurn its fifth channel (dialogueHighlights).
+// Wave 1151 additions: dramaticTurn stood at five of six channels after Wave 1137, missing
+// only visualBeats. INTENTION_TURN_STAGING_AFTERMATH_VOID gives it its sixth and final
+// channel, completing full six-channel saturation for every main tracked trigger in this pass
+// (raise_stakes, clockRaised, seededClueIds, unresolvedClues-debt, payoffSetupIds, dramaticTurn).
+// With those exhausted, this wave introduces revelation as a genuinely fresh checkAftermathVoid
+// trigger — it has never anchored an isTrigger side of a check anywhere in this file.
+// INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta;
+// INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID pairs it with emotionalShift.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6588,6 +6596,88 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1137c.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1137c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it happens leaves the character's intention unvoiced — no one's speech reckons with what just changed.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, give a character a line that names what the pivot means for what they want, so the turn registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // INTENTION_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath has no heavily-staged scene, while
+  // such staging occurs elsewhere. Distinct from INTENTION_TURN_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1095), INTENTION_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1109), INTENTION_TURN_CURIOSITY_
+  // AFTERMATH_VOID / INTENTION_TURN_RELATIONAL_AFTERMATH_VOID (Wave 1123), and INTENTION_TURN_
+  // DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (Wave 1137, same trigger paired with suspenseDelta/
+  // emotionalShift/curiosityDelta/relationshipShifts/dialogueHighlights) — this is the sixth
+  // and final consequence channel for this trigger, completing full six-channel saturation.
+  {
+    const r1151a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1151a.fires) {
+      issues.push({
+        location: `${r1151a.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'INTENTION_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1151a.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1151a.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the character's shifting intention registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences for what the character wants register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes anywhere with a
+  // positive curiosity delta, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath has no rise in curiosity, while such rises occur elsewhere. Distinct from every
+  // other rule in this file: revelation has never anchored an isTrigger side of a check here —
+  // REVELATION_CLOCK_AFTERMATH_VOID and CLOCK_REVELATION_AFTERMATH_VOID use revelation only as
+  // an aftermath channel for the clockRaised trigger, in either direction. A disclosed fact that
+  // fails to seed any fresh question about what the character now wants leaves the intention
+  // layer spending information without buying forward pull in return.
+  {
+    const r1151b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1151b.fires) {
+      issues.push({
+        location: `${r1151b.triggerCount} revelation scene(s) — no rise in curiosity within 2 scenes`,
+        rule: 'INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1151b.triggerCount} scenes that reveal something is followed by two scenes with no rise in curiosity, even though ${r1151b.aftermathCount} such rises occur elsewhere in the script. A revelation that closes a question without opening a new one about what the character will now pursue spends the intention layer's information budget without renewing the audience's appetite to keep tracking the want.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information provoke a fresh question about what the character wants next, so disclosure keeps generating curiosity about intention instead of only resolving it.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes anywhere with a
+  // non-neutral emotional shift, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath registers no emotional shift on any character, while such shifts occur elsewhere.
+  // Distinct from INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID (this wave, same trigger paired
+  // with curiosityDelta — the second channel for this genuinely fresh trigger) and from
+  // REVELATION_CLOCK_AFTERMATH_VOID / CLOCK_REVELATION_AFTERMATH_VOID (revelation as an
+  // aftermath channel, not a trigger). A disclosure that never lands as a felt emotional beat
+  // leaves the intention layer's information registering as plot mechanics the character never
+  // visibly reacts to.
+  {
+    const r1151c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1151c.fires) {
+      issues.push({
+        location: `${r1151c.triggerCount} revelation scene(s) — no emotional shift within 2 scenes`,
+        rule: 'INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1151c.triggerCount} scenes that reveal something is followed by two scenes with no emotional shift, even though ${r1151c.aftermathCount} such shifts occur elsewhere in the script. A revelation that lands without ever registering on a character's felt state leaves the intention layer's disclosures reading as information delivered to the audience rather than something that visibly changes what the character wants or how they feel about pursuing it.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the new information lands as something felt, not just something known.`,
       });
     }
   }

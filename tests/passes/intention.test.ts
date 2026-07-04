@@ -1352,6 +1352,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1151 — intentionPass: intention turn-staging aftermath void, intention revelation-curiosity aftermath void, intention revelation-emotional aftermath void', async () => {
+    const makeRec1151 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1151 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('INTENTION_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1151a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1151(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_TURN_STAGING_AFTERMATH_VOID'), 'INTENTION_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a heavily-staged scene within its window', async () => {
+      const recs1151an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1151(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_TURN_STAGING_AFTERMATH_VOID'), 'INTENTION_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID fires when every revelation is followed by two scenes with no curiosity rise', async () => {
+      const recs1151b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeRec1151(i, { curiosityDelta: 1 });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when a revelation is followed by a curiosity rise within its window', async () => {
+      const recs1151bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeRec1151(i, { curiosityDelta: 1 });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1151c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeRec1151(i, { emotionalShift: 'positive' });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1151cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1151(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeRec1151(i, { emotionalShift: 'positive' });
+        return makeRec1151(i);
+      });
+      const res = await runIN1151(recs1151cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1137 — intentionPass: intention payoff-dialogue-highlight aftermath void, intention payoff-staging aftermath void, intention turn-dialogue-highlight aftermath void', async () => {
     const makeRec1137 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
