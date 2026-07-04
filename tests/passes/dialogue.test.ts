@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1134 — dialoguePass: dialogue clock-staging aftermath void, dialogue turn-relational aftermath void, dialogue turn-staging aftermath void', async () => {
+    const makeRec1134 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1134 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1134 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no heavily-staged scene', async () => {
+      const records1134a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1134(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by a heavily-staged scene within its window', async () => {
+      const records1134an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1134(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no relationship shift', async () => {
+      const records1134b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1134(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by a relationship shift within its window', async () => {
+      const records1134bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1134(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_TURN_STAGING_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no heavily-staged scene', async () => {
+      const records1134c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1134(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_STAGING_AFTERMATH_VOID'), 'DIALOGUE_TURN_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_TURN_STAGING_AFTERMATH_VOID does not fire when a dramatic turn is followed by a heavily-staged scene within its window', async () => {
+      const records1134cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1134(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1134(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1134(i);
+      });
+      const res = await runD1134(buildScenes1134(10), records1134cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_STAGING_AFTERMATH_VOID'), 'DIALOGUE_TURN_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1120 — dialoguePass: dialogue clock-suspense aftermath void, dialogue clock-highlight aftermath void, dialogue turn-emotional aftermath void', async () => {
     const makeRec1120 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

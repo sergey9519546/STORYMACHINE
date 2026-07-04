@@ -540,6 +540,12 @@
 // DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID pairs clockRaised with suspenseDelta (fourth channel)
 // and DIALOGUE_CLOCK_HIGHLIGHT_AFTERMATH_VOID pairs it with dialogueHighlights (fifth channel);
 // DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID pairs dramaticTurn with emotionalShift (third channel).
+// Wave 1134 additions (opens rotation cycle 41): DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID gives
+// clockRaised its sixth and final channel (previously paired with curiosityDelta/emotionalShift/
+// relationshipShifts/suspenseDelta/dialogueHighlights, now also paired with visualBeats),
+// completing full six-channel saturation for this trigger. DIALOGUE_TURN_RELATIONAL_AFTERMATH_
+// VOID and DIALOGUE_TURN_STAGING_AFTERMATH_VOID give dramaticTurn its fourth and fifth channels
+// (relationshipShifts, visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6636,6 +6642,85 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1120c.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1120c.aftermathCount} such shifts occur elsewhere. A pivot that never registers on any character's felt emotional state leaves the dialogue layer's turns reading as plot mechanics rather than moments that change how someone feels.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt, not just something that happened.`,
+      });
+    }
+  }
+
+  // DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID -- Sequence/aftermath x clockRaised trigger ->
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying clock-raise scenes (pos<n-2), >=2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1091), DIALOGUE_CLOCK_EMOTIONAL_AFTERMATH_VOID, DIALOGUE_CLOCK_RELATIONAL_AFTERMATH_
+  // VOID (Wave 1106), DIALOGUE_CLOCK_SUSPENSE_AFTERMATH_VOID, and DIALOGUE_CLOCK_HIGHLIGHT_
+  // AFTERMATH_VOID (Wave 1120, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta/dialogueHighlights) -- this is the sixth and final
+  // consequence channel for this trigger, completing full saturation.
+  {
+    const r1134a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1134a.fires) {
+      issues.push({
+        location: `${r1134a.triggerCount} clock-raise scene(s) -- no heavily-staged scene within 2 scenes of any`,
+        rule: 'DIALOGUE_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1134a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1134a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the dialogue layer's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID -- Sequence/aftermath x dramaticTurn trigger ->
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n>=8, >=2 qualifying dramatic-turn scenes (pos<n-2), >=2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every turn's two-scene aftermath carries
+  // no relationship movement, while such movement occurs elsewhere. Distinct from DIALOGUE_
+  // TURN_SUSPENSE_AFTERMATH_VOID (Wave 1092), DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1106), and DIALOGUE_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1120, same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift) -- this is the fourth consequence channel for
+  // this trigger.
+  {
+    const r1134b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1134b.fires) {
+      issues.push({
+        location: `${r1134b.triggerCount} dramatic-turn aftermath(s) -- no relationship shift within 2 scenes`,
+        rule: 'DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1134b.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1134b.aftermathCount} such shifts occur elsewhere. A pivot that never moves how any two characters stand with each other treats the turn as an isolated plot event rather than something that reshapes the relational world the dialogue plays out in.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly move a relationship -- a trust gained or lost, an alliance tested -- so the turn registers between characters, not just in the plot.`,
+      });
+    }
+  }
+
+  // DIALOGUE_TURN_STAGING_AFTERMATH_VOID -- Sequence/aftermath x dramaticTurn trigger ->
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n>=8, >=2
+  // qualifying dramatic-turn scenes (pos<n-2), >=2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath has no heavily-staged scene, while
+  // such staging occurs elsewhere. Distinct from DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1092), DIALOGUE_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1106), DIALOGUE_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 1120), and DIALOGUE_TURN_RELATIONAL_AFTERMATH_VOID (this wave, same
+  // trigger paired with suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts) -- this
+  // is the fifth consequence channel for this trigger.
+  {
+    const r1134c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1134c.fires) {
+      issues.push({
+        location: `${r1134c.triggerCount} dramatic-turn aftermath(s) -- no heavily-staged scene within 2 scenes`,
+        rule: 'DIALOGUE_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1134c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1134c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the dialogue layer's turns registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
       });
     }
   }
