@@ -439,6 +439,11 @@
 // payoff/seed arrays audited in Waves 941/955), INTENTION_TURN_ZONE_IMBALANCE (dramaticTurn !==
 // 'nothing' categorical), and INTENTION_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta
 // distinct from the suspense/curiosity ones audited in Waves 941/955).
+// Wave 983 additions: auditing the last two clean zone-imbalance candidates in this pass —
+// INTENTION_CLOCK_ZONE_IMBALANCE (clockRaised boolean) and INTENTION_HIGHLIGHT_ZONE_IMBALANCE
+// (dialogueHighlights array) — plus, since zone-imbalance is now down to those two, one aftermath-
+// void pairing via checkAftermathVoid: INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
+// curiosity), the first use of raise_stakes as an aftermath-void TRIGGER in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5594,6 +5599,80 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r969c.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName969c} contains ${r969c.counts[r969c.bloatZoneIdx]} of them (${Math.round((r969c.counts[r969c.bloatZoneIdx] / r969c.totalCount) * 100)}%) while ${emptyNames969c} contains none. Deadline pressure bloats in one structural quarter and never moves in another, so the character pursues their goal under a running clock in only part of the story.`,
         suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames969c} — so the character's intention operates under deadline pressure across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_ZONE_IMBALANCE — Underweight/bloat × (clockRaised === true) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockRaised === true predicate as the
+  // existing 3-zone INTENTION_CLOCK_ZONE_CLUSTER and run-based INTENTION_CLOCK_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the clockRaised BOOLEAN field, distinct
+  // from the numeric clockDelta signal audited in Wave 969.
+  {
+    const r983a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r983a.fires) {
+      const emptyNames983a = r983a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName983a = FOUR_ZONE_NAMES[r983a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames983a} empty; ${bloatName983a} has ${r983a.counts[r983a.bloatZoneIdx]}/${r983a.totalCount} clock-raising scenes`,
+        rule: 'INTENTION_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r983a.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName983a} contains ${r983a.counts[r983a.bloatZoneIdx]} of them (${Math.round((r983a.counts[r983a.bloatZoneIdx] / r983a.totalCount) * 100)}%) while ${emptyNames983a} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the character pursues their goal under a deadline in only part of the story.`,
+        suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) — ${emptyNames983a} — so the character's intention operates under a deadline across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × (dialogueHighlights.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a dialogue highlight total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone INTENTION_HIGHLIGHT_ZONE_CLUSTER and run-based INTENTION_HIGHLIGHT_DROUGHT_RUN — the
+  // first application of the 4-zone bloat+empty-zone mode to the dialogueHighlights array field.
+  {
+    const r983b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r983b.fires) {
+      const emptyNames983b = r983b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName983b = FOUR_ZONE_NAMES[r983b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames983b} empty; ${bloatName983b} has ${r983b.counts[r983b.bloatZoneIdx]}/${r983b.totalCount} dialogue-highlight scenes`,
+        rule: 'INTENTION_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r983b.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName983b} contains ${r983b.counts[r983b.bloatZoneIdx]} of them (${Math.round((r983b.counts[r983b.bloatZoneIdx] / r983b.totalCount) * 100)}%) while ${emptyNames983b} contains none. Memorable lines bloat in one structural quarter and never land in another, so the character's pursuit of their goal is voiced memorably in only part of the story.`,
+        suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames983b} — a dialogue highlight so the character's intention keeps being voiced memorably across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID — with the zone-imbalance mode now down to two clean
+  // trio-complete signals (both audited above), this check pivots to the sequence/aftermath mode via
+  // the shared checkAftermathVoid helper: raise-stakes trigger × curiosity aftermath. Every stakes-
+  // raising scene is followed by two scenes that raise no new curiosity, even though fresh questions
+  // do open elsewhere. Escalating danger should usually provoke a new question about what happens
+  // next; when every stakes-raise's aftermath opens no curiosity, the character's escalating pursuit
+  // sits inert rather than propelling the audience forward. First use of raise_stakes as an
+  // aftermath-void TRIGGER in this pass.
+  {
+    const r983c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r983c.fires) {
+      issues.push({
+        location: `${r983c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'INTENTION_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r983c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r983c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger should usually provoke a new uncertainty about what the character's pursuit will cost or require next. When every stakes-raise's aftermath opens no curiosity, the character's escalating intention sits inert rather than propelling the audience forward.`,
+        suggestedFix: `Let at least one stakes-raise open a new question in its aftermath: in the scene or two after the danger sharpens, plant an uncertainty about what the character's pursuit of their goal will cost next.`,
       });
     }
   }
