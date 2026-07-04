@@ -429,6 +429,12 @@
 // (relationshipShifts array, distinct from the seed/payoff arrays), and PACING_REVELATION_ZONE_
 // IMBALANCE (revelation != null — the revelation string field, distinct from the purpose-enum
 // PACING_REVELATION_PURPOSE one).
+// Wave 985 additions: PACING_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) and PACING_TURN_
+// ZONE_IMBALANCE (dramaticTurn !== 'nothing') — the last two clean trio-complete zone-imbalance
+// candidates in this pass (PACING_STAGING was skipped: its cluster/drought predicates disagree,
+// >=2 vs >0 visualBeats). With zone-imbalance now down to just these two, this wave completes the
+// trio with one aftermath-void pairing: PACING_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
+// curiosityDelta), the first use of raise_stakes as an aftermath-void trigger in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -5539,6 +5545,79 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r971c.totalCount} revelation scenes are unevenly distributed across its four structural zones: ${bloatName971c} contains ${r971c.counts[r971c.bloatZoneIdx]} of them (${Math.round((r971c.counts[r971c.bloatZoneIdx] / r971c.totalCount) * 100)}%) while ${emptyNames971c} contains none. Disclosures bloat in one structural quarter and never land in another, so pacing surges with new information in only part of the story.`,
         suggestedFix: `Redistribute disclosures: land a revelation in at least one scene inside the empty zone(s) — ${emptyNames971c} — so pacing keeps surging with new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // highlighted-dialogue scenes total, divided across four equal structural zones. Distinct from
+  // the existing 3-zone PACING_HIGHLIGHT_ZONE_CLUSTER and run-based PACING_HIGHLIGHT_DROUGHT_RUN —
+  // the first application of the 4-zone bloat+empty-zone mode to this channel.
+  {
+    const r985a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r985a.fires) {
+      const emptyNames985a = r985a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName985a = FOUR_ZONE_NAMES[r985a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames985a} empty; ${bloatName985a} has ${r985a.counts[r985a.bloatZoneIdx]}/${r985a.totalCount} highlighted-dialogue scenes`,
+        rule: 'PACING_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r985a.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName985a} contains ${r985a.counts[r985a.bloatZoneIdx]} of them (${Math.round((r985a.counts[r985a.bloatZoneIdx] / r985a.totalCount) * 100)}%) while ${emptyNames985a} contains none. Memorable dialogue bloats in one structural quarter and never lands in another, so pacing carries verbal peaks in only part of the story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames985a} — a standout line of dialogue so pacing keeps carrying verbal peaks across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_TURN_ZONE_IMBALANCE — Underweight/bloat × (dramaticTurn !== 'nothing') × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // dramatic-turn scenes total, divided across four equal structural zones. Distinct from the
+  // existing 3-zone PACING_TURN_ZONE_CLUSTER and run-based PACING_TURN_DROUGHT_RUN — the last of
+  // this pass's two remaining clean trio-complete signals (PACING_STAGING was skipped: its
+  // cluster (visualBeats.length>=2) and drought-run (visualBeats.length>0) predicates disagree, so
+  // its "trio" doesn't actually audit one consistent signal).
+  {
+    const r985b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+    });
+    if (r985b.fires) {
+      const emptyNames985b = r985b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName985b = FOUR_ZONE_NAMES[r985b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames985b} empty; ${bloatName985b} has ${r985b.counts[r985b.bloatZoneIdx]}/${r985b.totalCount} dramatic-turn scenes`,
+        rule: 'PACING_TURN_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r985b.totalCount} dramatic-turn scenes are unevenly distributed across its four structural zones: ${bloatName985b} contains ${r985b.counts[r985b.bloatZoneIdx]} of them (${Math.round((r985b.counts[r985b.bloatZoneIdx] / r985b.totalCount) * 100)}%) while ${emptyNames985b} contains none. Pivots bloat in one structural quarter and never land in another, so pacing carries reversals in only part of the story.`,
+        suggestedFix: `Redistribute pivots: give at least one scene inside the empty zone(s) — ${emptyNames985b} — a dramatic turn so pacing keeps carrying reversals across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PACING_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now exhausted down to the two
+  // signals above, this wave completes the trio via the sequence/aftermath mode. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying stakes-raise scenes
+  // (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every stakes-raise's two-scene aftermath opens no new curiosity, while curiosity
+  // does occur elsewhere. The only prior aftermath-void rule in this pass (PACING_SEED_STAGING_
+  // AFTERMATH_VOID, Wave 635) uses seededClueIds as its trigger — this is the first use of
+  // raise_stakes as an aftermath-void trigger in this pass.
+  {
+    const r985c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r985c.fires) {
+      issues.push({
+        location: `${r985c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'PACING_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r985c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r985c.aftermathCount} scenes elsewhere do open fresh questions. Pacing that escalates danger without provoking a new uncertainty about what comes next reads as inert rather than propulsive in the beats immediately following every escalation.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so pacing carries curiosity forward rather than sitting in a learnable void.`,
       });
     }
   }

@@ -934,6 +934,72 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 985 — pacingPass: pacing highlight zone imbalance, pacing turn zone imbalance, pacing stakes-curiosity aftermath void', async () => {
+    const runP985 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PACING_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs985a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['line'] : [] }));
+      const res = await runP985(recs985a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_ZONE_IMBALANCE'), 'PACING_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs985an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['line'] : [] }));
+      const res = await runP985(recs985an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_ZONE_IMBALANCE'), 'PACING_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PACING_TURN_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dramatic-turn scenes', async () => {
+      const recs985b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 1, 2, 8, 9].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runP985(recs985b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_TURN_ZONE_IMBALANCE'), 'PACING_TURN_ZONE_IMBALANCE should fire');
+    });
+
+    it('PACING_TURN_ZONE_IMBALANCE does not fire when dramatic-turn scenes touch every zone', async () => {
+      const recs985bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dramaticTurn: [0, 3, 5, 8].includes(i) ? 'reversal' : 'nothing' }));
+      const res = await runP985(recs985bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_TURN_ZONE_IMBALANCE'), 'PACING_TURN_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: curiosity raised only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: curiosity raised at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PACING_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs985c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP985(recs985c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_STAKES_CURIOSITY_AFTERMATH_VOID'), 'PACING_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PACING_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs985cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runP985(recs985cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_STAKES_CURIOSITY_AFTERMATH_VOID'), 'PACING_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 971 — pacingPass: pacing clock delta zone imbalance, pacing relationship zone imbalance, pacing revelation zone imbalance', async () => {
     const runP971 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
