@@ -510,6 +510,11 @@
 // channel). THEME_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives unresolvedClues.length>0 a
 // fifth channel (previously paired with emotionalShift/curiosityDelta/suspenseDelta/
 // relationshipShifts, now also paired with dialogueHighlights).
+// Wave 1130 additions: payoffSetupIds was at three of six channels (curiosityDelta/
+// emotionalShift/relationshipShifts) and clockRaised at two (suspenseDelta/curiosityDelta).
+// THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID gives payoffSetupIds its fourth channel (suspenseDelta);
+// THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID and THEME_CLOCK_RELATIONAL_AFTERMATH_VOID give
+// clockRaised its third and fourth channels (emotionalShift, relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6429,6 +6434,81 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1116c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1116c.aftermathCount} such rises occur elsewhere. Time pressure that never reopens the field of questions right after it tightens leaves the theme's relationship with urgency feeling mechanical rather than generative.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface so the theme's ticking clock keeps deepening curiosity, not just urgency.`,
+      });
+    }
+  }
+
+  // THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no rise in suspense, while such rises
+  // occur elsewhere. Distinct from THEME_PAYOFF_CURIOSITY_AFTERMATH_VOID (Wave 1102),
+  // THEME_PAYOFF_EMOTIONAL_AFTERMATH_VOID, and THEME_PAYOFF_RELATIONAL_AFTERMATH_VOID (Wave
+  // 1116, same trigger paired with curiosityDelta/emotionalShift/relationshipShifts) — this is
+  // the fourth consequence channel for this trigger.
+  {
+    const r1130a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1130a.fires) {
+      issues.push({
+        location: `${r1130a.triggerCount} payoff scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'THEME_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1130a.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1130a.aftermathCount} such rises occur elsewhere. A resolved setup that never leaves fresh tension in its wake leaves the theme's payoffs feeling settled rather than opening onto the next thing at risk.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new tension rise from what the resolution cost or changed, so the theme's payoffs keep generating stakes instead of closing the matter entirely.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from THEME_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1102) and THEME_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1116, same trigger paired with
+  // suspenseDelta/curiosityDelta) — this is the third consequence channel for this trigger.
+  {
+    const r1130b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1130b.fires) {
+      issues.push({
+        location: `${r1130b.triggerCount} clock-raise scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1130b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no emotional shift, even though ${r1130b.aftermathCount} such shifts occur elsewhere. Time pressure that never registers emotionally right after it tightens leaves the theme's relationship with urgency feeling mechanical rather than felt.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a character's emotional register shift in response to the mounting pressure, so the theme's ticking clock carries felt weight, not just structural urgency.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // THEME_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave 1102), THEME_CLOCK_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1116), and THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift) — this is the fourth consequence channel for
+  // this trigger.
+  {
+    const r1130c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1130c.fires) {
+      issues.push({
+        location: `${r1130c.triggerCount} clock-raise scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'THEME_CLOCK_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1130c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1130c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the theme's clock isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
       });
     }
   }
