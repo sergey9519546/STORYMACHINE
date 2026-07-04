@@ -512,6 +512,12 @@
 // seededClueIds its first checkAftermathVoid-based sequence/aftermath pairing with curiosityDelta
 // — distinct from the existing hand-rolled CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID (Wave 590, same
 // trigger paired with suspenseDelta via a different implementation).
+// Wave 1094 additions: with all four main triggers fully saturated since Wave 1080, this wave
+// continues building out seededClueIds' checkAftermathVoid channel set (currently just
+// curiosityDelta, plus the separately-implemented hand-rolled CONFLICT_SEED_SUSPENSE_AFTERMATH_
+// VOID from Wave 590) — CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID (emotionalShift),
+// CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID (relationshipShifts), and CONFLICT_SEED_STAGING_
+// AFTERMATH_VOID (visualBeats) give this trigger three fresh channels.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6350,6 +6356,83 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1080c.triggerCount} clue-planting scenes is followed by two scenes with no rise in curiosity, even though ${r1080c.aftermathCount} such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the conflict's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the conflict's foreshadowing keeps generating curiosity, not just sitting as inert setup.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no emotional shift, while such shifts
+  // occur elsewhere. Distinct from CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID (Wave 1080, same
+  // trigger paired with curiosityDelta) and CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID (Wave 590,
+  // hand-rolled, suspenseDelta) — this is the second checkAftermathVoid-based channel for this
+  // trigger.
+  {
+    const r1094a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1094a.fires) {
+      issues.push({
+        location: `${r1094a.triggerCount} seed scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1094a.triggerCount} clue-planting scenes is followed by two scenes with no emotional shift, even though ${r1094a.aftermathCount} such shifts occur elsewhere. A planted clue that never registers emotionally right after it lands leaves the conflict's foreshadowing feeling procedural — information delivered without anyone visibly reacting to what it implies.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let a character's emotional register shift in response to what the clue implies, so the plant carries felt weight, not just informational weight.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying seed scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship shift,
+  // 2-scene lookahead. Fires when every seed's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. Distinct from CONFLICT_SEED_CURIOSITY_
+  // AFTERMATH_VOID, CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/emotionalShift), and CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID (Wave 590,
+  // hand-rolled, suspenseDelta) — this is the third checkAftermathVoid-based channel for this
+  // trigger.
+  {
+    const r1094b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1094b.fires) {
+      issues.push({
+        location: `${r1094b.triggerCount} seed scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1094b.triggerCount} clue-planting scenes is followed by two scenes with no recorded relationship shift, even though ${r1094b.aftermathCount} such shifts occur elsewhere. A planted clue that never moves how characters stand with each other leaves the conflict's foreshadowing isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let it shift how a pair of characters relate — suspicion, alliance, or distance — so the plant has interpersonal consequence, not just narrative setup.`,
+      });
+    }
+  }
+
+  // CONFLICT_SEED_STAGING_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath has no heavily-staged scene, while such staging occurs
+  // elsewhere. Distinct from CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID, CONFLICT_SEED_EMOTIONAL_
+  // AFTERMATH_VOID, CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/emotionalShift/relationshipShifts), and CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID
+  // (Wave 590, hand-rolled, suspenseDelta) — this is the fourth checkAftermathVoid-based channel
+  // for this trigger.
+  {
+    const r1094c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1094c.fires) {
+      issues.push({
+        location: `${r1094c.triggerCount} seed scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'CONFLICT_SEED_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1094c.triggerCount} clue-planting scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1094c.aftermathCount} such scenes exist elsewhere in the script. A planted clue that never earns a visually charged follow-through leaves the conflict's foreshadowing registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, stage at least two concrete visual beats, so the plant registers in image, not just in plot bookkeeping.`,
       });
     }
   }

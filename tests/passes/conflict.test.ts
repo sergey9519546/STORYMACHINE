@@ -1535,6 +1535,90 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1094 — conflictPass: conflict seed-emotional aftermath void, conflict seed-relational aftermath void, conflict seed-staging aftermath void', async () => {
+    const makeRec1094 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1094 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID fires when every seed is followed by two scenes with no emotional shift', async () => {
+      const recs1094a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1094(i, { emotionalShift: 'positive' });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed is followed by an emotional shift within its window', async () => {
+      const recs1094an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1094(i, { emotionalShift: 'positive' });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID'), 'CONFLICT_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID fires when every seed is followed by two scenes with no relationship shift', async () => {
+      const recs1094b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1094(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID'), 'CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID does not fire when a seed is followed by a relationship shift within its window', async () => {
+      const recs1094bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1094(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID'), 'CONFLICT_SEED_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('CONFLICT_SEED_STAGING_AFTERMATH_VOID fires when every seed is followed by two scenes with no visually dense scene', async () => {
+      const recs1094c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeRec1094(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_STAGING_AFTERMATH_VOID'), 'CONFLICT_SEED_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('CONFLICT_SEED_STAGING_AFTERMATH_VOID does not fire when a seed is followed by a visually dense scene within its window', async () => {
+      const recs1094cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1094(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeRec1094(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1094(i);
+      });
+      const res = await runCF1094(recs1094cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SEED_STAGING_AFTERMATH_VOID'), 'CONFLICT_SEED_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1080 — conflictPass: conflict turn-suspense aftermath void, conflict turn-dialogue-highlight aftermath void, conflict seed-curiosity aftermath void', async () => {
     const makeRec1080 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
