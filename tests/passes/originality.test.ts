@@ -1210,6 +1210,104 @@ He sits at his desk.
   });
 
 
+  describe('Wave 984 — originalityPass: originality highlight zone imbalance, originality stakes curiosity aftermath void, originality clock relationship aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/956/970 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (dialogueHighlights array / purpose==='raise_stakes' / clockRaised bool) never overlap the
+    // filler purpose pool, so cycling never contaminates a fixture.
+    const PURPOSE_POOL_984 = ['turning_point', 'complicate', 'introduce_conflict', 'establish_world'];
+    const SENTENCE_POOL_984 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor984 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec984 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor984(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_984[idx % PURPOSE_POOL_984.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain984 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor984(i)}\n\n${SENTENCE_POOL_984[i % SENTENCE_POOL_984.length]}`).join('\n\n');
+    const runO984 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain984(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of highlighted-dialogue scenes', async () => {
+      const recs984a = Array.from({ length: 10 }, (_, i) => makeRec984(i, [0, 1, 2, 8, 9].includes(i) ? { dialogueHighlights: ['line'] } : {}));
+      const res = await runO984(recs984a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE'), 'ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE does not fire when highlighted-dialogue scenes touch every zone', async () => {
+      const recs984an = Array.from({ length: 10 }, (_, i) => makeRec984(i, [0, 3, 5, 8].includes(i) ? { dialogueHighlights: ['line'] } : {}));
+      const res = await runO984(recs984an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE'), 'ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs984b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec984(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeRec984(i, { curiosityDelta: 1 });
+        return makeRec984(i);
+      });
+      const res = await runO984(recs984b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs984bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec984(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeRec984(i, { curiosityDelta: 1 });
+        return makeRec984(i);
+      });
+      const res = await runO984(recs984bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID'), 'ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no relationship shift', async () => {
+      const recs984c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec984(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec984(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec984(i);
+      });
+      const res = await runO984(recs984c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID'), 'ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID does not fire when a clock-raise is followed by a relationship shift within its window', async () => {
+      const recs984cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec984(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec984(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec984(i);
+      });
+      const res = await runO984(recs984cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID'), 'ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 970 — originalityPass: originality relationship zone imbalance, originality clock delta zone imbalance, originality emotion zone imbalance', async () => {
     // Same truncation pitfall as Waves 592/606/…/942/956 above — every fixture cycles purpose/
     // emotion/slug/sentence per scene to avoid tripping unrelated 'major' rules that would crowd

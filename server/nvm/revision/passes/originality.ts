@@ -461,6 +461,12 @@
 // CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — a delta distinct from the curiosity/suspense ones
 // audited in Wave 942/956), and ORIGINALITY_EMOTION_ZONE_IMBALANCE (emotionalShift !== 'neutral' —
 // the any-direction valence signal, distinct from the separate positive/negative-emotion rules).
+// Wave 984 additions: ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights array) — the last
+// clean trio-complete zone-imbalance candidate in this pass (ORIGINALITY_STAGING was skipped: its
+// cluster/drought predicates disagree, >=2 vs >0 visualBeats). With zone-imbalance now exhausted,
+// this wave pivots to the sequence/aftermath mode for two more checks, each a first-use pairing in
+// this pass: ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes → curiosityDelta) and
+// ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID (clockRaised → relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5933,6 +5939,83 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r970c.totalCount} emotionally-charged scenes are unevenly distributed across its four structural zones: ${bloatName970c} contains ${r970c.counts[r970c.bloatZoneIdx]} of them (${Math.round((r970c.counts[r970c.bloatZoneIdx] / r970c.totalCount) * 100)}%) while ${emptyNames970c} contains none — a predictable emotional rhythm the audience can learn to anticipate rather than feeling distributed unevenly across the whole story.`,
         suggestedFix: `Redistribute feeling: give at least one scene inside the empty zone(s) — ${emptyNames970c} — an emotional shift (positive or negative) so where the story carries feeling stays less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × dialogueHighlights array × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4
+  // highlighted-dialogue scenes total, divided across four equal structural zones. Distinct from
+  // the existing 3-zone ORIGINALITY_HIGHLIGHT_ZONE_CLUSTER and run-based ORIGINALITY_HIGHLIGHT_
+  // DROUGHT_RUN — the first application of the 4-zone bloat+empty-zone mode to this channel. This
+  // is the last clean trio-complete zone-imbalance candidate in this pass: ORIGINALITY_STAGING was
+  // considered but skipped because its cluster (visualBeats.length>=2) and drought-run
+  // (visualBeats.length>0) predicates disagree, so its "trio" doesn't actually audit one signal.
+  {
+    const r984a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r984a.fires) {
+      const emptyNames984a = r984a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName984a = FOUR_ZONE_NAMES[r984a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames984a} empty; ${bloatName984a} has ${r984a.counts[r984a.bloatZoneIdx]}/${r984a.totalCount} highlighted-dialogue scenes`,
+        rule: 'ORIGINALITY_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r984a.totalCount} scenes carrying a standout line of dialogue are unevenly distributed across its four structural zones: ${bloatName984a} contains ${r984a.counts[r984a.bloatZoneIdx]} of them (${Math.round((r984a.counts[r984a.bloatZoneIdx] / r984a.totalCount) * 100)}%) while ${emptyNames984a} contains none — a predictable concentration the audience can learn to anticipate rather than memorable dialogue distributed unevenly across the whole story.`,
+        suggestedFix: `Redistribute quotable lines: give at least one scene inside the empty zone(s) — ${emptyNames984a} — a standout line of dialogue so where the story's memorable dialogue lands stays less predictable across its whole shape.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now exhausted in this pass
+  // (only the signal above remained clean), this wave pivots to the sequence/aftermath mode. Built
+  // on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying stakes-raise scenes
+  // (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every stakes-raise's two-scene aftermath opens no new curiosity, while curiosity does
+  // occur elsewhere. raise_stakes' distribution is already audited via ORIGINALITY_STAKES_ZONE_
+  // IMBALANCE/CLUSTER/DROUGHT_RUN, but this is the first use of it as an aftermath-void TRIGGER in
+  // this pass — a distinct analytical question (does escalation earn a consequence?) from where
+  // escalation is placed.
+  {
+    const r984b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r984b.fires) {
+      issues.push({
+        location: `${r984b.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'ORIGINALITY_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r984b.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r984b.aftermathCount} scenes elsewhere do open fresh questions. Once the audience notices the pattern, they learn that escalation never earns a new question nearby — a predictable, avoidable absence rather than genuinely unpredictable follow-through.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation is followed by curiosity rather than a learnable void.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raising scenes (clockRaised === true, pos<n-2), ≥2 relationship-shift
+  // scenes anywhere, 2-scene lookahead. Fires when every clock-raising scene's two-scene aftermath
+  // has no relationship shift, while such shifts occur elsewhere. clockRaised has been audited for
+  // distribution (ORIGINALITY_CLOCK_DROUGHT_RUN, CLOCK_RAISED_ZONE_CLUSTER) but never paired with
+  // relationshipShifts, and never used as an aftermath-void trigger in this pass — a fresh
+  // trigger/aftermath combination distinct from the stakes/curiosity pairing above.
+  {
+    const r984c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r984c.fires) {
+      issues.push({
+        location: `${r984c.triggerCount} clock-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ORIGINALITY_CLOCK_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r984c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r984c.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, they learn that time pressure never bears on how characters treat each other nearby — a predictable, avoidable absence.`,
+        suggestedFix: `In the two scenes following at least one clock-raising moment, let the ticking deadline strain or shift a relationship so escalating time pressure carries interpersonal weight rather than sitting in a learnable void.`,
       });
     }
   }
