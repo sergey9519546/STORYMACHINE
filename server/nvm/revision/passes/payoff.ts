@@ -510,6 +510,13 @@
 // relationshipShifts/emotionalShift, now also paired with visualBeats). Together these complete
 // full six-channel saturation for all six of this pass's main triggers (raise_stakes,
 // unresolvedClues-debt, revelation, clockRaised, seededClueIds, dramaticTurn).
+// Wave 1112 additions: clockRaised, seededClueIds, and dramaticTurn are genuinely fully
+// saturated as of Wave 1098, but raise_stakes and heavy unresolvedClues debt remain at four
+// checkAftermathVoid channels each (curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts),
+// still missing dialogueHighlights and visualBeats. PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID and PAYOFF_STAKES_STAGING_AFTERMATH_VOID give raise_stakes its fifth and sixth channels,
+// completing full saturation for this trigger. PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID gives heavy unresolvedClues debt a fifth channel.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6143,6 +6150,86 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1098c.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1098c.aftermathCount} such scenes exist elsewhere. A pivot that never earns a visually charged follow-through leaves the payoff machinery's turns registering as plot mechanics rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot registers in image, not just as a structural beat.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying stakes-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line
+  // of dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains
+  // no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from PAYOFF_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, PAYOFF_STAKES_SUSPENSE_AFTERMATH_VOID, PAYOFF_STAKES_EMOTIONAL_
+  // AFTERMATH_VOID, and PAYOFF_STAKES_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts respectively) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1112a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1112a.fires) {
+      issues.push({
+        location: `${r1112a.triggerCount} stakes-raise(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1112a.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1112a.aftermathCount} such scenes exist elsewhere. Stakes that never earn a memorable line right after they rise leave the payoff machinery's escalation registering as event rather than something anyone says out loud.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, give a character a line that names what's now at risk, so the payoff machinery speaks to the escalation rather than only staging it.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_STAGING_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID,
+  // PAYOFF_STAKES_SUSPENSE_AFTERMATH_VOID, PAYOFF_STAKES_EMOTIONAL_AFTERMATH_VOID, PAYOFF_
+  // STAKES_RELATIONAL_AFTERMATH_VOID, and PAYOFF_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same
+  // trigger paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts/
+  // dialogueHighlights respectively) — this is the sixth and final consequence channel for this
+  // trigger, completing full saturation.
+  {
+    const r1112b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1112b.fires) {
+      issues.push({
+        location: `${r1112b.triggerCount} stakes-raise(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'PAYOFF_STAKES_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1112b.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1112b.aftermathCount} such scenes exist elsewhere. Stakes that never earn a visually charged follow-through leave the payoff machinery's escalation registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, stage at least two concrete visual beats, so the escalation registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × heavy
+  // unresolvedClues debt trigger → dialogueHighlights absence. Built on checkAftermathVoid from
+  // the shared checks library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2
+  // scenes anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // heavy-debt scene's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, PAYOFF_OPEN_
+  // THREAD_EMOTIONAL_AFTERMATH_VOID, PAYOFF_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, and PAYOFF_
+  // OPEN_THREAD_RELATIONAL_AFTERMATH_VOID (same trigger paired with suspenseDelta/emotionalShift/
+  // curiosityDelta/relationshipShifts respectively) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1112c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1112c.fires) {
+      issues.push({
+        location: `${r1112c.triggerCount} heavy clue-debt scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PAYOFF_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1112c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1112c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery that never earns a memorable line right after it compounds leaves the payoff machinery's open threads feeling abstract rather than voiced.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so the accumulating mystery registers in speech, not just as narrative backlog.`,
       });
     }
   }
