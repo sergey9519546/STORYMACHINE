@@ -549,6 +549,11 @@
 // gives revelation its third channel (emotionalShift); ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID
 // and ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID give dramaticTurn its second and third channels
 // (suspenseDelta, curiosityDelta).
+// Wave 1152 additions: after Wave 1138, revelation and dramaticTurn were each at three of six
+// channels (curiosityDelta, suspenseDelta, emotionalShift). ORIGINALITY_REVELATION_RELATIONAL_
+// AFTERMATH_VOID and ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID give each trigger its fourth
+// channel (relationshipShifts); ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID gives revelation
+// its fifth channel (visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6928,6 +6933,87 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1138c.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1138c.aftermathCount} such rises occur elsewhere. Once the audience notices the pattern, they learn that a pivot never opens a fresh question right after it happens — a predictable, avoidable absence that leaves every turn registering as a closed event rather than a link that generates the next thing to wonder about.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface from the pivot, so the story keeps generating curiosity instead of settling into the new state of affairs every time.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger
+  // → relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes anywhere with
+  // a recorded relationship shift, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath carries no relationship movement, while such movement occurs elsewhere. Distinct
+  // from ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_REVELATION_SUSPENSE_
+  // AFTERMATH_VOID (Wave 1124), and ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID (Wave 1138,
+  // same trigger paired with curiosityDelta/suspenseDelta/emotionalShift) — this is the fourth
+  // consequence channel for this trigger. Once the audience notices the pattern, a disclosure
+  // that never moves who stands with whom becomes a predictable, isolated event.
+  {
+    const r1152a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1152a.fires) {
+      issues.push({
+        location: `${r1152a.triggerCount} revelation scene(s) — no relationship shift within 2 scenes`,
+        rule: 'ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1152a.triggerCount} scenes that reveal something is followed by two scenes with no recorded relationship shift, even though ${r1152a.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, a disclosure never moving who stands with whom becomes a learnable absence — every revelation reads as private information rather than a fact that reshapes the interpersonal world.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it move a relationship — trust gained or lost, an alliance tested — so the new information registers between characters, not only in what the audience now knows.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every turn's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. Distinct from ORIGINALITY_TURN_EMOTIONAL_
+  // AFTERMATH_VOID (Wave 1124), ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID, and ORIGINALITY_TURN_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1138, same trigger paired with emotionalShift/suspenseDelta/
+  // curiosityDelta) — this is the fourth consequence channel for this trigger. A pivot that never
+  // moves a bond, once the audience notices, becomes a predictable, purely structural event.
+  {
+    const r1152b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1152b.fires) {
+      issues.push({
+        location: `${r1152b.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1152b.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1152b.aftermathCount} such shifts occur elsewhere. Once the audience notices the pattern, a pivot that never moves who stands with whom becomes a learnable absence — every turn reads as an isolated plot event rather than something that reshapes the relational world.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it move a relationship — an ally who wavers, a bond that fractures — so the pivot registers between characters, not just in the plot.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from ORIGINALITY_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1124), ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID (Wave 1138), and ORIGINALITY_
+  // REVELATION_RELATIONAL_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // suspenseDelta/emotionalShift/relationshipShifts) — this is the fifth consequence channel for
+  // this trigger. A revelation that never earns a visually charged follow-through, once the
+  // audience notices, becomes a predictable, purely verbal event.
+  {
+    const r1152c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1152c.fires) {
+      issues.push({
+        location: `${r1152c.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1152c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1152c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, a revelation that never earns a visually charged follow-through becomes a learnable absence — disclosures register as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
       });
     }
   }

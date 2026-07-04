@@ -1210,6 +1210,110 @@ He sits at his desk.
   });
 
 
+  describe('Wave 1152 — originalityPass: originality revelation-relational aftermath void, originality turn-relational aftermath void, originality revelation-staging aftermath void', async () => {
+    // Same truncation pitfall as Waves 592/606/…/1124/1138 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (revelation string / dramaticTurn string) never overlap the filler purpose pool, so
+    // cycling never contaminates a fixture.
+    const PURPOSE_POOL_1152 = ['complicate', 'introduce_conflict', 'establish_world', 'character_moment'];
+    const SENTENCE_POOL_1152 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor1152 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec1152 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor1152(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_1152[idx % PURPOSE_POOL_1152.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain1152 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor1152(i)}\n\n${SENTENCE_POOL_1152[i % SENTENCE_POOL_1152.length]}`).join('\n\n');
+    const runO1152 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain1152(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const recs1152a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeRec1152(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const recs1152an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeRec1152(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no relationship shift', async () => {
+      const recs1152b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1152(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by a relationship shift within its window', async () => {
+      const recs1152bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1152(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID'), 'ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID fires when every revelation is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1152c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeRec1152(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID does not fire when a revelation is followed by a heavily-staged scene within its window', async () => {
+      const recs1152cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1152(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeRec1152(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeRec1152(i);
+      });
+      const res = await runO1152(recs1152cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID'), 'ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1138 — originalityPass: originality revelation-emotional aftermath void, originality turn-suspense aftermath void, originality turn-curiosity aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/1110/1124 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
