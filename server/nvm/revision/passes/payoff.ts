@@ -439,6 +439,11 @@
 // raising delta beside Wave 944's suspense one), PAYOFF_REVELATION_ZONE_IMBALANCE (revelation != null —
 // the revelation string field, distinct from the purpose-enum PAYOFF_REVELATION_PURPOSE one), and
 // PAYOFF_TURN_ZONE_IMBALANCE (dramaticTurn !== 'nothing' — the dramatic-turn categorical signal).
+// Wave 972 additions: auditing the three remaining trio-complete signals in this pass, spanning three
+// distinct classes: PAYOFF_CLOCK_ZONE_IMBALANCE (clockRaised boolean — whether a ticking clock is
+// introduced at all), PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta,
+// distinct from the boolean field above), and PAYOFF_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights
+// array, distinct from all previously audited arrays in this pass).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5327,6 +5332,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r958c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName958c} contains ${r958c.counts[r958c.bloatZoneIdx]} of them (${Math.round((r958c.counts[r958c.bloatZoneIdx] / r958c.totalCount) * 100)}%) while ${emptyNames958c} contains none. Turns bloat in one structural quarter and never fire in another, so the payoff of a beat that flips the situation is confined to part of the story.`,
         suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames958c} — a dramatic turn so situation-flipping payoffs land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_ZONE_IMBALANCE — Underweight/bloat × (clockRaised === true) × four structural zones.
+  // Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-raising scenes total,
+  // divided across four equal structural zones. Fires only when one zone has zero such scenes while
+  // another holds ≥50% of the total. Uses the same clockRaised === true predicate as the existing
+  // 3-zone PAYOFF_CLOCK_ZONE_CLUSTER and run-based PAYOFF_CLOCK_DROUGHT_RUN — the first application of
+  // the 4-zone bloat+empty-zone mode to the clockRaised BOOLEAN field, distinct from the numeric
+  // clockDelta signal audited just below (whether a clock is introduced at all, not by how much it moves).
+  {
+    const r972a = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => r.clockRaised === true,
+    });
+    if (r972a.fires) {
+      const emptyNames972a = r972a.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName972a = FOUR_ZONE_NAMES[r972a.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames972a} empty; ${bloatName972a} has ${r972a.counts[r972a.bloatZoneIdx]}/${r972a.totalCount} clock-raising scenes`,
+        rule: 'PAYOFF_CLOCK_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r972a.totalCount} clock-raising scenes are unevenly distributed across its four structural zones: ${bloatName972a} contains ${r972a.counts[r972a.bloatZoneIdx]} of them (${Math.round((r972a.counts[r972a.bloatZoneIdx] / r972a.totalCount) * 100)}%) while ${emptyNames972a} contains none. Ticking clocks bloat in one structural quarter and are never introduced in another, so the payoff of a beat that puts the story on a deadline is confined to part of the story.`,
+        suggestedFix: `Redistribute ticking clocks: introduce a time pressure (clockRaised) in at least one scene inside the empty zone(s) — ${emptyNames972a} — so deadline payoffs land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE — Underweight/bloat × (clockDelta !== 0) × four structural
+  // zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 clock-moving scenes
+  // total, divided across four equal structural zones. Fires only when one zone has zero such scenes
+  // while another holds ≥50% of the total. Uses the same clockDelta !== 0 predicate as the existing
+  // 3-zone PAYOFF_CLOCK_DELTA_ZONE_CLUSTER and run-based PAYOFF_CLOCK_DELTA_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to this delta signal, distinct from the boolean
+  // clockRaised field audited just above.
+  {
+    const r972b = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r972b.fires) {
+      const emptyNames972b = r972b.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName972b = FOUR_ZONE_NAMES[r972b.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames972b} empty; ${bloatName972b} has ${r972b.counts[r972b.bloatZoneIdx]}/${r972b.totalCount} clock-moving scenes`,
+        rule: 'PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r972b.totalCount} clock-moving scenes are unevenly distributed across its four structural zones: ${bloatName972b} contains ${r972b.counts[r972b.bloatZoneIdx]} of them (${Math.round((r972b.counts[r972b.bloatZoneIdx] / r972b.totalCount) * 100)}%) while ${emptyNames972b} contains none. Deadline pressure bloats in one structural quarter and never moves in another, so the tension a payoff resolves is confined to part of the story.`,
+        suggestedFix: `Redistribute clock movement: move or add a scene that changes the clock (clockDelta ≠ 0) into the empty zone(s) — ${emptyNames972b} — so deadline pressure keeps building toward payoff across every structural quarter, not only the quarter currently carrying most of it.`,
+      });
+    }
+  }
+
+  // PAYOFF_HIGHLIGHT_ZONE_IMBALANCE — Underweight/bloat × (dialogueHighlights.length > 0) × four
+  // structural zones. Built on checkZoneImbalance from the shared checks library. n≥10, ≥4 scenes
+  // with a dialogue highlight total, divided across four equal structural zones. Fires only when one
+  // zone has zero such scenes while another holds ≥50% of the total. Distinct from the existing
+  // 3-zone PAYOFF_HIGHLIGHT_ZONE_CLUSTER and run-based PAYOFF_HIGHLIGHT_DROUGHT_RUN — the first
+  // application of the 4-zone bloat+empty-zone mode to the dialogueHighlights array field, distinct
+  // from all previously audited arrays in this pass.
+  {
+    const r972c = checkZoneImbalance({
+      records, minRecords: 10, minCount: 4, bloatRatio: 0.5,
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r972c.fires) {
+      const emptyNames972c = r972c.emptyZoneIdxs.map(i => FOUR_ZONE_NAMES[i]).join(', ');
+      const bloatName972c = FOUR_ZONE_NAMES[r972c.bloatZoneIdx];
+      issues.push({
+        location: `${emptyNames972c} empty; ${bloatName972c} has ${r972c.counts[r972c.bloatZoneIdx]}/${r972c.totalCount} dialogue-highlight scenes`,
+        rule: 'PAYOFF_HIGHLIGHT_ZONE_IMBALANCE',
+        severity: 'minor',
+        description: `The story's ${r972c.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName972c} contains ${r972c.counts[r972c.bloatZoneIdx]} of them (${Math.round((r972c.counts[r972c.bloatZoneIdx] / r972c.totalCount) * 100)}%) while ${emptyNames972c} contains none. Memorable lines bloat in one structural quarter and never land in another, so the payoff of a line that lands is confined to part of the story.`,
+        suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames972c} — a dialogue highlight so quotable payoffs land across every structural quarter, not only the quarter currently carrying most of them.`,
       });
     }
   }

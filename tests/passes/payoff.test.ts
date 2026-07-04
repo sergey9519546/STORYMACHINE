@@ -1365,6 +1365,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 972 — payoffPass: payoff clock zone imbalance, payoff clock delta zone imbalance, payoff highlight zone imbalance', async () => {
+    const runPY972 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Zone geometry n=10: Z0={0,1,2}, Z1={3,4}, Z2={5,6,7}, Z3={8,9}. Target at 0,1,2,8,9 →
+    // Z0 3/5=60% (bloat), Z1 and Z2 empty → fires. Target at 0,3,5,8 → every zone touched → no-fire.
+    it('PAYOFF_CLOCK_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-raising scenes', async () => {
+      const recs972a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 1, 2, 8, 9].includes(i) }));
+      const res = await runPY972(recs972a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_ZONE_IMBALANCE'), 'PAYOFF_CLOCK_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_CLOCK_ZONE_IMBALANCE does not fire when clock-raising scenes touch every zone', async () => {
+      const recs972an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockRaised: [0, 3, 5, 8].includes(i) }));
+      const res = await runPY972(recs972an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_ZONE_IMBALANCE'), 'PAYOFF_CLOCK_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of clock-moving scenes', async () => {
+      const recs972b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 1, 2, 8, 9].includes(i) ? 1 : 0 }));
+      const res = await runPY972(recs972b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE'), 'PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE does not fire when clock-moving scenes touch every zone', async () => {
+      const recs972bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { clockDelta: [0, 3, 5, 8].includes(i) ? 1 : 0 }));
+      const res = await runPY972(recs972bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE'), 'PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE should not fire');
+    });
+
+    it('PAYOFF_HIGHLIGHT_ZONE_IMBALANCE fires when one zone is empty while another holds >=50% of dialogue-highlight scenes', async () => {
+      const recs972c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 1, 2, 8, 9].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runPY972(recs972c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_ZONE_IMBALANCE'), 'PAYOFF_HIGHLIGHT_ZONE_IMBALANCE should fire');
+    });
+
+    it('PAYOFF_HIGHLIGHT_ZONE_IMBALANCE does not fire when dialogue-highlight scenes touch every zone', async () => {
+      const recs972cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, { dialogueHighlights: [0, 3, 5, 8].includes(i) ? ['a memorable line'] : [] }));
+      const res = await runPY972(recs972cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_HIGHLIGHT_ZONE_IMBALANCE'), 'PAYOFF_HIGHLIGHT_ZONE_IMBALANCE should not fire');
+    });
+  });
+
   describe('Wave 958 — payoffPass: payoff curiosity zone imbalance, payoff revelation zone imbalance, payoff turn zone imbalance', async () => {
     const runPY958 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
