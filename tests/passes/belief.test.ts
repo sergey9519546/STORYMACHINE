@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 978 — beliefPass: belief stakes relationship aftermath void, belief payoff curiosity aftermath void, belief seed emotional aftermath void', async () => {
+    const runBF978 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID fires when every stakes-raise has no relationship shift within 2 scenes', async () => {
+      const recs978a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([8, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runBF978(recs978a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID'), 'BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within 2 scenes', async () => {
+      const recs978an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { purpose: 'raise_stakes' } : ([1, 9].includes(i) ? { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] } : {})));
+      const res = await runBF978(recs978an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID'), 'BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID fires when every payoff has no curiosity raised within 2 scenes', async () => {
+      const recs978b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF978(recs978b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID does not fire when a payoff is followed by curiosity within 2 scenes', async () => {
+      const recs978bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { payoffSetupIds: ['s1'] } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF978(recs978bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID fires when every seed has no emotional shift within 2 scenes', async () => {
+      const recs978c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF978(recs978c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed is followed by an emotional shift within 2 scenes', async () => {
+      const recs978cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { seededClueIds: ['c1'] } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF978(recs978cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 964 — beliefPass: belief highlight zone imbalance, belief relationship zone imbalance, belief turn zone imbalance', async () => {
     const runBF964 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');

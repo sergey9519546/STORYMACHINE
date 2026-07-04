@@ -437,6 +437,12 @@
 // array), BELIEF_RELATIONSHIP_ZONE_IMBALANCE (relationshipShifts array), and BELIEF_TURN_ZONE_IMBALANCE
 // (dramaticTurn !== 'nothing' categorical) — the highlight and relationship arrays are distinct from
 // all previously audited belief arrays (payoff/open-thread/seed/staging).
+// Wave 978 additions: with the zone-imbalance mode now exhausted for this pass, pivots to the
+// sequence/aftermath mode via checkAftermathVoid, adding three trigger→aftermath pairings that use
+// trigger signals (raise_stakes purpose, payoffSetupIds, seededClueIds) absent from the pass's ~14
+// existing aftermath-void rules (built around assertion/revelation/turn/clue-debt triggers):
+// BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID (raise_stakes → relational), BELIEF_PAYOFF_CURIOSITY_
+// AFTERMATH_VOID (payoff → curiosity), and BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID (seed → emotional).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5419,6 +5425,86 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r964c.totalCount} scenes with a dramatic turn are unevenly distributed across its four structural zones: ${bloatName964c} contains ${r964c.counts[r964c.bloatZoneIdx]} of them (${Math.round((r964c.counts[r964c.bloatZoneIdx] / r964c.totalCount) * 100)}%) while ${emptyNames964c} contains none. Turns bloat in one structural quarter and never fire in another, so the beats that overturn the audience's expectations concentrate in only part of the story.`,
         suggestedFix: `Redistribute turns: give at least one scene inside the empty zone(s) — ${emptyNames964c} — a dramatic turn so the belief-tracking layer keeps overturning expectations across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 978: with the underweight/bloat (zone-imbalance) mode now exhausted for this pass, this
+  // wave pivots to the sequence/aftermath mode via the shared checkAftermathVoid helper, adding three
+  // trigger→aftermath pairings using trigger signals (raise_stakes purpose, payoffSetupIds, and
+  // seededClueIds) that this pass's ~14 existing aftermath-void rules — built around assertion/
+  // revelation/turn/clue-debt triggers — have never used as a TRIGGER. Each fires only when the
+  // trigger genuinely occurs (≥2, full 2-scene lookahead) AND the aftermath signal genuinely occurs
+  // somewhere (≥2), but NO trigger's window contains it — proving decoupling, not mere absence. ────
+
+  // BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID — raise-stakes trigger × relational aftermath. Every
+  // stakes-raising scene is followed by two scenes with no relationship shift, even though bonds do
+  // move elsewhere. Escalating danger usually strains or realigns who stands with whom; when every
+  // stakes-raise's aftermath leaves all bonds untouched, the belief-tracking layer's escalations are
+  // impersonal — they raise the danger but never test who the protagonist can trust. Distinct from
+  // every existing assertion/revelation/turn-triggered aftermath rule in this pass — this is the
+  // first use of raise_stakes as an aftermath-void TRIGGER.
+  {
+    const r978a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r978a.fires) {
+      issues.push({
+        location: `${r978a.triggerCount} stakes-raise aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'BELIEF_STAKES_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r978a.triggerCount} escalations) is followed by two scenes in which no relationship shifts, even though ${r978a.aftermathCount} scenes elsewhere do move a bond. Raising the stakes usually reshapes who stands with whom — new danger tests alliances, forces choices, exposes loyalties. When every escalation's aftermath leaves all bonds untouched, the belief-tracking layer's rising danger is impersonal: it threatens the plot but never who the protagonist can trust.`,
+        suggestedFix: `Let at least one stakes-raise move a bond in its aftermath: in the scene or two after the danger sharpens, have the pressure realign a relationship — an ally who wavers, an enemy who becomes necessary, trust that fractures under the new weight.`,
+      });
+    }
+  }
+
+  // BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID — payoff trigger × curiosity aftermath. Every payoff
+  // scene is followed by two scenes that raise no new curiosity, even though fresh questions do
+  // open elsewhere. Cashing in one setup should usually seed the next question the belief-tracking
+  // layer will chase; when every payoff's aftermath opens no curiosity, the story's threads close
+  // without opening new ones — the belief-tracking layer runs dry right after paying off. Distinct
+  // from every existing seed/revelation-triggered curiosity rule in this pass — this is the first
+  // use of payoffSetupIds as an aftermath-void TRIGGER.
+  {
+    const r978b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r978b.fires) {
+      issues.push({
+        location: `${r978b.triggerCount} payoff aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'BELIEF_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r978b.triggerCount} cashed-in setups) is followed by two scenes that raise no new curiosity, even though ${r978b.aftermathCount} scenes elsewhere do open fresh questions. A payoff usually clears the way for the next question the belief-tracking layer will chase; when every payoff's aftermath opens nothing new, threads close without replacing themselves — the story's engine of anticipation stalls right after delivering.`,
+        suggestedFix: `Let at least one payoff open a new question in its aftermath: in the scene or two after a setup pays off, plant a fresh uncertainty — an unintended consequence, a question the resolution itself raises. A payoff that reseeds curiosity keeps the belief-tracking layer moving forward instead of settling.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID — seed trigger × emotional aftermath. Every clue-seeding
+  // scene is followed by two scenes with no emotional shift, even though feeling registers
+  // elsewhere. Planting a clue usually carries some charge — unease, curiosity's cousin dread,
+  // quiet hope; when every seed's aftermath is emotionally flat, the belief-tracking layer's
+  // groundwork lands as pure information with no felt weight. Distinct from every existing seed-
+  // paired rule in this pass (which pair seed with clock or use seed as an AFTERMATH, not a
+  // trigger) — this is the first use of seededClueIds as an aftermath-void TRIGGER.
+  {
+    const r978c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r978c.fires) {
+      issues.push({
+        location: `${r978c.triggerCount} seed aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r978c.triggerCount} plants) is followed by two emotionally neutral scenes, even though ${r978c.aftermathCount} emotionally-charged scenes exist elsewhere. Planting a clue usually carries some charge for whoever notices it — unease at what it implies, a flicker of hope, quiet dread. When every seed's aftermath is affectively flat, the belief-tracking layer's groundwork registers as pure information with no felt weight.`,
+        suggestedFix: `Let at least one seed carry feeling in its aftermath: in the scene or two after a clue is planted, show someone reacting to it — a beat of unease, a private hope, a flicker of dread. A seed whose aftermath is felt lands as more than plot mechanics.`,
       });
     }
   }
