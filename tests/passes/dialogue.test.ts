@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1092 — dialoguePass: dialogue shift-relational aftermath void, dialogue clock-curiosity aftermath void, dialogue turn-suspense aftermath void', async () => {
+    const makeRec1092 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1092 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1092 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID fires when every significant shift is followed by two scenes with no further relationship movement', async () => {
+      const records1092a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 8 || i === 9) return makeRec1092(i, { relationshipShifts: [{ pairKey: 'c|d', dimension: 'respect', amount: 0.1 }] });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID does not fire when a significant shift is followed by relationship movement within its window', async () => {
+      const records1092an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 0.5 }] });
+        if (i === 1 || i === 9) return makeRec1092(i, { relationshipShifts: [{ pairKey: 'c|d', dimension: 'respect', amount: 0.1 }] });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_SHIFT_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no curiosity rise', async () => {
+      const records1092b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1092(i, { curiosityDelta: 1 });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID does not fire when a clock-raise is followed by a curiosity rise within its window', async () => {
+      const records1092bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1092(i, { curiosityDelta: 1 });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_CLOCK_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const records1092c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeRec1092(i, { suspenseDelta: 1 });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const records1092cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1092(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeRec1092(i, { suspenseDelta: 1 });
+        return makeRec1092(i);
+      });
+      const res = await runD1092(buildScenes1092(10), records1092cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID'), 'DIALOGUE_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1078 — dialoguePass: dialogue stakes-staging aftermath void, dialogue open-thread-staging aftermath void, dialogue shift-highlight aftermath void', async () => {
     const makeRec1078 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
