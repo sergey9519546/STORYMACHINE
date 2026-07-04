@@ -462,6 +462,14 @@
 // also paired with suspenseDelta). RHYTHM_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
 // payoffSetupIds a fifth channel (previously paired with emotionalShift/curiosityDelta/
 // suspenseDelta/relationshipShifts, now also paired with dialogueHighlights).
+// Wave 1072 additions: RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID gives payoffSetupIds its sixth and
+// final standard channel (previously paired with emotionalShift/curiosityDelta/suspenseDelta/
+// relationshipShifts/dialogueHighlights, now also paired with visualBeats, completing full
+// saturation). RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives dramaticTurn a fifth channel
+// (previously paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta, now
+// also paired with dialogueHighlights). RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
+// raise_stakes a fifth channel (previously paired with curiosityDelta/suspenseDelta/
+// relationshipShifts/emotionalShift, now also paired with dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5497,6 +5505,85 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1058c.triggerCount} payoff scenes is followed by two scenes with no highlighted dialogue, even though ${r1058c.aftermathCount} such scenes exist elsewhere in the script. A resolved setup that never earns a memorable line right after it lands leaves the rhythm's payoffs registering as structural closure alone, with no voice confirming what the resolution meant.`,
         suggestedFix: `After at least one payoff, let one of the following two scenes carry a memorable line — a character naming what just resolved, giving the payoff a voice, not just a checked box.`,
+      });
+    }
+  }
+
+  // RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 visually-dense scenes anywhere (visualBeats length≥2),
+  // 2-scene lookahead. Fires when every payoff's two-scene aftermath contains no visually dense
+  // scene, while such scenes occur elsewhere. Distinct from RHYTHM_PAYOFF_EMOTIONAL_AFTERMATH_
+  // VOID, RHYTHM_PAYOFF_CURIOSITY_AFTERMATH_VOID, RHYTHM_PAYOFF_SUSPENSE_AFTERMATH_VOID,
+  // RHYTHM_PAYOFF_RELATIONAL_AFTERMATH_VOID, and RHYTHM_PAYOFF_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (same trigger paired with emotionalShift/curiosityDelta/suspenseDelta/relationshipShifts/
+  // dialogueHighlights respectively) — this is the sixth and final standard-channel pairing for
+  // this trigger, completing full saturation.
+  {
+    const r1072a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1072a.fires) {
+      issues.push({
+        location: `${r1072a.triggerCount} payoff scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'RHYTHM_PAYOFF_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1072a.triggerCount} payoff scenes is followed by two scenes with no substantial physical staging, even though ${r1072a.aftermathCount} such scenes exist elsewhere in the script. A resolved setup gains weight when the world briefly holds physical attention right after it lands, but that opportunity consistently passes unstaged in the scenes immediately following every payoff.`,
+        suggestedFix: `After at least one payoff, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the resolution a physical anchor before the rhythm moves on.`,
+      });
+    }
+  }
+
+  // RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from RHYTHM_TURN_
+  // RELATIONAL_AFTERMATH_VOID, RHYTHM_TURN_EMOTIONAL_AFTERMATH_VOID, RHYTHM_TURN_CURIOSITY_
+  // AFTERMATH_VOID, and RHYTHM_TURN_SUSPENSE_AFTERMATH_VOID (same trigger paired with
+  // relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta respectively) — this is the
+  // fifth standard-channel pairing for this trigger.
+  {
+    const r1072b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1072b.fires) {
+      issues.push({
+        location: `${r1072b.triggerCount} dramatic-turn aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'RHYTHM_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1072b.triggerCount} pivots) is followed by two scenes with no highlighted dialogue, even though ${r1072b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it lands leaves the rhythm's turns registering as plot mechanics without a voice confirming what changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a character voice what just changed — a line worth remembering, not just a structural pivot passing silently.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying stakes-raising scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from RHYTHM_STAKES_
+  // CURIOSITY_AFTERMATH_VOID, RHYTHM_STAKES_SUSPENSE_AFTERMATH_VOID, RHYTHM_STAKES_RELATIONAL_
+  // AFTERMATH_VOID, and RHYTHM_STAKES_EMOTIONAL_AFTERMATH_VOID (same trigger paired with
+  // curiosityDelta/suspenseDelta/relationshipShifts/emotionalShift respectively) — this is the
+  // fifth standard-channel pairing for this trigger.
+  {
+    const r1072c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1072c.fires) {
+      issues.push({
+        location: `${r1072c.triggerCount} stakes-raising scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RHYTHM_STAKES_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1072c.triggerCount} stakes-raising scenes is followed by two scenes with no highlighted dialogue, even though ${r1072c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes that never earn a memorable line right after they land leave the rhythm's escalation registering as plot mechanics, with no voice naming what's now at risk.`,
+        suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry a memorable line — a character naming what's now at risk, so the raised stakes are voiced, not just structurally raised.`,
       });
     }
   }
