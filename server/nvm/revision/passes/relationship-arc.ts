@@ -453,6 +453,14 @@
 // STAKES_AFTERMATH_VOID inverts the pattern — purpose === 'raise_stakes' as TRIGGER, relationshipShifts
 // as the AFTERMATH signal — the first time this pass audits relationshipShifts as a consequence
 // rather than a cause.
+// Wave 1001 additions: RELATIONAL_STAGING re-checked and re-excluded (same predicate mismatch,
+// >=2 vs >0 visualBeats). With zone-imbalance still exhausted, this wave gives three existing
+// aftermath-void triggers a fresh consequence channel: RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID
+// (raise_stakes, previously only paired with relationshipShifts in Wave 987, now paired with
+// curiosityDelta), RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID (seededClueIds, previously only
+// paired with visualBeats, now paired with curiosityDelta), and RELATIONAL_OPEN_THREAD_EMOTIONAL_
+// AFTERMATH_VOID (heavy unresolvedClues debt, previously only paired with visualBeats, now paired
+// with emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5758,6 +5766,77 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every stakes-raising scene (${r987c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r987c.aftermathCount} such shifts occur elsewhere. Escalating danger that never strains or bends how characters treat each other in the scenes right after it leaves the relational arc untouched by the story's own rising pressure.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so rising pressure registers on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath opens no new curiosity, while
+  // curiosity does occur elsewhere. Distinct from RELATIONAL_STAKES_AFTERMATH_VOID (Wave 987, same
+  // trigger paired with relationshipShifts) — this pairs raise_stakes with curiosityDelta for the
+  // first time in this pass.
+  {
+    const r1001a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1001a.fires) {
+      issues.push({
+        location: `${r1001a.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1001a.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r1001a.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger that never provokes a new uncertainty about what the relationship will cost leaves the relational arc without a question the audience can carry forward.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question about what the escalation means for the relationship so the arc keeps propelling curiosity forward rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath opens no new curiosity, while curiosity does occur
+  // elsewhere. Distinct from RELATIONAL_SEED_STAGING_AFTERMATH_VOID (same trigger paired with
+  // visualBeats) — this pairs seededClueIds with curiosityDelta for the first time in this pass.
+  {
+    const r1001b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1001b.fires) {
+      issues.push({
+        location: `${r1001b.triggerCount} seed aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1001b.triggerCount} plants) is followed by two scenes that raise no new curiosity, even though ${r1001b.aftermathCount} scenes elsewhere do open fresh questions. A planted clue that never compounds into a further question about the relationship leaves the arc's groundwork inert rather than deepening the audience's investment in how the bond will change.`,
+        suggestedFix: `Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what it means for the relationship.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-
+  // clue-debt trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥2
+  // emotionally-charged scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath is emotionally flat, while charged scenes occur elsewhere. Distinct from
+  // RELATIONAL_OPEN_THREAD_STAGING_AFTERMATH_VOID (same trigger paired with visualBeats) — this
+  // pairs heavy clue-debt with emotionalShift for the first time in this pass.
+  {
+    const r1001c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1001c.fires) {
+      issues.push({
+        location: `${r1001c.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RELATIONAL_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1001c.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1001c.aftermathCount} emotionally-charged scenes exist elsewhere. Accumulated mystery that never registers as felt weight in the scenes right after it leaves the relational arc's uncertainty inert rather than pressing on the bond.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, show a character reacting emotionally to the accumulated unresolved material — a beat of unease or frustration — so the mystery presses on the relationship rather than sitting as inert backlog.`,
       });
     }
   }
