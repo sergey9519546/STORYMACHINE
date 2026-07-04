@@ -465,6 +465,13 @@
 // AFTERMATH_VOID (clockRaised, previously paired with visualBeats/emotionalShift, now a third
 // channel with curiosityDelta), and INTENTION_SEED_EMOTIONAL_AFTERMATH_VOID (seededClueIds,
 // previously paired with visualBeats/curiosityDelta, now a third channel with emotionalShift).
+// Wave 1039 additions: with raise_stakes now at four channels, this wave targets the less-
+// saturated triggers instead: INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (heavy unresolvedClues
+// debt, previously paired with payoffSetupIds/curiosityDelta, now a third channel with
+// emotionalShift), INTENTION_SEED_SUSPENSE_AFTERMATH_VOID (seededClueIds, previously paired with
+// visualBeats/curiosityDelta/emotionalShift, now a fourth channel with suspenseDelta), and
+// INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID (clockRaised, previously paired with visualBeats/
+// emotionalShift/curiosityDelta, now a fourth channel with suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5913,6 +5920,81 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clue-seeding scene in the story (${r1025c.triggerCount} plants) is followed by two emotionally neutral scenes, even though ${r1025c.aftermathCount} emotionally-charged scenes exist elsewhere. Planting a clue without it ever registering as felt in the scenes right after leaves the character's intention purely informational, disconnected from what's actually driving them forward.`,
         suggestedFix: `In the two scenes following at least one clue-seeding moment, let someone's feelings register the new information so the seed carries emotional weight alongside its narrative function.`,
+      });
+    }
+  }
+
+  // INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 emotionally-charged
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from the original
+  // unresolvedClues → payoffSetupIds rule and the unresolvedClues → curiosityDelta rule (same
+  // trigger paired with payoffSetupIds and curiosityDelta respectively) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1039a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1039a.fires) {
+      issues.push({
+        location: `${r1039a.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'INTENTION_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1039a.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1039a.aftermathCount} emotionally-charged scenes exist elsewhere. A pile-up of open questions that never registers as felt in the scenes right after it leaves the character's intention purely intellectual rather than something driving them emotionally.`,
+        suggestedFix: `In the two scenes following a heavy clue-debt moment, let someone's feelings register the weight of the unresolved questions so the intention's pursuit carries emotional stakes, not just informational ones.`,
+      });
+    }
+  }
+
+  // INTENTION_SEED_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene lookahead. Fires
+  // when every seed's two-scene aftermath carries no suspense rise, while such rises occur
+  // elsewhere. Distinct from the original seededClueIds → visualBeats rule, INTENTION_SEED_
+  // CURIOSITY_AFTERMATH_VOID, and INTENTION_SEED_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with visualBeats/curiosityDelta/emotionalShift respectively) — this is the fourth consequence
+  // channel for this trigger.
+  {
+    const r1039b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1039b.fires) {
+      issues.push({
+        location: `${r1039b.triggerCount} clue-seed aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'INTENTION_SEED_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1039b.triggerCount} plants) is followed by two scenes with no rise in suspense, even though ${r1039b.aftermathCount} such rises occur elsewhere. A planted clue that never generates any tension in its immediate wake leaves the character's pursuit feeling inert rather than propelled forward by what was just planted.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the tension rise so the planted material feels like it's actively pressuring the character's intention, not just informing it.`,
+      });
+    }
+  }
+
+  // INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no suspense rise, while
+  // such rises occur elsewhere. Distinct from the original clockRaised → visualBeats rule,
+  // INTENTION_CLOCK_EMOTIONAL_AFTERMATH_VOID, and INTENTION_CLOCK_CURIOSITY_AFTERMATH_VOID (same
+  // trigger paired with visualBeats/emotionalShift/curiosityDelta respectively) — this is the
+  // fourth consequence channel for this trigger.
+  {
+    const r1039c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1039c.fires) {
+      issues.push({
+        location: `${r1039c.triggerCount} clock-raise aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'INTENTION_CLOCK_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clock-raise scene in the story (${r1039c.triggerCount} of them) is followed by two scenes with no rise in suspense, even though ${r1039c.aftermathCount} such rises occur elsewhere. A ticking deadline that doesn't tighten the felt sense of urgency right after it leaves the character's intention facing a stated pressure rather than something they visibly feel bearing down on them.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let the tension visibly climb so the ticking deadline presses on the character's pursuit, not just their situation.`,
       });
     }
   }
