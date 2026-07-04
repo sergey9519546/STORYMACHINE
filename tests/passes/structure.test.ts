@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1017 — structurePass: structure turn-curiosity aftermath void, structure payoff-emotional aftermath void, structure stakes-relational aftermath void', async () => {
+    const runST1017 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no new curiosity', async () => {
+      const recs1017a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by new curiosity within its window', async () => {
+      const recs1017an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID'), 'STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID fires when every payoff is followed by two scenes with no emotional shift', async () => {
+      const recs1017b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID does not fire when a payoff is followed by an emotional shift within its window', async () => {
+      const recs1017bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { payoffSetupIds: ['setup1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1017c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1017cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1017(recs1017cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID'), 'STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1003 — structurePass: structure stakes-suspense aftermath void, structure payoff-relational aftermath void, structure open-thread-emotional aftermath void', async () => {
     const runST1003 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
