@@ -495,6 +495,11 @@
 // revelation as a genuinely fresh checkAftermathVoid trigger — it has only ever anchored
 // distribution/timing (zone-imbalance/zone-cluster) checks here, never sequence/aftermath:
 // VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
+// Wave 1131 additions: revelation had only its Wave-1117 curiosityDelta channel; unresolvedClues
+// (>=3) had only VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID (Wave 1019, visualBeats). VOICE_
+// REVELATION_EMOTIONAL_AFTERMATH_VOID and VOICE_REVELATION_SUSPENSE_AFTERMATH_VOID give
+// revelation its second and third channels (emotionalShift, suspenseDelta); VOICE_OPEN_THREAD_
+// CURIOSITY_AFTERMATH_VOID gives unresolvedClues its second channel (curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6726,6 +6731,79 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1117c.triggerCount} revelation scenes is followed by two scenes with no rise in curiosity, even though ${r1117c.aftermathCount} such rises occur elsewhere. A truth that surfaces without reopening the field of questions right after it lands leaves the voice's reckoning with new information feeling like a closed fact rather than a development that keeps generating new stakes.`,
         suggestedFix: `In the two scenes following at least one revelation, let a new question surface so the voice's discoveries keep generating curiosity instead of settling the matter entirely.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1117, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1131a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1131a.fires) {
+      issues.push({
+        location: `${r1131a.triggerCount} revelation scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'VOICE_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1131a.triggerCount} revelation scenes is followed by two scenes with no emotional shift, even though ${r1131a.aftermathCount} such shifts occur elsewhere. A truth that surfaces without registering on any character's felt state right after it lands leaves the voice's reckoning with new information reading as plot mechanics rather than something anyone actually feels.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the discovery lands as something felt, not just learned.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every revelation's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID
+  // (Wave 1117) and VOICE_REVELATION_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired
+  // with curiosityDelta/emotionalShift) — this is the third consequence channel for this
+  // trigger.
+  {
+    const r1131b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1131b.fires) {
+      issues.push({
+        location: `${r1131b.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'VOICE_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1131b.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1131b.aftermathCount} such rises occur elsewhere. A truth that surfaces without sharpening danger or uncertainty right after it lands leaves the voice's reckoning with new information feeling settled rather than newly charged.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm.`,
+      });
+    }
+  }
+
+  // VOICE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues (>=3)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavily-unresolved scenes (pos<n-2), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every such scene's two-scene aftermath carries no
+  // rise in curiosity, while such rises occur elsewhere. Distinct from VOICE_OPEN_THREAD_
+  // STAGING_AFTERMATH_VOID (Wave 1019, same trigger paired with visualBeats) — this is the
+  // second consequence channel for this trigger.
+  {
+    const r1131c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1131c.fires) {
+      issues.push({
+        location: `${r1131c.triggerCount} heavily-unresolved scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'VOICE_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying three or more unresolved threads (${r1131c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1131c.aftermathCount} such rises occur elsewhere in the script. A pile-up of open questions that never generates a fresh question right after it registers as inert accumulation rather than a voice actively deepening its own mystery.`,
+        suggestedFix: `In the two scenes following a heavily-unresolved scene, let a new question surface from the mounting uncertainty, so the voice's accumulating threads keep generating curiosity, not just piling up as backlog.`,
       });
     }
   }
