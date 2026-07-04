@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 1061 — voicePass: voice clock-emotional aftermath void, voice seed-suspense aftermath void, voice stakes-relational aftermath void', async () => {
+    const runV1061 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no emotional shift', async () => {
+      const recs1061a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID does not fire when a clock-raise is followed by an emotional shift within its window', async () => {
+      const recs1061an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_CLOCK_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_SEED_SUSPENSE_AFTERMATH_VOID fires when every seed is followed by two scenes with no suspense rise', async () => {
+      const recs1061b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SEED_SUSPENSE_AFTERMATH_VOID'), 'VOICE_SEED_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_SEED_SUSPENSE_AFTERMATH_VOID does not fire when a seed is followed by a suspense rise within its window', async () => {
+      const recs1061bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['c1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SEED_SUSPENSE_AFTERMATH_VOID'), 'VOICE_SEED_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_STAKES_RELATIONAL_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no relationship shift', async () => {
+      const recs1061c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_STAKES_RELATIONAL_AFTERMATH_VOID'), 'VOICE_STAKES_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_STAKES_RELATIONAL_AFTERMATH_VOID does not fire when a stakes-raise is followed by a relationship shift within its window', async () => {
+      const recs1061cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1061(recs1061cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_STAKES_RELATIONAL_AFTERMATH_VOID'), 'VOICE_STAKES_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1047 — voicePass: voice seed-curiosity aftermath void, voice payoff-emotional aftermath void, voice clock-suspense aftermath void', async () => {
     const runV1047 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
