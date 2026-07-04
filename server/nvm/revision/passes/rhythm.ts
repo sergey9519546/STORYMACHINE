@@ -494,6 +494,12 @@
 // unresolvedClues (length>0) as a genuinely fresh checkAftermathVoid trigger — it has only ever
 // anchored distribution/timing (zone-imbalance) checks here, never sequence/aftermath:
 // RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
+// Wave 1128 additions: unresolvedClues (length>0) had only its one Wave-1114 channel.
+// RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID and RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID
+// give it its second and third channels (suspenseDelta, emotionalShift). clockRaised has never
+// anchored a checkAftermathVoid trigger in this file — only distribution/timing (zone-cluster,
+// peak-uncaused) — RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID gives it a first, fresh channel
+// (curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5836,6 +5842,80 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying an unresolved thread (${r1114c.triggerCount} instances) is followed by two scenes with no rise in curiosity, even though ${r1114c.aftermathCount} such rises occur elsewhere in the script. An open question that never generates a fresh question right after it lingers registers as inert plot backlog rather than a thread the rhythm keeps actively developing.`,
         suggestedFix: `In the two scenes following at least one open-thread moment, let a new question surface so the rhythm's lingering questions keep generating curiosity, not just accumulating as backlog.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath
+  // carries no rise in suspense, while such rises occur elsewhere. Distinct from RHYTHM_OPEN_
+  // THREAD_CURIOSITY_AFTERMATH_VOID (Wave 1114, same trigger paired with curiosityDelta) — this
+  // is the second consequence channel for this trigger.
+  {
+    const r1128a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1128a.fires) {
+      issues.push({
+        location: `${r1128a.triggerCount} open-thread scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1128a.triggerCount} instances) is followed by two scenes with no rise in suspense, even though ${r1128a.aftermathCount} such rises occur elsewhere in the script. An open question that never sharpens danger or urgency right after it lingers registers as inert plot backlog rather than a thread the rhythm keeps actively pressurizing.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, let the lingering question raise the stakes, so the rhythm's unresolved threads keep generating tension, not just accumulating as backlog.`,
+      });
+    }
+  }
+
+  // RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (length>0) trigger → emotionalShift absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying open-thread scenes (pos<n-2), ≥2 emotionally-shifted
+  // scenes anywhere, 2-scene lookahead. Fires when every open-thread scene's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from RHYTHM_OPEN_
+  // THREAD_CURIOSITY_AFTERMATH_VOID (Wave 1114) and RHYTHM_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID
+  // (this wave, same trigger paired with curiosityDelta/suspenseDelta) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1128b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1128b.fires) {
+      issues.push({
+        location: `${r1128b.triggerCount} open-thread scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RHYTHM_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying an unresolved thread (${r1128b.triggerCount} instances) is followed by two scenes with no emotional shift, even though ${r1128b.aftermathCount} such shifts occur elsewhere in the script. An open question that never registers on any character's felt state right after it lingers leaves the rhythm's unresolved threads reading as inert plot backlog rather than something anyone carries a feeling about.`,
+        suggestedFix: `In the two scenes following at least one open-thread moment, let it visibly weigh on a character's emotional register, so the rhythm's lingering questions land as felt, not just tracked.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raise scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raise's two-scene aftermath carries no rise in curiosity,
+  // while such rises occur elsewhere. Distinct from every existing clockRaised/clockDelta check
+  // in this file (CLOCK_SIGNAL_PEAK_UNCAUSED and zone-cluster checks — all distribution/timing
+  // modes, none sequence/aftermath) — this is the first check to use clockRaised as a
+  // checkAftermathVoid trigger in this pass.
+  {
+    const r1128c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1128c.fires) {
+      issues.push({
+        location: `${r1128c.triggerCount} clock-raise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1128c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no rise in curiosity, even though ${r1128c.aftermathCount} such rises occur elsewhere. A deadline that tightens without opening a new question leaves the rhythm's clock registering as a schedule rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, let a new question surface from the mounting pressure, so the deadline keeps the rhythm generating curiosity, not just counting down.`,
       });
     }
   }
