@@ -444,6 +444,14 @@
 // introduced at all), PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE (clockDelta !== 0 — the numeric delta,
 // distinct from the boolean field above), and PAYOFF_HIGHLIGHT_ZONE_IMBALANCE (dialogueHighlights
 // array, distinct from all previously audited arrays in this pass).
+// Wave 986 additions: zone-imbalance is now fully exhausted in this pass (the only remaining
+// cluster+drought pair, PAYOFF_STAGING, has inconsistent predicates — >=2 vs >0 visualBeats — so
+// it was skipped, same as in prior waves). This wave pivots entirely to the sequence/aftermath
+// mode with three fresh trigger/aftermath pairings, none of which reuse a combination already
+// covered by SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, CLOCK_STAGING_AFTERMATH_VOID, or PAYOFF_TURN_
+// HIGHLIGHT_AFTERMATH_VOID: PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes → curiosityDelta),
+// PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID (heavy unresolvedClues debt → suspenseDelta), and
+// PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID (revelation != null → relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5407,6 +5415,82 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r972c.totalCount} scenes with a dialogue highlight are unevenly distributed across its four structural zones: ${bloatName972c} contains ${r972c.counts[r972c.bloatZoneIdx]} of them (${Math.round((r972c.counts[r972c.bloatZoneIdx] / r972c.totalCount) * 100)}%) while ${emptyNames972c} contains none. Memorable lines bloat in one structural quarter and never land in another, so the payoff of a line that lands is confined to part of the story.`,
         suggestedFix: `Redistribute highlights: give at least one scene inside the empty zone(s) — ${emptyNames972c} — a dialogue highlight so quotable payoffs land across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID — with zone-imbalance now fully exhausted in this pass
+  // (PAYOFF_STAGING was the only remaining cluster+drought pair, and its predicates disagree —
+  // >=2 vs >0 visualBeats — so it was skipped), this wave pivots entirely to the sequence/
+  // aftermath mode. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // stakes-raise scenes (purpose === 'raise_stakes', pos<n-2), ≥2 curiosity-raising scenes
+  // anywhere, 2-scene lookahead. Fires when every stakes-raise's two-scene aftermath opens no new
+  // curiosity, while curiosity does occur elsewhere. First use of raise_stakes as an aftermath-void
+  // trigger in this pass — distinct from the seed/clock/turn triggers already paired with
+  // dialogueHighlights and visualBeats.
+  {
+    const r986a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r986a.fires) {
+      issues.push({
+        location: `${r986a.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r986a.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r986a.aftermathCount} scenes elsewhere do open fresh questions. An escalation that earns no fresh question nearby leaves the payoff engine nothing new to seed and later collect on.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, plant a new open question so escalation feeds the payoff engine rather than dead-ending in a learnable void.`,
+      });
+    }
+  }
+
+  // PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × heavy unresolved-clue-debt
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (unresolvedClues.length≥3, pos<n-2), ≥2 tension-raising
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // raises no tension, while tension does rise elsewhere. First pairing of heavy clue-debt with
+  // suspenseDelta as an aftermath-void combination in this pass — a predictable pattern where
+  // accumulated unresolved material never translates into rising tension nearby undercuts the
+  // payoff engine's ability to make that debt feel consequential.
+  {
+    const r986b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r986b.fires) {
+      issues.push({
+        location: `${r986b.triggerCount} heavy clue-debt scene(s) — no suspense raised within 2 scenes of any`,
+        rule: 'PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r986b.triggerCount} instances) is followed by two full scenes with no rise in suspense, even though ${r986b.aftermathCount} such rises occur elsewhere in the story. Accumulated mystery that never tightens tension nearby reads as inert debt rather than a payoff the audience is anxious to see resolved.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, raise the tension — a ticking complication or a near-miss — so unresolved threads feel consequential rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID — Sequence/aftermath × revelation (string field)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (revelation != null, pos<n-2), ≥2 relationship-
+  // shift scenes anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // carries no relationship shift, while such shifts occur elsewhere. First use of the revelation
+  // string field as an aftermath-void trigger in this pass, and the first pairing of any trigger
+  // with relationshipShifts as the aftermath signal — a disclosure that never bears on how
+  // characters treat each other nearby is a payoff the engine leaves uncollected.
+  {
+    const r986c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r986c.fires) {
+      issues.push({
+        location: `${r986c.triggerCount} revelation aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every revelation in the story (${r986c.triggerCount} disclosures) is followed by two scenes with no shift in any relationship, even though ${r986c.aftermathCount} such shifts occur elsewhere. A disclosure that never bears on how characters treat each other in the scenes right after it lands as information without interpersonal consequence.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information strain or shift a relationship so the disclosure pays off interpersonally rather than sitting inert.`,
       });
     }
   }

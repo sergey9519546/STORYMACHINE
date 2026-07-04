@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 986 — payoffPass: payoff stakes-curiosity aftermath void, payoff open-thread-suspense aftermath void, payoff revelation-relationship aftermath void', async () => {
+    const runPY986 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID fires when every stakes-raise is followed by two scenes with no new curiosity', async () => {
+      const recs986a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID does not fire when a stakes-raise is followed by new curiosity within its window', async () => {
+      const recs986an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { purpose: 'raise_stakes' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID'), 'PAYOFF_STAKES_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no rise in suspense', async () => {
+      const recs986b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by rising suspense within its window', async () => {
+      const recs986bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID'), 'PAYOFF_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const recs986c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID should fire');
+    });
+
+    it('PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const recs986cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY986(recs986cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID'), 'PAYOFF_REVELATION_RELATIONSHIP_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 972 — payoffPass: payoff clock zone imbalance, payoff clock delta zone imbalance, payoff highlight zone imbalance', async () => {
     const runPY972 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
