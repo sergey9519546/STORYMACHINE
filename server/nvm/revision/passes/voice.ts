@@ -432,6 +432,13 @@
 // VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID combinations: VOICE_STAKES_CURIOSITY_AFTERMATH_VOID
 // (raise_stakes → curiosityDelta), VOICE_TURN_SUSPENSE_AFTERMATH_VOID (dramatic turn → suspense),
 // and VOICE_PAYOFF_RELATIONSHIP_AFTERMATH_VOID (payoffSetupIds → relationshipShifts).
+// Wave 1005 additions: zone-imbalance remains exhausted (VOICE_REVELATION/VOICE_RELATIONSHIP still
+// duplicates of already-audited signals). This wave gives three existing aftermath-void triggers a
+// fresh consequence channel: VOICE_CLOCK_CURIOSITY_AFTERMATH_VOID (clockRaised, previously only
+// paired with dialogueHighlights, now paired with curiosityDelta), VOICE_SEED_EMOTIONAL_AFTERMATH_
+// VOID (seededClueIds, previously only paired with dialogueHighlights, now paired with
+// emotionalShift), and VOICE_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn, previously only paired
+// with suspenseDelta, now paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5986,6 +5993,78 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every payoff scene in the story (${r991c.triggerCount} callbacks) is followed by two scenes with no shift in any relationship, even though ${r991c.aftermathCount} such shifts occur elsewhere. A callback that never bears on how characters treat each other in the scenes right after it lands as information completing without interpersonal consequence.`,
         suggestedFix: `In the two scenes following at least one payoff, let the collected setup strain or shift a relationship so the callback pays off interpersonally, not only structurally.`,
+      });
+    }
+  }
+
+  // VOICE_CLOCK_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying clock-raising scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every clock-raising scene's two-scene aftermath opens no new curiosity,
+  // while curiosity does occur elsewhere. Distinct from CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (same trigger paired with dialogueHighlights) — this pairs clockRaised with curiosityDelta for
+  // the first time in this pass.
+  {
+    const r1005a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1005a.fires) {
+      issues.push({
+        location: `${r1005a.triggerCount} clock-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'VOICE_CLOCK_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene that raises a ticking clock (${r1005a.triggerCount} instances) is followed by two scenes that raise no new curiosity, even though ${r1005a.aftermathCount} scenes elsewhere do open fresh questions. A deadline should usually provoke a new question — will it be met, what happens if it isn't; when every clock-raise's aftermath opens no curiosity, the voice's register of urgency has no corresponding register of wonder in the beats right after.`,
+        suggestedFix: `In the two scenes following at least one clock-raising moment, plant a new open question tied to the deadline so time pressure feeds a voice of curiosity rather than sitting in a learnable void.`,
+      });
+    }
+  }
+
+  // VOICE_SEED_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath is emotionally flat, while charged scenes occur
+  // elsewhere. Distinct from VOICE_SEED_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired
+  // with dialogueHighlights) — this pairs seededClueIds with emotionalShift for the first time in
+  // this pass.
+  {
+    const r1005b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1005b.fires) {
+      issues.push({
+        location: `${r1005b.triggerCount} seed aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'VOICE_SEED_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1005b.triggerCount} plants) is followed by two emotionally neutral scenes, even though ${r1005b.aftermathCount} emotionally-charged scenes exist elsewhere. Planting a clue usually carries some charge — unease, curiosity's cousin dread, quiet hope; when every seed's aftermath is affectively flat, the voice's groundwork lands as pure information with no felt weight.`,
+        suggestedFix: `Let at least one seed carry feeling in its aftermath: in the scene or two after a clue is planted, show someone reacting to it — a beat of unease, a private hope, a flicker of dread.`,
+      });
+    }
+  }
+
+  // VOICE_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no relationship shift, while
+  // such shifts occur elsewhere. Distinct from VOICE_TURN_SUSPENSE_AFTERMATH_VOID (same trigger
+  // paired with suspenseDelta) — this pairs dramaticTurn with relationshipShifts for the first
+  // time in this pass.
+  {
+    const r1005c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1005c.fires) {
+      issues.push({
+        location: `${r1005c.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'VOICE_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1005c.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1005c.aftermathCount} such shifts occur elsewhere. A pivot that never bears on how characters treat each other in the scenes right after it lands as a plot beat the voice registers structurally rather than interpersonally.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let the pivot strain or shift a relationship so the voice registers the turn's interpersonal consequence, not only its plot mechanics.`,
       });
     }
   }
