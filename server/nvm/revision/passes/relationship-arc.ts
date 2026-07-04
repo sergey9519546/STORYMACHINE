@@ -490,6 +490,15 @@
 // unresolvedClues debt, previously at five channels, now also paired with dialogueHighlights), and
 // RELATIONAL_STAKES_STAGING_AFTERMATH_VOID (raise_stakes, previously at five channels, now also
 // paired with visualBeats — its only missing standard channel).
+// Wave 1071 additions: with seededClueIds/unresolvedClues/raise_stakes all now fully saturated,
+// this wave pivots to the relationshipShifts-as-trigger family, which has two distinct trigger
+// predicates each with room left: the |amount|≥0.3 magnitude variant (previously only paired with
+// dialogueHighlights via RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID, Wave 609) gets two
+// fresh channels — RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID (visualBeats) and
+// RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID (emotionalShift) — and the length>0
+// variant (already covering relational/curiosity/suspense/emotional via a mix of hand-rolled and
+// checkAftermathVoid mechanisms) gets its fifth channel with RELATIONSHIP_SHIFT_STAGING_
+// AFTERMATH_VOID (visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6173,6 +6182,87 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1057c.triggerCount} stakes-raising scenes is followed by two scenes with no substantial physical staging, even though ${r1057c.aftermathCount} such scenes exist elsewhere in the script. Raised stakes gain weight when the world briefly holds physical attention around them, but that opportunity consistently passes unstaged in the scenes immediately following every stakes-raise.`,
         suggestedFix: `After at least one stakes-raise, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the raised stakes a physical anchor in the world.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID — Sequence/aftermath × relationshipShifts
+  // (|amount|≥0.3 magnitude) trigger → visualBeats absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying shift scenes (|amount|≥0.3, pos<n-2), ≥2
+  // visually-dense scenes anywhere (visualBeats length≥2), 2-scene lookahead. Fires when every
+  // shift's two-scene aftermath contains no visually dense scene, while such scenes occur
+  // elsewhere. Distinct from RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same |amount|
+  // ≥0.3 trigger paired with dialogueHighlights) — this is the second consequence channel for
+  // this magnitude-gated trigger variant, and distinct from the length>0 variant's own channels
+  // (a materially looser trigger predicate).
+  {
+    const r1071a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1071a.fires) {
+      issues.push({
+        location: `${r1071a.triggerCount} relationship-shift scene(s) — no visually dense scene within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1071a.triggerCount} significant relationship-shift scenes is followed by two scenes with no substantial physical staging, even though ${r1071a.aftermathCount} such scenes exist elsewhere in the script. A bond that has just meaningfully shifted gains texture when the world briefly holds physical attention right after it, but that opportunity consistently passes unstaged in the scenes immediately following every shift.`,
+        suggestedFix: `After at least one significant relationship shift, let one of the following two scenes carry substantial physical staging — an action or gesture that gives the new dynamic a physical anchor before the arc moves on.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath ×
+  // relationshipShifts (|amount|≥0.3 magnitude) trigger → emotionalShift absence. Built on
+  // checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying shift scenes
+  // (|amount|≥0.3, pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene lookahead. Fires when
+  // every shift's two-scene aftermath carries no emotional shift, while such shifts occur
+  // elsewhere. Distinct from RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and
+  // RELATIONSHIP_SHIFT_MAGNITUDE_STAGING_AFTERMATH_VOID (same |amount|≥0.3 trigger paired with
+  // dialogueHighlights and visualBeats respectively) — this is the third consequence channel for
+  // this magnitude-gated trigger variant, distinct from the length>0 variant's own hand-rolled
+  // RELATIONSHIP_SHIFT_EMOTIONAL_AFTERMATH_VOID (a materially looser trigger predicate).
+  {
+    const r1071b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).some(s => Math.abs(s.amount) >= 0.3),
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1071b.fires) {
+      issues.push({
+        location: `${r1071b.triggerCount} relationship-shift scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'RELATIONSHIP_SHIFT_MAGNITUDE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1071b.triggerCount} significant relationship-shift scenes is followed by two scenes registering no emotional shift, even though ${r1071b.aftermathCount} such shifts occur elsewhere. A bond that has just meaningfully changed produces no felt reaction in the scenes immediately following it, leaving the shift transactionally recorded rather than emotionally lived.`,
+        suggestedFix: `After at least one significant relationship shift, let a character react emotionally in one of the following two scenes — the rupture leaves someone shaken, the repair produces relief or discomfort — so the audience feels what the change cost or meant.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_SHIFT_STAGING_AFTERMATH_VOID — Sequence/aftermath × relationshipShifts
+  // (length>0) trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying shift scenes (pos<n-2), ≥2 visually-dense scenes anywhere
+  // (visualBeats length≥2), 2-scene lookahead. Fires when every shift's two-scene aftermath
+  // contains no visually dense scene, while such scenes occur elsewhere. Distinct from
+  // RELATIONSHIP_SHIFT_AFTERMATH_VOID, RELATIONSHIP_SHIFT_CURIOSITY_VOID/RELATIONSHIP_SHIFT_
+  // CURIOSITY_AFTERMATH_VOID, and RELATIONSHIP_SHIFT_SUSPENSE_AFTERMATH_VOID/RELATIONSHIP_SHIFT_
+  // EMOTIONAL_AFTERMATH_VOID (same length>0 trigger paired with relationshipShifts/curiosityDelta/
+  // suspenseDelta/emotionalShift respectively) — this is the fifth consequence channel for this
+  // trigger variant, distinct from the |amount|≥0.3 magnitude variant's own staging channel above
+  // (a materially stricter trigger predicate).
+  {
+    const r1071c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.relationshipShifts ?? []).length > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1071c.fires) {
+      issues.push({
+        location: `${r1071c.triggerCount} relationship-shift aftermath(s) — no visually dense scene within 2 scenes`,
+        rule: 'RELATIONSHIP_SHIFT_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every relationship-shift scene with room after it (${r1071c.triggerCount} in total) is followed by two scenes with no substantial physical staging, even though ${r1071c.aftermathCount} such scenes exist elsewhere. A bond that changes gains texture when the world briefly holds physical attention right after it, but that opportunity consistently passes unstaged in the scenes immediately following every shift.`,
+        suggestedFix: `In the two scenes following at least one relationship shift, let substantial physical staging carry some of the weight — an action or gesture that gives the changed bond a physical anchor before the story moves on.`,
       });
     }
   }
