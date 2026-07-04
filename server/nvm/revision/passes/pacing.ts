@@ -494,6 +494,17 @@
 // (emotionalShift), PACING_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID (relationshipShifts), and
 // PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID (visualBeats) give this trigger three fresh channels,
 // leaving only dialogueHighlights before it too reaches full six-channel saturation.
+// Wave 1111 additions: PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives clockDelta≠0
+// its sixth and final channel (previously paired with suspenseDelta/curiosityDelta/
+// emotionalShift/relationshipShifts/visualBeats, now also paired with dialogueHighlights),
+// completing full six-channel saturation for every trigger in this pass. With no channel gaps
+// remaining on any existing trigger, this wave introduces suspenseDelta>0 and emotionalShift
+// (non-neutral) as genuinely fresh checkAftermathVoid triggers — neither has ever anchored the
+// isTrigger side of a sequence/aftermath check here, though both are heavily used as aftermath
+// signals and as isPresent subjects in other analytical modes (drought-run, zone-cluster,
+// zone-imbalance). PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs suspenseDelta with
+// curiosityDelta; PACING_EMOTION_RELATIONAL_AFTERMATH_VOID pairs emotionalShift with
+// relationshipShifts.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6286,6 +6297,84 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene where the clock's numeric pressure shifts (${r1097c.triggerCount} instances) is followed by two scenes with no heavily-staged visual beat, even though ${r1097c.aftermathCount} such scenes exist elsewhere in the script. A changing deadline that never earns a visually charged follow-through leaves the pacing's clock mechanics registering as narrated pressure rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, stage at least two concrete visual beats, so the clock's mechanics register in image, not just as a changing number.`,
+      });
+    }
+  }
+
+  // PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying clock-delta scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every clock-delta scene's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from PACING_CLOCK_DELTA_SUSPENSE_AFTERMATH_VOID, PACING_CLOCK_DELTA_CURIOSITY_
+  // AFTERMATH_VOID, PACING_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID, PACING_CLOCK_DELTA_RELATIONAL_
+  // AFTERMATH_VOID, and PACING_CLOCK_DELTA_STAGING_AFTERMATH_VOID (same trigger paired with
+  // suspenseDelta/curiosityDelta/emotionalShift/relationshipShifts/visualBeats respectively) —
+  // this is the sixth and final sequence/aftermath channel for this numeric trigger, completing
+  // full saturation for every trigger in this pass.
+  {
+    const r1111a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1111a.fires) {
+      issues.push({
+        location: `${r1111a.triggerCount} clock-delta scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'PACING_CLOCK_DELTA_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene where the clock's numeric pressure shifts (${r1111a.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1111a.aftermathCount} such scenes exist elsewhere in the script. A changing deadline that never earns a memorable line right after it shifts leaves the pacing's clock mechanics registering as a silent number rather than something a character's voice gives weight to.`,
+        suggestedFix: `In the two scenes following at least one shift in the clock's numeric pressure, let a character's line acknowledge or react to the change, so the clock's mechanics register in speech, not just as a changing number.`,
+      });
+    }
+  }
+
+  // PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta>0 trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-rising scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-rise's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from PACING_SUSPENSE_DROUGHT_RUN,
+  // PACING_SUSPENSE_ZONE_CLUSTER, and PACING_SUSPENSE_ZONE_IMBALANCE (run-based and
+  // distribution/timing modes, none sequence/aftermath) — this is the first check to use
+  // suspenseDelta>0 as a checkAftermathVoid trigger in this pass.
+  {
+    const r1111b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1111b.fires) {
+      issues.push({
+        location: `${r1111b.triggerCount} suspense-rise scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1111b.triggerCount} scenes where suspense rises is followed by two scenes with no rise in curiosity, even though ${r1111b.aftermathCount} such rises occur elsewhere. Tension that never opens a fresh question right after it spikes leaves the pacing's danger and mystery engines decoupled — the story tightens without also deepening what the reader wants to know.`,
+        suggestedFix: `In the two scenes following at least one suspense rise, let a new question surface so the pacing's tension and curiosity build together instead of on separate tracks.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × emotionalShift
+  // (non-neutral) trigger → relationshipShifts absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 scenes
+  // anywhere with a recorded relationship shift, 2-scene lookahead. Fires when every
+  // emotionally-charged scene's two-scene aftermath carries no relationship movement, while such
+  // movement occurs elsewhere. Distinct from PACING_EMOTION_ZONE_CLUSTER (distribution/timing,
+  // not sequence/aftermath) — this is the first check to use emotionalShift as a
+  // checkAftermathVoid trigger in this pass.
+  {
+    const r1111c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1111c.fires) {
+      issues.push({
+        location: `${r1111c.triggerCount} emotionally-charged scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PACING_EMOTION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1111c.triggerCount} emotionally-charged scenes is followed by two scenes with no recorded relationship shift, even though ${r1111c.aftermathCount} such shifts occur elsewhere. A scene that registers strong feeling without moving how characters stand with each other right after leaves the pacing's emotional beats isolated from the relational stakes they should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let it shift how a pair of characters relate, so the pacing's emotional beats carry interpersonal weight, not just internal feeling.`,
       });
     }
   }
