@@ -412,6 +412,12 @@
 // beside Wave 946's suspense one), RHYTHM_REVELATION_ZONE_IMBALANCE (revelation != null — the
 // revelation string field), and RHYTHM_REVELATION_PURPOSE_ZONE_IMBALANCE (purpose === 'revelation',
 // whose trio was completed in Wave 932 — the purpose enum, distinct from the string-field rule).
+// Wave 974 additions: with the zone-imbalance mode now exhausted for this pass, pivots to the
+// sequence/aftermath mode via checkAftermathVoid, adding three trigger→aftermath pairings beyond the
+// pass's sole existing one (REVELATION_SIGNAL_AFTERMATH_FLAT: revelation → emotional):
+// RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID (dramatic-turn → relational), RHYTHM_PAYOFF_EMOTIONAL_
+// AFTERMATH_VOID (payoff → emotional), and RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID (raise_stakes →
+// curiosity) — each a distinct trigger/output pairing proving decoupling.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -4924,6 +4930,84 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `The story's ${r960c.totalCount} revelation-purposed scenes are unevenly distributed across its four structural zones: ${bloatName960c} contains ${r960c.counts[r960c.bloatZoneIdx]} of them (${Math.round((r960c.counts[r960c.bloatZoneIdx] / r960c.totalCount) * 100)}%) while ${emptyNames960c} contains none. Purpose-built disclosures bloat in one structural quarter and vanish from another, giving the rhythm's information surges an uneven structural pattern.`,
         suggestedFix: `Redistribute disclosures: purpose at least one scene inside the empty zone(s) — ${emptyNames960c} — as a revelation so the rhythm keeps surging with new information across every structural quarter, not only the quarter currently carrying most of them.`,
+      });
+    }
+  }
+
+  // ── Wave 974: with the underweight/bloat (zone-imbalance) mode now exhausted for this pass (every
+  // signal with a complete 3-zone/run trio has been 4-zone-audited), this wave pivots to the
+  // sequence/aftermath mode via the shared checkAftermathVoid helper, adding three trigger→aftermath
+  // pairings beyond the pass's sole existing one (REVELATION_SIGNAL_AFTERMATH_FLAT: revelation →
+  // emotional). Each fires only when the trigger genuinely occurs (≥2, full 2-scene lookahead) AND
+  // the aftermath signal genuinely occurs somewhere (≥2-3), but NO trigger's window contains it —
+  // proving decoupling, not mere absence. ──────────────────────────────────────────────────────────
+
+  // RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID — dramatic-turn trigger × relational aftermath. Every
+  // dramatic turn is followed by two scenes with no relationship shift, even though bonds do move
+  // elsewhere in the story. A turn usually realigns who stands with whom in its wake; when every
+  // turn's aftermath leaves all bonds untouched, the rhythm's pivots are structurally loud but
+  // relationally silent. Distinct from REVELATION_SIGNAL_AFTERMATH_FLAT (revelation trigger ×
+  // emotional channel) — this is the dramatic-turn trigger × RELATIONAL channel, a distinct pairing.
+  {
+    const r974a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r974a.fires) {
+      issues.push({
+        location: `${r974a.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RHYTHM_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic turn (${r974a.triggerCount} pivots) is followed by two scenes in which no relationship shifts, even though ${r974a.aftermathCount} scenes elsewhere do move a bond. A turn usually reshapes who stands with whom — an ally revealed, a loyalty tested, a bond strained by the reversal. When every turn's aftermath leaves all bonds untouched, the rhythm's pivots are structurally loud but relationally silent.`,
+        suggestedFix: `Let at least one dramatic turn move a bond in its aftermath: in the scene or two after a pivot, have the reversal realign a relationship — trust tested, an alliance forced, distance opened by what just changed. A turn whose aftermath shifts a relationship has consequence beyond plot mechanics.`,
+      });
+    }
+  }
+
+  // RHYTHM_PAYOFF_EMOTIONAL_AFTERMATH_VOID — payoff trigger × emotional aftermath. Every payoff
+  // scene is followed by two scenes with no emotional shift, even though feeling registers
+  // elsewhere. Cashing in a setup should carry a charge into what follows; when every payoff's
+  // aftermath is emotionally flat, the rhythm's callbacks land mechanically but not affectively.
+  // Distinct from REVELATION_SIGNAL_AFTERMATH_FLAT (revelation trigger × same emotional channel) —
+  // this is the PAYOFF trigger × emotional channel, a distinct trigger pairing.
+  {
+    const r974b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 3, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r974b.fires) {
+      issues.push({
+        location: `${r974b.triggerCount} payoff aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'RHYTHM_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r974b.triggerCount} cashed-in setups) is followed by two emotionally neutral scenes, even though ${r974b.aftermathCount} emotionally-charged scenes exist elsewhere. Paying off a planted setup should land emotionally in its wake — satisfaction, cost, relief. When every payoff's aftermath is affectively flat, the rhythm's callbacks are mechanically satisfying but hollow.`,
+        suggestedFix: `Let at least one payoff move someone emotionally in its aftermath: in the scene or two after a setup pays off, show what it costs or gives — a victory's ache, a fear finally answered. A payoff whose aftermath carries feeling earns its callback rather than merely completing it.`,
+      });
+    }
+  }
+
+  // RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID — raise-stakes trigger × curiosity aftermath. Every
+  // stakes-raising scene is followed by two scenes with no new curiosity, even though fresh
+  // questions do open elsewhere. Escalating danger should usually provoke new questions about how
+  // it will be met; when every stakes-raise's aftermath opens no curiosity, the rhythm's escalation
+  // beats land without follow-through wonder. Distinct from RHYTHM_CURIOSITY_PEAK_UNCAUSED (single-
+  // peak isolation) and from the revelation/turn/payoff triggers above — this is the raise_stakes
+  // trigger × CURIOSITY channel, a distinct trigger/output pairing.
+  {
+    const r974c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r974c.fires) {
+      issues.push({
+        location: `${r974c.triggerCount} stakes-raise aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'RHYTHM_STAKES_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r974c.triggerCount} escalations) is followed by two scenes that raise no new curiosity, even though ${r974c.aftermathCount} scenes elsewhere do open fresh questions. Escalating danger usually provokes new uncertainty — how will this be survived, who will pay for it, what happens next. When every stakes-raise's aftermath opens no curiosity, the rhythm's escalation beats land flat rather than propelling the audience forward.`,
+        suggestedFix: `Let at least one stakes-raise open a new question in its aftermath: in the scene or two after the danger sharpens, plant a fresh uncertainty — an unknown consequence, an unresolved choice, a threat whose shape isn't yet clear. A stakes-raise whose aftermath provokes curiosity keeps the rhythm propulsive, not just tense.`,
       });
     }
   }
