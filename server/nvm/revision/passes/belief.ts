@@ -466,6 +466,13 @@
 // (payoffSetupIds, previously paired with curiosityDelta/relationshipShifts/emotionalShift, now a
 // fourth channel with suspenseDelta), and BELIEF_SEED_RELATIONAL_AFTERMATH_VOID (seededClueIds,
 // previously paired with emotionalShift/suspenseDelta, now a third channel with relationshipShifts).
+// Wave 1034 additions: with raise_stakes and payoffSetupIds now at four channels each, this wave
+// targets the two less-saturated triggers instead: BELIEF_SEED_CURIOSITY_AFTERMATH_VOID
+// (seededClueIds, previously paired with emotionalShift/suspenseDelta/relationshipShifts, now a
+// fourth channel with curiosityDelta), and two fresh channels for the heavy-unresolvedClues-debt
+// trigger (threshold ≥3, previously only paired with curiosityDelta): BELIEF_OPEN_THREAD_
+// EMOTIONAL_AFTERMATH_VOID (paired with emotionalShift) and BELIEF_OPEN_THREAD_RELATIONAL_
+// AFTERMATH_VOID (paired with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5747,6 +5754,80 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every clue-seeding scene in the story (${r1020c.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1020c.aftermathCount} such shifts occur elsewhere. Planting a clue without it ever bearing on how characters treat each other right after leaves the belief-tracking layer's groundwork purely informational, never interpersonal.`,
         suggestedFix: `In the two scenes following at least one clue seed, let the new information strain or shift a relationship so the belief-tracking layer's groundwork lands interpersonally, not just as plot data.`,
+      });
+    }
+  }
+
+  // BELIEF_SEED_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath carries no curiosity rise, while such rises occur
+  // elsewhere. Distinct from BELIEF_SEED_EMOTIONAL_AFTERMATH_VOID, BELIEF_SEED_SUSPENSE_
+  // AFTERMATH_VOID, and BELIEF_SEED_RELATIONAL_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift/suspenseDelta/relationshipShifts respectively) — this is the fourth
+  // consequence channel for this trigger in this pass.
+  {
+    const r1034a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1034a.fires) {
+      issues.push({
+        location: `${r1034a.triggerCount} clue-seed aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'BELIEF_SEED_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene in the story (${r1034a.triggerCount} plants) is followed by two scenes with no rise in curiosity, even though ${r1034a.aftermathCount} such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the belief-tracking layer's groundwork buried rather than voiced as something the audience now wonders about.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as a live question, not just planted information.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 emotionally-charged scenes
+  // anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath carries
+  // no emotional shift, while such shifts occur elsewhere. Distinct from BELIEF_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with curiosityDelta) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1034b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1034b.fires) {
+      issues.push({
+        location: `${r1034b.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1034b.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1034b.aftermathCount} emotionally-charged scenes exist elsewhere. A pile-up of open questions that never registers as felt in the scenes right after it leaves the belief-tracking layer's mounting uncertainty purely intellectual rather than something anyone visibly carries.`,
+        suggestedFix: `In the two scenes following a heavy clue-debt moment, let someone's feelings register the weight of the unresolved questions so the belief-tracking layer's debt lands emotionally, not just informationally.`,
+      });
+    }
+  }
+
+  // BELIEF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 relationship-shift
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no bond change, while such changes occur elsewhere. Distinct from BELIEF_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID and BELIEF_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (same trigger paired
+  // with curiosityDelta and emotionalShift respectively) — this is the third consequence channel
+  // for this trigger.
+  {
+    const r1034c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1034c.fires) {
+      issues.push({
+        location: `${r1034c.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'BELIEF_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1034c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1034c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the belief-tracking layer's uncertainty purely informational rather than something straining the bond.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the belief-tracking layer's open threads register interpersonally, not just as plot backlog.`,
       });
     }
   }
