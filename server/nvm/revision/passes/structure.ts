@@ -458,6 +458,13 @@
 // emotionalShift for a third channel), and STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID
 // (raise_stakes, previously paired with curiosityDelta and suspenseDelta, now paired with
 // relationshipShifts for a third channel).
+// Wave 1031 additions: three more fresh channels for existing triggers: STRUCTURE_STAKES_
+// EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta/suspenseDelta/
+// relationshipShifts, now a fourth channel with emotionalShift), STRUCTURE_TURN_RELATIONAL_
+// AFTERMATH_VOID (dramaticTurn, previously paired with visualBeats/curiosityDelta, now a third
+// channel with relationshipShifts), and STRUCTURE_PAYOFF_CURIOSITY_AFTERMATH_VOID (payoffSetupIds,
+// previously paired with dialogueHighlights/relationshipShifts/emotionalShift, now a fourth
+// channel with curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5706,6 +5713,80 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every stakes-raising scene (${r1017c.triggerCount} escalations) is followed by two scenes with no shift in any relationship, even though ${r1017c.aftermathCount} such shifts occur elsewhere. Escalating danger that never bears on how characters treat each other in the scenes right after it leaves the story's architecture with an escalation beat isolated from the relationships it should be testing.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, let the escalating danger strain or shift a relationship so rising pressure registers on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // STRUCTURE_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from STRUCTURE_STAKES_CURIOSITY_AFTERMATH_VOID,
+  // STRUCTURE_STAKES_SUSPENSE_AFTERMATH_VOID, and STRUCTURE_STAKES_RELATIONAL_AFTERMATH_VOID
+  // (same trigger paired with curiosityDelta/suspenseDelta/relationshipShifts respectively) — this
+  // is the fourth consequence channel for this trigger in this pass.
+  {
+    const r1031a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1031a.fires) {
+      issues.push({
+        location: `${r1031a.triggerCount} raise-stakes aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'STRUCTURE_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene in the story (${r1031a.triggerCount} of them) is followed by two emotionally neutral scenes, even though ${r1031a.aftermathCount} emotionally-charged scenes exist elsewhere. A stakes-raise that isn't matched by any feeling in the scenes right after it leaves the structure's escalation registering as a declared beat rather than something anyone visibly feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let someone's feelings visibly register the new danger so the structural escalation lands emotionally, not only mechanically.`,
+      });
+    }
+  }
+
+  // STRUCTURE_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from the original dramaticTurn → visualBeats rule and
+  // STRUCTURE_TURN_CURIOSITY_AFTERMATH_VOID (same trigger paired with visualBeats and
+  // curiosityDelta respectively) — this is the third consequence channel for this trigger.
+  {
+    const r1031b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1031b.fires) {
+      issues.push({
+        location: `${r1031b.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'STRUCTURE_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1031b.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1031b.aftermathCount} such shifts occur elsewhere. A pivot that never bears on how characters treat each other in the scenes right after it lands as a structural beat the story registers mechanically rather than interpersonally.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let the pivot strain or shift a relationship so the structure's turn registers on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // STRUCTURE_PAYOFF_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath carries no curiosity rise, while such rises
+  // occur elsewhere. Distinct from the original payoffSetupIds → dialogueHighlights rule,
+  // STRUCTURE_PAYOFF_RELATIONAL_AFTERMATH_VOID, and STRUCTURE_PAYOFF_EMOTIONAL_AFTERMATH_VOID
+  // (same trigger paired with dialogueHighlights/relationshipShifts/emotionalShift respectively) —
+  // this is the fourth consequence channel for this trigger.
+  {
+    const r1031c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1031c.fires) {
+      issues.push({
+        location: `${r1031c.triggerCount} payoff aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'STRUCTURE_PAYOFF_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1031c.triggerCount} cashed-in setups) is followed by two scenes with no rise in curiosity, even though ${r1031c.aftermathCount} such rises occur elsewhere. A resolution that closes cleanly with no fresh question in its wake leaves the structure's payoff beats feeling terminal rather than generative of the next stretch of story.`,
+        suggestedFix: `In the two scenes following at least one payoff, let a new question rise so the structure keeps generating curiosity instead of only closing threads.`,
       });
     }
   }
