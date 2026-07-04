@@ -479,6 +479,13 @@
 // (payoffSetupIds, previously paired with emotionalShift/suspenseDelta, now a third channel with
 // curiosityDelta), and CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID (dramaticTurn, previously paired
 // with visualBeats/curiosityDelta, now a third channel with emotionalShift).
+// Wave 1038 additions: with raise_stakes now at four channels, this wave targets the less-
+// saturated triggers instead: CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID (heavy unresolvedClues
+// debt, previously paired with relationshipShifts/visualBeats/curiosityDelta, now a fourth channel
+// with emotionalShift), CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID (dramaticTurn, previously paired
+// with visualBeats/curiosityDelta/emotionalShift, now a fourth channel with relationshipShifts),
+// and CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID (payoffSetupIds, previously paired with
+// emotionalShift/suspenseDelta/curiosityDelta, now a fourth channel with relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6008,6 +6015,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1024c.triggerCount} pivots) is followed by two emotionally neutral scenes, even though ${r1024c.aftermathCount} emotionally-charged scenes exist elsewhere. A conflict pivot that never registers as felt in the scenes right after it lands as a plot mechanic the story tracks structurally rather than something anyone visibly carries.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let someone's feelings visibly register the pivot so the conflict's turn lands emotionally, not just structurally.`,
+      });
+    }
+  }
+
+  // CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues
+  // debt trigger → emotionalShift absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 emotionally-charged
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no emotional shift, while such shifts occur elsewhere. Distinct from the original
+  // unresolvedClues → relationshipShifts and → visualBeats rules, and CONFLICT_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID (same trigger paired with curiosityDelta) — this is the fourth
+  // consequence channel for this trigger in this pass.
+  {
+    const r1038a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1038a.fires) {
+      issues.push({
+        location: `${r1038a.triggerCount} heavy clue-debt scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CONFLICT_OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1038a.triggerCount} instances) is followed by two emotionally neutral scenes, even though ${r1038a.aftermathCount} emotionally-charged scenes exist elsewhere. A pile-up of open questions that never registers as felt in the scenes right after it leaves the conflict's mounting uncertainty purely intellectual rather than something anyone visibly carries.`,
+        suggestedFix: `In the two scenes following a heavy clue-debt moment, let someone's feelings register the weight of the unresolved questions so the conflict's debt lands emotionally, not just informationally.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from the original dramaticTurn → visualBeats rule,
+  // CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID, and CONFLICT_TURN_EMOTIONAL_AFTERMATH_VOID (same
+  // trigger paired with visualBeats/curiosityDelta/emotionalShift respectively) — this is the
+  // fourth consequence channel for this trigger in this pass.
+  {
+    const r1038b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1038b.fires) {
+      issues.push({
+        location: `${r1038b.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'CONFLICT_TURN_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1038b.triggerCount} pivots) is followed by two scenes with no shift in any relationship, even though ${r1038b.aftermathCount} such shifts occur elsewhere. A conflict pivot that never bears on how characters treat each other in the scenes right after it lands as a plot mechanic the story tracks structurally rather than interpersonally.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let the pivot strain or shift a relationship so the conflict's turn lands on the bonds between characters, not only on the plot.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying payoff scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath carries no bond change, while such
+  // changes occur elsewhere. Distinct from the original payoffSetupIds → emotionalShift rule,
+  // CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID, and CONFLICT_PAYOFF_CURIOSITY_AFTERMATH_VOID (same
+  // trigger paired with emotionalShift/suspenseDelta/curiosityDelta respectively) — this is the
+  // fourth consequence channel for this trigger in this pass.
+  {
+    const r1038c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1038c.fires) {
+      issues.push({
+        location: `${r1038c.triggerCount} payoff aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'CONFLICT_PAYOFF_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene in the story (${r1038c.triggerCount} cashed-in setups) is followed by two scenes with no shift in any relationship, even though ${r1038c.aftermathCount} such shifts occur elsewhere. A conflict that resolves cleanly with no fresh strain on any relationship in its wake leaves the payoff feeling settled rather than still generating friction between the people caught in it.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolution strain or shift a relationship so the conflict's payoff ripples interpersonally, not just narratively.`,
       });
     }
   }
