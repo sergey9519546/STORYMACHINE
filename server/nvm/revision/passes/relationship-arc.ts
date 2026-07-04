@@ -467,6 +467,16 @@
 // (heavy unresolvedClues debt, previously paired with visualBeats and emotionalShift, now paired
 // with curiosityDelta), and RELATIONAL_STAKES_SUSPENSE_AFTERMATH_VOID (raise_stakes, previously
 // paired with relationshipShifts and curiosityDelta, now paired with suspenseDelta).
+// Wave 1029 additions: RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID gives raise_stakes a fourth
+// checkAftermathVoid channel (previously paired with relationshipShifts/curiosityDelta/
+// suspenseDelta, now paired with emotionalShift). The other two checks flip direction on an
+// existing pairing rather than duplicating it: RELATIONAL_SEED_AFTERMATH_VOID pairs seededClueIds
+// as TRIGGER with relationshipShifts as channel — distinct from the existing RELATIONSHIP_SHIFT_
+// SEED_AFTERMATH_VOID, which runs the same two fields in the opposite direction (relationshipShifts
+// as trigger, seededClueIds as channel) — and RELATIONAL_OPEN_THREAD_AFTERMATH_VOID pairs heavy
+// unresolvedClues debt as trigger with relationshipShifts as channel, a combination neither this
+// pass's OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED (co-occurrence mode, not aftermath) nor any
+// other rule here has audited.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5916,6 +5926,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every stakes-raising scene (${r1015c.triggerCount} escalations) is followed by two scenes with no rise in tension, even though ${r1015c.aftermathCount} such rises occur elsewhere. Escalating danger that never tightens the felt sense of jeopardy in the beats right after it leaves the relational arc's stakes reading as stated rather than felt.`,
         suggestedFix: `In the two scenes following at least one stakes-raise, tighten the tension — a ticking complication or a near-miss that bears on the relationship — so escalating danger registers as felt, not just stated.`,
+      });
+    }
+  }
+
+  // RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying raise_stakes scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath carries no emotional shift,
+  // while such shifts occur elsewhere. Distinct from RELATIONAL_STAKES_AFTERMATH_VOID
+  // (relationshipShifts), RELATIONAL_STAKES_CURIOSITY_AFTERMATH_VOID, and RELATIONAL_STAKES_
+  // SUSPENSE_AFTERMATH_VOID (same trigger paired with curiosityDelta and suspenseDelta
+  // respectively) — this is the fourth consequence channel for this trigger in this pass.
+  {
+    const r1029a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1029a.fires) {
+      issues.push({
+        location: `${r1029a.triggerCount} stakes-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'RELATIONAL_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1029a.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r1029a.aftermathCount} emotionally-charged scenes exist elsewhere. Escalating danger that never registers as felt in the beats right after it leaves the relational arc's stakes reading as declared rather than something anyone in the bond visibly carries.`,
+        suggestedFix: `In the two scenes following at least one stakes-raise, let someone's feelings visibly register the new danger so escalating pressure lands emotionally within the relationship, not only as stated fact.`,
+      });
+    }
+  }
+
+  // RELATIONAL_SEED_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger → relationshipShifts
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying seed
+  // scenes (pos<n-2), ≥2 relationship-shift scenes anywhere, 2-scene lookahead. Fires when every
+  // seed's two-scene aftermath carries no bond change, while such changes occur elsewhere. Distinct
+  // from RELATIONSHIP_SHIFT_SEED_AFTERMATH_VOID, which runs the same two fields in the opposite
+  // direction (relationshipShifts as trigger, seededClueIds as channel) — this rule makes
+  // seededClueIds the trigger and relationshipShifts the channel, a fourth channel for this trigger
+  // alongside visualBeats/curiosityDelta/emotionalShift.
+  {
+    const r1029b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1029b.fires) {
+      issues.push({
+        location: `${r1029b.triggerCount} seed aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RELATIONAL_SEED_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every clue-seeding scene (${r1029b.triggerCount} plants) is followed by two scenes with no shift in any relationship, even though ${r1029b.aftermathCount} such shifts occur elsewhere. A planted clue that never bears on how characters treat each other nearby leaves the seed purely mechanical, disconnected from the bonds the arc is meant to be tracking.`,
+        suggestedFix: `In the two scenes following at least one clue-seeding moment, let the planted material strain or shift a relationship so the seed carries relational weight alongside its narrative function.`,
+      });
+    }
+  }
+
+  // RELATIONAL_OPEN_THREAD_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold ≥3), ≥2 relationship-shift
+  // scenes anywhere, 2-scene lookahead. Fires when every heavy-debt scene's two-scene aftermath
+  // carries no bond change, while such changes occur elsewhere. Distinct from this pass's
+  // OPEN_THREAD_RELATIONSHIP_SHIFT_DECOUPLED (co-occurrence mode, not sequence/aftermath) — this is
+  // the fourth consequence channel for this trigger alongside visualBeats/emotionalShift/
+  // curiosityDelta.
+  {
+    const r1029c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1029c.fires) {
+      issues.push({
+        location: `${r1029c.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'RELATIONAL_OPEN_THREAD_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1029c.triggerCount} instances) is followed by two scenes with no shift in any relationship, even though ${r1029c.aftermathCount} such shifts occur elsewhere. A pile-up of open questions that never bears on how characters treat each other nearby leaves the relational arc's uncertainty purely informational rather than something straining the bond.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let the mounting uncertainty strain or shift a relationship so the arc's open threads register interpersonally, not just as plot backlog.`,
       });
     }
   }
