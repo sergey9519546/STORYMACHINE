@@ -543,6 +543,17 @@
 // VOID each give payoffSetupIds and heavy unresolvedClues debt a fresh channel using
 // dialogueHighlights — a field neither trigger has been paired with via checkAftermathVoid
 // before in this pass.
+// Wave 1093 additions: ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives heavy unresolvedClues
+// debt its sixth checkAftermathVoid channel (previously paired with emotionalShift/visualBeats/
+// curiosityDelta/suspenseDelta/dialogueHighlights, now also paired with relationshipShifts),
+// completing full coverage of the standard six-channel set for this trigger. ARC_CLOCK_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID gives clockRaised its sixth channel (previously paired with
+// curiosityDelta/relationshipShifts/visualBeats/emotionalShift/suspenseDelta, now also paired
+// with dialogueHighlights), completing the same for clockRaised. With unresolvedClues, clockRaised,
+// raise_stakes, and payoffSetupIds now all effectively fully covered, ARC_REVELATION_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID gives revelation a fifth channel (previously paired with
+// relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta, now also paired with
+// dialogueHighlights).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6214,6 +6225,87 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r1079c.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1079c.aftermathCount} such scenes exist elsewhere in the script. Accumulated mystery about the protagonist's arc that never earns a memorable line right after it compounds leaves the arc's uncertainty voiceless rather than felt in what characters say to each other.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let a character voice the weight of what's unresolved, so accumulated mystery registers in dialogue, not only as structural backlog.`,
+      });
+    }
+  }
+
+  // ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × heavy unresolvedClues debt
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavy-debt scenes (pos<n-2, threshold≥3), ≥2 scenes anywhere with
+  // a recorded relationship shift, 2-scene lookahead. Fires when every heavy-debt scene's
+  // two-scene aftermath carries no relationship movement, while such movement occurs elsewhere.
+  // Distinct from OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID, ARC_OPEN_THREAD_STAGING_AFTERMATH_VOID,
+  // ARC_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID, ARC_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, and
+  // ARC_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (same trigger paired with
+  // emotionalShift/visualBeats/curiosityDelta/suspenseDelta/dialogueHighlights respectively) —
+  // this is the sixth and final standard-channel pairing for this trigger, completing full
+  // saturation.
+  {
+    const r1093a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1093a.fires) {
+      issues.push({
+        location: `${r1093a.triggerCount} heavy clue-debt scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying heavy unresolved clue-debt (${r1093a.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1093a.aftermathCount} such shifts exist elsewhere in the script. Accumulated mystery about the protagonist's arc that never moves how they stand with anyone else leaves the uncertainty isolated to internal bookkeeping, never touching the arc's relational stakes.`,
+        suggestedFix: `In the two scenes following at least one heavy clue-debt moment, let it shift how the protagonist relates to another character, so the accumulating mystery carries interpersonal weight, not just internal suspense.`,
+      });
+    }
+  }
+
+  // ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from ARC_CLOCK_
+  // CURIOSITY_AFTERMATH_VOID, ARC_CLOCK_RELATIONAL_AFTERMATH_VOID, ARC_CLOCK_STAGING_AFTERMATH_
+  // VOID, ARC_CLOCK_EMOTIONAL_AFTERMATH_VOID, and ARC_CLOCK_SUSPENSE_AFTERMATH_VOID (same trigger
+  // paired with curiosityDelta/relationshipShifts/visualBeats/emotionalShift/suspenseDelta
+  // respectively) — this is the sixth and final standard-channel pairing for this trigger,
+  // completing full saturation.
+  {
+    const r1093b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1093b.fires) {
+      issues.push({
+        location: `${r1093b.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1093b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no highlighted dialogue, even though ${r1093b.aftermathCount} such scenes exist elsewhere in the script. Time pressure that never earns a memorable line right after it tightens leaves the arc's relationship with urgency unvoiced — no character's speech registers what the deadline costs them.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs them personally, so the arc's urgency is voiced, not just staged.`,
+      });
+    }
+  }
+
+  // ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // (non-null) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying revelation scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from ARC_REVELATION_RELATIONAL_AFTERMATH_VOID, ARC_REVELATION_EMOTIONAL_AFTERMATH_VOID,
+  // ARC_REVELATION_CURIOSITY_AFTERMATH_VOID, and ARC_REVELATION_SUSPENSE_AFTERMATH_VOID (same
+  // trigger paired with relationshipShifts/emotionalShift/curiosityDelta/suspenseDelta
+  // respectively) — this is the fifth consequence channel for this trigger.
+  {
+    const r1093c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1093c.fires) {
+      issues.push({
+        location: `${r1093c.triggerCount} revelation scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1093c.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1093c.aftermathCount} such scenes exist elsewhere in the script. A discovery that never earns a memorable line right after it lands leaves the arc's confrontation with new information unvoiced — no character's speech processes what was just learned.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that processes what was discovered, so the arc's reckoning with new information registers in speech, not just in plot state.`,
       });
     }
   }

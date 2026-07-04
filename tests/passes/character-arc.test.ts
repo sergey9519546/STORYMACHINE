@@ -1080,6 +1080,91 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1093 — characterArcPass: arc open-thread-relational aftermath void, arc clock-dialogue-highlight aftermath void, arc revelation-dialogue-highlight aftermath void', async () => {
+    const makeRec1093 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1093 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID fires when every heavy clue-debt scene is followed by two scenes with no relationship shift', async () => {
+      const recs1093a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeRec1093(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID does not fire when a heavy clue-debt scene is followed by a relationship shift within its window', async () => {
+      const recs1093an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeRec1093(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'ARC_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1093b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeRec1093(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a clock-raise is followed by highlighted dialogue within its window', async () => {
+      const recs1093bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeRec1093(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every revelation is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1093c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeRec1093(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a revelation is followed by highlighted dialogue within its window', async () => {
+      const recs1093cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1093(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeRec1093(i, { dialogueHighlights: ['a memorable line'] });
+        return makeRec1093(i);
+      });
+      const res = await runArc1093(recs1093cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'ARC_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1079 — characterArcPass: arc stakes-staging aftermath void, arc payoff-dialogue-highlight aftermath void, arc open-thread-dialogue-highlight aftermath void', async () => {
     const makeRec1079 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
