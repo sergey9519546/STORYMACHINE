@@ -467,6 +467,12 @@
 // channel or in other analytical modes before now), and CONFLICT_OPEN_THREAD_CURIOSITY_AFTERMATH_
 // VOID (heavy unresolvedClues debt, already a trigger paired with relationshipShifts and
 // visualBeats, now paired with curiosityDelta for a third consequence channel).
+// Wave 1010 additions: this wave gives three more triggers a fresh consequence channel:
+// CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID (dramaticTurn, previously only paired with visualBeats,
+// now paired with curiosityDelta), CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID (payoffSetupIds,
+// previously only paired with emotionalShift, now paired with suspenseDelta), and CONFLICT_STAKES_
+// EMOTIONAL_AFTERMATH_VOID (raise_stakes, previously paired with curiosityDelta and suspenseDelta,
+// now paired with emotionalShift for a third channel).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -5852,6 +5858,77 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying heavy unresolved clue-debt (${r996c.triggerCount} instances) is followed by two full scenes that raise no new curiosity, even though ${r996c.aftermathCount} such rises occur elsewhere. Accumulated mystery should usually compound into fresh questions rather than sit as inert backlog; when every heavy-debt scene's aftermath opens nothing new, the conflict's unresolved material stalls instead of deepening.`,
         suggestedFix: `In the two scenes following at least one heavy clue-debt moment, plant a new open question so accumulated mystery keeps compounding rather than sitting in a learnable lull.`,
+      });
+    }
+  }
+
+  // CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-raising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath opens no new curiosity, while curiosity
+  // does occur elsewhere. Distinct from CONFLICT_TURN_STAGING_AFTERMATH_VOID (same trigger paired
+  // with visualBeats) — this pairs dramaticTurn with curiosityDelta for the first time in this pass.
+  {
+    const r1010a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1010a.fires) {
+      issues.push({
+        location: `${r1010a.triggerCount} dramatic-turn aftermath(s) — no curiosity raised within 2 scenes`,
+        rule: 'CONFLICT_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1010a.triggerCount} pivots) is followed by two scenes that raise no new curiosity, even though ${r1010a.aftermathCount} scenes elsewhere do open fresh questions. A pivot should usually provoke a new question about what changes next; when every turn's aftermath opens no curiosity, the conflict's reversal lands as a closed event rather than a springboard for further wondering.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, plant a new open question so the pivot keeps propelling curiosity forward rather than closing the matter.`,
+      });
+    }
+  }
+
+  // CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 tension-raising scenes anywhere, 2-scene lookahead.
+  // Fires when every payoff's two-scene aftermath raises no tension, while tension does rise
+  // elsewhere. Distinct from CONFLICT_PAYOFF_EMOTIONAL_AFTERMATH_VOID (Wave 996, same trigger
+  // paired with emotionalShift) — this pairs payoffSetupIds with suspenseDelta for the first time
+  // in this pass.
+  {
+    const r1010b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1010b.fires) {
+      issues.push({
+        location: `${r1010b.triggerCount} payoff aftermath(s) — no suspense raised within 2 scenes`,
+        rule: 'CONFLICT_PAYOFF_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every payoff scene (${r1010b.triggerCount} cashed-in setups) is followed by two scenes with no rise in tension, even though ${r1010b.aftermathCount} such rises occur elsewhere. A callback should sometimes reopen or escalate tension rather than only resolve it; when every payoff's aftermath registers no suspense, the conflict settles into calm with nothing left pressing.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolution reveal a new complication or near-miss that raises tension again, so the callback doesn't just close a loop but opens the next one.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAKES_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × raise_stakes trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying stakes-raise scenes (pos<n-2), ≥2 emotionally-charged scenes anywhere, 2-scene
+  // lookahead. Fires when every stakes-raise's two-scene aftermath is emotionally flat, while
+  // charged scenes occur elsewhere. Distinct from CONFLICT_STAKES_CURIOSITY_AFTERMATH_VOID (Wave
+  // 982, curiosityDelta) and CONFLICT_STAKES_SUSPENSE_AFTERMATH_VOID (Wave 996, suspenseDelta) —
+  // this is the third consequence channel for this trigger in this pass.
+  {
+    const r1010c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.purpose === 'raise_stakes',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1010c.fires) {
+      issues.push({
+        location: `${r1010c.triggerCount} stakes-raise aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'CONFLICT_STAKES_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every stakes-raising scene (${r1010c.triggerCount} escalations) is followed by two emotionally neutral scenes, even though ${r1010c.aftermathCount} emotionally-charged scenes exist elsewhere. Escalating danger should usually carry felt weight for the characters living through it; when every stakes-raise's aftermath is affectively flat, the conflict's escalation reads as a stated fact rather than a threat anyone feels.`,
+        suggestedFix: `Let at least one stakes-raise carry feeling in its aftermath: in the scene or two after the danger sharpens, show someone reacting to it emotionally — fear, resolve, dread.`,
       });
     }
   }
