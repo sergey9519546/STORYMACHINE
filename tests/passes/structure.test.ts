@@ -1005,6 +1005,69 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+  describe('Wave 1184 — structurePass (Program v2, Type 3 — genre-conditioned): DARK_NIGHT_ABSENT genre threshold', async () => {
+    const makeRec1184 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain1184 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure1184 = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      midpointPressure: 2, tightestScene: 7, reversalCount: 2,
+    };
+
+    // ── DARK_NIGHT_ABSENT genre threshold ────────────────────────────────────
+    // Craft argument: comedy's low point is measured in dignity and embarrassment, not
+    // survival dread (GENRE_MODIFIERS.comedy — "let characters keep their dignity stakes
+    // even when the situation is absurd"), so a milder suspense dip (0.7, above comedy's
+    // 0.5 floor but below the generic 1) still legitimately counts as the "all is lost" beat.
+    it("structurePass: DARK_NIGHT_ABSENT fires generically at suspenseDelta=0.7 but not under comedy's looser floor", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      // 10 scenes; dark night zone = floor(10*0.65)=6 to floor(10*0.85)=8 (scenes 6-7)
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec1184(i, { emotionalShift: i === 7 ? 'negative' : 'neutral', suspenseDelta: i === 7 ? 0.7 : 1.5 }),
+      );
+      const baseInput = {
+        fountain: blankFountain1184(10), original: blankFountain1184(10),
+        records: records as any, structure: baseStructure1184 as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+        `Expected DARK_NIGHT_ABSENT generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const comedyResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy' } });
+      assert.ok(
+        !comedyResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+        "Should NOT fire under comedy's looser 0.5 suspense floor at suspenseDelta=0.7",
+      );
+    });
+
+    it('structurePass: DARK_NIGHT_ABSENT genre-absent path is byte-identical to the pre-Wave-1184 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec1184(i, { emotionalShift: 'neutral', suspenseDelta: i >= 8 ? 3 : 1.5 }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain1184(10), original: blankFountain1184(10),
+        records: records as any, structure: baseStructure1184 as any,
+        annotations: [], approvedSpans: [],
+      });
+      const darkNight = result.issues.filter(i => i.rule === 'DARK_NIGHT_ABSENT');
+      assert.ok(darkNight.length >= 1, 'Should fire generically on this all-neutral-zone fixture');
+      assert.equal(
+        darkNight[0].description,
+        'No scene in the pre-climax zone (60%–80%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push',
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+  });
 
   describe('Wave 1171 — structurePass: structure suspense-staging aftermath void, structure suspense-dialogue-highlight aftermath void, structure seed-emotional aftermath void', async () => {
     const runST1171 = async (records: ScreenplaySceneRecord[]) => {

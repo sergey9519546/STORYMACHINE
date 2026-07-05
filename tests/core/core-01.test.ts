@@ -9,7 +9,7 @@ import http from 'node:http';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { withTimeout, generateContent, generateContentStream, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider, getModel, modelForTask } from '../../server/engine/ai.ts';
 import { analyzeSubtext } from '../../server/lib/subtext-meter.ts';
-import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES } from '../../server/lib/genre-router.ts';
+import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES, GENRE_RULE_MODIFIERS } from '../../server/lib/genre-router.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../../server/lib/memory.ts';
 import { metrics } from '../../server/lib/metrics.ts';
 import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from '../../server/lib/personality.ts';
@@ -1925,6 +1925,38 @@ describe('genre-router — genrePromptBlock', () => {
   it('every GENRE_MODIFIERS entry has at least 3 forbidden clichés', () => {
     for (const [genre, mod] of Object.entries(GENRE_MODIFIERS)) {
       assert.ok(mod.forbiddenCliches.length >= 3, `${genre} should have ≥3 clichés`);
+    }
+  });
+
+  // Wave 1184 additions (Program v2, Type 3 — genre-conditioned): shape tests for the
+  // new numeric-modifiers table. GENRE_RULE_MODIFIERS is Partial<Record<StoryGenre, ...>>
+  // by design (a rule-modifier home for a genre is opt-in, not mandatory) — these tests
+  // pin the invariants pacing.ts/structure.ts rely on rather than testing every value.
+  it('GENRE_RULE_MODIFIERS only keys on known genres from GENRE_NAMES', () => {
+    const knownGenres = new Set(Object.keys(GENRE_NAMES));
+    for (const genre of Object.keys(GENRE_RULE_MODIFIERS)) {
+      assert.ok(knownGenres.has(genre), `${genre} in GENRE_RULE_MODIFIERS must be a known StoryGenre`);
+    }
+  });
+
+  it('every populated GENRE_RULE_MODIFIERS field is a finite, positive number', () => {
+    for (const [genre, mod] of Object.entries(GENRE_RULE_MODIFIERS)) {
+      assert.ok(mod && Object.keys(mod).length > 0, `${genre} entry should not be empty if present`);
+      for (const [field, value] of Object.entries(mod!)) {
+        assert.equal(typeof value, 'number', `${genre}.${field} should be a number`);
+        assert.ok(Number.isFinite(value), `${genre}.${field} should be finite`);
+        assert.ok((value as number) > 0, `${genre}.${field} should be positive`);
+      }
+    }
+  });
+
+  it('genres absent from GENRE_RULE_MODIFIERS (romance, sci_fi, noir, mystery) have no live rule modifier yet', () => {
+    // Coverage-honesty pin for future Type 3 waves: this asserts the CURRENT set of
+    // genres with no rule-threshold modifier, not a permanent restriction — a future
+    // wave that adds one should update this list, not delete the test.
+    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = ['romance', 'sci_fi', 'noir', 'mystery'];
+    for (const genre of genresWithoutModifier) {
+      assert.equal(GENRE_RULE_MODIFIERS[genre], undefined, `${genre} should not yet have a live rule modifier`);
     }
   });
 });

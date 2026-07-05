@@ -539,15 +539,32 @@
 // STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID and STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_
 // VOID give suspenseDelta its fourth and fifth channels (visualBeats, dialogueHighlights);
 // STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID gives seededClueIds its second channel (emotionalShift).
+// Wave 1184 additions (Program v2, Type 3 — genre-conditioned): DARK_NIGHT_ABSENT is one of
+// the highest-firing generic rules in the calibration corpus (20/20 samples — see the wave's
+// measurement pass). Its suspenseDelta floor for what counts as the "all is lost" beat now
+// consults GENRE_RULE_MODIFIERS (server/lib/genre-router.ts), generic value as the default:
+// comedy's low point is measured in dignity/embarrassment rather than survival dread, so a
+// milder dip still legitimately counts (floor loosens); horror's low point must carry genuine
+// dread, so a passing dip should not count (floor tightens). storyContext absent, genre
+// absent, or genre unset in the table -> identical constant and identical issue text to
+// pre-Wave-1184 behavior.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { GENRE_RULE_MODIFIERS } from '../../../lib/genre-router.ts';
+import type { StoryGenre } from '../../../engine/types.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
   const issues: RevisionIssue[] = [];
   const n = records.length;
+
+  // Wave 1184: resolved once per pass, consumed by DARK_NIGHT_ABSENT below. Undefined
+  // when storyContext/genre is absent or the genre has no live rule modifier — the
+  // consumer falls through to its own generic constant in that case.
+  const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
+  const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
 
   // ── Act balance checks ────────────────────────────────────────────────────
   if (structure.completionPercent < 80 && structure.actPosition === 'act3') {
@@ -782,14 +799,19 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const darkNightEnd = Math.floor(n * 0.85);
     const darkZone = records.slice(darkNightStart, darkNightEnd);
     if (darkZone.length >= 2) {
+      // Wave 1184: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS (see the
+      // file-header comment). Absent/unknown genre falls through to the pre-wave
+      // constant of 1.
+      const darkNightSuspenseFloor1184 = genreMod1184?.darkNightSuspenseFloor ?? 1;
       const hasDarkNight = darkZone.some(r =>
-        r.emotionalShift === 'negative' && r.suspenseDelta > 1,
+        r.emotionalShift === 'negative' && r.suspenseDelta > darkNightSuspenseFloor1184,
       );
       if (!hasDarkNight) {
+        const genreNote1184 = genreMod1184?.darkNightSuspenseFloor !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
         issues.push({
           location: `Scenes ${darkNightStart}–${darkNightEnd} (pre-climax zone)`,
           rule: 'DARK_NIGHT_ABSENT',
-          description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push`,
+          description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push${genreNote1184}`,
           severity: 'major',
           suggestedFix: 'Insert an "all is lost" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken.',
         });

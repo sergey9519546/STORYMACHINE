@@ -218,3 +218,65 @@ export const GENRE_NAMES: Record<StoryGenre, string> = {
   noir:     'Noir',
   mystery:  'Mystery',
 };
+
+// ── Wave 1184 additions (Program v2, Type 3 — genre-conditioned) ────────────
+// GENRE_MODIFIERS above feeds prompt text (HOW to write). This table feeds
+// revision-pass THRESHOLDS (WHAT counts as a defect) for a small set of
+// high-firing generic rules where a genre legitimately moves the bar — never
+// to quiet a rule for everyone, only to make the guard fire on genuinely
+// different craft expectations. Each numeric field is OPTIONAL per genre: a
+// genre with no live modifier for a given rule (or no entry in this table at
+// all) falls through to that rule's own generic constant, so
+// storyContext.genre being absent, unknown, or simply not listed here is
+// always byte-identical to the pre-Wave-1184 behavior. Consuming pass files
+// look this up via `GENRE_RULE_MODIFIERS[genre]?.<field> ?? <generic default>`
+// — see server/nvm/revision/passes/pacing.ts (ENERGY_MONOTONE,
+// PACING_PLATEAU) and structure.ts (DARK_NIGHT_ABSENT) for the call sites and
+// the one-sentence craft argument behind each threshold.
+export interface GenreRuleThresholds {
+  /** ENERGY_MONOTONE (pacing.ts): the scene-length coefficient-of-variation
+   *  cutoff below which the story is flagged as rhythmically monotone.
+   *  Generic default 0.35 (lower CoV = more uniform = more likely to fire). */
+  energyMonotoneCoV?: number;
+  /** PACING_PLATEAU (pacing.ts): the max/min length ratio a 4-scene window
+   *  may span and still count as a "flat" plateau. Generic default 1.2
+   *  (a smaller ratio makes the plateau check fire on tighter windows). */
+  pacingPlateauRatio?: number;
+  /** DARK_NIGHT_ABSENT (structure.ts): the suspenseDelta a negative-
+   *  emotional-shift scene in the pre-climax zone must clear to count as the
+   *  story's "all is lost" beat. Generic default 1 (a higher floor makes the
+   *  beat harder to satisfy, so absence fires more readily). */
+  darkNightSuspenseFloor?: number;
+}
+
+export const GENRE_RULE_MODIFIERS: Partial<Record<StoryGenre, GenreRuleThresholds>> = {
+  // Thriller's contract is forward momentum in every scene (see
+  // GENRE_MODIFIERS.thriller: "no scene ends in the same place it began"), so
+  // even moderate scene-length uniformity already reads as a stall — both
+  // rhythm checks tighten (fire more readily) for thriller.
+  thriller: {
+    energyMonotoneCoV: 0.45,
+    pacingPlateauRatio: 1.3,
+  },
+  // Drama's register is grounded restraint (GENRE_MODIFIERS.drama: "silence
+  // and restraint do heavy lifting"), so a sustained, deliberately uniform
+  // cadence is a legitimate stylistic choice, not a defect — both rhythm
+  // checks loosen (fire less readily) for drama.
+  drama: {
+    energyMonotoneCoV: 0.25,
+    pacingPlateauRatio: 1.1,
+  },
+  // Comedy's low point is measured in dignity and embarrassment, not survival
+  // dread (GENRE_MODIFIERS.comedy: "let characters keep their dignity stakes
+  // even when the situation is absurd"), so a milder suspense dip still
+  // legitimately counts as the "all is lost" beat — the floor loosens.
+  comedy: {
+    darkNightSuspenseFloor: 0.5,
+  },
+  // Horror's low point must carry genuine dread, not a passing dip
+  // (GENRE_MODIFIERS.horror: "creeping unease curdling into terror"), so the
+  // beat needs a higher suspense floor to count as earned — the floor tightens.
+  horror: {
+    darkNightSuspenseFloor: 1.5,
+  },
+};
