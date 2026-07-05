@@ -503,6 +503,23 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## STANDING DIRECTIVE 2 — Integration over accumulation (user, 2026-07-05)
+
+Nothing ships as a separate feature of its own. Every axis entry and
+module must CONNECT: a defined consumer chain from signal → rule/critic
+→ report/export/UI or generation prompt. Landing review includes an
+integration check ("who consumes this?"); dangling ends are wired in an
+integration wave BEFORE further expansion of that axis. Known dangling
+ends to wire (I-wave 1): genrePromiseBlock → prompt assembly;
+story_tone → real IllusionState persistence + composeThresholds
+actually consumed by revision passes (they read GENRE_RULE_MODIFIERS
+directly today); defense cascade/trinity → deterministic.ts keyless
+fallback; metrics module → ScriptDoctorReport + doctor panel (text
+path, not just /api/nvm/metrics ops path); new projection targets →
+ProjectionGalleryPanel; CHARACTER_ARC_MODES → config route + prompt
+consumption; discrimination-harness todos → drive the next detector
+wave (told-exposition inversion first).
+
 ## STANDING DIRECTIVE — Exhaustive coverage (user, 2026-07-05)
 
 Every configurable/enumerable axis in the product must be pushed to
