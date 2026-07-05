@@ -1535,6 +1535,76 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1178 — conflictPass (distinct-mode pivot): conflict staging back-loaded, conflict suspense front-loaded, conflict emotion back-loaded', async () => {
+    const makeRec1178 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      dialogueHighlights: [], revelation: null,
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runCF1178 = async (records: any[]) => {
+      const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+      return conflictPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    // Half-loaded geometry n=8 → mid=4 (front {0..3}, back {4..7}).
+    // FIRE (back-loaded): matching signal at 0 (front) and 4,5,6,7 (back) → 4/5 = 80% back, front=1.
+    // NO-FIRE: matching signal at 0,1 (front) and 4,5 (back) → 2/4 = 50%, balanced.
+    it('CONFLICT_STAGING_BACK_LOADED fires when >70% of heavily-staged scenes fall in the second half', async () => {
+      const recs1178a = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 4, 5, 6, 7].forEach(i => { recs1178a[i] = makeRec1178(i, { visualBeats: ['beat one', 'beat two'] }); });
+      const res = await runCF1178(recs1178a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_STAGING_BACK_LOADED'), 'CONFLICT_STAGING_BACK_LOADED should fire');
+    });
+
+    it('CONFLICT_STAGING_BACK_LOADED does not fire when heavily-staged scenes are balanced across halves', async () => {
+      const recs1178an = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 1, 4, 5].forEach(i => { recs1178an[i] = makeRec1178(i, { visualBeats: ['beat one', 'beat two'] }); });
+      const res = await runCF1178(recs1178an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_STAGING_BACK_LOADED'), 'CONFLICT_STAGING_BACK_LOADED should not fire');
+    });
+
+    // FIRE (front-loaded): matching signal at 0,1,2,3 (front) and 4 (back) → 4/5 = 80% front, back=1.
+    // NO-FIRE: matching signal at 0,1 (front) and 4,5 (back) → 2/4 = 50%, balanced.
+    it('CONFLICT_SUSPENSE_FRONT_LOADED fires when >70% of suspense-rising scenes fall in the first half', async () => {
+      const recs1178b = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 1, 2, 3, 4].forEach(i => { recs1178b[i] = makeRec1178(i, { suspenseDelta: 1 }); });
+      const res = await runCF1178(recs1178b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_SUSPENSE_FRONT_LOADED'), 'CONFLICT_SUSPENSE_FRONT_LOADED should fire');
+    });
+
+    it('CONFLICT_SUSPENSE_FRONT_LOADED does not fire when suspense-rising scenes are balanced across halves', async () => {
+      const recs1178bn = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 1, 4, 5].forEach(i => { recs1178bn[i] = makeRec1178(i, { suspenseDelta: 1 }); });
+      const res = await runCF1178(recs1178bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_SUSPENSE_FRONT_LOADED'), 'CONFLICT_SUSPENSE_FRONT_LOADED should not fire');
+    });
+
+    // FIRE (back-loaded): matching signal at 0 (front) and 4,5,6,7 (back) → 4/5 = 80% back, front=1.
+    // NO-FIRE: matching signal at 0,1 (front) and 4,5 (back) → 2/4 = 50%, balanced.
+    it('CONFLICT_EMOTION_BACK_LOADED fires when >70% of emotionally-charged scenes fall in the second half', async () => {
+      const recs1178c = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 4, 5, 6, 7].forEach(i => { recs1178c[i] = makeRec1178(i, { emotionalShift: 'positive' }); });
+      const res = await runCF1178(recs1178c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_BACK_LOADED'), 'CONFLICT_EMOTION_BACK_LOADED should fire');
+    });
+
+    it('CONFLICT_EMOTION_BACK_LOADED does not fire when emotionally-charged scenes are balanced across halves', async () => {
+      const recs1178cn = Array.from({ length: 8 }, (_, i) => makeRec1178(i));
+      [0, 1, 4, 5].forEach(i => { recs1178cn[i] = makeRec1178(i, { emotionalShift: 'positive' }); });
+      const res = await runCF1178(recs1178cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CONFLICT_EMOTION_BACK_LOADED'), 'CONFLICT_EMOTION_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 1164 — conflictPass: conflict revelation-dialogue-highlight aftermath void, conflict suspense-emotional aftermath void, conflict suspense-curiosity aftermath void', async () => {
     const makeRec1164 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

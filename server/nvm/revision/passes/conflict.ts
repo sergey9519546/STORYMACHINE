@@ -555,10 +555,19 @@
 // negative-conflict signal in this file, never as the isTrigger side of a check.
 // CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID pairs suspenseDelta with emotionalShift;
 // CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
+// Wave 1178 additions (continues the pivot to distinct analytical modes begun in dialogue.ts
+// Wave 1176): this pass had already exhausted co-occurrence/decoupling (15 rules covering
+// nearly every trigger against the compound conflict/rupture/repair signals) and backward-cause
+// (checkPeakUncaused on 9 channels), so mining either further risked duplicating an existing
+// rule. Distribution/timing was the real gap: only two channels (curiosity, repair) had ever
+// been front/back-loading checked, both via hand-rolled code, never through the shared
+// checkHalfLoaded helper — the first use of that helper in this file. CONFLICT_STAGING_BACK_
+// LOADED, CONFLICT_SUSPENSE_FRONT_LOADED, and CONFLICT_EMOTION_BACK_LOADED give visualBeats,
+// suspenseDelta, and emotionalShift their first distribution/timing checks in this pass.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function conflictPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, approvedSpans } = input;
@@ -6856,6 +6865,81 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1164c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1164c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the conflict layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // CONFLICT_STAGING_BACK_LOADED — Distribution/timing × visualBeats. Built on checkHalfLoaded
+  // from the shared checks library — the first use of this helper in this file. n≥8, ≥4
+  // visually-dense scenes, front half ≥1, >70% in the second half. Fires when the physical
+  // staging of conflict is scarce early and only accumulates as the story nears its climax,
+  // leaving the opening's confrontations comparatively unstaged. Distinct from every existing
+  // visualBeats check in this file (CONFLICT_STAGING_PEAK_UNCAUSED, CONFLICT_PAYOFF_STAGING_
+  // DECOUPLED, and the zone-cluster/zone-imbalance checks) — none of which measure a front/back
+  // distribution skew — and from CONFLICT_CURIOSITY_FRONT_LOADED / CONFLICT_REPAIR_FRONT_LOADED
+  // (same mode, different channels).
+  {
+    const r1178a = checkHalfLoaded({
+      records, minRecords: 8, minCount: 4, ratioThreshold: 0.7, direction: 'back',
+      isPresent: r => (r.visualBeats ?? []).length >= 2,
+      minOtherHalfCount: 1,
+    });
+    if (r1178a.fires) {
+      issues.push({
+        location: `Staging distribution: ${r1178a.otherHalfCount} front-half / ${r1178a.matchingHalfCount} back-half`,
+        rule: 'CONFLICT_STAGING_BACK_LOADED',
+        severity: 'minor',
+        description: `${r1178a.matchingHalfCount} of the story's ${r1178a.count} heavily-staged scenes (${Math.round(r1178a.matchingHalfCount / r1178a.count * 100)}%) fall in the second half, leaving only ${r1178a.otherHalfCount} in the first. The physical dimension of conflict is scarce early and only accumulates as the climax nears — the opening's confrontations play out with comparatively little visible, staged action, so the story's sense of physical danger builds late rather than being established from the outset.`,
+        suggestedFix: `Stage at least one heavily physical conflict beat in the first half — a scuffle, a chase, a tense standoff played out in action rather than only dialogue. Physical conflict that builds gradually across the whole story reads as escalating danger; physical conflict that only appears late reads as a late-arriving genre shift.`,
+      });
+    }
+  }
+
+  // CONFLICT_SUSPENSE_FRONT_LOADED — Distribution/timing × suspenseDelta (>0). Built on
+  // checkHalfLoaded from the shared checks library. n≥8, ≥4 suspense-rising scenes, back half
+  // ≥1, >70% in the first half. Fires when tension is spent early and the second half — where
+  // the stakes should be sharpest — carries proportionally little rising suspense. Distinct from
+  // CONFLICT_SUSPENSE_DECOUPLED (co-occurrence, not distribution), CONFLICT_STAGING_BACK_LOADED
+  // (this wave, different channel), and CONFLICT_CURIOSITY_FRONT_LOADED (Wave 534, same mode and
+  // direction, different channel — curiosity, not suspense).
+  {
+    const r1178b = checkHalfLoaded({
+      records, minRecords: 8, minCount: 4, ratioThreshold: 0.7, direction: 'front',
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+      minOtherHalfCount: 1,
+    });
+    if (r1178b.fires) {
+      issues.push({
+        location: `Suspense distribution: ${r1178b.matchingHalfCount} front-half / ${r1178b.otherHalfCount} back-half`,
+        rule: 'CONFLICT_SUSPENSE_FRONT_LOADED',
+        severity: 'minor',
+        description: `${r1178b.matchingHalfCount} of the story's ${r1178b.count} suspense-rising scenes (${Math.round(r1178b.matchingHalfCount / r1178b.count * 100)}%) fall in the first half, leaving only ${r1178b.otherHalfCount} in the second. The conflict's tension is front-loaded — danger spikes early and then the second half, where the confrontation should be tightening toward its resolution, generates comparatively little rising suspense of its own.`,
+        suggestedFix: `Introduce or sustain at least one fresh suspense spike in the second half — a new threat, a complication that raises the danger just as the conflict nears its resolution. Tension that builds through the climax, rather than being spent early, is what keeps the confrontation's outcome in doubt until the end.`,
+      });
+    }
+  }
+
+  // CONFLICT_EMOTION_BACK_LOADED — Distribution/timing × emotionalShift (non-neutral). Built on
+  // checkHalfLoaded from the shared checks library. n≥8, ≥4 emotionally-charged scenes, front
+  // half ≥1, >70% in the second half. Fires when felt emotion is scarce early and only
+  // accumulates as the story nears its climax, leaving the opening's conflict comparatively
+  // unfelt. Distinct from CONFLICT_EMOTION_DECOUPLED (co-occurrence, not distribution) and
+  // CONFLICT_REPAIR_EMOTION_DECOUPLED (a different mode entirely, pairing emotion with repair
+  // rather than measuring emotion's own distribution) — this is the first distribution/timing
+  // check on the emotionalShift channel in this pass.
+  {
+    const r1178c = checkHalfLoaded({
+      records, minRecords: 8, minCount: 4, ratioThreshold: 0.7, direction: 'back',
+      isPresent: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      minOtherHalfCount: 1,
+    });
+    if (r1178c.fires) {
+      issues.push({
+        location: `Emotion distribution: ${r1178c.otherHalfCount} front-half / ${r1178c.matchingHalfCount} back-half`,
+        rule: 'CONFLICT_EMOTION_BACK_LOADED',
+        severity: 'minor',
+        description: `${r1178c.matchingHalfCount} of the story's ${r1178c.count} emotionally-charged scenes (${Math.round(r1178c.matchingHalfCount / r1178c.count * 100)}%) fall in the second half, leaving only ${r1178c.otherHalfCount} in the first. The conflict's felt cost is back-loaded — the opening confrontations register as plot mechanics, and only as the climax nears does the danger start to visibly weigh on anyone.`,
+        suggestedFix: `Let at least one early conflict scene land emotionally — a flash of fear, anger, or grief at the first sign of danger, not only once the stakes are already at their peak. A conflict that costs something felt from its first appearance reads as consequential throughout, not just at the end.`,
       });
     }
   }
