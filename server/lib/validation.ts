@@ -241,6 +241,18 @@ export const ReviseBodySchema = z.object({
   title: z.string().max(256).optional(),
 });
 
+// POST /api/scriptide/doctor — stateless (no sessionId): raw Fountain text in,
+// ScriptDoctorReport out. 900_000 chars is deliberately below the express
+// `express.json({ limit: '1mb' })` body cap (server/app.ts) so this schema's
+// max-length check is the one that actually fires and returns a clean 400 —
+// in the worst case (1 byte/char) 1mb ≈ 1_048_576 chars, so a fountain string
+// right at that ceiling would otherwise be rejected by the body parser with a
+// less specific 413 instead of this schema's message.
+export const DoctorBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000),
+  title: z.string().max(300).optional(),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.

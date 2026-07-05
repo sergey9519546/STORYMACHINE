@@ -12,6 +12,7 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
+import { validate, DoctorBodySchema } from '../lib/validation.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
@@ -215,6 +216,29 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
     return;
   }
   res.json({ status: 'ok', ...saved });
+}));
+
+// ── Script Doctor (bridge half 3) ────────────────────────────────────────────
+// POST /api/scriptide/doctor — run the deterministic 14-pass revision-engine
+// checkup over raw Fountain text and return the aggregated ScriptDoctorReport.
+// gameLimiter, NOT aiLimiter: every other analysis route in this file calls an
+// LLM and sits behind aiLimiter, but the doctor never does — runScriptDoctor()
+// runs the revision pipeline inside runDiagnoseOnly() (server/nvm/revision/
+// rewrite.ts), an AsyncLocalStorage-scoped flag that gates every pass's rewrite
+// step so no pass can reach the model even if a future pass regresses that
+// guard. It's pure CPU work over the request body, so it belongs on the
+// higher-throughput gameLimiter like the other stateless/non-AI routes above.
+// Stateless by design: no sessionId, no getOrCreateSession/Stage — the doctor
+// only needs the Fountain text itself, so nothing here touches `sessions`.
+router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  const { fountain } = req.body as { fountain: string; title?: string };
+  // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
+  // passes, matching this file's convention of lazily loading heavy modules
+  // (see the engine/ai.ts and engine/character-memory.ts imports below) so
+  // routes that never call the doctor don't pay for it at startup.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain);
+  res.json(report);
 }));
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
