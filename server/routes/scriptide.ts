@@ -12,7 +12,7 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import { validate, DoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
@@ -293,6 +293,84 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // every existing field untouched (including any percentile fields a
   // parallel agent adds to `dimensions`), so this can never regress an
   // existing consumer of the report shape.
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+  res.json({ ...report, rootCauses, source });
+}));
+
+// POST /api/scriptide/doctor/deep — opt-in "deep read" sibling of /doctor
+// above. Same two-format body contract (DeepDoctorBodySchema is presently a
+// plain alias of DoctorBodySchema — see validation.ts) and the same fdx→
+// Fountain conversion path, reused exactly as /doctor does it. The ONE thing
+// that changes is what runScriptDoctor is told to do with each scene's
+// signals: deep read is generative SENSING, not generative JUDGING — an LLM
+// reads each scene's meaning (subtext, stakes, motivation, irony) into the
+// same record-signal schema the 1,300 deterministic rules already judge, but
+// every verdict the response carries (health, passes, dimensions, verdict…)
+// still comes from those same rules running over whatever signals it read.
+// See the deepRead field's doc comment on ScriptDoctorReport
+// (server/nvm/analyze/types.ts) for the full lineage contract this route's
+// response must honor: a quick report never carries `deepRead`, a deep
+// report always does (even when keyless — see below), and two reports with
+// the same contentHash but different modes are NOT comparable draft-over-
+// draft, because the signals underneath came from a different process.
+//
+// aiLimiter, NOT gameLimiter — the opposite tier from /doctor, and
+// deliberately so: /doctor's whole reason for sitting on gameLimiter is that
+// runDiagnoseOnly() makes the revision pipeline provably unable to reach an
+// LLM. Deep read is the one deliberate exception to that guarantee — it
+// fans out up to ~10 LLM calls (one per scene, up to the core's per-request
+// scene cap) before the deterministic passes ever run, so it belongs on the
+// same stricter, LLM-aware budget every other generative route in this file
+// uses, not the higher-throughput CPU-only budget /doctor and /diagnose share.
+//
+// Keyless behavior is a 200, never a 500: with no AI key configured,
+// runScriptDoctor's deep-read path falls back to the lexicon signals for
+// every scene (report.deepRead.usedLLM === false, fallbackScenes covers the
+// whole script) and still returns a complete report — the same
+// "boots without a key, degrades honestly" posture server.ts holds for the
+// rest of the product (see CLAUDE.md's gotcha on this). Deep read never
+// throws for lack of a key; it just quietly becomes a quick read that was
+// asked to be deep.
+//
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage.
+router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySchema), asyncHandler(async (req, res) => {
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+
+  let fountain: string;
+  let source: DoctorSource;
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return;
+    }
+    fountain = converted.fountain;
+    source = {
+      format: 'fdx',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+  } else {
+    fountain = fountainBody as string;
+    source = { format: 'fountain' };
+  }
+
+  // Dynamic import — same lazy-load convention as /doctor above.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain, undefined, { deepRead: true });
+
+  // Root-cause clustering, attached here for the exact same reason /doctor
+  // attaches it at the route rather than inside doctor.ts — see that route's
+  // comment above. Deep read changes how SIGNALS were sensed, not the shape
+  // of the resulting issues, so this step is identical either way.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
   res.json({ ...report, rootCauses, source });

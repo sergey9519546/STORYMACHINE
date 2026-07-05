@@ -381,6 +381,16 @@ export const DoctorBodySchema = z.object({
   'provide exactly one of fountain or fdx',
 );
 
+// POST /api/scriptide/doctor/deep — the opt-in "deep read" sibling of /doctor
+// above. Same two-format contract (exactly one of fountain/fdx, optional
+// title) — deep read only changes HOW the doctor senses each scene's
+// signals (LLM reading vs. lexicon heuristics), never what the request body
+// looks like, so this is a plain alias rather than a re-declared schema:
+// keeping it a distinct exported name (instead of importing DoctorBodySchema
+// directly at the route) leaves room for the two bodies to diverge later
+// (e.g. a future per-scene budget field) without disturbing /doctor's schema.
+export const DeepDoctorBodySchema = DoctorBodySchema;
+
 // POST /api/scriptide/diagnose — stateless (no sessionId), fountain-only. This
 // is the debounce-friendly "diagnostics as you type" sibling of /doctor: it
 // has no fdx/pdf variant because it runs on every keystroke-pause tick against

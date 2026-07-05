@@ -224,6 +224,30 @@ const DOCTOR_HISTORY_KEY = "sm_doctor_history_v1";
 const DOCTOR_HISTORY_MAX_ENTRIES = 50;
 const DOCTOR_HISTORY_DISPLAY_MAX = 10;
 
+// ─── Deep read toggle preference (client-side, localStorage) ────────────────
+// Just a sticky checkbox — same try/catch-degrades-to-default idiom as the
+// history helpers above, so a private-mode browser or a full quota just means
+// the toggle resets to its default next visit instead of ever breaking the
+// panel.
+const DEEP_READ_PREF_KEY = "sm_doctor_deep_read_pref_v1";
+
+function loadDeepReadPref(): boolean {
+  try {
+    return localStorage.getItem(DEEP_READ_PREF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveDeepReadPref(enabled: boolean): void {
+  try {
+    localStorage.setItem(DEEP_READ_PREF_KEY, enabled ? "1" : "0");
+  } catch {
+    // Private-mode localStorage access, or quota exceeded — the preference
+    // just doesn't persist; the toggle still works fine for this session.
+  }
+}
+
 // The health-scoring formula's version, bumped every time server/nvm/analyze/
 // doctor.ts changes its scoring formula materially (i.e. the same script's
 // displayed health/dimension numbers would meaningfully shift, not just a
@@ -253,6 +277,14 @@ interface DoctorHistoryEntry {
    *  before this field existed predates it — see entryFormulaVersion below
    *  for how those are treated (v1 by definition, not by omission-as-bug). */
   formulaVersion?: number;
+  /** Which reading mode produced this entry: 'quick' (deterministic-only
+   *  signals) or 'deep' (an LLM read each scene's meaning into the same
+   *  schema via POST /api/scriptide/doctor/deep). Optional because every
+   *  entry recorded before deep read existed predates this field entirely —
+   *  a MISSING mode means 'quick' by definition (deep read didn't exist yet
+   *  when it was recorded), the same "absence is a known fact, not an
+   *  unknown" convention formulaVersion already uses above. */
+  mode?: "quick" | "deep";
 }
 
 /** An entry's effective formula version. Entries recorded before this field
@@ -261,6 +293,12 @@ interface DoctorHistoryEntry {
  *  ran without stamping a version), not "unknown"/"assume current". */
 function entryFormulaVersion(entry: DoctorHistoryEntry): number {
   return entry.formulaVersion ?? 1;
+}
+
+/** An entry's effective read mode — see DoctorHistoryEntry.mode's comment for
+ *  why a missing field means 'quick' rather than 'unknown'. */
+function entryMode(entry: DoctorHistoryEntry): "quick" | "deep" {
+  return entry.mode ?? "quick";
 }
 
 function loadDoctorHistory(): DoctorHistoryEntry[] {
@@ -303,6 +341,7 @@ function clearDoctorHistory(): void {
 function recordDoctorHistory(
   report: ScriptDoctorReport,
   title: string,
+  mode: "quick" | "deep",
 ): { history: DoctorHistoryEntry[]; previous: DoctorHistoryEntry | null } {
   const existing = loadDoctorHistory();
   const previous = existing.length > 0 ? existing[existing.length - 1] : null;
@@ -322,6 +361,7 @@ function recordDoctorHistory(
     bySeverity: report.bySeverity,
     dimensions: (report.dimensions ?? []).map((d) => ({ key: d.key, score: d.score })),
     formulaVersion: DOCTOR_HISTORY_FORMULA_VERSION,
+    mode,
   };
   const next = [...existing, entry].slice(-DOCTOR_HISTORY_MAX_ENTRIES);
   saveDoctorHistory(next);
@@ -432,30 +472,49 @@ function DraftDeltaStrip({
   );
 }
 
-/** Cross-formula-version honesty notice: rendered INSTEAD of DraftDeltaStrip
- *  whenever the previous history entry was scored under a different
- *  formulaVersion than the one running now. Every field DraftDeltaStrip
- *  subtracts (health, dimension scores) came from a differently-shaped
- *  scale in that case — a "+12" or "-38" here would be a fabricated number
- *  dressed as a fact, not an honest comparison. Verdicts (RECOMMEND/CONSIDER/
- *  PASS) are the one exception: they're words, not points on either scale, so
- *  they stay directly comparable and are still shown — same standard
- *  DraftDeltaStrip already applies to `verdictChanged`. */
+/** Cross-lineage honesty notice: rendered INSTEAD of DraftDeltaStrip whenever
+ *  the previous history entry isn't comparable to the current report on
+ *  either of the two axes that can silently invalidate a delta:
+ *   - 'formula' — scored under a different DOCTOR_HISTORY_FORMULA_VERSION.
+ *   - 'mode'    — read under a different mode ('quick' deterministic-only vs.
+ *                 'deep' LLM-sensed signals, per ScriptDoctorReport.deepRead's
+ *                 lineage contract in server/nvm/analyze/types.ts: same
+ *                 contentHash + different mode is NOT comparable draft-over-
+ *                 draft).
+ *   - 'both'    — both at once.
+ *  Every field DraftDeltaStrip subtracts (health, dimension scores) came from
+ *  a differently-shaped scale or a differently-sensed signal set in these
+ *  cases — a "+12" or "-38" here would be a fabricated number dressed as a
+ *  fact, not an honest comparison. Verdicts (RECOMMEND/CONSIDER/PASS) are the
+ *  one exception: they're words, not points on either scale, so they stay
+ *  directly comparable and are still shown — same standard DraftDeltaStrip
+ *  already applies to `verdictChanged`. */
 function CrossVersionNotice({
   previous,
   current,
+  reason,
 }: {
   previous: DoctorHistoryEntry;
   current: ScriptDoctorReport;
+  reason: "formula" | "mode" | "both";
 }) {
+  const heading =
+    reason === "mode"
+      ? "Different read modes — not directly comparable"
+      : reason === "both"
+      ? "Scoring model updated and read modes differ since your last draft"
+      : "Scoring model updated since your last draft";
+  const bodyLead =
+    reason === "mode"
+      ? "One draft was a quick (deterministic) read and the other was a deep read (AI-sensed signals) — the underlying signals came from a different process, so scores aren’t directly comparable"
+      : "Scores aren’t directly comparable";
   return (
     <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 p-3 space-y-1.5">
       <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Scoring model updated
-        since your last draft
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {heading}
       </p>
       <p className="text-xs font-mono leading-relaxed text-amber-900 dark:text-amber-200">
-        Scores aren&rsquo;t directly comparable
+        {bodyLead}
         {previous.verdict && current.verdict ? (
           <>
             {" "}
@@ -700,6 +759,44 @@ export default function ScriptDoctorPanel({
   const [exportError, setExportError] = useState<string | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
 
+  // Whether an AI key is configured server-side — gates the "Deep read"
+  // toggle only, never the quick (deterministic) diagnosis path, which is
+  // this product's always-available front door (see CLAUDE.md's gotcha on
+  // keyless boot). null until the check resolves; ScriptIDE itself already
+  // fetches /api/ai-config for its own banner, but this panel can be opened
+  // standalone (e.g. before ScriptIDE's own check resolves) so it fetches its
+  // own copy independently — same pattern InterviewPanel uses for the exact
+  // same reason.
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => {
+        /* non-critical — the toggle just stays disabled-by-uncertainty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // "Deep read" toggle: opt-in, sticky across sessions (localStorage). Only
+  // meaningful for fountain/fdx sources — a pdf upload always runs the quick
+  // path regardless (see runDiagnosis's `useDeepRead` computation and the
+  // pdf-route follow-up note there).
+  const [deepReadEnabled, setDeepReadEnabled] = useState<boolean>(() => loadDeepReadPref());
+  useEffect(() => {
+    saveDeepReadPref(deepReadEnabled);
+  }, [deepReadEnabled]);
+  // Which mode the IN-FLIGHT or MOST RECENT run actually targeted — drives the
+  // loading-state copy so "Reading each scene with AI…" only appears for a
+  // real deep-read request, not just because the toggle happens to be checked
+  // right now (the toggle can change after a run started).
+  const [lastRunMode, setLastRunMode] = useState<"quick" | "deep">("quick");
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -852,6 +949,18 @@ export default function ScriptDoctorPanel({
       ? { fdx: uploadedFile!.content }
       : { fountain: effectiveText };
 
+    // Deep read targets the /doctor/deep sibling for fountain/fdx sources
+    // only. PDF stays quick-only for now: the pdf route composes
+    // conversion+doctor server-side in one handler (server/routes/scriptide.ts),
+    // and giving it a deep-read variant means either duplicating that
+    // conversion step or reshaping the route — real work, deliberately out of
+    // scope here (off-limits per this run's contract) and left as a
+    // follow-up. A sample run is always plain fountain text, so it can use
+    // deep read exactly like a real fountain source when the toggle is on.
+    const useDeepRead = deepReadEnabled && !isPdf;
+    const effectiveMode: "quick" | "deep" = useDeepRead ? "deep" : "quick";
+    setLastRunMode(effectiveMode);
+
     const request = isPdf
       ? fetch("/api/scriptide/doctor/pdf", {
           method: "POST",
@@ -859,7 +968,7 @@ export default function ScriptDoctorPanel({
           body: uploadedFile!.pdfBytes,
           signal: controller.signal,
         })
-      : fetch("/api/scriptide/doctor", {
+      : fetch(useDeepRead ? "/api/scriptide/doctor/deep" : "/api/scriptide/doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
@@ -876,6 +985,8 @@ export default function ScriptDoctorPanel({
             res.status === 404
               ? isPdf
                 ? "PDF diagnosis isn't live yet — the /api/scriptide/doctor/pdf route hasn't been deployed."
+                : useDeepRead
+                ? "Deep read isn't live yet — the /api/scriptide/doctor/deep route hasn't been deployed."
                 : "Script Doctor isn't live yet — the /api/scriptide/doctor route hasn't been deployed."
               : `Diagnosis failed (${res.status})`;
           throw new Error(body?.error ?? fallback);
@@ -896,9 +1007,14 @@ export default function ScriptDoctorPanel({
         // sample runs; otherwise unchanged — record this diagnosis (unless
         // it's an exact repeat of the last one) and capture whatever was
         // newest *before* this call as the delta baseline / identical-script
-        // check.
+        // check. `effectiveMode` (not `data.deepRead`'s presence) stamps the
+        // history entry's mode: a keyless deep-read run still hit
+        // /doctor/deep and still carries `deepRead` on its report, so mode
+        // reflects which lineage the request belongs to, matching the
+        // lineage contract on ScriptDoctorReport.deepRead — not whether the
+        // LLM actually fired this particular time.
         if (!isSampleRun) {
-          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "");
+          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "", effectiveMode);
           setHistory(nextHistory);
           setPreviousEntry(previous);
         }
@@ -1074,12 +1190,26 @@ export default function ScriptDoctorPanel({
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Upload script
         </button>
+        {/* Export is disabled outright for a deep-read report, not offered
+            with a caveat. POST /api/export/coverage re-runs a QUICK read
+            server-side (it has no deep-read variant — out of scope for this
+            run, see the deliverable's off-limits list), so exporting a deep
+            report would silently swap its lineage: the writer would download
+            a document claiming to cover the draft on screen, scored by a
+            different process than the one that actually produced it.
+            Authenticity over convenience — a disabled button with an honest
+            title beats a toast nobody reads before the file's already
+            downloaded. */}
         {status === "success" && report && (
           <button
             onClick={handleExportReport}
-            disabled={exportStatus === "loading"}
+            disabled={exportStatus === "loading" || !!report.deepRead}
             aria-label="Export coverage report as an HTML document"
-            title="Export the current report as a downloadable HTML coverage document"
+            title={
+              report.deepRead
+                ? "Export re-verifies deterministically (quick read) — run a quick diagnosis to export"
+                : "Export the current report as a downloadable HTML coverage document"
+            }
             className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
           >
             {exportStatus === "loading" ? (
@@ -1204,6 +1334,38 @@ export default function ScriptDoctorPanel({
                 scene-by-scene issue heatmap, and your top priority fixes.
                 {uploadedFile && " It will analyze the uploaded file shown above, not the editor."}
               </p>
+              {/* Deep read toggle: opt-in, labeled, and disabled (with an
+                  explanatory title) whenever it can't actually do anything —
+                  no AI key configured, or the active source is a PDF upload
+                  (quick-only for now, see runDiagnosis's useDeepRead note).
+                  The quick path below is never gated on llmReady — it's the
+                  product's always-available front door. */}
+              {(() => {
+                const disabledReason = isPdfUpload
+                  ? "Deep read isn't available for PDF uploads yet — this will run as a quick (deterministic) read."
+                  : llmReady === false
+                  ? "Deep read needs an AI key configured — set one in Settings, or leave this unchecked to run the deterministic quick read."
+                  : undefined;
+                return (
+                  <label
+                    className={`flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest select-none ${
+                      disabledReason
+                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "text-gray-700 dark:text-gray-300 cursor-pointer"
+                    }`}
+                    title={disabledReason}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={deepReadEnabled}
+                      disabled={!!disabledReason}
+                      onChange={(e) => setDeepReadEnabled(e.target.checked)}
+                      className="w-3.5 h-3.5"
+                    />
+                    Deep read (AI reads each scene&rsquo;s meaning &mdash; slower, uses your AI key)
+                  </label>
+                );
+              })()}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => runDiagnosis()}
@@ -1231,7 +1393,9 @@ export default function ScriptDoctorPanel({
           <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-500" aria-hidden="true" />
             <p className="text-xs uppercase tracking-widest text-gray-500" role="status" aria-live="polite">
-              Running 14 passes&hellip;
+              {lastRunMode === "deep"
+                ? "Reading each scene's meaning with AI, then running 14 passes…"
+                : "Running 14 passes…"}
             </p>
             <button
               disabled
@@ -1353,6 +1517,33 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
+            {/* Deep read strip — present ONLY on reports from POST
+                /api/scriptide/doctor/deep (report.deepRead; see its doc
+                comment in server/nvm/analyze/types.ts). Honest about the
+                keyless-degrade case: usedLLM:false means every scene fell
+                back to lexicon signals, so this ran as a quick read that was
+                asked to be deep — said outright rather than implying an AI
+                reading happened when it didn't. Placed on the report header,
+                right after the verdict/grade box, since it changes how to
+                read every score below it. */}
+            {report.deepRead && (
+              <div className="bg-indigo-50 dark:bg-indigo-950/30 border-2 border-indigo-300 dark:border-indigo-800 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  {report.deepRead.usedLLM
+                    ? `Deep read: ${report.deepRead.scenesRead} of ${report.deepRead.scenesTotal} scenes read by AI`
+                    : "AI unavailable — this ran as a quick read"}
+                </p>
+                {report.deepRead.fallbackScenes.length > 0 && (
+                  <p className="text-[10px] font-mono text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                    Fell back to lexicon signals for scene
+                    {report.deepRead.fallbackScenes.length === 1 ? "" : "s"}{" "}
+                    {report.deepRead.fallbackScenes.map((idx) => idx + 1).join(", ")}.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Plain-language summary — a readable paragraph a writer with no
                 film-school vocabulary can act on immediately. */}
             {report.plainSummary && (
@@ -1389,23 +1580,35 @@ export default function ScriptDoctorPanel({
                 Identical contentHash to that previous entry gets the flat
                 "no changes" notice per the determinism nuance in the task
                 spec (the script itself is unchanged, regardless of which
-                formula scored it), rather than a delta strip showing
+                formula or mode scored it), rather than a delta strip showing
                 all-zero deltas. Otherwise — genuinely different content —
-                a formula-version mismatch against the CURRENT running
-                version takes priority over the ordinary delta strip: two
-                reports scored by different formulas are not comparable
-                numbers no matter how much the script changed, so this
-                branch must be checked before DraftDeltaStrip ever renders. */}
+                a formula-version mismatch and/or a read-mode mismatch (quick
+                vs. deep — see ScriptDoctorReport.deepRead's lineage contract)
+                against the CURRENT report takes priority over the ordinary
+                delta strip: reports scored by different formulas, or whose
+                signals came from different reading processes, are not
+                comparable numbers no matter how much the script changed, so
+                this branch must be checked before DraftDeltaStrip ever
+                renders. */}
             {previousEntry && report.contentHash && (
               previousEntry.contentHash === report.contentHash ? (
                 <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
                   No changes since last diagnosis — identical script.
                 </p>
-              ) : entryFormulaVersion(previousEntry) !== DOCTOR_HISTORY_FORMULA_VERSION ? (
-                <CrossVersionNotice previous={previousEntry} current={report} />
-              ) : (
-                <DraftDeltaStrip previous={previousEntry} current={report} />
-              )
+              ) : (() => {
+                  const formulaDiffers = entryFormulaVersion(previousEntry) !== DOCTOR_HISTORY_FORMULA_VERSION;
+                  const modeDiffers = entryMode(previousEntry) !== (report.deepRead ? "deep" : "quick");
+                  if (!formulaDiffers && !modeDiffers) {
+                    return <DraftDeltaStrip previous={previousEntry} current={report} />;
+                  }
+                  return (
+                    <CrossVersionNotice
+                      previous={previousEntry}
+                      current={report}
+                      reason={formulaDiffers && modeDiffers ? "both" : formulaDiffers ? "formula" : "mode"}
+                    />
+                  );
+                })()
             )}
 
             {/* Craft dimensions — 14 passes rolled up into 5 writer-facing scores. */}
@@ -1682,6 +1885,18 @@ export default function ScriptDoctorPanel({
                                 title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
                               >
                                 (older scoring model)
+                              </span>
+                            )}
+                            {/* Deep-read provenance tag — quick entries stay
+                                untagged (the common case); only a deep-read
+                                entry needs the callout, since that's the one
+                                whose signals came from a different process. */}
+                            {entryMode(entry) === "deep" && (
+                              <span
+                                className="text-[9px] italic text-indigo-500 dark:text-indigo-400 shrink-0"
+                                title="This diagnosis was a deep read — an LLM sensed each scene's meaning into the same signal schema, rather than the deterministic lexicon alone."
+                              >
+                                (deep read)
                               </span>
                             )}
                           </li>
