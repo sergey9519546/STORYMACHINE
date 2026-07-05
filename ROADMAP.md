@@ -432,8 +432,70 @@ Four function gaps take priority over all polish. Anchors verified:
   shows `suggestedFix` as tooltip text only — no path from an editor
   squiggle to the fix-and-verify endpoint.
 
-A 4-agent ultrareview (3 inventory sweeps + 1 fresh-eyes product critic)
-is auditing the whole product; its findings shape Runs 17–31.
+### Ultrareview verdict (4-agent audit, 2026-07-05) — shapes Runs 18–31
+
+Surface map: ~18 routes with no UI caller (each claim needs verification —
+one false negative already caught: doctor/deep IS called), ~38 routes with
+inline-only or missing zod validation (drift from CLAUDE.md's "every route
+zod-validates" claim), AIPanel orphaned. Test audit: 52 untested server
+modules (room critics, proof tiers 1–2, agent decision logic), ZERO frontend
+component tests, 100% fixture-only rule tests, no real-script regression
+corpus. Docs audit: 95% aligned, clue lifecycle fires 0/20 corpus samples.
+Product critic (ran the live server, A/B tested own scripts): **HEADLINE —
+a deliberately bad script scored 78.7 while a well-crafted subtextual one
+scored 72.** Reversal/relationship detectors are keyed to blunt explicit
+signals; NON_RESPONSIVE_EXCHANGE punishes professional elliptical dialogue
+(literal word-overlap test); ON_THE_NOSE regex missed pure feeling-narration
+("stressed"/"worried" not in word list, template too rigid); dimension
+scores collapse to five identical values on short scripts (scarcity term
+dominates); ~131 issues with 4× near-duplicate families; exports render
+"Untitled" despite a Fountain title page (title-page block never parsed);
+no page-count/runtime units anywhere; pitch kit has no pitch content;
+room critique leaks proof-kernel jargon; buildStrengths is
+absence-of-negative only. Praise: error handling bulletproof, keyless
+degradation honest, root-cause clustering "the best feature in the
+product", exposition detection real, ~15ms doctor runs.
+
+## 13a. Runs 18–31 — The next fifteen (synthesis of the ultrareview)
+
+- [ ] **Run 18 — Score trust (THE premise fix).** Subtext-aware
+  reversal/relationship-shift sensing; fix or retire
+  NON_RESPONSIVE_EXCHANGE's literal-overlap test; broaden ON_THE_NOSE
+  beyond the "I feel X" template + fixed word list; fix short-script
+  dimension collapse (scarcity term swamps density) or suppress false
+  precision; NEW TEST CLASS — discrimination harness: paired good/bad
+  scripts where good MUST outscore bad, in CI forever.
+- [ ] **Run 19 — Report quality.** Cross-pass dedup of near-identical
+  issue families (the *_SEED_*_EMOTION family) before user display;
+  page-count/runtime estimate in every report and export; Fountain
+  title-page parsing as default title everywhere; "reads like an excerpt"
+  confidence caveat for few-scene inputs.
+- [ ] **Run 20 — Excellence sprint.** Accelerated Type-2 waves: positive
+  craft detectors (clean reversal, tight subtext, executed escalation)
+  feeding buildStrengths — the critic ranked this above further defect
+  rules given the A/B inversion.
+- [ ] **Run 21 — Producer surfaces.** Pitch kit gets pitch content
+  (deterministic logline from protagonist/goal/obstacle signals, genre,
+  synopsis, comps slot); coverage title fix; page metrics in exports.
+- [ ] **Run 22 — Validation completeness.** Zod schemas for every route
+  in the ~38 gap list (restores the CLAUDE.md security claim); room
+  critique translation layer (no proof-kernel jargon reaches writers).
+- [ ] **Run 23 — Dead-surface reconciliation.** Verify each "no UI
+  caller" route; EXPOSE the valuable ones (session export/import,
+  export/verify determinism badge, run-scene) — only expand, don't
+  reduce; mark genuinely deprecated code as such.
+- [ ] **Run 24 — Test depth.** Real-script regression corpus
+  (public-domain screenplays end-to-end through all 14 passes); tests for
+  the 52 untested modules (room critics, proof tiers, agent decision);
+  first frontend component tests.
+- [ ] **Run 25 — Onboarding.** First-run experience: sample content
+  reachable in one click from every entry surface; blank-editor bounce
+  fix.
+- [ ] **Runs 26–31 — Depth cycles.** Wave cycles 3–5 (1191+, cursor
+  Type 2) under the discrimination harness as an additional gate;
+  genre-conditioned variants; deep-read on the PDF path; slate fdx/pdf;
+  R13 flag persistence; real-key LLM quality eval (needs user key);
+  then 17b polish items.
 
 ### Run 17b — Polish (retained, after function work)
 
