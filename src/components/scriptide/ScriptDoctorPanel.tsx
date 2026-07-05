@@ -21,6 +21,7 @@ import {
   ArrowUp,
   ArrowDown,
   Minus,
+  Sparkles,
 } from "lucide-react";
 import type {
   ScriptDoctorReport,
@@ -34,6 +35,7 @@ import type {
   RevisionIssue,
   PassName,
 } from "../../../server/nvm/revision/passes/types.ts";
+import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,14 @@ interface UploadedScript {
   content: string;
   format: "fountain" | "fdx" | "pdf";
   pdfBytes?: ArrayBuffer;
+  /** Where this source came from: a real user-selected file ("upload") or
+   *  the built-in sample screenplay ("sample", src/lib/sample-script.ts)
+   *  loaded via "Try a sample script". Drives the provenance chip's
+   *  label/icon and — critically — whether a successful diagnosis records a
+   *  draft-history entry: a sample run is a one-click demo, not the user's
+   *  own draft, so it must never pollute their real history (see
+   *  runDiagnosis's isSampleRun guard). */
+  provenance: "upload" | "sample";
 }
 
 // Matches the request-contract guard on the doctor route: reject oversized
@@ -214,6 +224,21 @@ const DOCTOR_HISTORY_KEY = "sm_doctor_history_v1";
 const DOCTOR_HISTORY_MAX_ENTRIES = 50;
 const DOCTOR_HISTORY_DISPLAY_MAX = 10;
 
+// The health-scoring formula's version, bumped every time server/nvm/analyze/
+// doctor.ts changes its scoring formula materially (i.e. the same script's
+// displayed health/dimension numbers would meaningfully shift, not just a
+// rule tweak that nudges one issue). Stamped onto every NEW history entry so
+// the delta strip can tell "this draft actually got worse" apart from "the
+// ruler changed length since you last measured" — comparing raw numbers
+// across a formula change is not a regression, it's a lie.
+//   v1 = the original scene-count-normalized clamp-to-[0,100] era.
+//   v2 = the current opportunity-normalized craftPenalty formula (weighted
+//        issues read as a density against wordCount^0.7 + a scarcity term),
+//        which moved realistic scripts' displayed health from ~0 to ~7-73 —
+//        a swing large enough that any cross-version numeric delta is
+//        meaningless.
+const DOCTOR_HISTORY_FORMULA_VERSION = 2;
+
 interface DoctorHistoryEntry {
   at: number;
   title: string;
@@ -223,6 +248,19 @@ interface DoctorHistoryEntry {
   totalIssues: number;
   bySeverity: { critical: number; major: number; minor: number };
   dimensions: Array<{ key: DimensionKey; score: number }>;
+  /** The scoring formula in effect when this entry was recorded (see
+   *  DOCTOR_HISTORY_FORMULA_VERSION). Optional because every entry recorded
+   *  before this field existed predates it — see entryFormulaVersion below
+   *  for how those are treated (v1 by definition, not by omission-as-bug). */
+  formulaVersion?: number;
+}
+
+/** An entry's effective formula version. Entries recorded before this field
+ *  existed have no `formulaVersion` at all — per the task's contract, a
+ *  MISSING field means v1 by definition (v1 was the only formula that ever
+ *  ran without stamping a version), not "unknown"/"assume current". */
+function entryFormulaVersion(entry: DoctorHistoryEntry): number {
+  return entry.formulaVersion ?? 1;
 }
 
 function loadDoctorHistory(): DoctorHistoryEntry[] {
@@ -283,6 +321,7 @@ function recordDoctorHistory(
     totalIssues: report.totalIssues,
     bySeverity: report.bySeverity,
     dimensions: (report.dimensions ?? []).map((d) => ({ key: d.key, score: d.score })),
+    formulaVersion: DOCTOR_HISTORY_FORMULA_VERSION,
   };
   const next = [...existing, entry].slice(-DOCTOR_HISTORY_MAX_ENTRIES);
   saveDoctorHistory(next);
@@ -389,6 +428,45 @@ function DraftDeltaStrip({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Cross-formula-version honesty notice: rendered INSTEAD of DraftDeltaStrip
+ *  whenever the previous history entry was scored under a different
+ *  formulaVersion than the one running now. Every field DraftDeltaStrip
+ *  subtracts (health, dimension scores) came from a differently-shaped
+ *  scale in that case — a "+12" or "-38" here would be a fabricated number
+ *  dressed as a fact, not an honest comparison. Verdicts (RECOMMEND/CONSIDER/
+ *  PASS) are the one exception: they're words, not points on either scale, so
+ *  they stay directly comparable and are still shown — same standard
+ *  DraftDeltaStrip already applies to `verdictChanged`. */
+function CrossVersionNotice({
+  previous,
+  current,
+}: {
+  previous: DoctorHistoryEntry;
+  current: ScriptDoctorReport;
+}) {
+  return (
+    <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 p-3 space-y-1.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Scoring model updated
+        since your last draft
+      </p>
+      <p className="text-xs font-mono leading-relaxed text-amber-900 dark:text-amber-200">
+        Scores aren&rsquo;t directly comparable
+        {previous.verdict && current.verdict ? (
+          <>
+            {" "}
+            — verdict then:{" "}
+            <span className="font-bold uppercase">{previous.verdict}</span> &middot; now:{" "}
+            <span className="font-bold uppercase">{current.verdict}</span>.
+          </>
+        ) : (
+          "."
+        )}
+      </p>
     </div>
   );
 }
@@ -598,6 +676,14 @@ export default function ScriptDoctorPanel({
   // still on screen. Null for pdf-sourced reports — those export from
   // report.source.convertedFountain instead, which the server already returns.
   const [analyzedSnapshot, setAnalyzedSnapshot] = useState<{ fountain?: string; fdx?: string } | null>(null);
+  // The title actually sent with the currently-displayed report's request —
+  // ordinarily just the `title` prop, but a sample run overrides it with the
+  // sample's own title (see runDiagnosis's sampleOverride param). "Export
+  // report" reuses THIS rather than the live `title` prop for the same
+  // stale-state reason analyzedSnapshot exists: exporting a sample-sourced
+  // report must never get relabeled under whatever project title happens to
+  // be open, since the two have nothing to do with each other.
+  const [activeReportTitle, setActiveReportTitle] = useState<string | undefined>(undefined);
 
   // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
   const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
@@ -662,7 +748,7 @@ export default function ScriptDoctorPanel({
         );
         return;
       }
-      setUploadedFile({ name: file.name, content: "", format: "pdf", pdfBytes: buffer });
+      setUploadedFile({ name: file.name, content: "", format: "pdf", pdfBytes: buffer, provenance: "upload" });
       abortRef.current?.abort();
       setStatus("idle");
       setReport(null);
@@ -697,7 +783,7 @@ export default function ScriptDoctorPanel({
     const sniffedFdx = /^\s*<\?xml/.test(text) || text.includes("<FinalDraft");
     const format: "fountain" | "fdx" = lowerName.endsWith(".fdx") || sniffedFdx ? "fdx" : "fountain";
 
-    setUploadedFile({ name: file.name, content: text, format });
+    setUploadedFile({ name: file.name, content: text, format, provenance: "upload" });
     // A fresh upload supersedes whatever was on screen — drop back to idle so
     // "Run Diagnosis" unambiguously targets the new source, not a stale
     // report or error from the editor content.
@@ -716,8 +802,22 @@ export default function ScriptDoctorPanel({
     setErrorMessage(null);
   };
 
-  const runDiagnosis = () => {
-    if (isEmpty) return;
+  /** `sampleOverride` is set only by loadSample's own immediate call, to hand
+   *  the sample's text/title straight through rather than reading them back
+   *  off `uploadedFile`/`fountain` — those are updated via setState just
+   *  before this call and so would still read their PRE-update values inside
+   *  this same synchronous handler. Every subsequent call (Re-run, Retry) is
+   *  argument-less as before, reading `uploadedFile` from render state as
+   *  usual — by then React has committed the sample into that state, so
+   *  `uploadedFile?.provenance === "sample"` alone is enough to recognize a
+   *  sample re-run and keep it out of history. */
+  const runDiagnosis = (sampleOverride?: { fountain: string; title: string }) => {
+    if (!sampleOverride && isEmpty) return;
+
+    // True for the sample's very first run (via the override) AND for every
+    // later Re-run of it (no override, but the active source is still the
+    // sample) — either way, this diagnosis must not be recorded as a draft.
+    const isSampleRun = !!sampleOverride || uploadedFile?.provenance === "sample";
 
     // Cancel any in-flight diagnosis so its response can't land after a newer one.
     abortRef.current?.abort();
@@ -735,18 +835,22 @@ export default function ScriptDoctorPanel({
     // Request contract: exactly one of fountain|fdx as JSON, OR raw PDF bytes
     // with no JSON wrapper. A .fdx upload sends its raw text as `fdx`; a .pdf
     // upload POSTs the bytes directly to the dedicated pdf route; everything
-    // else (editor text, or an uploaded .fountain/.txt file) sends `fountain`.
-    // `snapshotForThisRun` mirrors whichever branch fires — it's what "Export
-    // report" reuses later, since by then `uploadedFile`/`fountain` may have
-    // moved on. pdf has no snapshot: the server's response itself carries
-    // convertedFountain, which export reads directly off the report.
-    const isPdf = uploadedFile?.format === "pdf";
-    const isFdx = uploadedFile?.format === "fdx";
+    // else (editor text, an uploaded .fountain/.txt file, or the sample)
+    // sends `fountain`. `snapshotForThisRun` mirrors whichever branch fires —
+    // it's what "Export report" reuses later, since by then `uploadedFile`/
+    // `fountain` may have moved on. pdf has no snapshot: the server's
+    // response itself carries convertedFountain, which export reads directly
+    // off the report. The sample is always plain fountain text, never pdf/fdx,
+    // so both flags are unconditionally false while sampleOverride is set.
+    const isPdf = !sampleOverride && uploadedFile?.format === "pdf";
+    const isFdx = !sampleOverride && uploadedFile?.format === "fdx";
+    const effectiveTitle = sampleOverride ? sampleOverride.title : title;
+    const effectiveText = sampleOverride ? sampleOverride.fountain : activeText;
     const snapshotForThisRun: { fountain?: string; fdx?: string } | null = isPdf
       ? null
       : isFdx
       ? { fdx: uploadedFile!.content }
-      : { fountain: activeText };
+      : { fountain: effectiveText };
 
     const request = isPdf
       ? fetch("/api/scriptide/doctor/pdf", {
@@ -758,7 +862,9 @@ export default function ScriptDoctorPanel({
       : fetch("/api/scriptide/doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(isFdx ? { fdx: uploadedFile!.content, title } : { fountain: activeText, title }),
+          body: JSON.stringify(
+            isFdx ? { fdx: uploadedFile!.content, title: effectiveTitle } : { fountain: effectiveText, title: effectiveTitle }
+          ),
           signal: controller.signal,
         });
 
@@ -780,14 +886,22 @@ export default function ScriptDoctorPanel({
         if (myGeneration !== generationRef.current) return; // superseded by a newer run
         setReport(data);
         setAnalyzedSnapshot(snapshotForThisRun);
+        setActiveReportTitle(effectiveTitle);
         setOpenPasses({});
         setStatus("success");
-        // Draft-over-draft history: record this diagnosis (unless it's an
-        // exact repeat of the last one) and capture whatever was newest
-        // *before* this call as the delta baseline / identical-script check.
-        const { history: nextHistory, previous } = recordDoctorHistory(data, title ?? "");
-        setHistory(nextHistory);
-        setPreviousEntry(previous);
+        // Draft-over-draft history: a sample run is a one-click demo, not the
+        // user's own draft — recording it would plant a fake "draft" in a
+        // returning writer's real history (and, worse, become the delta
+        // baseline for their NEXT actual diagnosis). Skip entirely for
+        // sample runs; otherwise unchanged — record this diagnosis (unless
+        // it's an exact repeat of the last one) and capture whatever was
+        // newest *before* this call as the delta baseline / identical-script
+        // check.
+        if (!isSampleRun) {
+          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "");
+          setHistory(nextHistory);
+          setPreviousEntry(previous);
+        }
       })
       .catch((err: unknown) => {
         if (myGeneration !== generationRef.current) return; // superseded — ignore
@@ -800,6 +914,26 @@ export default function ScriptDoctorPanel({
         setErrorMessage(err instanceof Error ? err.message : "Diagnosis failed");
       })
       .finally(() => clearTimeout(timeoutId));
+  };
+
+  /** "Try a sample script": loads the built-in sample (src/lib/sample-script.ts)
+   *  as an uploaded-style source — same provenance mechanism as a real
+   *  upload, just tagged "sample" instead of "upload" — and runs diagnosis
+   *  on it immediately, in the same click. Passing the sample's text/title
+   *  straight into runDiagnosis (rather than relying on the setUploadedFile
+   *  call just above to land first) is required, not stylistic: state
+   *  updates from this handler haven't committed yet when runDiagnosis reads
+   *  `uploadedFile`/`activeText` a few lines later in the same synchronous
+   *  call, so without the override the first run would fire against
+   *  whatever was active before this click (typically empty). */
+  const loadSample = () => {
+    setUploadError(null);
+    abortRef.current?.abort();
+    setUploadedFile({ name: sampleScriptTitle, content: sampleScriptFountain, format: "fountain", provenance: "sample" });
+    setStatus("idle");
+    setReport(null);
+    setErrorMessage(null);
+    runDiagnosis({ fountain: sampleScriptFountain, title: sampleScriptTitle });
   };
 
   const handleExportReport = () => {
@@ -816,7 +950,12 @@ export default function ScriptDoctorPanel({
     // from — never live editor/upload state, which may have moved on since
     // diagnosis succeeded. pdf-sourced reports have no fountain/fdx snapshot
     // (the doctor/pdf route takes raw bytes, not JSON), so they export the
-    // server's own convertedFountain instead.
+    // server's own convertedFountain instead. Title likewise reuses
+    // activeReportTitle (the title THIS report was actually generated under)
+    // rather than the live `title` prop — for a sample-sourced report those
+    // two can differ (the host project's title vs. the sample's own), and
+    // exporting under the wrong one would mislabel a demo as the user's work.
+    const exportTitle = activeReportTitle ?? title;
     let payload: { fountain?: string; fdx?: string; title?: string };
     if (report.source?.format === "pdf") {
       const converted = report.source.convertedFountain;
@@ -825,13 +964,13 @@ export default function ScriptDoctorPanel({
         setExportError("This PDF-sourced report has no converted Fountain text to export.");
         return;
       }
-      payload = { fountain: converted, title };
+      payload = { fountain: converted, title: exportTitle };
     } else if (analyzedSnapshot) {
-      payload = { ...analyzedSnapshot, title };
+      payload = { ...analyzedSnapshot, title: exportTitle };
     } else {
       // Defensive fallback — unreachable in practice, since analyzedSnapshot
       // is set in lockstep with the report itself for every non-pdf source.
-      payload = { fountain: activeText, title };
+      payload = { fountain: activeText, title: exportTitle };
     }
 
     fetch("/api/export/coverage", {
@@ -851,7 +990,7 @@ export default function ScriptDoctorPanel({
         }
         const filename =
           parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
-          `${safeFilenameStem(title)}-coverage.html`;
+          `${safeFilenameStem(exportTitle)}-coverage.html`;
         const blob = await res.blob();
         return { blob, filename };
       })
@@ -953,7 +1092,7 @@ export default function ScriptDoctorPanel({
         )}
         {status === "success" && (
           <button
-            onClick={runDiagnosis}
+            onClick={() => runDiagnosis()}
             disabled={isEmpty}
             aria-label="Re-run diagnosis"
             className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
@@ -970,20 +1109,34 @@ export default function ScriptDoctorPanel({
         </button>
       </div>
 
-      {/* Uploaded-file chip: shown whenever an upload is active, in every
-          status, so the writer always knows what they're looking at. */}
+      {/* Uploaded-file / sample chip: shown whenever an alternate source is
+          active, in every status, so the writer always knows what they're
+          looking at. Sample provenance swaps the icon/copy but reuses the
+          exact same chip and the exact same ✕ → clearUpload path back to the
+          editor content, per the "reuse the existing uploadedFile-style
+          source mechanism" design. */}
       {uploadedFile && (
         <div className="flex items-center gap-2 px-6 py-2 bg-gray-100 dark:bg-zinc-800 border-b-2 border-black/10 dark:border-white/10 shrink-0">
-          <FileText className="w-3.5 h-3.5 shrink-0 text-gray-600 dark:text-gray-300" aria-hidden="true" />
+          {uploadedFile.provenance === "sample" ? (
+            <Sparkles className="w-3.5 h-3.5 shrink-0 text-gray-600 dark:text-gray-300" aria-hidden="true" />
+          ) : (
+            <FileText className="w-3.5 h-3.5 shrink-0 text-gray-600 dark:text-gray-300" aria-hidden="true" />
+          )}
           <span
             className="text-[10px] font-mono uppercase tracking-widest text-gray-700 dark:text-gray-300 truncate flex-1"
             title={uploadedFile.name}
           >
-            Analyzing upload: {uploadedFile.name}
+            {uploadedFile.provenance === "sample"
+              ? `Sample script: ${uploadedFile.name}`
+              : `Analyzing upload: ${uploadedFile.name}`}
           </span>
           <button
             onClick={clearUpload}
-            aria-label="Stop analyzing the uploaded file and go back to the editor content"
+            aria-label={
+              uploadedFile.provenance === "sample"
+                ? "Stop analyzing the sample script and go back to the editor content"
+                : "Stop analyzing the uploaded file and go back to the editor content"
+            }
             title="Analyze the editor content instead"
             className="p-1 brutal-border hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
           >
@@ -1026,11 +1179,21 @@ export default function ScriptDoctorPanel({
         {/* ── Idle state ── */}
         {status === "idle" &&
           (isEmpty ? (
-            <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600 text-gray-400">
+            <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600 text-gray-400 space-y-4">
               <p className="text-xs uppercase tracking-widest">
                 Write some script content, or upload a script file above, before
                 running a diagnosis.
               </p>
+              {/* Zero-friction on-ramp: a curious visitor with nothing written
+                  yet and nothing to upload otherwise dead-ends right here.
+                  One click loads a built-in sample and runs it immediately —
+                  see loadSample. */}
+              <button
+                onClick={loadSample}
+                className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-2 mx-auto"
+              >
+                <Sparkles className="w-3.5 h-3.5" aria-hidden="true" /> Try a sample script
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -1041,12 +1204,25 @@ export default function ScriptDoctorPanel({
                 scene-by-scene issue heatmap, and your top priority fixes.
                 {uploadedFile && " It will analyze the uploaded file shown above, not the editor."}
               </p>
-              <button
-                onClick={runDiagnosis}
-                className="w-full bg-black text-white px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
-              >
-                <Stethoscope className="w-4 h-4" aria-hidden="true" /> Run Diagnosis
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => runDiagnosis()}
+                  className="flex-1 bg-black text-white px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
+                >
+                  <Stethoscope className="w-4 h-4" aria-hidden="true" /> Run Diagnosis
+                </button>
+                {/* Beside the main action, not instead of it — a writer with
+                    their own script uses "Run Diagnosis"; this is purely the
+                    zero-friction demo path for a curious first-time visitor. */}
+                <button
+                  onClick={loadSample}
+                  aria-label="Load a built-in sample screenplay and run a diagnosis on it immediately, instead of the current content"
+                  title="Try Script Doctor on a built-in sample screenplay — no upload or typing needed"
+                  className="px-4 py-3 text-xs font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center justify-center gap-2 shrink-0"
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden="true" /> Try a sample
+                </button>
+              </div>
             </div>
           ))}
 
@@ -1074,7 +1250,7 @@ export default function ScriptDoctorPanel({
             </p>
             <p className="text-xs text-red-800 dark:text-red-300 leading-relaxed">{errorMessage}</p>
             <button
-              onClick={runDiagnosis}
+              onClick={() => runDiagnosis()}
               disabled={isEmpty}
               className="bg-black text-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors brutal-border disabled:opacity-40 flex items-center gap-2"
             >
@@ -1212,12 +1388,21 @@ export default function ScriptDoctorPanel({
                 all (nothing to compare on the very first-ever diagnosis).
                 Identical contentHash to that previous entry gets the flat
                 "no changes" notice per the determinism nuance in the task
-                spec, rather than a delta strip showing all-zero deltas. */}
+                spec (the script itself is unchanged, regardless of which
+                formula scored it), rather than a delta strip showing
+                all-zero deltas. Otherwise — genuinely different content —
+                a formula-version mismatch against the CURRENT running
+                version takes priority over the ordinary delta strip: two
+                reports scored by different formulas are not comparable
+                numbers no matter how much the script changed, so this
+                branch must be checked before DraftDeltaStrip ever renders. */}
             {previousEntry && report.contentHash && (
               previousEntry.contentHash === report.contentHash ? (
                 <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
                   No changes since last diagnosis — identical script.
                 </p>
+              ) : entryFormulaVersion(previousEntry) !== DOCTOR_HISTORY_FORMULA_VERSION ? (
+                <CrossVersionNotice previous={previousEntry} current={report} />
               ) : (
                 <DraftDeltaStrip previous={previousEntry} current={report} />
               )
@@ -1487,6 +1672,18 @@ export default function ScriptDoctorPanel({
                             <span className="text-gray-600 dark:text-gray-300 truncate">
                               {entry.totalIssues} issue{entry.totalIssues === 1 ? "" : "s"}
                             </span>
+                            {/* Cross-version entries are never deleted — they stay
+                                listed with a subtle tag rather than vanishing, since
+                                a scoring-formula change is not a reason to erase a
+                                writer's own recorded history. */}
+                            {entryFormulaVersion(entry) !== DOCTOR_HISTORY_FORMULA_VERSION && (
+                              <span
+                                className="text-[9px] italic text-gray-400 dark:text-gray-500 shrink-0"
+                                title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
+                              >
+                                (older scoring model)
+                              </span>
+                            )}
                           </li>
                         ))}
                     </ul>
