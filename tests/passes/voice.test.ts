@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 1173 — voicePass: voice open-thread-dialogue-highlight aftermath void, voice suspense-curiosity aftermath void, voice suspense-emotional aftermath void', async () => {
+    const runV1173 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every heavily-unresolved scene is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1173a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a heavily-unresolved scene is followed by highlighted dialogue within its window', async () => {
+      const recs1173an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID fires when every suspense-spike is followed by two scenes with no curiosity rise', async () => {
+      const recs1173b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID does not fire when a suspense-spike is followed by a curiosity rise within its window', async () => {
+      const recs1173bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID fires when every suspense-spike is followed by two scenes with no emotional shift', async () => {
+      const recs1173c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID does not fire when a suspense-spike is followed by an emotional shift within its window', async () => {
+      const recs1173cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1173(recs1173cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1159 — voicePass: voice revelation-dialogue-highlight aftermath void, voice revelation-staging aftermath void, voice open-thread-relational aftermath void', async () => {
     const runV1159 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

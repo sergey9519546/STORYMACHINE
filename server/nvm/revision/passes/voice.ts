@@ -512,6 +512,15 @@
 // fifth and sixth channels (dialogueHighlights, visualBeats), completing full six-channel
 // saturation for this trigger. VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives unresolvedClues
 // its fifth channel (relationshipShifts).
+// Wave 1173 additions: after Wave 1159, unresolvedClues (>=3) stood at five of six channels
+// (visualBeats, curiosityDelta, suspenseDelta, emotionalShift, relationshipShifts). VOICE_OPEN_
+// THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives it its sixth and final channel
+// (dialogueHighlights), completing full six-channel saturation for every existing trigger in
+// this pass. With those exhausted, this wave introduces suspenseDelta>0 as a genuinely fresh
+// checkAftermathVoid trigger — it has only ever appeared as an aftermath channel in this file,
+// never as the isTrigger side of a check. VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs
+// suspenseDelta with curiosityDelta; VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID pairs it with
+// emotionalShift.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6975,6 +6984,83 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying three or more unresolved threads (${r1159c.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1159c.aftermathCount} such shifts occur elsewhere in the script. A pile-up of open questions that never moves how characters stand with each other right after it registers as isolated bookkeeping rather than pressure the relationships actually carry.`,
         suggestedFix: `In the two scenes following a heavily-unresolved scene, let the accumulating uncertainty shift a relationship — a bond strained or an alliance tested by everything still unanswered — so the voice's lingering questions carry interpersonal weight.`,
+      });
+    }
+  }
+
+  // VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues
+  // (>=3) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared
+  // checks library. n≥8, ≥2 qualifying heavily-unresolved scenes (pos<n-2), ≥2 scenes anywhere
+  // with a highlighted line of dialogue, 2-scene lookahead. Fires when every such scene's
+  // two-scene aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere.
+  // Distinct from VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID (Wave 1019), VOICE_OPEN_THREAD_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1131), VOICE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID, VOICE_OPEN_
+  // THREAD_EMOTIONAL_AFTERMATH_VOID (Wave 1145), and VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID
+  // (Wave 1159, same trigger paired with visualBeats/curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts) — this is the sixth and final consequence channel for this trigger,
+  // completing full six-channel saturation.
+  {
+    const r1173a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1173a.fires) {
+      issues.push({
+        location: `${r1173a.triggerCount} heavily-unresolved scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'VOICE_OPEN_THREAD_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying three or more unresolved threads (${r1173a.triggerCount} instances) is followed by two scenes with no highlighted dialogue, even though ${r1173a.aftermathCount} such scenes exist elsewhere in the script. A pile-up of open questions that never earns a memorable line in its immediate wake leaves the voice's accumulating uncertainty unvoiced — no character's speech reckons with what's still hanging.`,
+        suggestedFix: `In the two scenes following a heavily-unresolved scene, give a character a standout line that reckons with what's still unanswered, so the voice's mystery registers in speech, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from every existing suspenseDelta
+  // reference in this file: prior rules use it only as an aftermath channel for other triggers,
+  // never as the isTrigger side of a check — this is the first check to use suspenseDelta as a
+  // trigger in this pass.
+  {
+    const r1173b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1173b.fires) {
+      issues.push({
+        location: `${r1173b.triggerCount} suspense-spike scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1173b.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1173b.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the voice's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath registers no emotional
+  // shift, while such shifts occur elsewhere. Distinct from VOICE_SUSPENSE_CURIOSITY_AFTERMATH_
+  // VOID (this wave, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1173c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1173c.fires) {
+      issues.push({
+        location: `${r1173c.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'VOICE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1173c.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1173c.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it leaves the voice's tension reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a character's emotional register shift in response to the danger, so the tension carries felt weight, not just structural pressure.`,
       });
     }
   }
