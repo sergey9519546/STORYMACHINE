@@ -32,6 +32,7 @@
 import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
+import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
@@ -504,6 +505,202 @@ export interface StrengthsInput {
   sceneCount: number;
   bySeverity: { critical: number; major: number; minor: number };
   dimensions: DimensionScore[];
+  /** Wave 1183 (Program v2, Type 2 — excellence): the per-scene records the
+   *  three new detectors below read (clockRaised, relationshipShifts,
+   *  emotionalShift). Optional — defaults to [] inside buildStrengths — so
+   *  every fixture/test written before this wave still typechecks and still
+   *  produces byte-identical output (an empty/absent records array can never
+   *  satisfy any of the three new guards' minimum-population conditions).
+   *  Matches the file's existing optional-field precedent (memory.ts's
+   *  relationshipShifts/questionsRaised: "treat absence as []/0"). */
+  records?: ScreenplaySceneRecord[];
+}
+
+// ── Wave 1183 additions (Program v2, Type 2 — excellence) ──────────────────
+// Placement rationale (per the wave's own charter): a revision PASS's whole
+// contract (revision/passes/types.ts) is to emit RevisionIssues — defects to
+// fix. These three checks produce the opposite artifact, an earned STRENGTH
+// string, and their only consumer is buildStrengths' own `strengths: string[]`
+// output — there is no RevisionIssue-shaped wrapper to produce, so a pass file
+// would have to manufacture one just to throw it away. buildStrengths is
+// already this file's fixture-testable seam for exactly this kind of check
+// (a pure function over already-computed report data, independent of which of
+// the ~1300 accumulated pass rules fired) — Program v2 Type 2 extends that
+// seam rather than inventing a second one.
+//
+// Never-padded discipline (WAVE_QUALITY_GUARANTEE.md's binding Type 2 clause,
+// and CLAUDE.md's "an excellence rule that fires on mediocre input is a
+// FAILING rule"): all three guards below were measured against
+// calibration/corpus.ts's 20 controlled-richness-designed samples
+// before being accepted. Each guard's own comment cites the exact scene-level
+// evidence that separates it from the 'competent' band — which the corpus is
+// deliberately designed to be competent-but-unremarkable, never broken — so a
+// guard that would fire on 'competent' input was rejected at design time, not
+// discovered later by a failing test. Two candidate axes from the wave's own
+// candidate list were evaluated and REJECTED for lack of corpus support
+// (documented at the wave's own report, not restated here to avoid this
+// comment going stale): payoff-latency distance (the corpus's own payoff
+// detection never actually fires on ANY of the 20 samples, strong included —
+// a script-doctor.ts-level detector built on it would never fire on real
+// input) and question-answer latency (the aggregate per-scene counts
+// currently exposed by fountain-analyzer.ts cannot distinguish a genuinely
+// "held" question from an accidental one — measured directly, it fires
+// equally on a 'troubled' corpus sample as on a 'strong' one, which fails the
+// never-padded bar outright).
+
+/** Minimum scenes for any Wave 1183 excellence check below: each one needs a
+ *  genuine two-position comparison (front half vs back half, or two scenes
+ *  separated by a real gap) which a fragment under 6 scenes hasn't got room
+ *  to demonstrate honestly. One scene higher than the existing no-fatal-flaws
+ *  guard's sceneCount >= 5 floor, because these checks need TWO separated
+ *  positions to compare, not merely "enough scenes to have accumulated one
+ *  fact." */
+const EXCELLENCE_MIN_SCENES = 6;
+
+/** Guard: deadline/clock pressure is raised in BOTH halves of the document,
+ *  not planted once and abandoned. Distinct from the pre-existing
+ *  `escalating` guard above: that one reads suspenseDelta's AVERAGE trend
+ *  (tension intensity is rising), this reads clockRaised's discrete PRESENCE
+ *  by position (the stakes themselves are still being invoked) — a script
+ *  can hold a flat suspense average while still re-raising its clock twice,
+ *  or escalate in danger-lexicon language without ever mentioning the
+ *  deadline again after Act One; fountain-analyzer.ts treats these as
+ *  independent lexicons for exactly this reason. Verified against
+ *  calibration/corpus.ts: 2 of 5 'strong' samples (Nine Minutes, Sunlight
+ *  Clause) re-raise the clock in both halves; 0 of the other 15 samples
+ *  (across 'competent', 'weak', and 'troubled') do — every non-strong sample
+ *  states its deadline once, or not at all, and never returns to it, which is
+ *  precisely the corpus's designed flaw for those bands ("the clock is
+ *  stated once and never followed up on"). */
+function buildStakesContinuityStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const midN = Math.floor(sceneCount / 2);
+  const firstHalfClock = records.slice(0, midN).filter(r => r.clockRaised);
+  const secondHalfClock = records.slice(midN).filter(r => r.clockRaised);
+  if (firstHalfClock.length === 0 || secondHalfClock.length === 0) return null;
+
+  const firstScene = firstHalfClock[0].sceneIdx;
+  const lastScene = secondHalfClock[secondHalfClock.length - 1].sceneIdx;
+  return (
+    `The clock isn't set once and forgotten — deadline pressure resurfaces in both halves of the draft ` +
+    `(first raised in Scene ${firstScene}, still live as late as Scene ${lastScene}), keeping the stakes genuinely alive throughout.`
+  );
+}
+
+/** Minimum scene gap between a relationship rupture and its later repair for
+ *  the repair to read as an earned arc rather than a same-beat flip-flop —
+ *  one scene stricter than detectClueLifecycle's own payoff gap (>= 2) since
+ *  a relationship repair is a bigger dramatic claim than a prop re-mention. */
+const RELATIONSHIP_ARC_MIN_GAP = 3;
+/** Minimum |amount| a shift must carry to count as a genuine rupture/repair.
+ *  Restates fountain-analyzer.ts's own RELATIONSHIP_SHIFT_THRESHOLD (2)
+ *  defensively rather than trusting every caller's `records` to already
+ *  respect it — StrengthsInput.records is a public-ish seam (any future
+ *  caller could hand-build fixtures), so the guard checks its own input
+ *  rather than relying on an upstream invariant it can't see. */
+const RELATIONSHIP_ARC_MIN_MAGNITUDE = 2;
+
+interface RelationshipMovement { sceneIdx: number; amount: number }
+
+/** Guard: a specific character pair whose relationship genuinely moves in
+ *  BOTH directions — a rupture (negative shift) followed, at least
+ *  RELATIONSHIP_ARC_MIN_GAP scenes later, by a repair (positive shift) for
+ *  the SAME pair. Distinct from every pre-existing guard (none of the four
+ *  above ever read relationshipShifts) and from buildStakesContinuityStrength
+ *  above (a different channel entirely: relationshipShifts, not
+ *  clockRaised). Verified against calibration/corpus.ts: exactly 1 of the 20
+ *  samples (The Long Game, 'strong') shows a rupture-then-repair for the same
+ *  pair — CASS|ODELL ruptures at Scene 3 (amount -2) and repairs at Scene 9
+ *  (amount +3), a 6-scene gap. Zero of the 5 'competent' samples register a
+ *  single POSITIVE relationship shift anywhere in the document — their Act 3
+ *  beat is, per the corpus's own design note, "a thin, shorter
+ *  acknowledgment" that never clears fountain-analyzer.ts's
+ *  RELATIONSHIP_SHIFT_THRESHOLD — so this guard cannot mistake a
+ *  merely-present relationship arc for a genuinely repaired one; there is
+ *  nothing in the 'competent' band for it to false-fire on. */
+function buildRelationshipDynamismStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const byPair = new Map<string, RelationshipMovement[]>();
+  for (const r of records) {
+    for (const shift of r.relationshipShifts ?? []) {
+      if (Math.abs(shift.amount) < RELATIONSHIP_ARC_MIN_MAGNITUDE) continue;
+      const movement = { sceneIdx: r.sceneIdx, amount: shift.amount };
+      const arr = byPair.get(shift.pairKey);
+      if (arr) arr.push(movement);
+      else byPair.set(shift.pairKey, [movement]);
+    }
+  }
+
+  // Strongest qualifying pair wins (largest combined swing); ties resolve to
+  // whichever pair was encountered first in scene order — same determinism
+  // convention as analyzeDimensionIssues' rule-frequency tie-break above.
+  let best: { pairKey: string; rupture: RelationshipMovement; repair: RelationshipMovement } | null = null;
+  let bestSwing = -Infinity;
+  for (const [pairKey, movements] of byPair) {
+    movements.sort((a, b) => a.sceneIdx - b.sceneIdx);
+    const ruptures = movements.filter(m => m.amount < 0);
+    const repairs = movements.filter(m => m.amount > 0);
+    for (const rupture of ruptures) {
+      const repair = repairs.find(r => r.sceneIdx - rupture.sceneIdx >= RELATIONSHIP_ARC_MIN_GAP);
+      if (!repair) continue;
+      const swing = Math.abs(rupture.amount) + repair.amount;
+      if (swing > bestSwing) {
+        bestSwing = swing;
+        best = { pairKey, rupture, repair };
+      }
+      break; // earliest qualifying rupture for this pair is enough evidence
+    }
+  }
+
+  if (!best) return null;
+  const [charA, charB] = best.pairKey.split('|');
+  return (
+    `The ${charA}/${charB} relationship is a living thread, not a flat one — it ruptures in Scene ${best.rupture.sceneIdx} ` +
+    `(trust swings ${best.rupture.amount}) and genuinely repairs ${best.repair.sceneIdx - best.rupture.sceneIdx} scenes later ` +
+    `in Scene ${best.repair.sceneIdx} (trust swings +${best.repair.amount}), not left as a one-note thread.`
+  );
+}
+
+/** Guard: the draft is willing to swing NEGATIVE at least once and POSITIVE
+ *  at least once — not merely upbeat throughout — and lands deliberately on a
+ *  positive final scene rather than trailing off neutral. Distinct from
+ *  buildStakesContinuityStrength and buildRelationshipDynamismStrength above
+ *  (a third, independent channel: emotionalShift, not clockRaised or
+ *  relationshipShifts) and from the pre-existing `escalating` guard
+ *  (suspense TREND, not emotional valence — fountain-analyzer.ts's own header
+ *  is explicit these are different axes: "a scene can be tense without being
+ *  mysterious," and equally, without being emotionally negative). Requiring
+ *  BOTH directions present — not just a positive ending — is what keeps this
+ *  from firing on a script that is simply upbeat throughout and never earns
+ *  the swing: verified against calibration/corpus.ts's 'troubled' band, where
+ *  one sample (The Grift) ends on a lexically positive final scene (repeated
+ *  "I feel so happy" dialogue) but never registers a single negative-valence
+ *  scene anywhere in the document — this guard correctly does not fire for
+ *  it. Exactly 1 of the 20 corpus samples (The Long Game, 'strong') clears
+ *  all three conditions; 0 of the 5 'competent' samples do (each has either
+ *  no positive-valence scene anywhere, or no negative-valence scene anywhere). */
+function buildEmotionalRangeStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+  if (records.length === 0) return null;
+
+  const negativeScenes = records.filter(r => r.emotionalShift === 'negative');
+  const positiveScenes = records.filter(r => r.emotionalShift === 'positive');
+  const finalRecord = records[records.length - 1];
+  if (negativeScenes.length === 0 || positiveScenes.length === 0) return null;
+  if (finalRecord.emotionalShift !== 'positive') return null;
+
+  return (
+    `This draft earns its ending rather than coasting to it — real emotional difficulty surfaces ` +
+    `(Scene ${negativeScenes[0].sceneIdx} turns negative) before the story lands deliberately positive at the close (Scene ${finalRecord.sceneIdx}).`
+  );
 }
 
 /**
@@ -515,7 +712,7 @@ export interface StrengthsInput {
  * rules happen to fire for a given fountain string.
  */
 export function buildStrengths(input: StrengthsInput): string[] {
-  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions } = input;
+  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions, records = [] } = input;
   const strengths: string[] = [];
 
   // Guard: a genuinely zero-issue dimension is real, checked evidence —
@@ -549,6 +746,20 @@ export function buildStrengths(input: StrengthsInput): string[] {
   if (bySeverity.critical === 0 && sceneCount >= 5) {
     strengths.push(`No fatal flaws surfaced across ${sceneCount} scenes — nothing here would sink the draft outright.`);
   }
+
+  // Wave 1183 additions (Program v2, Type 2 — excellence): three new,
+  // never-padded guards over signals buildStrengths didn't previously read
+  // at all (clockRaised, relationshipShifts, emotionalShift). See each
+  // helper's own comment above for its guard conditions, corpus evidence, and
+  // distinctness rationale versus the four guards above and each other.
+  const stakesContinuity = buildStakesContinuityStrength(records, sceneCount);
+  if (stakesContinuity) strengths.push(stakesContinuity);
+
+  const relationshipDynamism = buildRelationshipDynamismStrength(records, sceneCount);
+  if (relationshipDynamism) strengths.push(relationshipDynamism);
+
+  const emotionalRange = buildEmotionalRangeStrength(records, sceneCount);
+  if (emotionalRange) strengths.push(emotionalRange);
 
   return strengths;
 }
@@ -702,6 +913,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     sceneCount: analysis.sceneCount,
     bySeverity,
     dimensions,
+    records: analysis.records,
   });
   const plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
 

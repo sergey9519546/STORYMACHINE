@@ -175,6 +175,14 @@ fix it before it misleads another session further.
 - [ ] **(S)** Frontend chunk splitting: the `ScriptIDE` chunk is >530KB;
   lazy-load its heavy panels.
 
+### Wave 1183 finding (analyzer weakness, schedule as a Type 1 wave)
+- [ ] **(M)** detectClueLifecycle's payoff detection requires the seeded
+  phrase to recur VERBATIM (quoted) — it fires on zero of 20 corpus samples
+  because real dialogue restates clues unquoted. A content-word-overlap
+  payoff matcher (like the question-resolution linkage from Wave 1182) would
+  make clue-lifecycle signals real on actual scripts. Until then,
+  payoff-latency excellence detection is impossible (measured, Wave 1183).
+
 ### Parity-harness findings (discovered at Run 9 close — schedule in Run 10+)
 - [ ] **(S)** Unify scene slugs across producers: `memory.ts` deriveSlug and
   `compile.ts` projectFountain hardcode DIFFERENT slug templates (idx vs

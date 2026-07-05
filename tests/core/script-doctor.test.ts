@@ -10,8 +10,10 @@ import {
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
+import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
 import type { DimensionKey, DimensionScore } from '../../server/nvm/analyze/types.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
 
 const PASS_ORDER = [
   'structure', 'causality', 'intention', 'belief', 'conflict', 'character-arc', 'dialogue',
@@ -414,6 +416,208 @@ describe('buildStrengths — earned, never-padded bullets', () => {
     assert.ok(
       !strengths.some(s => s.includes('gets paid off')),
       'must not claim payoff completeness when nothing was ever seeded',
+    );
+  });
+});
+
+// ── Wave 1183 (Program v2, Type 2 — excellence detectors) ────────────────────
+// Three new buildStrengths guards, added additively via StrengthsInput.records
+// (see doctor.ts's Wave 1183 header comment for placement/distinctness
+// rationale): sustained stakes (clockRaised in both halves), relationship
+// dynamism (a rupture-then-repair for the same character pair), and emotional
+// range (both valence directions present, landing deliberately positive).
+
+/** Substrings unique to each Wave 1183 strength template — used only to
+ *  detect WHICH guard fired without depending on exact scene numbers/wording,
+ *  so corpus-level assertions below stay robust to phrasing tweaks. */
+const WAVE_1183_MARKERS = [
+  "isn't set once and forgotten",       // buildStakesContinuityStrength
+  'living thread, not a flat one',      // buildRelationshipDynamismStrength
+  'earns its ending rather than coasting', // buildEmotionalRangeStrength
+] as const;
+
+/** Minimal ScreenplaySceneRecord fixture factory — every field defaulted to
+ *  "nothing happened this scene" so a test only needs to override the one or
+ *  two fields its guard actually reads, matching this file's existing
+ *  baseStructureState/buildDimensionFixtures precedent. */
+function buildSceneRecord(sceneIdx: number, overrides: Partial<ScreenplaySceneRecord> = {}): ScreenplaySceneRecord {
+  return {
+    commitId: `fixture-scene-${sceneIdx}`,
+    sceneIdx,
+    slug: `INT. FIXTURE - SCENE ${sceneIdx + 1}`,
+    purpose: 'complicate',
+    dramaticTurn: '',
+    revelation: null,
+    emotionalShift: 'neutral',
+    visualBeats: [],
+    dialogueHighlights: [],
+    unresolvedClues: [],
+    seededClueIds: [],
+    payoffSetupIds: [],
+    clockRaised: false,
+    clockDelta: 0,
+    suspenseDelta: 0,
+    curiosityDelta: 0,
+    relationshipShifts: [],
+    createdAt: sceneIdx,
+    ...overrides,
+  };
+}
+
+function buildSceneRecords(
+  sceneCount: number, overridesByIdx: Record<number, Partial<ScreenplaySceneRecord>> = {},
+): ScreenplaySceneRecord[] {
+  return Array.from({ length: sceneCount }, (_, i) => buildSceneRecord(i, overridesByIdx[i]));
+}
+
+/** buildStrengths input shared by every Wave 1183 fixture test below: no
+ *  other guard has genuine evidence, so a fired strength can only be one of
+ *  the three new ones under test — isolates each assertion the same way the
+ *  pre-existing "no-fire case" fixture above does. */
+function baseStrengthsInputFor(records: ScreenplaySceneRecord[]) {
+  return {
+    structure: baseStructureState({ escalating: false, openClues: 3 }),
+    anyClueSeeded: false,
+    sceneCount: records.length,
+    bySeverity: { critical: 1, major: 0, minor: 0 },
+    dimensions: buildDimensionFixtures([1, 1, 1, 1, 1]),
+    records,
+  };
+}
+
+describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures)', () => {
+  it('stakes continuity FIRE: clock raised in both halves names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      1: { clockRaised: true },
+      6: { clockRaised: true },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s => s.includes("isn't set once and forgotten") && s.includes('Scene 1') && s.includes('Scene 6')),
+      `expected the stakes-continuity strength naming Scene 1 and Scene 6, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('stakes continuity NO-FIRE: a competent-but-unremarkable clock raised only once never fires', () => {
+    // Mirrors the corpus's own 'competent'/'weak' pattern: the deadline is
+    // stated once and never returned to — real craft elsewhere, just not
+    // sustained stakes. Not broken, just unremarkable on this one axis.
+    const records = buildSceneRecords(8, { 1: { clockRaised: true } });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes("isn't set once and forgotten")),
+      `stakes-continuity must not fire on a single first-half-only clock mention, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('relationship dynamism FIRE: a rupture followed 6 scenes later by a repair names both scenes and the pair', () => {
+    const records = buildSceneRecords(8, {
+      1: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: -3 }] },
+      7: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: 2 }] },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('living thread, not a flat one') && s.includes('ALEX/JORDAN') &&
+        s.includes('Scene 1') && s.includes('Scene 7')),
+      `expected the relationship-dynamism strength naming ALEX/JORDAN, Scene 1 and Scene 7, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('relationship dynamism NO-FIRE: a rupture with no later repair for the same pair never fires', () => {
+    // Mirrors the corpus's 'competent' design note: a real rupture, but the
+    // Act 3 beat is a thin acknowledgment that never actually reverses it —
+    // competent-but-unremarkable, not a broken relationship-arc pass.
+    const records = buildSceneRecords(8, {
+      1: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: -3 }] },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('living thread, not a flat one')),
+      `relationship-dynamism must not fire on a rupture with no qualifying repair, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('emotional range FIRE: a negative scene followed by a positive final scene names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      2: { emotionalShift: 'negative' },
+      7: { emotionalShift: 'positive' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('earns its ending rather than coasting') && s.includes('Scene 2') && s.includes('Scene 7')),
+      `expected the emotional-range strength naming Scene 2 and Scene 7, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('emotional range NO-FIRE: a negative scene with no positive scene anywhere never fires', () => {
+    // Mirrors the corpus's 'competent' pattern (Reasonable Doubt, Thanksgiving,
+    // Maybe): real negative-valence craft, but the draft never earns a
+    // genuine positive swing anywhere, including at the close.
+    const records = buildSceneRecords(8, { 2: { emotionalShift: 'negative' } });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('earns its ending rather than coasting')),
+      `emotional-range must not fire on a negative-only draft with no positive scene anywhere, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+});
+
+describe('runScriptDoctor — Wave 1183 excellence detectors against the real reference corpus', () => {
+  it('at least one new detector fires somewhere across the 5 strong-band samples', async () => {
+    const strongReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'strong').map(s => runScriptDoctor(s.fountain)),
+    );
+    const anyFired = strongReports.some(r => (r.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m))));
+    assert.ok(
+      anyFired,
+      `expected at least one Wave 1183 strength somewhere in the strong band, got: ` +
+        `${JSON.stringify(strongReports.map(r => r.strengths))}`,
+    );
+  });
+
+  it('never-padded proof: no Wave 1183 detector fires on any competent-band sample', async () => {
+    const competentReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'competent').map(async s => ({
+        label: s.label, report: await runScriptDoctor(s.fountain),
+      })),
+    );
+    for (const { label, report } of competentReports) {
+      const fired = WAVE_1183_MARKERS.filter(m => (report.strengths ?? []).some(s => s.includes(m)));
+      assert.deepEqual(
+        fired, [],
+        `Wave 1183 detector(s) [${fired.join(', ')}] false-fired on competent-band sample "${label}" — ` +
+          `the competent band is deliberately competent-but-unremarkable, never broken; a fire here means the ` +
+          `guard is padded.`,
+      );
+    }
+  });
+});
+
+describe('Wave 1183 — calibration-drift guard (strengths must never leak into scoring)', () => {
+  it('health stays a pure function of bySeverity/sceneCount/wordCount across the whole corpus, regardless of which (if any) Wave 1183 strengths fired', async () => {
+    let sawAWave1183Strength = false;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      if ((report.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m)))) sawAWave1183Strength = true;
+
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths (a separate, downstream field) must never be able to move it`,
+      );
+    }
+    assert.ok(
+      sawAWave1183Strength,
+      'expected at least one corpus sample to carry a Wave 1183 strength — otherwise this guard would be vacuous',
     );
   });
 });
