@@ -40,7 +40,7 @@ export function HarvestPanel({ onClose }: HarvestPanelProps) {
           qualityScore: sidecarData.qualityScore ?? 0,
           proppCoverage: Math.round((sidecarData.proppCoverage ?? 0) * 100),
           tensionTotal: sidecarData.tensionTotal ?? 0,
-          ghostCount: ghostData.count ?? 0,
+          ghostCount: ghostData.ghosts?.length ?? 0,
           commitCount: sidecarData.commitCount ?? 0,
         });
       } catch {
