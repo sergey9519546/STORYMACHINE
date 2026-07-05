@@ -7,7 +7,7 @@ import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS
 import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
-  gameLimiter, aiLimiter, sessions,
+  gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
@@ -309,11 +309,26 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
 //     route with its own body-parsing middleware instead of a third field on
 //     the JSON schema.
 // Middleware chain:
-//   gameLimiter        — same tier as /doctor: pdfToFountain + runScriptDoctor
-//                         are both pure CPU work with no LLM call (see the
-//                         /doctor route's comment above for why that route
-//                         sits on gameLimiter, not aiLimiter — identical
-//                         reasoning applies here).
+//   heavyBodyLimiter    — NOT gameLimiter, deliberately. This route accepts up
+//                         to 15mb of raw body per request (see express.raw()
+//                         below) where every other gameLimiter-tier route in
+//                         this file caps its JSON body at 1mb (server/app.ts's
+//                         global express.json({limit:'1mb'})). At gameLimiter's
+//                         120/min, a single client could force ~1.8GB/min of
+//                         PDF-parsing work (pdfjs-dist buffering + parsing) —
+//                         a materially different DoS profile from the rest of
+//                         this file's gameLimiter routes, so it gets its own,
+//                         much lower budget (10/min — see the DoS-math comment
+//                         at heavyBodyLimiter's definition in session-store.ts)
+//                         instead of sharing gameLimiter's. It REPLACES
+//                         gameLimiter here rather than stacking alongside it:
+//                         a PDF upload is a single logical action, and making
+//                         it also consume the general 120/min budget would
+//                         double-penalize this route's callers against a
+//                         ceiling that exists for unrelated lightweight
+//                         JSON routes, without adding any further protection
+//                         (heavyBodyLimiter's 10/min is already the binding
+//                         constraint for this route in every case).
 //   express.raw(...)    — the request body is opaque PDF bytes, not JSON.
 //                         server/app.ts's global express.json({limit:'1mb'})
 //                         is content-type-gated to application/json and
@@ -330,7 +345,7 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
 // Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage.
 router.post(
   '/api/scriptide/doctor/pdf',
-  gameLimiter,
+  heavyBodyLimiter,
   express.raw({ type: ['application/pdf', 'application/octet-stream'], limit: '15mb' }),
   asyncHandler(async (req, res) => {
     const body = req.body as unknown;

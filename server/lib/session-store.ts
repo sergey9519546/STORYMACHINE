@@ -57,6 +57,32 @@ export const aiLimiter = rateLimit({
   message: { error: 'Too many AI requests, please slow down.' },
 });
 
+// heavyBodyLimiter — for routes that accept a large raw (non-JSON) request
+// body, where gameLimiter's normal 120/min ceiling is dangerously generous.
+//
+// The DoS math this closes: POST /api/scriptide/doctor/pdf accepts up to
+// 15mb of raw PDF bytes (server/routes/scriptide.ts's express.raw({limit:
+// '15mb'})) and previously sat behind gameLimiter alone — 120 requests/min at
+// up to 15mb each is ~1.8GB/min of theoretical ingest a single client could
+// force the server to buffer and hand to pdfjs-dist, per client, before a
+// single request is rejected. At 10 requests/min the same worst case caps at
+// ~150MB/min per client — in line with the route's own comment that real
+// screenplay PDFs are low-single-digit megabytes, so legitimate use (a writer
+// re-submitting a revised draft a few times a minute) is untouched while a
+// scripted flood is throttled an order of magnitude sooner.
+//
+// Same IP-based keying as gameLimiter (no custom keyGenerator on either), so
+// the two limiters partition the same client identity into independent
+// budgets — see the route wiring in scriptide.ts for why this REPLACES
+// gameLimiter on that route rather than stacking on top of it.
+export const heavyBodyLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Large-upload rate limit reached — try again in a minute.' },
+});
+
 // ── Session constants ─────────────────────────────────────────────────────────
 export const SESSION_DB_DIR  = process.env.SESSION_DB_DIR ?? path.join(process.cwd(), 'data', 'sessions');
 export const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
