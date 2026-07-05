@@ -520,6 +520,12 @@
 // payoffSetupIds its fifth and sixth channels (dialogueHighlights, visualBeats), completing
 // full saturation for this trigger. THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives
 // clockRaised its fifth channel (dialogueHighlights).
+// Wave 1158 additions: THEME_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its sixth and final
+// channel (visualBeats), completing full six-channel saturation for every main tracked trigger
+// in this pass. With those exhausted, this wave introduces dramaticTurn and revelation as
+// genuinely fresh checkAftermathVoid triggers — neither has ever anchored the isTrigger side of
+// a check in this file. THEME_TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with
+// curiosityDelta; THEME_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6593,6 +6599,85 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1144c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no memorable line, even though ${r1144c.aftermathCount} such lines exist elsewhere in the script. A deadline that tightens without earning a line that reckons with it leaves the theme's clock voiced only in narration, never in what a character says.`,
         suggestedFix: `In the two scenes following at least one clock-raise, give a character a line that names what the deadline costs, so the pressure registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // THEME_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every clock-raise's two-scene aftermath has no heavily-staged scene, while such staging
+  // occurs elsewhere. Distinct from THEME_CLOCK_SUSPENSE_AFTERMATH_VOID (Wave 1102), THEME_
+  // CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1116), THEME_CLOCK_EMOTIONAL_AFTERMATH_VOID, THEME_
+  // CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 1130), and THEME_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID (Wave 1144, same trigger paired with suspenseDelta/curiosityDelta/emotionalShift/
+  // relationshipShifts/dialogueHighlights) — this is the sixth and final consequence channel
+  // for this trigger, completing full six-channel saturation.
+  {
+    const r1158a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1158a.fires) {
+      issues.push({
+        location: `${r1158a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'THEME_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1158a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1158a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the theme's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // THEME_TURN_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in curiosity, while
+  // such rises occur elsewhere. Distinct from every other rule in this file: dramaticTurn has
+  // never anchored the isTrigger side of a check here — this is the first check to use it as a
+  // checkAftermathVoid trigger in this pass. A pivot that never opens a fresh question about
+  // what the story's central concern now means leaves the turn structurally present but
+  // thematically inert.
+  {
+    const r1158b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1158b.fires) {
+      issues.push({
+        location: `${r1158b.triggerCount} dramatic-turn aftermath(s) — no curiosity rise within 2 scenes`,
+        rule: 'THEME_TURN_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1158b.triggerCount} pivots) is followed by two scenes with no rise in curiosity, even though ${r1158b.aftermathCount} such rises occur elsewhere. A pivot that never opens a fresh question about what the story's central theme now means leaves the turn feeling like a plot event divorced from the meaning it should be testing.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let a new question surface about what the pivot reveals or complicates about the story's theme, so the turn keeps generating curiosity about meaning, not just plot.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // rise in curiosity, while such rises occur elsewhere. Distinct from every other rule in this
+  // file: revelation has never anchored the isTrigger side of a check here — this is the first
+  // check to use it as a checkAftermathVoid trigger in this pass. A disclosed truth that fails
+  // to seed any fresh question about the story's central concern spends the theme layer's
+  // information budget without renewing the audience's investment in it.
+  {
+    const r1158c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1158c.fires) {
+      issues.push({
+        location: `${r1158c.triggerCount} revelation scene(s) — no rise in curiosity within 2 scenes`,
+        rule: 'THEME_REVELATION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1158c.triggerCount} scenes that reveal something is followed by two scenes with no rise in curiosity, even though ${r1158c.aftermathCount} such rises occur elsewhere in the script. A revelation that closes a question without opening a new one about the story's central concern leaves the theme layer's disclosures reading as plot resolution rather than a deepening of what the story is really about.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information provoke a fresh question about the story's theme, so disclosure keeps generating curiosity about meaning instead of only closing plot threads.`,
       });
     }
   }

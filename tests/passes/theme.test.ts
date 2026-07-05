@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1158 — themePass: theme clock-staging aftermath void, theme turn-curiosity aftermath void, theme revelation-curiosity aftermath void', async () => {
+    const runT1158 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_CLOCK_STAGING_AFTERMATH_VOID fires when every clock-raise is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1158a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_CLOCK_STAGING_AFTERMATH_VOID'), 'THEME_CLOCK_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_CLOCK_STAGING_AFTERMATH_VOID does not fire when a clock-raise is followed by a heavily-staged scene within its window', async () => {
+      const recs1158an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { clockRaised: true });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_CLOCK_STAGING_AFTERMATH_VOID'), 'THEME_CLOCK_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_TURN_CURIOSITY_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no curiosity rise', async () => {
+      const recs1158b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_CURIOSITY_AFTERMATH_VOID'), 'THEME_TURN_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_TURN_CURIOSITY_AFTERMATH_VOID does not fire when a dramatic turn is followed by a curiosity rise within its window', async () => {
+      const recs1158bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_CURIOSITY_AFTERMATH_VOID'), 'THEME_TURN_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_REVELATION_CURIOSITY_AFTERMATH_VOID fires when every revelation is followed by two scenes with no curiosity rise', async () => {
+      const recs1158c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'THEME_REVELATION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_REVELATION_CURIOSITY_AFTERMATH_VOID does not fire when a revelation is followed by a curiosity rise within its window', async () => {
+      const recs1158cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { curiosityDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1158(recs1158cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_CURIOSITY_AFTERMATH_VOID'), 'THEME_REVELATION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1144 — themePass: theme payoff-dialogue-highlight aftermath void, theme payoff-staging aftermath void, theme clock-dialogue-highlight aftermath void', async () => {
     const runT1144 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
