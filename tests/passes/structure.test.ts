@@ -1006,6 +1006,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1171 — structurePass: structure suspense-staging aftermath void, structure suspense-dialogue-highlight aftermath void, structure seed-emotional aftermath void', async () => {
+    const runST1171 = async (records: ScreenplaySceneRecord[]) => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      return structurePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1171a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID does not fire when a suspense-rise is followed by a heavily-staged scene within its window', async () => {
+      const recs1171an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every suspense-rise is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1171b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a suspense-rise is followed by highlighted dialogue within its window', async () => {
+      const recs1171bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID fires when every seed scene is followed by two scenes with no emotional shift', async () => {
+      const recs1171c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['clue1'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID does not fire when a seed scene is followed by an emotional shift within its window', async () => {
+      const recs1171cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { seededClueIds: ['clue1'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runST1171(recs1171cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID'), 'STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1157 — structurePass: structure suspense-emotional aftermath void, structure suspense-relational aftermath void, structure seed-curiosity aftermath void', async () => {
     const runST1157 = async (records: ScreenplaySceneRecord[]) => {
       const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');

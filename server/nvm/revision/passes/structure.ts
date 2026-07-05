@@ -534,6 +534,11 @@
 // seededClueIds as a genuinely fresh checkAftermathVoid trigger — it has never anchored the
 // isTrigger side of any check in this file: STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID pairs it
 // with curiosityDelta.
+// Wave 1171 additions: after Wave 1157, suspenseDelta stood at three of six channels
+// (curiosityDelta, emotionalShift, relationshipShifts) and seededClueIds at one (curiosityDelta).
+// STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID and STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_
+// VOID give suspenseDelta its fourth and fifth channels (visualBeats, dialogueHighlights);
+// STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID gives seededClueIds its second channel (emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6550,6 +6555,82 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1157c.triggerCount} scenes that plant a clue is followed by two scenes with no rise in curiosity, even though ${r1157c.aftermathCount} such rises occur elsewhere. A planted clue that never provokes a fresh question in its immediate aftermath leaves the seed structurally present but inert — the story sets something up without letting the audience feel the pull of wondering what it means.`,
         suggestedFix: `In the two scenes following at least one seed, let a new question surface from what was just planted, so the clue generates curiosity rather than passing unnoticed until its eventual payoff.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1143) and STRUCTURE_SUSPENSE_EMOTIONAL_AFTERMATH_VOID / STRUCTURE_SUSPENSE_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1157, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts) — this is the fourth consequence channel for this trigger.
+  {
+    const r1171a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1171a.fires) {
+      issues.push({
+        location: `${r1171a.triggerCount} suspense-spike scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1171a.triggerCount} suspense-spike scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1171a.aftermathCount} such scenes exist elsewhere in the script. A spike in danger that never earns a visually charged follow-through leaves the structure's tension registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, stage at least two concrete visual beats, so the mounting danger registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta
+  // (>0) trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every suspense-spike's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 1143), STRUCTURE_SUSPENSE_EMOTIONAL_
+  // AFTERMATH_VOID, STRUCTURE_SUSPENSE_RELATIONAL_AFTERMATH_VOID (Wave 1157), and STRUCTURE_
+  // SUSPENSE_STAGING_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift/relationshipShifts/visualBeats) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1171b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1171b.fires) {
+      issues.push({
+        location: `${r1171b.triggerCount} suspense-spike scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1171b.triggerCount} suspense-spike scenes is followed by two scenes with no highlighted dialogue, even though ${r1171b.aftermathCount} such scenes exist elsewhere in the script. A spike in danger that never earns a memorable line in its wake leaves the structure's tension voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, give a character a standout line that reckons with the danger, so the tension registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × seededClueIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying seed scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene lookahead.
+  // Fires when every seed's two-scene aftermath registers no emotional shift, while such shifts
+  // occur elsewhere. Distinct from STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID (Wave 1157, same
+  // trigger paired with curiosityDelta) — this is the second consequence channel for this
+  // trigger.
+  {
+    const r1171c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.seededClueIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1171c.fires) {
+      issues.push({
+        location: `${r1171c.triggerCount} seed scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1171c.triggerCount} scenes that plant a clue is followed by two scenes with no emotional shift, even though ${r1171c.aftermathCount} such shifts occur elsewhere. A planted clue that never registers on any character's felt state right after it lands leaves the structure's setups reading as pure bookkeeping rather than moments that carry any felt weight until their eventual payoff.`,
+        suggestedFix: `In the two scenes following at least one seed, let the planting land on a character's emotional register — unease, hope, suspicion — so the setup carries felt weight, not just structural function.`,
       });
     }
   }
