@@ -39,12 +39,23 @@ const AIPanel = lazy(() => import("./AIPanel"));
 const DirectorPanel = lazy(() => import("./DirectorPanel"));
 const AnalysisPanel = lazy(() => import("./scriptide/AnalysisPanel"));
 const ScriptDoctorPanel = lazy(() => import("./scriptide/ScriptDoctorPanel"));
+const SlatePanel = lazy(() => import("./SlatePanel"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
 // same brutal-border/white-bg idiom) so first-open doesn't flash blank space
 // before sliding in.
 const DrawerPanelFallback = () => (
   <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+    <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
+  </div>
+);
+
+// SlatePanel is wider than the other drawers (it hosts a comparison table),
+// so its fallback matches SlatePanel's own w-[880px] shell rather than
+// DrawerPanelFallback's 500px — a mismatched fallback width would flash a
+// narrower box for a moment before the real panel snaps wider.
+const SlatePanelFallback = () => (
+  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -143,6 +154,7 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [showScriptDoctor, setShowScriptDoctor] = useState(false);
+  const [showSlate, setShowSlate] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
   // a first pass doesn't want squiggles until they ask for them.
   const [liveDiagnostics, setLiveDiagnostics] = useState(
@@ -997,6 +1009,7 @@ export default function ScriptIDE({
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
           showScriptDoctor={showScriptDoctor}
+          showSlate={showSlate}
           liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
@@ -1004,6 +1017,7 @@ export default function ScriptIDE({
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
           onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
+          onToggleSlate={() => setShowSlate((prev) => !prev)}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
@@ -1696,6 +1710,15 @@ export default function ScriptIDE({
             }}
             onClose={() => setShowScriptDoctor(false)}
           /></Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* ── SLATE OVERLAY (producer-tier multi-script comparison) ── */}
+      <AnimatePresence>
+        {showSlate && (
+          <Suspense fallback={<SlatePanelFallback />}>
+            <SlatePanel onClose={() => setShowSlate(false)} />
+          </Suspense>
         )}
       </AnimatePresence>
 

@@ -1087,6 +1087,23 @@ export default function ScriptDoctorPanel({
   const [exportError, setExportError] = useState<string | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
 
+  // Run 14 — producer exports: "Breakdown CSV" (POST /api/export/breakdown)
+  // and "Pitch kit" (POST /api/export/pitchkit), each its own independent
+  // secondary in-flight action, same rationale as exportStatus above (a
+  // failure/retry on one must never disturb the displayed report or the
+  // other export). Unlike Export report (POST /api/export/coverage, which
+  // has no deep-read variant), these two routes re-run a quick deterministic
+  // pass server-side regardless of which mode produced the ON-SCREEN report
+  // — a breakdown/pitch kit doesn't carry or claim the displayed report's
+  // scoring lineage the way the coverage document does, so there is no
+  // lineage to misrepresent and no reason to gate them on `report.deepRead`.
+  const [breakdownStatus, setBreakdownStatus] = useState<ExportStatus>("idle");
+  const [breakdownError, setBreakdownError] = useState<string | null>(null);
+  const breakdownAbortRef = useRef<AbortController | null>(null);
+  const [pitchkitStatus, setPitchkitStatus] = useState<ExportStatus>("idle");
+  const [pitchkitError, setPitchkitError] = useState<string | null>(null);
+  const pitchkitAbortRef = useRef<AbortController | null>(null);
+
   // Whether an AI key is configured server-side — gates the "Deep read"
   // toggle only, never the quick (deterministic) diagnosis path, which is
   // this product's always-available front door (see CLAUDE.md's gotcha on
@@ -1485,6 +1502,101 @@ export default function ScriptDoctorPanel({
       });
   };
 
+  /** Shared plumbing for the two producer-export buttons below (Breakdown
+   *  CSV / Pitch kit): both reuse the exact same snapshot-sourcing rules as
+   *  handleExportReport (never live editor/upload state — whatever the
+   *  DISPLAYED report actually analyzed), just POST to a different route and
+   *  land in a different status/error slot. `defaultFilename` is the
+   *  fallback used only when the response has no Content-Disposition header
+   *  to parse a name from. */
+  const runProducerExport = (
+    route: string,
+    defaultFilename: string,
+    setStatus2: (s: ExportStatus) => void,
+    setError2: (e: string | null) => void,
+    abortRef2: React.MutableRefObject<AbortController | null>,
+    notDeployedMessage: string,
+  ) => {
+    if (!report) return;
+
+    abortRef2.current?.abort();
+    const controller = new AbortController();
+    abortRef2.current = controller;
+
+    setStatus2("loading");
+    setError2(null);
+
+    const exportTitle = activeReportTitle ?? title;
+    let payload: { fountain?: string; fdx?: string; title?: string };
+    if (report.source?.format === "pdf") {
+      const converted = report.source.convertedFountain;
+      if (!converted) {
+        setStatus2("error");
+        setError2("This PDF-sourced report has no converted Fountain text to export.");
+        return;
+      }
+      payload = { fountain: converted, title: exportTitle };
+    } else if (analyzedSnapshot) {
+      payload = { ...analyzedSnapshot, title: exportTitle };
+    } else {
+      // Defensive fallback — unreachable in practice, same as
+      // handleExportReport's identical fallback above.
+      payload = { fountain: activeText, title: exportTitle };
+    }
+
+    fetch(route, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback = res.status === 404 ? notDeployedMessage : `Export failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        const filename =
+          parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+          defaultFilename;
+        const blob = await res.blob();
+        return { blob, filename };
+      })
+      .then(({ blob, filename }) => {
+        downloadBlob(blob, filename);
+        setStatus2("idle");
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return; // cancelled — no error state
+        setStatus2("error");
+        setError2(err instanceof Error ? err.message : "Export failed");
+      });
+  };
+
+  const handleExportBreakdown = () => {
+    const stem = safeFilenameStem(activeReportTitle ?? title);
+    runProducerExport(
+      "/api/export/breakdown",
+      `${stem}-breakdown.csv`,
+      setBreakdownStatus,
+      setBreakdownError,
+      breakdownAbortRef,
+      "Breakdown export isn't live yet — the /api/export/breakdown route hasn't been deployed.",
+    );
+  };
+
+  const handleExportPitchkit = () => {
+    const stem = safeFilenameStem(activeReportTitle ?? title);
+    runProducerExport(
+      "/api/export/pitchkit",
+      `${stem}-pitchkit.html`,
+      setPitchkitStatus,
+      setPitchkitError,
+      pitchkitAbortRef,
+      "Pitch kit export isn't live yet — the /api/export/pitchkit route hasn't been deployed.",
+    );
+  };
+
   /** The exact Fountain text the DISPLAYED report analyzed — same snapshot
    *  rationale as handleExportReport's payload above (never live editor/
    *  upload state, which may have moved on since diagnosis succeeded).
@@ -1666,6 +1778,8 @@ export default function ScriptDoctorPanel({
     return () => {
       abortRef.current?.abort();
       exportAbortRef.current?.abort();
+      breakdownAbortRef.current?.abort();
+      pitchkitAbortRef.current?.abort();
       fixAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
       if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
@@ -1761,6 +1875,43 @@ export default function ScriptDoctorPanel({
             Export report
           </button>
         )}
+        {/* Run 14 — producer exports: unlike Export report above, these two
+            always re-run a quick deterministic pass server-side regardless
+            of the on-screen report's mode, so a deep-read report is NOT
+            disabled here — only this button's own in-flight request gates
+            it (see runProducerExport's doc comment for the full rationale). */}
+        {status === "success" && report && (
+          <button
+            onClick={handleExportBreakdown}
+            disabled={breakdownStatus === "loading"}
+            aria-label="Export a scene/character breakdown as CSV"
+            title="Download a production breakdown (scenes, characters, locations) as CSV"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {breakdownStatus === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            Breakdown CSV
+          </button>
+        )}
+        {status === "success" && report && (
+          <button
+            onClick={handleExportPitchkit}
+            disabled={pitchkitStatus === "loading"}
+            aria-label="Export a standalone pitch kit as HTML"
+            title="Download a standalone, shareable pitch kit document (HTML)"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {pitchkitStatus === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            Pitch kit
+          </button>
+        )}
         {status === "success" && (
           <button
             onClick={() => runDiagnosis()}
@@ -1839,6 +1990,39 @@ export default function ScriptDoctorPanel({
           <button
             onClick={() => setExportError(null)}
             aria-label="Dismiss export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      {/* Breakdown CSV / Pitch kit export failures — same independent,
+          non-disruptive error idiom as Export report's banner above. */}
+      {breakdownStatus === "error" && breakdownError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Breakdown export failed: {breakdownError}</span>
+          <button
+            onClick={() => setBreakdownError(null)}
+            aria-label="Dismiss breakdown export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {pitchkitStatus === "error" && pitchkitError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Pitch kit export failed: {pitchkitError}</span>
+          <button
+            onClick={() => setPitchkitError(null)}
+            aria-label="Dismiss pitch kit export error"
             className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
           >
             <X className="w-3 h-3" aria-hidden="true" />
