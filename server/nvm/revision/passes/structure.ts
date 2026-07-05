@@ -548,6 +548,22 @@
 // dread, so a passing dip should not count (floor tightens). storyContext absent, genre
 // absent, or genre unset in the table -> identical constant and identical issue text to
 // pre-Wave-1184 behavior.
+// Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list;
+// see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): IDIOT_PLOT (a revelation or
+// resolved question is known by a specific character in an early scene, that character shares
+// 2+ later scenes with another character while the same clue/conflict stays open, and nothing
+// on the page — no secret/deception vocabulary — explains the silence; distinct from every
+// existing revelation check in this file, none of which track co-presence between a specific
+// knowing character and an affected character across multiple later scenes), and UNSEEDED_TWIST
+// (hardens the turn-without-cause coverage already in this file (DRAMATIC_TURN_CAUSELESS) and
+// in payoff.ts's dramatic-turn co-occurrence/aftermath family — read read-only first — with an
+// actual TEXT-CONTENT check those never perform: DRAMATIC_TURN_CAUSELESS asks whether a NUMERIC
+// signal preceded a turn; this asks whether the turn's own key noun phrase was ever mentioned in
+// ANY earlier scene at all, independent of numeric signals. Single-peak isolation x content-
+// overlap mode x final-third position — a genuinely new (channel, mode) cell). Both share the
+// file-local composite-text + cue-based speaker infrastructure duplicated from causality.ts's
+// Wave 1191 block (per the project's per-pass-file duplication convention — see tests/passes/
+// helpers.ts header and theme.ts's buildSceneText, Wave 130).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6665,6 +6681,133 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         description: `Every one of the story's ${r1171c.triggerCount} scenes that plant a clue is followed by two scenes with no emotional shift, even though ${r1171c.aftermathCount} such shifts occur elsewhere. A planted clue that never registers on any character's felt state right after it lands leaves the structure's setups reading as pure bookkeeping rather than moments that carry any felt weight until their eventual payoff.`,
         suggestedFix: `In the two scenes following at least one seed, let the planting land on a character's emotional register — unease, hope, suspicion — so the setup carries felt weight, not just structural function.`,
       });
+    }
+  }
+
+  // ── Wave 1191: Sin Check detector pack — infrastructure ────────────────────────
+  // Local, file-scoped composite-text + speaker infrastructure feeding the two checks
+  // below. See the file header for the full distinctness rationale of each check.
+  {
+    const headingRe1191 = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i;
+    const fountainLines1191 = fountain.split('\n');
+    const headingLineIdx1191: number[] = [];
+    fountainLines1191.forEach((l, li) => { if (headingRe1191.test(l.trim())) headingLineIdx1191.push(li); });
+    const headingsAligned1191 = headingLineIdx1191.length === records.length;
+
+    // Per-scene composite text — see causality.ts's identical Wave 1191 block for the
+    // full rationale (duplicated per the project's per-pass-file convention).
+    const sceneTextRaw1191: string[] = records.map((r, ri) => {
+      const parts: string[] = [r.slug, ...(r.dialogueHighlights ?? []), r.revelation ?? '', ...(r.visualBeats ?? [])];
+      if (headingsAligned1191) {
+        const start = headingLineIdx1191[ri];
+        const end = ri + 1 < headingLineIdx1191.length ? headingLineIdx1191[ri + 1] : fountainLines1191.length;
+        parts.push(fountainLines1191.slice(start, end).join(' '));
+      }
+      return parts.join(' ');
+    });
+    const sceneTextLower1191 = sceneTextRaw1191.map(t => t.toLowerCase());
+
+    // Character-cue speakers, mapped to scene index by nearest preceding heading line.
+    const cueRe1191 = /^[A-Z][A-Z0-9\s\-'.]{1,30}$/;
+    const cueExcludeRe1191 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
+    const speakerCounts1191 = new Map<string, number>();
+    const speakersByScene1191: Array<Set<string>> = records.map(() => new Set<string>());
+    if (headingsAligned1191) {
+      for (let li = 0; li < fountainLines1191.length; li++) {
+        const line = fountainLines1191[li].trim();
+        if (!line || !cueRe1191.test(line) || cueExcludeRe1191.test(line)) continue;
+        const speaker = line.split('(')[0].trim();
+        if (!speaker) continue;
+        let sceneIdx = 0;
+        for (let k = 0; k < headingLineIdx1191.length; k++) {
+          if (headingLineIdx1191[k] <= li) sceneIdx = k; else break;
+        }
+        speakerCounts1191.set(speaker, (speakerCounts1191.get(speaker) ?? 0) + 1);
+        speakersByScene1191[sceneIdx].add(speaker);
+      }
+    }
+
+    // ── IDIOT_PLOT ─────────────────────────────────────────────────────────────────
+    // A revelation/resolved question is known in an early scene; the character who
+    // knows it (the scene's dominant speaker) shares 2+ later scenes with another
+    // character while the same clue/conflict (unresolvedClues) stays open; no
+    // concealment vocabulary explains the silence. See file header for distinctness.
+    if (n >= 6) {
+      const concealRe1191 = /\b(secret\w*|conceal\w*|hid(?:e|ing|den)|hides|lie[sd]?|lying|cover-?up\w*|deceiv\w*|deception|withhold\w*|keep\w* (?:it |this )?(?:secret|quiet)|don'?t tell|doesn'?t tell|mustn'?t (?:tell|know)|can'?t (?:tell|know))\b/;
+      const half1191 = Math.max(1, Math.floor(n * 0.5));
+
+      for (let k = 0; k < half1191; k++) {
+        const r = records[k];
+        const hasKnowledge1191 = r.revelation !== null || (r.questionsResolved ?? 0) > 0;
+        const clueIds1191 = r.unresolvedClues ?? [];
+        if (!hasKnowledge1191 || clueIds1191.length === 0) continue;
+
+        const knower1191 = [...speakersByScene1191[k]].sort((a, b) =>
+          (speakerCounts1191.get(b) ?? 0) - (speakerCounts1191.get(a) ?? 0),
+        )[0];
+        if (!knower1191) continue;
+
+        const laterQualifying1191: number[] = [];
+        for (let j = k + 1; j < n; j++) {
+          const stillOpen1191 = (records[j].unresolvedClues ?? []).some(c => clueIds1191.includes(c));
+          if (!stillOpen1191) continue;
+          const knowerPresent1191 = speakersByScene1191[j].has(knower1191);
+          const othersPresent1191 = [...speakersByScene1191[j]].some(s => s !== knower1191);
+          if (knowerPresent1191 && othersPresent1191) laterQualifying1191.push(j);
+        }
+        if (laterQualifying1191.length < 2) continue;
+
+        const lastQualifying1191 = laterQualifying1191[laterQualifying1191.length - 1];
+        const concealed1191 = sceneTextLower1191.slice(k, lastQualifying1191 + 1).some(t => concealRe1191.test(t));
+        if (concealed1191) continue;
+
+        const eventuallyPaidOff1191 = records.slice(lastQualifying1191 + 1).some(r2 => (r2.payoffSetupIds ?? []).some(pid => clueIds1191.includes(pid)));
+        const staysOpenToEnd1191 = (records[n - 1].unresolvedClues ?? []).some(c => clueIds1191.includes(c));
+        if (!eventuallyPaidOff1191 && !staysOpenToEnd1191) continue;
+
+        issues.push({
+          location: `Scenes ${laterQualifying1191.join(', ')} (knower: ${knower1191}, since Scene ${k})`,
+          rule: 'IDIOT_PLOT',
+          description: `${knower1191} has known "${clueIds1191[0]}" since Scene ${k} and shares Scenes ${laterQualifying1191.join(', ')} with other characters while the conflict stays open — nobody on the page ever says the one thing that would end it, and there's no concealment motive (no secret/lie vocabulary) to explain the silence.`,
+          severity: 'major',
+          suggestedFix: `Either give ${knower1191} an explicit, motivated reason to withhold "${clueIds1191[0]}" (fear, loyalty, a secret worth keeping), or have them share it — and build the next complication from what sharing it changes.`,
+        });
+        break; // one flag per pass — the first qualifying knowledge scene is enough to name the pattern
+      }
+    }
+
+    // ── UNSEEDED_TWIST ─────────────────────────────────────────────────────────────
+    // The single highest-magnitude dramatic turn in the final third has a key noun
+    // phrase with zero content-word overlap with any earlier scene. See file header
+    // for the full distinctness rationale against DRAMATIC_TURN_CAUSELESS and
+    // payoff.ts's dramatic-turn family.
+    if (n >= 8) {
+      const lateThird1191 = Math.floor(n * (2 / 3));
+      const turnScenes1191 = records
+        .map((r, i) => ({ r, i }))
+        .filter(({ r, i }) => i >= lateThird1191 && (r.dramaticTurn ?? 'nothing') !== 'nothing' && Math.abs(r.suspenseDelta ?? 0) > 2);
+
+      if (turnScenes1191.length > 0) {
+        const peak1191 = turnScenes1191.reduce((best, cur) =>
+          Math.abs(cur.r.suspenseDelta) > Math.abs(best.r.suspenseDelta) ? cur : best,
+        );
+        const stop1191 = new Set(['the', 'and', 'that', 'with', 'from', 'this', 'they', 'have', 'were', 'their', 'into', 'about', 'when', 'then', 'what', 'which', 'there', 'over', 'after', 'before', 'because']);
+        const keyWords1191 = (peak1191.r.dramaticTurn.toLowerCase().match(/[a-z']{4,}/g) ?? []).filter(w => !stop1191.has(w));
+
+        if (keyWords1191.length > 0) {
+          const earlierText1191 = sceneTextLower1191.slice(0, peak1191.i).join(' ');
+          const anyOverlap1191 = keyWords1191.some(w => earlierText1191.includes(w));
+          if (!anyOverlap1191) {
+            issues.push({
+              location: `Scene ${peak1191.i} (${peak1191.r.slug})`,
+              rule: 'UNSEEDED_TWIST',
+              description: `Scene ${peak1191.i}'s late reversal ("${peak1191.r.dramaticTurn}") shares zero content words with any earlier scene — none of its key terms (${keyWords1191.slice(0, 4).join(', ')}) appear anywhere before it. The audience has no lexical foothold for this turn; it lands as information invented for the twist, not the payoff of anything planted.`,
+              severity: 'major',
+              suggestedFix: `Plant at least one of this turn's key terms in an earlier scene — a passing mention, an object glimpsed, a name spoken once — so an attentive rewatch finds the seed even if the first watch doesn't.`,
+            });
+          }
+        }
+      }
     }
   }
 

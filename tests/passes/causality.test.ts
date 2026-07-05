@@ -6261,3 +6261,308 @@ describe('Wave 130 — Causality pass REVELATION_WITHOUT_SETUP fix', () => {
   });
 
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wave 1191 — Sin Check detector pack: PLOT_ARMOR, COINCIDENCE_RESOLUTION,
+// UNMOTIVATED_BETRAYAL, PROTAGONIST_UNTESTED.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Wave 1191 — causalityPass: Sin Check detector pack', () => {
+  function makeRec1191(idx: number, slug: string, override: Partial<any> = {}): any {
+    return {
+      commitId: `c${idx}`, sceneIdx: idx, slug,
+      purpose: 'complicate', dramaticTurn: 'nothing', revelation: null,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      relationshipShifts: [], createdAt: 0,
+      ...override,
+    };
+  }
+
+  function makeInput1191(records: any[], fountain: string, storyContext: any = {}): any {
+    return {
+      fountain, original: fountain,
+      annotations: records.map(() => ({ revelation: null })),
+      structure: {} as any, records, approvedSpans: [], storyContext,
+    };
+  }
+
+  // ── PLOT_ARMOR ─────────────────────────────────────────────────────────────
+  describe('PLOT_ARMOR', () => {
+    // 6 scenes; JAKE is the only speaker (protagonist); scenes 1, 3, 5 are danger
+    // scenes (danger vocab + suspenseDelta>2, JAKE present); zero cost anywhere.
+    const dangerFountain = `INT. WAREHOUSE - DAY
+
+JAKE
+We need to move now.
+
+INT. ROOFTOP - NIGHT
+
+Gunfire erupts as JAKE dives behind the vent, bullets sparking off metal.
+
+JAKE
+That was close.
+
+INT. OFFICE - DAY
+
+JAKE
+Let's regroup.
+
+INT. BRIDGE - NIGHT
+
+An explosion rips through the bridge as JAKE leaps clear of the flames.
+
+JAKE
+Nobody move.
+
+INT. LAB - DAY
+
+JAKE
+Almost there.
+
+INT. DOCKS - NIGHT
+
+JAKE dodges as a knife-wielding attacker lunges, gunfire ringing out behind him.
+
+JAKE
+Not today.
+`;
+    const dangerSlugs = ['INT. WAREHOUSE - DAY', 'INT. ROOFTOP - NIGHT', 'INT. OFFICE - DAY', 'INT. BRIDGE - NIGHT', 'INT. LAB - DAY', 'INT. DOCKS - NIGHT'];
+    function dangerRecords(overrides: Record<number, Partial<any>> = {}) {
+      const base = [
+        makeRec1191(0, dangerSlugs[0]),
+        makeRec1191(1, dangerSlugs[1], { suspenseDelta: 3 }),
+        makeRec1191(2, dangerSlugs[2]),
+        makeRec1191(3, dangerSlugs[3], { suspenseDelta: 3 }),
+        makeRec1191(4, dangerSlugs[4]),
+        makeRec1191(5, dangerSlugs[5], { suspenseDelta: 3 }),
+      ];
+      for (const [idx, over] of Object.entries(overrides)) Object.assign(base[Number(idx)], over);
+      return base;
+    }
+
+    it('fires when the protagonist survives 3+ danger scenes with zero cost', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const result = await causalityPass(makeInput1191(dangerRecords(), dangerFountain));
+      const fired = result.issues.filter(i => i.rule === 'PLOT_ARMOR');
+      assert.ok(fired.length >= 1, `should fire PLOT_ARMOR; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.strictEqual(fired[0].severity, 'major');
+    });
+
+    it('does NOT fire when one danger scene carries an injury cost', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = dangerRecords({ 3: { visualBeats: ['JAKE stumbles away bleeding from a gash on his arm.'] } });
+      const result = await causalityPass(makeInput1191(records, dangerFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'PLOT_ARMOR'), 'a single injury signal should suppress the fire');
+    });
+
+    it('does NOT fire for a comedy-coded genre with only 3 danger scenes (threshold bumps to 4)', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const result = await causalityPass(makeInput1191(dangerRecords(), dangerFountain, { genre: 'action-comedy' }));
+      assert.ok(!result.issues.some(i => i.rule === 'PLOT_ARMOR'), 'comedy-coded genre requires 4 danger scenes, not 3');
+    });
+
+    it('does NOT fire with only 2 qualifying danger scenes', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = dangerRecords({ 5: { suspenseDelta: 0 } });
+      const fountainNoDocksDanger = dangerFountain.replace(
+        'JAKE dodges as a knife-wielding attacker lunges, gunfire ringing out behind him.',
+        'JAKE walks along the pier.',
+      );
+      const result = await causalityPass(makeInput1191(records, fountainNoDocksDanger));
+      assert.ok(!result.issues.some(i => i.rule === 'PLOT_ARMOR'), 'fewer than 3 danger scenes should not fire');
+    });
+  });
+
+  // ── COINCIDENCE_RESOLUTION ───────────────────────────────────────────────────
+  describe('COINCIDENCE_RESOLUTION', () => {
+    const plainFountain6 = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
+
+    it('fires when a payoff scene uses lucky-arrival phrasing to introduce a brand-new noun', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY'),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', {
+          payoffSetupIds: ['case_solved'],
+          visualBeats: ['A stranger named Ferguson suddenly appears with the missing files.'],
+        }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      const fired = result.issues.filter(i => i.rule === 'COINCIDENCE_RESOLUTION');
+      assert.ok(fired.length >= 1, `should fire COINCIDENCE_RESOLUTION; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when the resolving noun already appeared in an earlier scene', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { visualBeats: ['Ferguson watches quietly from across the street.'] }),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', {
+          payoffSetupIds: ['case_solved'],
+          visualBeats: ['A stranger named Ferguson suddenly appears with the missing files.'],
+        }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'COINCIDENCE_RESOLUTION'), 'a previously-mentioned resolver should not fire');
+    });
+
+    it('does NOT fire when the payoff traces to an earlier seeded clue', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY'),
+        makeRec1191(2, 'INT. SC2 - DAY', { seededClueIds: ['case_solved'] }),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', {
+          payoffSetupIds: ['case_solved'],
+          visualBeats: ['A stranger named Ferguson suddenly appears with the missing files.'],
+        }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'COINCIDENCE_RESOLUTION'), 'a payoff tracing to a seeded clue should not fire');
+    });
+  });
+
+  // ── UNMOTIVATED_BETRAYAL ──────────────────────────────────────────────────────
+  describe('UNMOTIVATED_BETRAYAL', () => {
+    const plainFountain6 = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
+
+    it('fires when an ally bond flips to hostile with zero prior strain, vocab, or revelation', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: -0.8 }] }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      const fired = result.issues.filter(i => i.rule === 'UNMOTIVATED_BETRAYAL');
+      assert.ok(fired.length >= 1, `should fire UNMOTIVATED_BETRAYAL; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when a negative shift for the pair appears before the hostile flip', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: -0.2 }] }),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: -0.8 }] }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'UNMOTIVATED_BETRAYAL'), 'prior strain should suppress the fire');
+    });
+
+    it('does NOT fire when suspicion/deception vocabulary appears in the run-up', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec1191(2, 'INT. SC2 - DAY', { dialogueHighlights: ['Something about him feels suspicious.'] }),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: -0.8 }] }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'UNMOTIVATED_BETRAYAL'), 'suspicion vocabulary should suppress the fire');
+    });
+
+    it('does NOT fire when an earlier revelation names either character', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: 0.6 }] }),
+        makeRec1191(2, 'INT. SC2 - DAY', { revelation: 'Bob has been planning this for weeks' }),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'),
+        makeRec1191(5, 'INT. SC5 - DAY', { relationshipShifts: [{ pairKey: 'Alice|Bob', dimension: 'trust', amount: -0.8 }] }),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'UNMOTIVATED_BETRAYAL'), 'an earlier revelation naming the betrayer should suppress the fire');
+    });
+  });
+
+  // ── PROTAGONIST_UNTESTED ──────────────────────────────────────────────────────
+  describe('PROTAGONIST_UNTESTED', () => {
+    const untestedSlugs = ['INT. ONE - DAY', 'INT. TWO - DAY', 'INT. THREE - DAY', 'INT. FOUR - DAY', 'INT. FIVE - DAY', 'INT. SIX - NIGHT'];
+    function untestedFountain(sceneSixBody: string) {
+      return `INT. ONE - DAY
+
+JAKE
+Good morning.
+
+INT. TWO - DAY
+
+JAKE
+Let's get to work.
+
+INT. THREE - DAY
+
+JAKE
+Making progress.
+
+INT. FOUR - DAY
+
+JAKE
+Almost there.
+
+INT. FIVE - DAY
+
+JAKE
+We did it.
+
+INT. SIX - NIGHT
+
+${sceneSixBody}
+`;
+    }
+    function untestedRecords(sceneSixOverride: Partial<any>) {
+      return [
+        makeRec1191(0, untestedSlugs[0]),
+        makeRec1191(1, untestedSlugs[1]),
+        makeRec1191(2, untestedSlugs[2]),
+        makeRec1191(3, untestedSlugs[3]),
+        makeRec1191(4, untestedSlugs[4]),
+        makeRec1191(5, untestedSlugs[5], sceneSixOverride),
+      ];
+    }
+
+    it('fires when the protagonist never takes a setback while the story shows negativity elsewhere', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const fountain = untestedFountain('MARA\nI failed to stop them. Everything is lost.');
+      const records = untestedRecords({ emotionalShift: 'negative' });
+      const result = await causalityPass(makeInput1191(records, fountain));
+      const fired = result.issues.filter(i => i.rule === 'PROTAGONIST_UNTESTED');
+      assert.ok(fired.length >= 1, `should fire PROTAGONIST_UNTESTED; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when the protagonist takes a setback', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const fountain = untestedFountain('MARA\nI failed to stop them. Everything is lost.');
+      const records = untestedRecords({ emotionalShift: 'negative' });
+      records[2] = { ...records[2], emotionalShift: 'negative' };
+      const result = await causalityPass(makeInput1191(records, fountain));
+      assert.ok(!result.issues.some(i => i.rule === 'PROTAGONIST_UNTESTED'), 'a protagonist setback should suppress the fire');
+    });
+
+    it('does NOT fire when the story shows no negativity anywhere (flat draft, not Mary Sue)', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const fountain = untestedFountain('MARA\nQuite a day.');
+      const records = untestedRecords({ emotionalShift: 'neutral' });
+      const result = await causalityPass(makeInput1191(records, fountain));
+      assert.ok(!result.issues.some(i => i.rule === 'PROTAGONIST_UNTESTED'), 'no negativity anywhere means the absence is not meaningful');
+    });
+  });
+});

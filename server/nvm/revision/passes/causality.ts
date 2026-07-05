@@ -588,6 +588,25 @@
 // CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID and CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID
 // give revelation its fourth and fifth channels (suspenseDelta, visualBeats); CAUSALITY_
 // SUSPENSE_RELATIONAL_AFTERMATH_VOID gives suspenseDelta its third channel (relationshipShifts).
+// Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list;
+// see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): PLOT_ARMOR (the protagonist
+// repeatedly survives lethal/high-danger scenes with zero recorded cost — no injury, no
+// negative emotional aftermath, no relationship/resource loss — across 3+ danger scenes, a
+// genre-aware threshold for comedy-coded scripts), COINCIDENCE_RESOLUTION (a payoff scene
+// closes the story using lucky-arrival phrasing and a brand-new proper noun/object never
+// mentioned before, tracing to no seeded clue — distinct in scope from DEUS_EX_MACHINA, which
+// is revelation-only, position-gated, and phrasing-agnostic), UNMOTIVATED_BETRAYAL (an
+// established-ally relationship flips to hostile with zero prior strain anywhere in the
+// run-up, zero suspicion/deception vocabulary, and no earlier revelation naming either party —
+// distinct from MOTIVATION_REVERSAL_UNCAUSED, which uses a tight 2-scene window and only three
+// numeric guards), and PROTAGONIST_UNTESTED (the protagonist never suffers ANY setback anywhere
+// in the script — emotional, textual, or relational — while the story demonstrably can render
+// one elsewhere; distinct from character-arc.ts's ARC_PROTAGONIST_UNTESTED_SOCIALLY, which is
+// relationship-shift-only and requires 2+ shifts, not a scene-presence population). All four
+// share a small file-local text/speaker infrastructure block (composite per-scene text, cue-
+// based speaker/protagonist detection) duplicated here rather than added to lib/checks.ts,
+// which is reserved for numeric analytical-mode templates, not lexicon extraction — matches
+// the precedent of theme.ts's buildSceneText (Wave 130) and dialogue.ts's extractDialogue.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6929,6 +6948,250 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         description: `Every one of the story's ${r1175c.triggerCount} suspense-spike scenes is followed by two scenes with no recorded relationship shift, even though ${r1175c.aftermathCount} such shifts occur elsewhere. A spike in danger that never moves how a pair of characters stand with each other right after it lands leaves the causal chain's tension isolated from the interpersonal stakes it should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let it shift a relationship — an alliance strained or forced by the danger — so the tension carries interpersonal weight, not just structural pressure.`,
       });
+    }
+  }
+
+  // ── Wave 1191: Sin Check detector pack — infrastructure ────────────────────────
+  // Local, file-scoped composite-text + speaker infrastructure feeding the four checks
+  // below. See the file header for the full distinctness rationale of each check.
+  {
+    const headingRe1191 = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i;
+    const fountainLines1191 = fountain.split('\n');
+    const headingLineIdx1191: number[] = [];
+    fountainLines1191.forEach((l, li) => { if (headingRe1191.test(l.trim())) headingLineIdx1191.push(li); });
+    const headingsAligned1191 = headingLineIdx1191.length === records.length;
+
+    // Per-scene composite text: slug + dialogue highlights + revelation + visual beats,
+    // plus (when the fountain's scene-heading count lines up with records.length) the raw
+    // fountain block between this scene's heading and the next. Falls back to record-only
+    // fields otherwise — a degenerate/mismatched fountain simply yields less signal, never
+    // a crash or a false fire.
+    const sceneTextRaw1191: string[] = records.map((r, ri) => {
+      const parts: string[] = [r.slug, ...(r.dialogueHighlights ?? []), r.revelation ?? '', ...(r.visualBeats ?? [])];
+      if (headingsAligned1191) {
+        const start = headingLineIdx1191[ri];
+        const end = ri + 1 < headingLineIdx1191.length ? headingLineIdx1191[ri + 1] : fountainLines1191.length;
+        parts.push(fountainLines1191.slice(start, end).join(' '));
+      }
+      return parts.join(' ');
+    });
+    const sceneTextLower1191 = sceneTextRaw1191.map(t => t.toLowerCase());
+
+    // Character-cue speakers (same ALL-CAPS cue heuristic as dialogue.ts's extractDialogue),
+    // mapped to scene index by nearest preceding heading line. Used to identify the
+    // protagonist (highest total cue count) and per-scene co-presence.
+    const cueRe1191 = /^[A-Z][A-Z0-9\s\-'.]{1,30}$/;
+    const cueExcludeRe1191 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
+    const speakerCounts1191 = new Map<string, number>();
+    const speakersByScene1191: Array<Set<string>> = records.map(() => new Set<string>());
+    if (headingsAligned1191) {
+      for (let li = 0; li < fountainLines1191.length; li++) {
+        const line = fountainLines1191[li].trim();
+        if (!line || !cueRe1191.test(line) || cueExcludeRe1191.test(line)) continue;
+        const speaker = line.split('(')[0].trim();
+        if (!speaker) continue;
+        let sceneIdx = 0;
+        for (let k = 0; k < headingLineIdx1191.length; k++) {
+          if (headingLineIdx1191[k] <= li) sceneIdx = k; else break;
+        }
+        speakerCounts1191.set(speaker, (speakerCounts1191.get(speaker) ?? 0) + 1);
+        speakersByScene1191[sceneIdx].add(speaker);
+      }
+    }
+    let protagonist1191: string | null = null;
+    let protagonistMax1191 = 0;
+    for (const [name, count] of speakerCounts1191) {
+      if (count > protagonistMax1191) { protagonistMax1191 = count; protagonist1191 = name; }
+    }
+
+    // ── PLOT_ARMOR ────────────────────────────────────────────────────────────────
+    // The protagonist repeatedly passes through lethal/high-danger scenes (danger
+    // vocabulary + a suspense spike) with zero recorded cost. Distinct from every
+    // existing suspense-channel check in this file (SUSPENSE_SPIKE_NO_CAUSE, SUSPENSE_
+    // PEAK_UNCAUSED, etc.) — those audit whether danger is set up causally; this audits
+    // whether danger, once it lands ON the protagonist, ever costs them anything at all.
+    // Guards: needs an identifiable protagonist (>=1 cue anywhere), needs >=3 qualifying
+    // danger scenes the protagonist is present in (>=4 for comedy-coded genres, where one
+    // big consequence-free set piece is a legitimate comedic beat, not systemic armor),
+    // and a SINGLE cost signal anywhere in the set kills the fire.
+    if (protagonist1191 && records.length >= 6) {
+      const protagonistName1191 = protagonist1191;
+      const dangerRe1191 = /\b(guns?|gunfire|gunshots?|knife|blade|explosion|explod\w*|bombs?|shoot\w*|shot|kill\w*|die[sd]?|dying|death|chase[sd]?|fight\w*|attack\w*|ambush\w*|trapped|falling|drown\w*|poison\w*|hostage\w*|kidnap\w*|cliff|burning|collapse\w*|crash\w*)\b/;
+      const injuryRe1191 = /\b(wound\w*|bleed\w*|blood\w*|bruise[sd]?|broken (?:bone|arm|leg|rib)\w*|hospital\w*|scarred|limp\w*|injur\w*|concuss\w*|stitches|crutch\w*)\b/;
+      const genre1191 = (input.storyContext?.genre ?? '').toLowerCase();
+      const dangerThreshold1191 = /comedy/.test(genre1191) ? 4 : 3;
+
+      const dangerScenes1191: number[] = [];
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        if (r.suspenseDelta > 2 && dangerRe1191.test(sceneTextLower1191[i]) && speakersByScene1191[i].has(protagonistName1191)) {
+          dangerScenes1191.push(i);
+        }
+      }
+
+      if (dangerScenes1191.length >= dangerThreshold1191) {
+        const hasCost1191 = dangerScenes1191.some(i => {
+          const next = records[i + 1];
+          const ownInjury = injuryRe1191.test(sceneTextLower1191[i]);
+          const nextInjury = next ? injuryRe1191.test(sceneTextLower1191[i + 1]) : false;
+          const ownNegEmotion = records[i].emotionalShift === 'negative';
+          const nextNegEmotion = next ? next.emotionalShift === 'negative' : false;
+          const ownNegRelationship = (records[i].relationshipShifts ?? []).some(s => s.amount < 0);
+          const nextNegRelationship = next ? (next.relationshipShifts ?? []).some(s => s.amount < 0) : false;
+          return ownInjury || nextInjury || ownNegEmotion || nextNegEmotion || ownNegRelationship || nextNegRelationship;
+        });
+
+        if (!hasCost1191) {
+          issues.push({
+            location: `Scenes ${dangerScenes1191.join(', ')} (protagonist: ${protagonistName1191})`,
+            rule: 'PLOT_ARMOR',
+            description: `${protagonistName1191} passes through ${dangerScenes1191.length} lethal/high-danger scenes (Scenes ${dangerScenes1191.join(', ')}) and comes out of every one with zero recorded cost — no injury, no negative emotional aftermath, no relationship or resource loss. Danger that never touches the protagonist stops reading as danger.`,
+            severity: 'major',
+            suggestedFix: `Give at least one of these encounters a real price: an injury that lingers, a relationship strained by what surviving it took, or a loss the protagonist has to carry into the next scene.`,
+          });
+        }
+      }
+    }
+
+    // ── COINCIDENCE_RESOLUTION ────────────────────────────────────────────────────
+    // A payoff scene resolves the story via an agent/object never mentioned before,
+    // dressed in lucky-arrival phrasing, tracing to no seeded clue. Distinct from
+    // DEUS_EX_MACHINA (above): that fires on any late unseeded REVELATION in the final
+    // 20% regardless of phrasing or novelty of the resolving noun; this fires on any
+    // PAYOFF scene (not revelation-scoped, not position-gated) that additionally carries
+    // coincidence phrasing AND introduces a brand-new proper noun — a stricter, more
+    // specific double signal. Guards: does not fire when the payoff traces to an earlier
+    // seeded clue (a legitimate Chekhov's-gun payoff, including mystery-genre culprit
+    // reveals seeded via seededClueIds), and does not fire when every capitalized token
+    // in the resolving scene already appeared in an earlier scene.
+    {
+      const coincidenceRe1191 = /\b(suddenly|just then|happened to|out of nowhere|by (?:sheer )?coincidence|as luck would have it|against all odds|randomly)\b/;
+      const properNounStop1191 = new Set(['The', 'A', 'An', 'He', 'She', 'They', 'It', 'We', 'You', 'I', 'But', 'And', 'So', 'Then', 'Now', 'This', 'That', 'His', 'Her', 'Their', 'Int', 'Ext', 'Cut', 'Fade']);
+      const seenNouns1191 = new Set<string>();
+
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const nounsHere1191 = (sceneTextRaw1191[i].match(/\b[A-Z][a-z]{2,}\b/g) ?? []).filter(w => !properNounStop1191.has(w));
+
+        const payoffIds1191 = r.payoffSetupIds ?? [];
+        if (i >= 2 && payoffIds1191.length > 0 && coincidenceRe1191.test(sceneTextLower1191[i])) {
+          const tracesToSeed1191 = payoffIds1191.some(pid =>
+            records.slice(0, i).some(prev => (prev.seededClueIds ?? []).includes(pid)),
+          );
+          if (!tracesToSeed1191) {
+            const newNouns1191 = nounsHere1191.filter(w => !seenNouns1191.has(w));
+            if (newNouns1191.length > 0) {
+              issues.push({
+                location: `Scene ${i} (${r.slug})`,
+                rule: 'COINCIDENCE_RESOLUTION',
+                description: `Scene ${i} closes out payoff(s) [${payoffIds1191.join(', ')}] using lucky-arrival phrasing and introduces "${newNouns1191[0]}" for the first time in the story — no earlier scene ever mentions it, and none of these payoffs trace to a clue seeded in any earlier scene. The resolution reads as coincidence, not payoff.`,
+                severity: 'major',
+                suggestedFix: `Either seed "${newNouns1191[0]}" (or whoever/whatever actually resolves this) in an earlier scene, or replace the lucky-arrival phrasing with a resolution that draws on something already established.`,
+              });
+            }
+          }
+        }
+
+        for (const w of nounsHere1191) seenNouns1191.add(w);
+      }
+    }
+
+    // ── UNMOTIVATED_BETRAYAL ───────────────────────────────────────────────────────
+    // An established-ally relationship flips to hostile with zero prior strain anywhere
+    // in the run-up, zero suspicion/deception vocabulary, and no earlier revelation
+    // naming either party. Distinct from MOTIVATION_REVERSAL_UNCAUSED (above): that rule
+    // requires an immediately-preceding positive shift within a tight 2-scene window and
+    // only guards against three numeric causes (revelation/clock/suspense) between the
+    // two shifts. This rule scans the ENTIRE run-up (not a 2-scene window), requires the
+    // flip to cross a hostile-level threshold (<=-0.6, not just any negative amount), and
+    // adds two text-lexicon guards (suspicion/deception vocabulary, an earlier revelation
+    // naming either character) the sibling rule never checks.
+    {
+      const strainRe1191 = /\b(suspicious|suspect\w*|distrust\w*|wary of|uneasy about|doesn'?t trust|didn'?t trust|deceiv\w*|secretly|behind (?:his|her|their|\w+'s) back|two-faced|double-cross\w*|conspir\w*|plotting against)\b/;
+
+      outer1191: for (let i = 0; i < records.length; i++) {
+        for (const shift of records[i].relationshipShifts ?? []) {
+          // Defensive: some legacy fixtures elsewhere in this file carry ad hoc
+          // relationshipShifts-like objects (e.g. {pair, delta} instead of
+          // {pairKey, amount}) that don't conform to the real record shape — a
+          // malformed entry should be skipped, never crash the whole pass.
+          if (typeof shift.amount !== 'number' || typeof shift.pairKey !== 'string') continue;
+          if (shift.amount <= 0.3) continue; // not an ally-level positive bond
+          const [nameA1191, nameB1191] = shift.pairKey.split('|');
+
+          for (let h = i + 1; h < records.length; h++) {
+            const hostile1191 = (records[h].relationshipShifts ?? []).find(s => s.pairKey === shift.pairKey && typeof s.amount === 'number' && s.amount <= -0.6);
+            if (!hostile1191) continue;
+
+            const priorStrain1191 = records.slice(i, h).some(r2 =>
+              (r2.relationshipShifts ?? []).some(s => s.pairKey === shift.pairKey && typeof s.amount === 'number' && s.amount < 0),
+            );
+            if (priorStrain1191) break; // strain found — the flip is motivated; no later h for this pair fires either
+
+            const vocabPresent1191 = sceneTextLower1191.slice(i, h + 1).some(t => strainRe1191.test(t));
+            const revelationNamesEither1191 = records.slice(i, h).some(r2 =>
+              r2.revelation !== null && (r2.revelation.includes(nameA1191) || r2.revelation.includes(nameB1191)),
+            );
+            if (vocabPresent1191 || revelationNamesEither1191) continue;
+
+            issues.push({
+              location: `Scenes ${i}–${h} (pair: ${shift.pairKey})`,
+              rule: 'UNMOTIVATED_BETRAYAL',
+              description: `"${shift.pairKey}" are established as allies in Scene ${i} (+${shift.amount.toFixed(2)}), then the bond flips to hostile in Scene ${h} (${hostile1191.amount.toFixed(2)}) with no prior strain anywhere in between, no suspicion or deception language on the page, and no earlier revelation naming either character — the betrayal has no visible motive.`,
+              severity: 'major',
+              suggestedFix: `Plant the turn before it happens: a scene of growing suspicion, a secret glimpsed, or a revelation that recontextualizes one character's earlier behavior — so the betrayal reads as the reveal of what was already true, not a coin-flip.`,
+            });
+            continue outer1191;
+          }
+        }
+      }
+    }
+
+    // ── PROTAGONIST_UNTESTED ───────────────────────────────────────────────────────
+    // The protagonist never suffers a setback anywhere in the script — no negative
+    // emotional beat, no failure/loss vocabulary, no relationship cost. Distinct from
+    // PLOT_ARMOR (above, this wave): that check is scoped to named lethal/high-danger
+    // scenes specifically; this is a global, danger-agnostic, three-channel check.
+    // Distinct from character-arc.ts's ARC_PROTAGONIST_UNTESTED_SOCIALLY: that rule is
+    // relationship-shift-only and requires >=2 shifts that are all positive; this rule
+    // requires ALL THREE of emotion/vocabulary/relationship to be clear across every
+    // scene the protagonist appears in, gated on scene presence rather than shift count,
+    // so it still fires for a protagonist with zero relationship shifts at all. Guard:
+    // requires the protagonist to appear in >=5 scenes, and requires the failure/
+    // negative-emotion signal to exist SOMEWHERE ELSE in the story (proving the absence
+    // is about the protagonist, not a flatly neutral draft with no such material at all).
+    if (protagonist1191) {
+      const protagonistName1191b = protagonist1191;
+      const failureRe1191 = /\b(fail\w*|lose[s]?|lost|defeat\w*|setback\w*|can'?t (?:do|make|stop|save)|unable to|mistake\w*|blew it|screw\w* up|messed up)\b/;
+
+      const protagonistScenes1191 = records
+        .map((r, i) => ({ r, i }))
+        .filter(({ i }) => speakersByScene1191[i].has(protagonistName1191b));
+
+      if (protagonistScenes1191.length >= 5) {
+        const protagonistHasSetback1191 = protagonistScenes1191.some(({ r, i }) =>
+          r.emotionalShift === 'negative' ||
+          failureRe1191.test(sceneTextLower1191[i]) ||
+          (r.relationshipShifts ?? []).some(s => s.amount < 0),
+        );
+
+        if (!protagonistHasSetback1191) {
+          const protagonistSceneIdxs1191 = new Set(protagonistScenes1191.map(({ i }) => i));
+          const elsewhereHasNegativity1191 = records.some((r, i) =>
+            !protagonistSceneIdxs1191.has(i) && (r.emotionalShift === 'negative' || failureRe1191.test(sceneTextLower1191[i])),
+          );
+
+          if (elsewhereHasNegativity1191) {
+            issues.push({
+              location: `${protagonistScenes1191.length} scene(s) featuring ${protagonistName1191b}`,
+              rule: 'PROTAGONIST_UNTESTED',
+              description: `${protagonistName1191b} appears in ${protagonistScenes1191.length} scenes and never once takes a setback — no negative emotional beat, no failure or loss on the page, no relationship cost — even though the story elsewhere shows it can render exactly that. A protagonist who never loses anything gives the audience nothing to worry about.`,
+              severity: 'major',
+              suggestedFix: `Give ${protagonistName1191b} at least one real defeat: a plan that fails, a cost that lands, a moment where losing is genuinely on the table and happens.`,
+            });
+          }
+        }
+      }
     }
   }
 

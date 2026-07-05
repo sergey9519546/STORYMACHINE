@@ -6659,3 +6659,155 @@ describe('Wave 139 — structurePass: Act boundaries + inciting incident', () =>
     );
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wave 1191 — Sin Check detector pack: IDIOT_PLOT, UNSEEDED_TWIST.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Wave 1191 — structurePass: Sin Check detector pack', () => {
+  function makeRec1191(idx: number, slug: string, override: Partial<any> = {}): any {
+    return {
+      commitId: `c${idx}`, sceneIdx: idx, slug,
+      purpose: 'complicate', dramaticTurn: 'nothing', revelation: null,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      relationshipShifts: [], createdAt: 0,
+      ...override,
+    };
+  }
+
+  function makeInput1191(records: any[], fountain: string, storyContext: any = {}): any {
+    return {
+      fountain, original: fountain,
+      annotations: records.map(() => ({ revelation: null })),
+      structure: {} as any, records, approvedSpans: [], storyContext,
+    };
+  }
+
+  // ── IDIOT_PLOT ─────────────────────────────────────────────────────────────
+  describe('IDIOT_PLOT', () => {
+    // 6 scenes: ALICE learns "who did it" in Scene 1 (revelation + unresolvedClues).
+    // ALICE and BOB then share Scenes 2, 3, 4 while the clue stays open, with no
+    // concealment vocabulary anywhere, and it stays open through the final scene.
+    const idiotFountain = `INT. HOUSE - DAY
+
+ALICE
+Just a quiet morning.
+
+INT. STUDY - NIGHT
+
+ALICE
+I saw who did it. It was the butler.
+
+INT. KITCHEN - DAY
+
+ALICE
+Pass the salt.
+
+BOB
+Sure thing.
+
+INT. LIVING ROOM - NIGHT
+
+ALICE
+Lovely evening, isn't it?
+
+BOB
+Wonderful, yes.
+
+INT. GARDEN - DAY
+
+ALICE
+The roses are blooming.
+
+BOB
+They are.
+
+INT. FINALE - NIGHT
+
+BOB
+We should really figure out who did this.
+`;
+    const idiotSlugs = ['INT. HOUSE - DAY', 'INT. STUDY - NIGHT', 'INT. KITCHEN - DAY', 'INT. LIVING ROOM - NIGHT', 'INT. GARDEN - DAY', 'INT. FINALE - NIGHT'];
+    function idiotRecords(overrides: Record<number, Partial<any>> = {}) {
+      const base = [
+        makeRec1191(0, idiotSlugs[0]),
+        makeRec1191(1, idiotSlugs[1], { revelation: 'the killer was the butler', unresolvedClues: ['killer_id'] }),
+        makeRec1191(2, idiotSlugs[2], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(3, idiotSlugs[3], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(4, idiotSlugs[4], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(5, idiotSlugs[5], { unresolvedClues: ['killer_id'] }),
+      ];
+      for (const [idx, over] of Object.entries(overrides)) Object.assign(base[Number(idx)], over);
+      return base;
+    }
+
+    it('fires when the knowing character shares 2+ later scenes while the conflict stays open', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const result = await structurePass(makeInput1191(idiotRecords(), idiotFountain));
+      const fired = result.issues.filter(i => i.rule === 'IDIOT_PLOT');
+      assert.ok(fired.length >= 1, `should fire IDIOT_PLOT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.strictEqual(fired[0].severity, 'major');
+    });
+
+    it('does NOT fire when concealment vocabulary explains the silence', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 2: { dialogueHighlights: ['I have to keep it a secret for now.'] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'concealment vocabulary should suppress the fire');
+    });
+
+    it('does NOT fire with fewer than 2 later co-present scenes', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 3: { unresolvedClues: [] }, 4: { unresolvedClues: [] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'fewer than 2 qualifying later scenes should not fire');
+    });
+
+    it('does NOT fire when the clue neither resolves nor stays open to the end', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 5: { unresolvedClues: [] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'a clue that silently vanishes (neither resolved nor open) should not fire');
+    });
+  });
+
+  // ── UNSEEDED_TWIST ─────────────────────────────────────────────────────────────
+  describe('UNSEEDED_TWIST', () => {
+    const plainFountain9 = Array.from({ length: 9 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
+
+    function twistRecords(finalOverride: Partial<any>) {
+      return [
+        makeRec1191(0, 'INT. SC0 - DAY'), makeRec1191(1, 'INT. SC1 - DAY'),
+        makeRec1191(2, 'INT. SC2 - DAY'), makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'), makeRec1191(5, 'INT. SC5 - DAY'),
+        makeRec1191(6, 'INT. SC6 - DAY'), makeRec1191(7, 'INT. SC7 - DAY'),
+        makeRec1191(8, 'INT. SC8 - DAY', finalOverride),
+      ];
+    }
+
+    it('fires for a late high-magnitude reversal whose key terms appear nowhere earlier', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -4 });
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      const fired = result.issues.filter(i => i.rule === 'UNSEEDED_TWIST');
+      assert.ok(fired.length >= 1, `should fire UNSEEDED_TWIST; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when an earlier scene already mentions one of the turn\'s key terms', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -4 });
+      records[2] = { ...records[2], visualBeats: ['A dusty vault sits in the corner of the room.'] };
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      assert.ok(!result.issues.some(i => i.rule === 'UNSEEDED_TWIST'), 'earlier content overlap should suppress the fire');
+    });
+
+    it('does NOT fire when the reversal magnitude is below the threshold', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -1 });
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      assert.ok(!result.issues.some(i => i.rule === 'UNSEEDED_TWIST'), 'a low-magnitude turn should not qualify');
+    });
+  });
+});
