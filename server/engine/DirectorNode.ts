@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.ts';
 import { getModel, generateContent } from './ai.ts';
 import { expectedTensionAt, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
 import { analyzeSubtext } from '../lib/subtext-meter.ts';
+import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 
 export class DirectorNode {
   private stage: Stage;
@@ -38,7 +39,9 @@ export class DirectorNode {
     const observableTranscript = recentActions.map(a => {
       const agent = this.stage.getAgent(a.char_id);
       const visibleType = a.action_type === 'LIE' ? 'SPEAK' : a.action_type;
-      return `[${visibleType}] ${agent?.name ?? 'Unknown'}: ${a.content}`;
+      const sName = sanitizeForPrompt(agent?.name ?? 'Unknown', 128);
+      const sContent = sanitizeForPrompt(a.content, 500);
+      return `[${visibleType}] ${sName}: ${sContent}`;
     }).join('\n');
 
     // Ground truth for the Director (which statements were actually lies)
@@ -46,7 +49,9 @@ export class DirectorNode {
       .filter(a => a.action_type === 'LIE')
       .map(a => {
         const agent = this.stage.getAgent(a.char_id);
-        return `${agent?.name ?? 'Unknown'} LIED: "${a.content}"`;
+        const sName = sanitizeForPrompt(agent?.name ?? 'Unknown', 128);
+        const sContent = sanitizeForPrompt(a.content, 500);
+        return `${sName} LIED: "${sContent}"`;
       }).join('\n') || 'No lies detected in this sequence.';
 
     // Evaluate from each agent's perspective concurrently
@@ -174,25 +179,27 @@ export class DirectorNode {
     const otherAgentIds = agentsInRoom.filter(a => a.char_id !== observer_id).map(a => a.char_id);
 
     // Build observer's bounded context — ONLY their own beliefs, NOT others' hidden motives
+    const sObserverName = sanitizeForPrompt(observer.name, 128);
+    const sPublicMask   = sanitizeForPrompt(observer.public_mask ?? '', 256);
     const observerBeliefs = (observer.beliefs ?? [])
       .slice(0, 8)
-      .map(b => `"${b.proposition}" (${Math.round(b.confidence * 100)}% confident)`).join(', ');
+      .map(b => `"${sanitizeForPrompt(b.proposition, 200)}" (${Math.round(b.confidence * 100)}% confident)`).join(', ');
 
-    const prompt = `You are evaluating how ${observer.name} perceives a scene.
+    const prompt = `You are evaluating how ${sObserverName} perceives a scene.
 
 OBSERVER PROFILE:
-- Name: ${observer.name}
-- Public persona: ${observer.public_mask}
+- Name: ${sObserverName}
+- Public persona: ${sPublicMask}
 - Prior beliefs: ${observerBeliefs || 'none established yet'}
 - Current suspicion level: ${observer.suspicion_score}/100
 
-WHAT ${observer.name.toUpperCase()} OBSERVED (transcript of audible events):
+WHAT ${sObserverName.toUpperCase()} OBSERVED (transcript of audible events):
 ${observableTranscript}
 
-DIRECTOR'S HIDDEN KNOWLEDGE (not available to ${observer.name}):
+DIRECTOR'S HIDDEN KNOWLEDGE (not available to ${sObserverName}):
 ${lieTranscript}
 
-From ${observer.name}'s perspective only:
+From ${sObserverName}'s perspective only:
 1. How much has their tension/suspicion changed? (delta: -20 to +20)
 2. Did anything they observed contradict their prior beliefs?
 3. What new facts did they derive from what they saw/heard?
@@ -269,7 +276,11 @@ From ${observer.name}'s perspective only:
       .map(u => {
         const target = allAgents.find(a => a.name === u.agent_name);
         if (!target) return null;
-        return { char_id: target.char_id, delta: Math.max(-20, Math.min(20, u.delta)), reason: u.reason };
+        // u.delta is LLM-parsed; coerce to finite BEFORE clamping (Math.min/max
+        // pass NaN through). A NaN delta would poison suspicion_score, which
+        // drives contagion, initiative order, and persuasion-outcome tracking.
+        const safeDelta = typeof u.delta === 'number' && isFinite(u.delta) ? u.delta : 0;
+        return { char_id: target.char_id, delta: Math.max(-20, Math.min(20, safeDelta)), reason: u.reason };
       })
       .filter((u): u is { char_id: string; delta: number; reason: string } => u !== null);
 
@@ -284,7 +295,14 @@ From ${observer.name}'s perspective only:
 
     return {
       observer_id,
-      tension_delta: Math.max(-20, Math.min(20, raw.tension_delta ?? 0)),
+      // tension_delta is parsed from LLM JSON. A non-finite value (NaN, or a
+      // non-numeric type that coerces to NaN) survives Math.min/Math.max
+      // unchanged (Math.min(20, NaN) === NaN) — and would then poison
+      // avgTensionDelta → _tensionAccumulator → the persisted Director tension
+      // state. Coerce to a finite number BEFORE clamping.
+      tension_delta: Math.max(-20, Math.min(20,
+        typeof raw.tension_delta === 'number' && isFinite(raw.tension_delta) ? raw.tension_delta : 0,
+      )),
       contradiction_detected: raw.contradiction_detected ?? false,
       new_beliefs: safeBeliefs,
       suspicion_updates: filteredUpdates,
@@ -494,7 +512,8 @@ From ${observer.name}'s perspective only:
 
     const exitNames = loc.adjacent_locations
       .map(id => this.stage.getLocation(id)?.name)
-      .filter((n): n is string => Boolean(n));
+      .filter((n): n is string => Boolean(n))
+      .map(n => sanitizeForPrompt(n, 128));
     if (exitNames.length === 0) return;
 
     // Scan last 5 actions in this room — if an agent accounts for ≥4 of them, they're stuck.
@@ -853,13 +872,15 @@ From ${observer.name}'s perspective only:
     for (const agent of agents) {
       const existing = this.stage.getActivePressures(agent.char_id);
       if (existing.some(p => p.pressure_type === 'REDIRECT')) continue;
+      const sConstraint = sanitizeForPrompt(activeBeat.constraint, 300);
+      const sGoal = sanitizeForPrompt(activeBeat.goal, 300);
       this.stage.addDramaticPressure({
         pressure_id: randomUUID(),
         target_char_id: agent.char_id,
         trigger_event_id: violations[violations.length - 1].action_id,
         pressure_type: 'REDIRECT',
         intensity: violatingIds.has(agent.char_id) ? 65 : 40,
-        bias_hint: `Beat constraint: ${activeBeat.constraint} — ${violatingIds.has(agent.char_id) ? 'you have started to drift from the scene\'s intended beat. Pull back.' : 'the scene is drifting; steer it back toward: ' + activeBeat.goal}`,
+        bias_hint: `Beat constraint: ${sConstraint} — ${violatingIds.has(agent.char_id) ? 'you have started to drift from the scene\'s intended beat. Pull back.' : 'the scene is drifting; steer it back toward: ' + sGoal}`,
         expires_at_turn: turnIndex + 2,
         applied: false,
       });
@@ -889,9 +910,12 @@ From ${observer.name}'s perspective only:
 
       // Oldest unexposed lie determines urgency
       const oldest = unexposed.sort((a, b) => a.proposition_id.localeCompare(b.proposition_id))[0];
-      const liarsName = this.stage.getAgent(
-        unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
-      )?.name ?? 'someone';
+      const liarsName = sanitizeForPrompt(
+        this.stage.getAgent(
+          unexposed.map(p => p.asserted_by).find(id => id !== agent.char_id) ?? ''
+        )?.name ?? 'someone',
+        128,
+      );
 
       // Fresh irony (1-2 unexposed lies, no WITHHOLD yet): emit WITHHOLD — the
       // information gap is opening. As it accumulates (3+ lies or existing WITHHOLD),

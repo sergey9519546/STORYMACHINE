@@ -8,7 +8,9 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { MutationOperator } from '../converge/operators.ts';
 import { convergeScene } from '../converge/loop.ts';
+import type { ConvergeBudget } from '../converge/loop.ts';
 import { emptyState } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 import { applyStoryOps } from '../ops/dispatcher.ts';
 import { runTier1 } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
@@ -65,11 +67,16 @@ export interface CorpusReport {
  *
  * H6: `maxSimulations` caps how many scenarios are executed.  Scenarios beyond
  * the cap are silently skipped so callers don't need to pre-slice the array.
+ * `maxScenesPerScenario` caps how many scene targets each sim processes, bounding
+ * LLM calls to `maxSimulations × maxScenesPerScenario × budget.maxIterations × budget.candidatesPerIteration`.
+ * `budget` overrides the default ConvergeBudget for every convergeScene call in this run.
  */
 export async function runSelfPlay(
   scenarios: SimScenario[],
   generate: CandidateGenerator,
   maxSimulations?: number,
+  maxScenesPerScenario?: number,
+  budget?: Pick<ConvergeBudget, 'maxIterations' | 'candidatesPerIteration' | 'maxLLMCalls'>,
 ): Promise<CorpusReport> {
   const effectiveScenarios = maxSimulations != null
     ? scenarios.slice(0, maxSimulations)
@@ -78,8 +85,12 @@ export async function runSelfPlay(
   const runs: SimResult[] = [];
 
   for (const scenario of effectiveScenarios) {
-    const result = await runOneSim(scenario, generate);
-    runs.push(result);
+    try {
+      const result = await runOneSim(scenario, generate, maxScenesPerScenario, budget);
+      runs.push(result);
+    } catch (err) {
+      logger.error('selfplay_scenario_failed', { scenarioId: scenario.scenarioId, error: (err as Error).message });
+    }
   }
 
   if (runs.length === 0) {
@@ -106,7 +117,12 @@ export async function runSelfPlay(
 
 // ── Internal: single sim ──────────────────────────────────────────────────────
 
-async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): Promise<SimResult> {
+async function runOneSim(
+  scenario: SimScenario,
+  generate: CandidateGenerator,
+  maxScenes?: number,
+  budget?: Pick<ConvergeBudget, 'maxIterations' | 'candidatesPerIteration' | 'maxLLMCalls'>,
+): Promise<SimResult> {
   let state: NarrativeState = scenario.initialState
     ? { ...scenario.initialState }
     : emptyState();
@@ -117,10 +133,28 @@ async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): P
   const operatorCounts = new Map<MutationOperator, number>();
   let totalIterations = 0;
 
-  for (const target of scenario.sceneTargets) {
+  // H6: cap scenes per sim to bound LLM cost; log skipped count for transparency.
+  const effectiveTargets = maxScenes != null ? scenario.sceneTargets.slice(0, maxScenes) : scenario.sceneTargets;
+  if (maxScenes != null && scenario.sceneTargets.length > maxScenes) {
+    logger.warn('selfplay_scenes_capped', {
+      scenarioId: scenario.scenarioId,
+      total: scenario.sceneTargets.length,
+      cap: maxScenes,
+      skipped: scenario.sceneTargets.length - maxScenes,
+    });
+  }
+
+  // H6: caller-supplied budget overrides the self-play defaults.
+  const convergeBudget: ConvergeBudget = {
+    maxIterations:         budget?.maxIterations         ?? 4,
+    candidatesPerIteration: budget?.candidatesPerIteration ?? 2,
+    ...(budget?.maxLLMCalls != null ? { maxLLMCalls: budget.maxLLMCalls } : {}),
+  };
+
+  for (const target of effectiveTargets) {
     const convergeResult = await convergeScene(
       state, target, generate,
-      { maxIterations: 4, candidatesPerIteration: 2 },
+      convergeBudget,
       scenario.seed + target.sceneIdx,
     );
 
@@ -152,7 +186,7 @@ async function runOneSim(scenario: SimScenario, generate: CandidateGenerator): P
     ? proofPassRates.reduce((a, b) => a + b, 0) / proofPassRates.length
     : 0;
   const meanValuation = valuations.length > 0
-    ? valuations.reduce((a, b) => a + b, 0) / valuations.length
+    ? valuations.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) / valuations.length
     : 0;
   const score = 0.5 * proofPassRate + 0.5 * (Math.min(meanValuation, 100) / 100);
 

@@ -26,6 +26,24 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
 }
 
+// ── Token cost estimation (M6) ───────────────────────────────────────────────
+// USD per 1M tokens. Defaults approximate Gemini Flash pricing; override per
+// deployment via AI_COST_INPUT_PER_M / AI_COST_OUTPUT_PER_M. Cost is an estimate
+// for budgeting and observability — not a billing source of truth.
+function rate(envVar: string, fallback: number): number {
+  const v = parseFloat(process.env[envVar] ?? '');
+  return isFinite(v) && v >= 0 ? v : fallback;
+}
+function estimateCostUsd(promptTokens: number, candidateTokens: number): number {
+  const inRate  = rate('AI_COST_INPUT_PER_M', 0.075);
+  const outRate = rate('AI_COST_OUTPUT_PER_M', 0.30);
+  return (promptTokens / 1_000_000) * inRate + (candidateTokens / 1_000_000) * outRate;
+}
+// Round to 6 decimals (micro-dollar precision) without float noise.
+function round6(n: number): number {
+  return Math.round(n * 1_000_000) / 1_000_000;
+}
+
 // A call label looks like "takeTurn:Alice" — the category is the part before ':'.
 function categoryOf(label: string): string {
   const i = label.indexOf(':');
@@ -93,6 +111,7 @@ export const metrics = {
         prompt_tokens: s.promptTokens,
         candidate_tokens: s.candidateTokens,
         total_tokens: s.promptTokens + s.candidateTokens,
+        est_cost_usd: round6(estimateCostUsd(s.promptTokens, s.candidateTokens)),
       };
     }
     return {
@@ -105,6 +124,7 @@ export const metrics = {
         total_prompt_tokens: totalPromptTokens,
         total_candidate_tokens: totalCandidateTokens,
         total_tokens: totalPromptTokens + totalCandidateTokens,
+        est_cost_usd: round6(estimateCostUsd(totalPromptTokens, totalCandidateTokens)),
         by_category: byCategory,
       },
     };

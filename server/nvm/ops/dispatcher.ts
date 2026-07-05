@@ -6,18 +6,30 @@ import { assertNever } from '../util/assertNever.ts';
 import type { StoryOp } from './StoryOp.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import { relationshipKey } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 
 export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState {
   switch (op.op) {
     case 'ADD_FACT':
       return { ...state, objectiveReality: [...state.objectiveReality, op.fact] };
 
-    case 'EXPIRE_FACT':
+    case 'EXPIRE_FACT': {
+      // Expiry is monotone: take the earliest expiry turn so a later EXPIRE_FACT
+      // can never silently extend (re-open) a validity window that was already closed.
+      // Warn if factId doesn't exist (TemporalProof should have caught this upstream).
+      const factExists = state.objectiveReality.some(f => f.factId === op.factId);
+      if (!factExists) {
+        logger.warn('dispatcher_expire_fact_not_found', { factId: op.factId });
+        return state;
+      }
       return {
         ...state,
         objectiveReality: state.objectiveReality.map(f =>
-          f.factId === op.factId ? { ...f, validTo: op.atTurn } : f),
+          f.factId === op.factId
+            ? { ...f, validTo: f.validTo === null ? op.atTurn : Math.min(f.validTo, op.atTurn) }
+            : f),
       };
+    }
 
     case 'UPDATE_BELIEF': {
       const existing = state.characterBeliefs[op.charId] ?? [];
@@ -58,11 +70,13 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
         payoffs: [...state.payoffs, { setupId: op.setupId, payoffEventId: op.payoffEventId }],
       };
 
-    case 'RAISE_CLOCK':
+    case 'RAISE_CLOCK': {
+      const amount = (typeof op.amount === 'number' && isFinite(op.amount)) ? op.amount : 0;
       return {
         ...state,
-        clocks: { ...state.clocks, [op.clockId]: (state.clocks[op.clockId] ?? 0) + op.amount },
+        clocks: { ...state.clocks, [op.clockId]: (state.clocks[op.clockId] ?? 0) + amount },
       };
+    }
 
     case 'ADVANCE_THEME_ARGUMENT':
       return {
@@ -72,13 +86,19 @@ export function applyStoryOp(state: NarrativeState, op: StoryOp): NarrativeState
 
     case 'UPDATE_READER_STATE': {
       const a = state.audienceState;
+      // `?? 0` does NOT catch NaN (NaN ?? 0 === NaN). A single non-finite delta
+      // would poison audienceState, which feeds the tension ledger, convergence
+      // scoring, and every UI tension readout. Coerce non-finite deltas to 0.
+      const fin = (n: number | undefined): number => (typeof n === 'number' && isFinite(n) ? n : 0);
       return {
         ...state,
         audienceState: {
-          knownFacts: op.delta.knownFact ? [...a.knownFacts, op.delta.knownFact] : a.knownFacts,
-          suspense:   a.suspense   + (op.delta.suspense   ?? 0),
-          curiosity:  a.curiosity  + (op.delta.curiosity  ?? 0),
-          investment: a.investment + (op.delta.investment ?? 0),
+          knownFacts: op.delta.knownFact
+          ? [...a.knownFacts, op.delta.knownFact].slice(-100) // cap to prevent unbounded growth
+          : a.knownFacts,
+          suspense:   Math.max(0, a.suspense   + fin(op.delta.suspense)),
+          curiosity:  Math.max(0, a.curiosity  + fin(op.delta.curiosity)),
+          investment: Math.max(0, a.investment + fin(op.delta.investment)),
         },
       };
     }

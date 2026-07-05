@@ -1,9 +1,11 @@
 // Wave 39 — Revision Panel
-// Shows the 12-pass revision pipeline UI: trigger revision, view per-pass
+// Shows the multi-pass revision pipeline UI: trigger revision, view per-pass
 // diffs with issue breakdowns, accept/reject individual pass results.
+// Pass count is data-driven (totalPasses from the SSE stream), so this UI adapts
+// automatically as passes are added to the pipeline (currently 14).
 // H8: Uses SSE streaming endpoint so each pass result appears as it completes.
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 interface RevisionIssue {
   location: string;
@@ -68,6 +70,10 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
   const [streamProgress, setStreamProgress] = useState<{ done: number; total: number } | null>(null);
   const evtRef = useRef<EventSource | null>(null);
 
+  useEffect(() => {
+    return () => { evtRef.current?.close(); };
+  }, []);
+
   const runRevision = useCallback(() => {
     // Close any existing stream
     if (evtRef.current) { evtRef.current.close(); evtRef.current = null; }
@@ -105,7 +111,7 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
           es.close();
           evtRef.current = null;
         }
-      } catch { /* ignore parse errors */ }
+      } catch (parseErr) { console.warn('[RevisionPanel] SSE parse error:', parseErr); }
     };
 
     es.onerror = () => {

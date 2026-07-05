@@ -136,10 +136,14 @@ function makeDefaultScenario(i: number): ScenarioConfig {
 }
 
 function LauncherTab() {
-  const [scenarios, setScenarios]     = useState<ScenarioConfig[]>([makeDefaultScenario(0)]);
-  const [running, setRunning]         = useState(false);
-  const [result, setResult]           = useState<{ runs: number; meanScore: number; bestScenario: string; operatorFrequency: Record<string, number> } | null>(null);
-  const [error, setError]             = useState<string | null>(null);
+  const [scenarios, setScenarios]           = useState<ScenarioConfig[]>([makeDefaultScenario(0)]);
+  const [running, setRunning]               = useState(false);
+  const [result, setResult]                 = useState<{ runs: number; meanScore: number; bestScenario: string; operatorFrequency: Record<string, number> } | null>(null);
+  const [error, setError]                   = useState<string | null>(null);
+  const [maxSimulations, setMaxSimulations] = useState<number>(5);
+  // H6: Per-simulation convergence budget controls
+  const [maxIterations, setMaxIterations]   = useState<number>(4);
+  const [maxLLMCalls, setMaxLLMCalls]       = useState<number | ''>('');
 
   function addScenario() {
     setScenarios(s => [...s, makeDefaultScenario(s.length)]);
@@ -157,7 +161,11 @@ function LauncherTab() {
     setRunning(true); setError(null); setResult(null);
     try {
       const SCENE_FNS = ['advance_plot', 'build_tension', 'reveal_character', 'establish_world', 'set_up_payoff'];
+      const budget: Record<string, number> = { maxIterations };
+      if (typeof maxLLMCalls === 'number' && maxLLMCalls > 0) budget.maxLLMCalls = maxLLMCalls;
       const body = {
+        maxSimulations,
+        budget,
         scenarios: scenarios.map(sc => ({
           scenarioId: sc.scenarioId,
           seed: sc.seed,
@@ -192,7 +200,7 @@ function LauncherTab() {
       {/* Scenario list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {scenarios.map((sc, i) => (
-          <div key={i} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
+          <div key={sc.scenarioId || i} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr 80px 60px 28px', gap: 8, alignItems: 'center' }}>
             <div>
               <div style={labelSt}>Scenario ID</div>
               <input value={sc.scenarioId} onChange={e => updateScenario(i, { scenarioId: e.target.value })}
@@ -214,11 +222,34 @@ function LauncherTab() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10 }}>
+      {/* Launch controls row 1: scenario count + convergence budget */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <button onClick={addScenario} disabled={scenarios.length >= 5} style={btnSt('#1e293b')}>
           + Add Scenario
         </button>
-        <button onClick={launch} disabled={running} style={{ ...btnSt('#7c3aed'), flex: 1, fontWeight: 700 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={labelSt}>Max Sims</div>
+          <input type="number" min={1} max={50} value={maxSimulations}
+            onChange={e => setMaxSimulations(Math.max(1, Math.min(50, Number(e.target.value))))}
+            style={{ ...inputSt, width: 60 }} title="Cap total simulations to control LLM cost" />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={labelSt}>Converge Iters</div>
+          <input type="number" min={1} max={10} value={maxIterations}
+            onChange={e => setMaxIterations(Math.max(1, Math.min(10, Number(e.target.value))))}
+            style={{ ...inputSt, width: 60 }} title="Max convergence iterations per scene (higher = better quality, more LLM cost)" />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={labelSt}>LLM Call Cap</div>
+          <input type="number" min={1} max={100} value={maxLLMCalls}
+            placeholder="auto"
+            onChange={e => {
+              const v = e.target.value === '' ? '' : Math.max(1, Math.min(100, Number(e.target.value)));
+              setMaxLLMCalls(v as number | '');
+            }}
+            style={{ ...inputSt, width: 70 }} title="Hard cap on total LLM calls per simulation (leave blank for automatic: iters × 2)" />
+        </div>
+        <button onClick={launch} disabled={running} style={{ ...btnSt('#7c3aed'), flex: 1, fontWeight: 700, minWidth: 140 }}>
           {running ? 'Running headless sims…' : `Launch ${scenarios.length} scenario${scenarios.length !== 1 ? 's' : ''}`}
         </button>
       </div>
@@ -390,13 +421,16 @@ function GenomeTab() {
   const [error, setError]         = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/nvm/corpus').then(r => r.json()).then((d: CorpusData) => {
       setRuns(d.runs ?? []);
       if (d.runs?.length >= 2) {
         setRunIdA(d.runs[0].run_id);
         setRunIdB(d.runs[1].run_id);
       }
-    }).catch(() => {});
+    }).catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : 'Failed to load corpus');
+    }).finally(() => setLoading(false));
   }, []);
 
   async function runDiff() {

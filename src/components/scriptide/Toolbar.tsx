@@ -12,6 +12,9 @@ interface ToolbarProps {
   onToggleDirectorsLayer: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
+  onExportFDX: () => void;
+  onExportPDF: () => void;
+  onExportDOCX: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -26,6 +29,9 @@ export default function Toolbar({
   onToggleDirectorsLayer,
   onToggleTypewriterSound,
   onExportFountain,
+  onExportFDX,
+  onExportPDF,
+  onExportDOCX,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -96,7 +102,31 @@ export default function Toolbar({
           aria-label="Export script as Fountain file"
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
-          <Download className="w-3 h-3" aria-hidden="true" /> Export .Fountain
+          <Download className="w-3 h-3" aria-hidden="true" /> .Fountain
+        </button>
+        <button
+          onClick={onExportFDX}
+          aria-label="Export script as Final Draft FDX file"
+          title="Export as Final Draft (.fdx)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .FDX
+        </button>
+        <button
+          onClick={onExportPDF}
+          aria-label="Export script as industry-standard PDF"
+          title="Export as PDF (Courier 12pt, industry margins)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .PDF
+        </button>
+        <button
+          onClick={onExportDOCX}
+          aria-label="Export script as Word document"
+          title="Export as Word (.docx)"
+          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+        >
+          <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
         </button>
         <button
           onClick={onOpenStoryMachine}

@@ -22,6 +22,9 @@ export interface BranchScore {
   coherence: number;          // 0-100
   viability: number;          // 0-100
   screenplayUsefulness: number; // 0-100
+  /** Scene-level arc alignment: does this branch advance character arcs,
+   *  pay off setups, or create an emotional polarity shift? */
+  arcAlignment: number;       // 0-100
   total: number;              // weighted average
 }
 
@@ -48,7 +51,7 @@ export function scoreBranch(
   // ── Coherence: Tier-1 proof gate ─────────────────────────────────────────
   const tier1 = runTier1(ir, state);
   const passCount = tier1.filter(r => r.pass).length;
-  const coherence = Math.round((passCount / tier1.length) * 100);
+  const coherence = tier1.length > 0 ? Math.round((passCount / tier1.length) * 100) : 100;
 
   // ── Viability: specificity (reuses quality engine) ───────────────────────
   const viability = Math.min(100, Math.round(specificityScore(ops) * 1.5));
@@ -56,12 +59,21 @@ export function scoreBranch(
   // ── Screenplay usefulness: tension + reveal potential ─────────────────────
   const screenplayUsefulness = computeScreenplayUsefulness(ops, state);
 
-  // Weighted total (equal weights for now; can tune)
+  // ── Arc alignment: does this branch advance arcs, pay off setups, or create
+  //    a polarity shift relative to the current emotional state? ─────────────
+  const arcAlignment = computeArcAlignment(ops, state);
+
+  // Weighted total — 6 dimensions summing to 1.0
   const total = Math.round(
-    (novelty * 0.2 + consequence * 0.25 + coherence * 0.25 + viability * 0.15 + screenplayUsefulness * 0.15)
+    novelty * 0.15 +
+    consequence * 0.2 +
+    coherence * 0.2 +
+    viability * 0.15 +
+    screenplayUsefulness * 0.15 +
+    arcAlignment * 0.15,
   );
 
-  return { novelty, consequence, coherence, viability, screenplayUsefulness, total };
+  return { novelty, consequence, coherence, viability, screenplayUsefulness, arcAlignment, total };
 }
 
 // ── Scoring helpers ───────────────────────────────────────────────────────────
@@ -81,7 +93,7 @@ function computeNovelty(ops: StoryOp[], recentCommits: StoryCommit[]): number {
     if (sim < minSimilarity) minSimilarity = sim;
   }
 
-  // Also compare content fingerprint for UPDATE_BELIEF ops
+  // Compare content fingerprint for UPDATE_BELIEF ops
   const candidatePropositions = new Set(
     ops.filter(o => o.op === 'UPDATE_BELIEF')
        .map(o => (o as Extract<StoryOp, {op: 'UPDATE_BELIEF'}>).belief.proposition.toLowerCase().slice(0, 40))
@@ -99,7 +111,23 @@ function computeNovelty(ops: StoryOp[], recentCommits: StoryCommit[]): number {
     }
   }
 
-  const rawNovelty = 1 - Math.max(minSimilarity, maxPropOverlap * 0.5);
+  // Compare character fingerprint — reusing the same chars as recent commits is less novel
+  const candidateCharIds = new Set(
+    ops.filter(o => 'charId' in o).map(o => (o as { charId: string }).charId),
+  );
+  let maxCharOverlap = 0;
+  for (const c of recentCommits.slice(-3)) {
+    const recentCharIds = new Set(
+      c.ops.filter(o => 'charId' in o).map(o => (o as { charId: string }).charId),
+    );
+    if (recentCharIds.size > 0 && candidateCharIds.size > 0) {
+      const overlap = [...candidateCharIds].filter(ch => recentCharIds.has(ch)).length;
+      const charSim = overlap / Math.max(recentCharIds.size, candidateCharIds.size);
+      if (charSim > maxCharOverlap) maxCharOverlap = charSim;
+    }
+  }
+
+  const rawNovelty = 1 - Math.max(minSimilarity, maxPropOverlap * 0.5, maxCharOverlap * 0.3);
   return Math.round(rawNovelty * 100);
 }
 
@@ -110,18 +138,32 @@ function computeConsequence(ops: StoryOp[]): number {
     switch (op.op) {
       case 'ADD_FACT':          score += 8;  break;
       case 'EXPIRE_FACT':       score += 10; break;
-      case 'UPDATE_BELIEF':     score += 6;  break;
-      case 'APPRAISE_EMOTION':  score += 5;  break;
-      case 'SHIFT_RELATIONSHIP':score += 12; break;
-      case 'RAISE_CLOCK':
-        score += (op as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount * 4;
+      case 'UPDATE_BELIEF': {
+        const conf = (op as Extract<StoryOp, {op:'UPDATE_BELIEF'}>).belief.confidence;
+        // Weight by confidence so a high-certainty belief shift scores more than a tentative one
+        score += 6 * Math.max(0.2, isFinite(conf) ? conf : 0.5);
         break;
+      }
+      case 'APPRAISE_EMOTION': {
+        // Weight by intensity: a high-intensity emotion shifts the story more than a mild one
+        const intensity = (op as Extract<StoryOp, {op:'APPRAISE_EMOTION'}>).emotion.intensity;
+        score += Math.max(2, (isFinite(intensity) ? intensity : 50) * 0.06);
+        break;
+      }
+      case 'SHIFT_RELATIONSHIP':score += 12; break;
+      case 'ADVANCE_OBJECT_ARC': score += 8; break;
+      case 'RAISE_CLOCK': {
+        const a = (op as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount;
+        score += (isFinite(a) ? a : 0) * 4;
+        break;
+      }
       case 'SEED_CLUE':         score += 15; break;
       case 'PAYOFF_SETUP':      score += 20; break;
       case 'ADVANCE_THEME_ARGUMENT': score += 10; break;
       case 'UPDATE_READER_STATE': {
         const d = (op as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta;
-        score += (Math.abs(d.suspense ?? 0) + Math.abs(d.curiosity ?? 0) + Math.abs(d.investment ?? 0)) * 3;
+        const sv = d.suspense ?? 0; const cv = d.curiosity ?? 0; const iv = d.investment ?? 0;
+        score += (Math.abs(isFinite(sv) ? sv : 0) + Math.abs(isFinite(cv) ? cv : 0) + Math.abs(isFinite(iv) ? iv : 0)) * 3;
         break;
       }
       default: score += 2;
@@ -131,12 +173,69 @@ function computeConsequence(ops: StoryOp[]): number {
   return Math.min(100, score);
 }
 
-function computeScreenplayUsefulness(ops: StoryOp[], _state: NarrativeState): number {
+/**
+ * Arc alignment (0–100): rewards scene-level dramatic progress.
+ *
+ *  - Polarity shift: APPRAISE_EMOTION with a valence opposite to the character's
+ *    current dominant emotion (state.characterEmotions). The scene should "turn".
+ *  - Goal advancement: ADVANCE_OBJECT_ARC ops signal a character's plan bearing fruit.
+ *  - Payoff: PAYOFF_SETUP ops close a dramatic loop that was opened earlier.
+ *  - Theme resolution: ADVANCE_THEME_ARGUMENT 'resolve' moves the argument to closure.
+ */
+function computeArcAlignment(ops: StoryOp[], state: NarrativeState): number {
+  let score = 30; // baseline — every branch has some arc value
+
+  const NEGATIVE_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame', 'contempt']);
+  const POSITIVE_EMOTIONS = new Set(['joy', 'trust', 'admiration', 'relief', 'love']);
+
+  // Polarity shift: emotion op with opposite valence to the character's current state
+  for (const op of ops) {
+    if (op.op !== 'APPRAISE_EMOTION') continue;
+    const current = state.characterEmotions[op.charId];
+    if (!current) continue;
+    const currentNeg = NEGATIVE_EMOTIONS.has(current.dominant);
+    const newNeg = NEGATIVE_EMOTIONS.has(op.emotion.dominant);
+    const newPos = POSITIVE_EMOTIONS.has(op.emotion.dominant);
+    if (currentNeg && newPos) { score += 25; break; } // dark→light turn
+    if (!currentNeg && newNeg) { score += 20; break; } // light→dark reversal
+  }
+
+  // Object arc advancement = character's plan bears fruit
+  score += ops.filter(o => o.op === 'ADVANCE_OBJECT_ARC').length * 15;
+
+  // Payoff setup = dramatic loop closes
+  score += ops.filter(o => o.op === 'PAYOFF_SETUP').length * 20;
+
+  // Theme resolution = argument reaches a conclusion
+  score += ops.filter(o => o.op === 'ADVANCE_THEME_ARGUMENT' && o.move === 'resolve').length * 15;
+
+  // Clue seeding = future arc primed
+  score += ops.filter(o => o.op === 'SEED_CLUE').length * 8;
+
+  // Earned payoff bonus: PAYOFF_SETUP where setupId matches an already-seeded clue
+  // in state means this branch closes a real dramatic loop, not just declares one
+  const seededClueIds = new Set(state.clues.map(c => c.clueId));
+  const earnedPayoffs = ops.filter(o => {
+    if (o.op !== 'PAYOFF_SETUP') return false;
+    return seededClueIds.has((o as Extract<StoryOp, {op:'PAYOFF_SETUP'}>).setupId);
+  }).length;
+  score += earnedPayoffs * 12;
+
+  return Math.min(100, score);
+}
+
+function computeScreenplayUsefulness(ops: StoryOp[], state: NarrativeState): number {
   let score = 50; // baseline
 
-  // Raises in tension are screenplay-useful
-  const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
-  score += clockOps.reduce((s, o) => s + (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount * 5, 0);
+  // Raises in tension are screenplay-useful; weight by how urgent the clock already is.
+  // A clock at 70/100 being pushed higher is more dramatic than a fresh clock at 5/100.
+  const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK') as Extract<StoryOp, {op:'RAISE_CLOCK'}>[];
+  score += clockOps.reduce((s, o) => {
+    const a = isFinite(o.amount) ? o.amount : 0;
+    const existing = state.clocks[o.clockId] ?? 0;
+    const urgencyMultiplier = 1 + (existing / 100); // 1.0 at 0%, up to 2.0 at 100%
+    return s + a * 5 * urgencyMultiplier;
+  }, 0);
 
   // Clues are highly screenplay-useful (setup/payoff)
   score += ops.filter(o => o.op === 'SEED_CLUE').length * 15;
@@ -147,6 +246,16 @@ function computeScreenplayUsefulness(ops: StoryOp[], _state: NarrativeState): nu
 
   // Relationship shifts = character drama
   score += ops.filter(o => o.op === 'SHIFT_RELATIONSHIP').length * 12;
+
+  // High-intensity emotions = dramatic peak moments (intensity > 60)
+  const highIntensityEmotions = ops.filter(o =>
+    o.op === 'APPRAISE_EMOTION' &&
+    (o as Extract<StoryOp, {op:'APPRAISE_EMOTION'}>).emotion.intensity > 60,
+  ).length;
+  score += highIntensityEmotions * 8;
+
+  // Object arc advancement = character plan bearing fruit = screenplay forward momentum
+  score += ops.filter(o => o.op === 'ADVANCE_OBJECT_ARC').length * 10;
 
   return Math.min(100, Math.max(0, score));
 }

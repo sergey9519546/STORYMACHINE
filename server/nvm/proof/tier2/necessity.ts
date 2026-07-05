@@ -11,9 +11,10 @@ const NECESSITY_THRESHOLD = 0.5;
 
 export function necessityProof(
   ir: NarrativeTransitionIR,
-  _state: NarrativeState,
+  state: NarrativeState,
 ): ProofResult {
-  const score = necessityScore(ir.ops);
+  // Pass state so necessityScore can detect re-assertions of emotions already in state.
+  const score = necessityScore(ir.ops, state);
   if (score >= NECESSITY_THRESHOLD) return passResult('NecessityProof', `necessity=${score.toFixed(2)}`);
   return failResult('NecessityProof', `necessity score ${score.toFixed(2)} below threshold ${NECESSITY_THRESHOLD}`, [
     {

@@ -37,6 +37,7 @@ interface HealthReport {
   proof: {
     passRate: number;
     avgQualityScore: number;
+    tier1TopFailures?: Array<{ proof: string; failCount: number }>;
   };
 }
 
@@ -173,6 +174,30 @@ export function StoryHealthPanel({ onClose }: Props) {
             <MiniStat label={`Clues / Payoffs`} value={`${report.epistemic.clueCount} / ${report.epistemic.payoffCount}`} color="#fbbf24" />
           </div>
         </div>
+
+        {/* Proof failure breakdown */}
+        {report.proof.tier1TopFailures && report.proof.tier1TopFailures.length > 0 && (
+          <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
+            <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, marginBottom: 8 }}>
+              Tier 1 Failure Breakdown
+            </div>
+            {report.proof.tier1TopFailures.map(({ proof, failCount }) => (
+              <div key={proof} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <span style={{ color: '#64748b', fontSize: 11 }}>{proof}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 80, background: '#334155', borderRadius: 3, height: 5 }}>
+                    <div style={{
+                      background: '#f87171',
+                      width: `${Math.min(100, Math.round((failCount / (report.commitCount || 1)) * 100))}%`,
+                      height: '100%', borderRadius: 3,
+                    }} />
+                  </div>
+                  <span style={{ color: '#f87171', fontSize: 11, width: 22, textAlign: 'right' }}>{failCount}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </div>

@@ -191,10 +191,11 @@ export function backchain(
   for (const s of schedule) {
     if (s.op.op === 'PAYOFF_SETUP') {
       const payoffOp = s.op as Extract<StoryOp, { op: 'PAYOFF_SETUP' }>;
-      const clueScene = schedule.find(sc => sc.op.op === 'SEED_CLUE');
+      const clueScene = schedule.find(sc => sc.op.op === 'SEED_CLUE' &&
+        (sc.op as Extract<StoryOp, { op: 'SEED_CLUE' }>).clueId === payoffOp.setupId);
       if (clueScene && clueScene.atScene >= s.atScene) {
         complete = false;
-        blockingConstraint = `SEED_CLUE must precede PAYOFF_SETUP "${payoffOp.setupId}" but both land at scene ${s.atScene}`;
+        blockingConstraint = `SEED_CLUE "${payoffOp.setupId}" must precede PAYOFF_SETUP but both land at scene ${s.atScene}`;
         lines.push(`⚠️  Ordering constraint violated: ${blockingConstraint}`);
       }
     }

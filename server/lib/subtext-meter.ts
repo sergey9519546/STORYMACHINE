@@ -60,7 +60,7 @@ export function analyzeSubtext(dialogueLines: string[]): SubtextAnalysis {
     const sub = SUBTEXT_INDICATORS.filter(p => p.test(line)).length;
     onTheNoseCount += otn;
     subtextCount += sub;
-    const lineScore = otn > 0 ? Math.min(100, otn * 40 - sub * 10) : 0;
+    const lineScore = otn > 0 ? Math.max(0, Math.min(100, otn * 40 - sub * 10)) : 0;
     if (lineScore > worstScore) { worstScore = lineScore; worstLine = line; }
   }
 

@@ -23,22 +23,18 @@ export function continuityCritic(ir: NarrativeTransitionIR, state: NarrativeStat
   for (const result of results) {
     if (result.pass) continue;
     for (const finding of result.findings) {
-      // M7: Use structured opIdx field instead of fragile regex on the message string.
-      // Falls back to regex for backwards-compat with any proof that predates the field.
-      const structuredIdx = finding.opIdx;
-      const legacyIdx = structuredIdx === undefined
-        ? (finding.message.match(/op\[(\d+)\]/)?.[1] !== undefined
-            ? Number(finding.message.match(/op\[(\d+)\]/)?.[1])
-            : null)
-        : null;
-      const targetOpIdx = structuredIdx ?? legacyIdx;
+      // M7: All Tier-1 proofs now set opIdx directly on ProofFinding.
+      // No regex fallback needed — the structured field is the source of truth.
+      const targetOpIdx: number | null = finding.opIdx ?? null;
+      // 'block' findings are hard structural violations (severity 92);
+      // 'flag'/'info' findings are softer quality concerns (severity 75).
       critiques.push({
         criticId: 'continuity',
-        severity: 80,   // proof failures are always high severity
+        severity: finding.severity === 'block' ? 92 : 75,
         targetOpIdx,
         objection: `[${result.proof}] ${finding.message}`,
         suggestedOperator: PROOF_TO_OPERATOR[result.proof] ?? null,
-        attentionBid: 85,
+        attentionBid: finding.severity === 'block' ? 95 : 82,
       });
     }
   }

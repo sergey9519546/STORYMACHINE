@@ -6,7 +6,8 @@
 // Rejected candidates go to the Ghost Ledger (A2) with specific reasons.
 // Budget limits total LLM calls.
 //
-// Composite score = 0.5 * normalizedTension + 0.5 * qualityScore (0–100 each).
+// Composite score = 0.6 * normalizedTension + 0.4 * qualityScore (0–100 each).
+// Dramatic tension is the primary goal; craft quality is the secondary gate.
 // The convergence criterion is all three gates simultaneously.
 
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
@@ -27,9 +28,21 @@ import { buildGenerationSpec, buildSystemPreamble } from '../generate/proof-spec
 import { buildQualityAwareConstraints } from '../generate/quality-spec.ts';
 import { proppMorphology } from '../quality/index.ts';
 import { applyOperator, ALL_OPERATORS } from './operators.ts';
+import { applyStoryOps } from '../ops/dispatcher.ts';
 import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
+
+// Pick an operator not yet tried in this convergence session; if all have been tried, pick randomly.
+function pickUntried(
+  ops: readonly MutationOperator[],
+  tried: Set<MutationOperator>,
+  prng: () => number,
+): MutationOperator {
+  const untried = ops.filter(o => !tried.has(o));
+  const pool = untried.length > 0 ? untried : [...ops];
+  return pool[randInt(prng, pool.length)];
+}
 
 export interface ConvergeStep {
   iteration: number;
@@ -71,6 +84,25 @@ export interface ConvergeBudget {
   maxLLMCalls?: number;
   /** When present, biases operator selection via corpus-learned Director Policy (G13→G1). */
   directorPolicy?: DirectorPolicy;
+  /**
+   * Wave 69: Live Story Bible summary text (built from Stage by caller).
+   * Prepended to every GenerationSpec systemPreamble so the LLM candidate
+   * generator has full story context — characters, arcs, clocks, theme.
+   */
+  bibleSummary?: string;
+  /**
+   * Wave 77: Open arc-completion promises from analyzeArcCompletion().
+   * Overdue/due-soon promises are forwarded to buildQualityAwareConstraints
+   * so the LLM is explicitly told which unresolved promises need closing.
+   * Previously hardcoded as [] — now thread from the caller via server.ts.
+   */
+  openPromises?: import('../quality/arc-tracker.ts').OpenPromise[];
+  /**
+   * Wave 85 (H8): Per-step streaming callback. Called synchronously after each
+   * candidate is evaluated so callers (e.g. the SSE endpoint) can stream
+   * progress to the client without waiting for the full loop to finish.
+   */
+  onStep?: (step: ConvergeStep) => void;
 }
 
 const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteration: 3 };
@@ -78,8 +110,8 @@ const DEFAULT_BUDGET: ConvergeBudget = { maxIterations: 8, candidatesPerIteratio
 // Normalize tension to 0-100 using the target as the reference ceiling.
 // At tensionTarget → 100; above tensionTarget → capped at 100.
 function normalizeTension(tension: number, tensionTarget: number): number {
-  if (tensionTarget <= 0) return 100;
-  return Math.min(100, (tension / tensionTarget) * 100);
+  if (!isFinite(tension) || !isFinite(tensionTarget) || tensionTarget <= 0) return 0;
+  return Math.max(0, Math.min(100, (tension / tensionTarget) * 100));
 }
 
 export async function convergeScene(
@@ -95,13 +127,15 @@ export async function convergeScene(
   const effectiveQualityTarget = target.qualityTarget ?? 60;
 
   let best: NarrativeTransitionIR | null = null;
-  let bestComposite = -1;
+  let bestComposite = -Infinity;
   let currentFailures: ProofResult[] = [];
   let currentQualityWarnings: import('../quality/index.ts').QualityWarning[] = [];
   let lastCandidates: NarrativeTransitionIR[] = [];
   // H6: Track cumulative LLM calls; stop when budget.maxLLMCalls is reached.
   const llmCallLimit = budget.maxLLMCalls ?? budget.maxIterations * budget.candidatesPerIteration;
   let llmCallCount = 0;
+  // Operator rotation: prefer untried operators before repeating; reset after full cycle.
+  const triedOperators = new Set<MutationOperator>();
 
   for (let iter = 0; iter < budget.maxIterations; iter++) {
     if (llmCallCount >= llmCallLimit) break;
@@ -113,33 +147,48 @@ export async function convergeScene(
       specConstraints = buildQualityAwareConstraints(
         baseSpec.constraints,
         currentQualityWarnings,
-        [],   // arc-completion promises not available without commit history; uses [] here
+        budget.openPromises ?? [],
         proppGaps,
       );
     }
+    // Wave 69: prepend the live Story Bible to the system preamble so the LLM
+    // candidate generator knows the full story context — characters, arcs, clocks.
+    const basePreamble = buildSystemPreamble(specConstraints, state);
+    const systemPreamble = budget.bibleSummary
+      ? `${budget.bibleSummary}\n\n${basePreamble}`
+      : basePreamble;
     const spec = {
       ...baseSpec,
       constraints: specConstraints,
-      systemPreamble: buildSystemPreamble(specConstraints, state),
+      systemPreamble,
     };
 
     let candidates: NarrativeTransitionIR[];
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
     // G13→G1: Director Policy (from corpus) biases operator when room has no consensus.
     let roomResult: WritersRoomResult | null = null;
+    let iterOperator: MutationOperator | undefined;
     if (best && iter > 0) {
       roomResult = runWritersRoom(best, state);
       let op: MutationOperator;
       if (roomResult.suggestedOperator) {
         op = roomResult.suggestedOperator;
       } else if (budget.directorPolicy) {
-        const arcLedger = deriveTensionLedger(state, target.sceneIdx);
+        const stateAfterBest = applyStoryOps(state, best.ops);
+        const arcLedger = deriveTensionLedger(stateAfterBest, target.sceneIdx);
         const topology = computeTopology([arcLedger]);
         const policyOps = queryPolicy(budget.directorPolicy, topology.dominantArc ?? 'unknown');
-        op = (policyOps[0] as MutationOperator | undefined) ?? ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+        const candidateOp = policyOps[0] as MutationOperator | undefined;
+        // Validate against known operators — a stale corpus string could crash applyOperator.
+        op = (candidateOp && (ALL_OPERATORS as readonly string[]).includes(candidateOp))
+          ? candidateOp
+          : pickUntried(ALL_OPERATORS, triedOperators, prng);
       } else {
-        op = ALL_OPERATORS[randInt(prng, ALL_OPERATORS.length)];
+        op = pickUntried(ALL_OPERATORS, triedOperators, prng);
       }
+      iterOperator = op;
+      triedOperators.add(op);
+      if (triedOperators.size >= ALL_OPERATORS.length) triedOperators.clear(); // reset after full cycle
       const mutation = applyOperator(op, best, state, seed + iter);
       const fresh = await generate(spec, 1);
       llmCallCount += 1;
@@ -158,7 +207,11 @@ export async function convergeScene(
     for (const candidate of candidates) {
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
-      const ledger = deriveTensionLedger(state, target.sceneIdx);
+      // Apply candidate ops to get post-transition state before valuing — otherwise
+      // every candidate in an iteration gets the identical pre-transition tension score,
+      // making the tension reward signal and convergence gate completely inert.
+      const postState = applyStoryOps(state, candidate.ops);
+      const ledger = deriveTensionLedger(postState, target.sceneIdx);
       const valuationScore = ledger.totalTension;
 
       // Quality gate — run on all candidates (even failed proofs) so the
@@ -171,7 +224,12 @@ export async function convergeScene(
       const t3 = tier3Rank(t3Results);
 
       const tensionNorm = normalizeTension(valuationScore, target.tensionTarget);
-      const compositeScore = 0.5 * tensionNorm + 0.5 * qualityScore;
+      // Guard the composite at its source so a single non-finite signal can't
+      // propagate into bestComposite tracking, the convergedThisIter winner sort,
+      // or finalComposite on either the converged or budget-exhausted return path.
+      // 60/40 weighting: dramatic tension is the primary objective; quality is craft gate.
+      const rawComposite = 0.6 * tensionNorm + 0.4 * qualityScore;
+      const compositeScore = isFinite(rawComposite) ? rawComposite : 0;
 
       const tensionMet = valuationScore >= target.tensionTarget;
       const qualityMet = qualityScore >= effectiveQualityTarget;
@@ -196,20 +254,24 @@ export async function convergeScene(
         qualityScore,
         compositeScore,
         tier3Rank: t3,
+        operator: iterOperator,
         ghostReason,
         writersRoomSummary: roomResult
           ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
           : undefined,
       };
       history.push(step);
+      budget.onStep?.(step);
 
       // Buffer fully-converged candidates for Tier 3 ranking
       if (passed && tensionMet && qualityMet) {
         convergedThisIter.push({ ir: candidate, valuation: valuationScore, quality: qualityScore, composite: compositeScore, t3 });
       }
 
-      // Track best composite (for mutation and fallback)
-      if (compositeScore > bestComposite) {
+      // Track best composite — only among Tier-1-passing candidates, so mutations
+      // are never seeded from an IR that fails hard blocks and the fallback path
+      // never returns an illegal transition.
+      if (passed && compositeScore > bestComposite) {
         best = candidate;
         bestComposite = compositeScore;
       }
@@ -250,10 +312,33 @@ export async function convergeScene(
     }
   }
 
-  // Budget exhausted — return best we found
-  const finalIR = best ?? lastCandidates[lastCandidates.length - 1] ??
-    (await generate(buildGenerationSpec(state, target), 1))[0];
-  const finalLedger = deriveTensionLedger(state, target.sceneIdx);
+  // Budget exhausted — return best Tier-1-passing candidate found.
+  // Prefer the highest-composite Tier-1-passing candidate; if that candidate also
+  // passes the quality gate we call it a "soft converge". Log quality gate miss so
+  // callers can detect low-craft fallbacks.
+  // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
+  let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
+  if (!finalIR && llmCallCount <= llmCallLimit) {
+    llmCallCount++;
+    const fallback = await generate(buildGenerationSpec(state, target), 1);
+    finalIR = fallback[0] ?? null;
+  }
+  // Last-resort: synthesise a pass-through IR. Copy target.activeMechanisms so
+  // the MechanismProof doesn't immediately fail the fallback (empty list would fail).
+  if (!finalIR) {
+    finalIR = lastCandidates[0] ?? {
+      transitionId: 'fallback',
+      sceneIdx: target.sceneIdx,
+      sceneFunction: target.sceneFunction ?? 'establish_world',
+      activeMechanisms: target.activeMechanisms?.length ? target.activeMechanisms : ['core_mechanism'],
+      beforeStateHash: '',
+      ops: [],
+      preconditions: [],
+      postconditions: [],
+      provenance: { origin: 'model_generated', createdAt: Date.now() },
+    } as unknown as NarrativeTransitionIR;
+  }
+  const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
 
   return {
@@ -263,7 +348,7 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: bestComposite,
+    finalComposite: (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite,
     ghosts,
   };
 }

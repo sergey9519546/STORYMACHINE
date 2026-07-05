@@ -14,7 +14,10 @@ export type ArcArchetype =
   | 'man_in_hole'             // fall then rise (redemption)
   | 'icarus'                  // rise then fall (hubris)
   | 'cinderella'              // rise, fall, rise (two-beat redemption)
-  | 'oedipus';                // fall, rise, fall (two-beat tragedy)
+  | 'oedipus'                 // fall, rise, fall (two-beat tragedy)
+  | 'flat_line'               // constant plateau — no tension movement (boring pacing signal)
+  | 'oscillation'             // repeating rise-fall cycles (thriller / tension seesaw)
+  | 'delayed_rise';           // flat start then explosive climax (slow burn)
 
 export interface TopologyScore {
   archetype: ArcArchetype;
@@ -38,6 +41,10 @@ const ARC_TEMPLATES: Record<ArcArchetype, number[]> = {
   icarus:          [0.2, 0.5, 0.75, 0.9, 0.6, 0.2],
   cinderella:      [0.3, 0.7, 0.4, 0.2, 0.6, 0.95],
   oedipus:         [0.8, 0.4, 0.7, 0.9, 0.5, 0.2],
+  // Extended archetypes (Wave 103) — detected via cosine similarity like the originals.
+  flat_line:       [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],  // pacing signal: no movement
+  oscillation:     [0.1, 0.9, 0.1, 0.9, 0.1, 0.9],  // thriller seesaw
+  delayed_rise:    [0.05, 0.1, 0.15, 0.4, 0.75, 0.95], // slow burn
 };
 
 function normalize(arr: number[]): number[] {
@@ -50,8 +57,9 @@ function normalize(arr: number[]): number[] {
 
 // Linear resample arr to targetLength points.
 function resample(arr: number[], targetLength: number): number[] {
+  if (arr.length === 0 || targetLength <= 0) return Array(Math.max(0, targetLength)).fill(0.5);
   if (arr.length === targetLength) return arr;
-  if (arr.length === 1) return Array(targetLength).fill(arr[0]);
+  if (arr.length === 1 || targetLength === 1) return Array(targetLength).fill(arr[0]);
   const result: number[] = [];
   for (let i = 0; i < targetLength; i++) {
     const t = i / (targetLength - 1);
@@ -117,4 +125,25 @@ export function onTrackForArc(
   const report = computeTopology(ledgers);
   if (report.dominantArc !== target) return false;
   return report.coherence >= minCoherence;
+}
+
+export type TrajectoryMomentum = 'building' | 'declining' | 'stalling' | 'volatile';
+
+// Compute the local momentum of the last 3 scenes.
+// 'stalling'  — tension barely moves (spread < 5 across last 3 values)
+// 'volatile'  — large swings (spread > 30), typical of thriller seesaw
+// 'building'  — net upward trend in last 3 scenes (last > first by > 5)
+// 'declining' — net downward trend (first > last by > 5)
+// Returns 'stalling' for fewer than 2 data points.
+export function computeTrajectoryMomentum(ledgers: TensionLedger[]): TrajectoryMomentum {
+  if (ledgers.length < 2) return 'stalling';
+  const window = ledgers.slice(-3).map(l => l.totalTension);
+  const lo = Math.min(...window);
+  const hi = Math.max(...window);
+  const spread = hi - lo;
+  if (spread > 30) return 'volatile';
+  if (spread < 5) return 'stalling';
+  const first = window[0];
+  const last = window[window.length - 1];
+  return last > first ? 'building' : 'declining';
 }

@@ -87,7 +87,12 @@ export class AppraisalEngine {
     }
 
     // ── Appraise recent goal mutations ──
-    const mutations = this.stage.getRecentGoalMutations(update.char_id, turnIndex);
+    // Filter to ONLY mutations created on the current turn. The 5-turn window in
+    // getRecentGoalMutations exists for historical queries; re-counting prior turns'
+    // mutations each subsequent turn would inflate emotions to 100 and keep them
+    // pinned for 5 turns from a single event — corrupting the entire psychology layer.
+    const mutations = this.stage.getRecentGoalMutations(update.char_id, turnIndex)
+      .filter(m => m.turn_index === turnIndex);
     for (const m of mutations) {
       if (m.mutation_type === 'subgoal_achieved') {
         next.joy = Math.min(100, next.joy + 30);
@@ -218,13 +223,20 @@ export class AppraisalEngine {
         if (b.char_id === a.char_id) continue;
         const trust = tom[b.char_id]?.trust_level ?? 0.3;
         const other = snap[b.char_id];
+        if (!other) continue;
         const rate = CONTAGION_RATE * trust;
 
         // joy and distress are contagious; fear is mildly; anger is self-directed
-        me.joy      = Math.max(0, Math.min(100, Math.round(me.joy      + rate * 1.2 * (other.joy      - me.joy))));
-        me.distress = Math.max(0, Math.min(100, Math.round(me.distress + rate * 0.8 * (other.distress - me.distress))));
-        me.fear     = Math.max(0, Math.min(100, Math.round(me.fear     + rate * 0.5 * (other.fear     - me.fear))));
+        // Accumulate without rounding — round once after all agents contribute
+        me.joy      = Math.max(0, Math.min(100, me.joy      + rate * 1.2 * (other.joy      - me.joy)));
+        me.distress = Math.max(0, Math.min(100, me.distress + rate * 0.8 * (other.distress - me.distress)));
+        me.fear     = Math.max(0, Math.min(100, me.fear     + rate * 0.5 * (other.fear     - me.fear)));
       }
+
+      // Round after all contagion contributions are accumulated
+      me.joy      = Math.round(me.joy);
+      me.distress = Math.round(me.distress);
+      me.fear     = Math.round(me.fear);
 
       setDominant(me);
       me.last_updated_at = turnIndex;

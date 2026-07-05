@@ -1,9 +1,8 @@
 // ConvergePanel — AlphaZero-for-drama search UI.
-// Shows the G1 convergence loop in action: iteration history with proof/tension/
-// quality scores, writers'-room operator+dominant-critic, ghost count, and
-// a convergence status badge.
+// Wave 85 (H8): Uses SSE streaming so each candidate result appears live as the
+// convergence loop evaluates it — no more "Searching…" spinner until completion.
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface ConvergeStep {
   iteration: number;
@@ -14,6 +13,7 @@ interface ConvergeStep {
   compositeScore: number;
   ghostReason?: string;
   writersRoomSummary?: string;
+  operator?: string;
 }
 
 interface ConvergeResult {
@@ -42,39 +42,60 @@ export function ConvergePanel({ onClose }: ConvPanelProps) {
   const [qualityTarget, setQuality]   = useState(60);
   const [maxIter, setMaxIter]         = useState(4);
   const [running, setRunning]         = useState(false);
+  const [liveSteps, setLiveSteps]     = useState<ConvergeStep[]>([]);
   const [result, setResult]           = useState<ConvergeResult | null>(null);
   const [error, setError]             = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
-  async function run() {
+  // Clean up SSE connection on unmount
+  useEffect(() => () => { esRef.current?.close(); }, []);
+
+  function run() {
+    if (running) return;
+    esRef.current?.close();
     setRunning(true);
     setError(null);
     setResult(null);
-    try {
-      const res = await fetch('/api/nvm/converge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target: {
-            sceneIdx,
-            sceneFunction: sceneFunc,
-            activeMechanisms: [],
-            tensionTarget,
-            qualityTarget,
-          },
-          budget: { maxIterations: maxIter, candidatesPerIteration: 2 },
-        }),
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({ error: 'Server error' }));
-        throw new Error(e.error ?? 'Server error');
-      }
-      setResult(await res.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
+    setLiveSteps([]);
+
+    const params = new URLSearchParams({
+      sceneIdx: String(sceneIdx),
+      sceneFunction: sceneFunc,
+      tensionTarget: String(tensionTarget),
+      qualityTarget: String(qualityTarget),
+      maxIterations: String(maxIter),
+      candidatesPerIteration: '2',
+    });
+
+    const es = new EventSource(`/api/nvm/converge-stream?${params}`);
+    esRef.current = es;
+
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'converge_step') {
+          setLiveSteps(prev => [...prev, data.step as ConvergeStep]);
+        } else if (data.type === 'converge_complete') {
+          setResult(data.result as ConvergeResult);
+          setRunning(false);
+          es.close();
+        } else if (data.type === 'converge_error') {
+          setError(data.error ?? 'Unknown error');
+          setRunning(false);
+          es.close();
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    es.onerror = () => {
+      if (running) setError('Connection lost — try again');
       setRunning(false);
-    }
+      es.close();
+    };
   }
+
+  // Derive steps to display: live steps while running, history from result when done
+  const displaySteps = result ? result.history : liveSteps;
 
   const row = (step: ConvergeStep, i: number) => {
     const statusColor = step.passed
@@ -91,7 +112,10 @@ export function ConvergePanel({ onClose }: ConvPanelProps) {
         <td style={{ padding: '4px 8px', color: '#60a5fa' }}>{step.valuationScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#a78bfa' }}>{step.qualityScore.toFixed(1)}</td>
         <td style={{ padding: '4px 8px', color: '#f9a8d4' }}>{step.compositeScore.toFixed(1)}</td>
-        <td style={{ padding: '4px 8px', color: '#64748b', fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <td style={{ padding: '4px 8px', color: '#34d399', fontSize: 11, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {step.operator ? step.operator.replace(/_/g, ' ') : '—'}
+        </td>
+        <td style={{ padding: '4px 8px', color: '#64748b', fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {step.writersRoomSummary ?? '—'}
         </td>
       </tr>
@@ -146,47 +170,47 @@ export function ConvergePanel({ onClose }: ConvPanelProps) {
         color: '#fff', border: 'none', borderRadius: 6,
         cursor: running ? 'default' : 'pointer', fontFamily: 'monospace',
       }}>
-        {running ? 'Searching…' : 'Run Convergence Search'}
+        {running
+          ? `Searching… (iter ${liveSteps.length > 0 ? liveSteps[liveSteps.length - 1].iteration + 1 : 1}/${maxIter})`
+          : 'Run Convergence Search'}
       </button>
 
       {error && <div style={{ color: '#f87171', marginBottom: 12 }}>{error}</div>}
 
-      {result && (
-        <div>
-          {/* Status banner */}
-          <div style={{
-            background: result.converged ? '#14532d' : '#7c2d12',
-            borderRadius: 6, padding: '8px 14px', marginBottom: 14,
-            display: 'flex', gap: 20, flexWrap: 'wrap',
-          }}>
-            <span style={{ fontWeight: 700, color: result.converged ? '#4ade80' : '#fb923c' }}>
-              {result.converged ? 'CONVERGED' : 'BUDGET EXHAUSTED'}
-            </span>
-            <span>{result.iterations} iteration{result.iterations !== 1 ? 's' : ''}</span>
-            <span>tension {result.finalValuation.toFixed(1)}</span>
-            <span>quality {result.finalQuality.toFixed(1)}</span>
-            <span>composite {result.finalComposite.toFixed(1)}</span>
-            <span style={{ color: '#f87171' }}>{result.ghostCount} ghost{result.ghostCount !== 1 ? 's' : ''}</span>
-          </div>
+      {/* Live step table — shown while running and after completion */}
+      {displaySteps.length > 0 && (
+        <div style={{ overflowX: 'auto', marginBottom: result ? 0 : 14 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
+                <th style={{ padding: '4px 8px' }}>iter</th>
+                <th style={{ padding: '4px 8px' }}>status</th>
+                <th style={{ padding: '4px 8px' }}>tension</th>
+                <th style={{ padding: '4px 8px' }}>quality</th>
+                <th style={{ padding: '4px 8px' }}>composite</th>
+                <th style={{ padding: '4px 8px' }}>operator</th>
+                <th style={{ padding: '4px 8px' }}>writers' room</th>
+              </tr>
+            </thead>
+            <tbody>{displaySteps.map((s, i) => row(s, i))}</tbody>
+          </table>
+        </div>
+      )}
 
-          {/* History table */}
-          {result.history.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
-                    <th style={{ padding: '4px 8px' }}>iter</th>
-                    <th style={{ padding: '4px 8px' }}>status</th>
-                    <th style={{ padding: '4px 8px' }}>tension</th>
-                    <th style={{ padding: '4px 8px' }}>quality</th>
-                    <th style={{ padding: '4px 8px' }}>composite</th>
-                    <th style={{ padding: '4px 8px' }}>writers' room</th>
-                  </tr>
-                </thead>
-                <tbody>{result.history.map((s, i) => row(s, i))}</tbody>
-              </table>
-            </div>
-          )}
+      {result && (
+        <div style={{
+          background: result.converged ? '#14532d' : '#7c2d12',
+          borderRadius: 6, padding: '8px 14px', marginTop: 14,
+          display: 'flex', gap: 20, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontWeight: 700, color: result.converged ? '#4ade80' : '#fb923c' }}>
+            {result.converged ? 'CONVERGED' : 'BUDGET EXHAUSTED'}
+          </span>
+          <span>{result.iterations} iteration{result.iterations !== 1 ? 's' : ''}</span>
+          <span>tension {result.finalValuation.toFixed(1)}</span>
+          <span>quality {result.finalQuality.toFixed(1)}</span>
+          <span>composite {result.finalComposite.toFixed(1)}</span>
+          <span style={{ color: '#f87171' }}>{result.ghostCount} ghost{result.ghostCount !== 1 ? 's' : ''}</span>
         </div>
       )}
     </div>

@@ -78,13 +78,13 @@ function detectCarrier(text: string): ClueCarrier {
 // ── STEER parsing ─────────────────────────────────────────────────────────────
 
 /**
- * STEER patterns: "steer <char> to|toward|toward <goal>"
+ * STEER patterns: "steer <char> to|toward|towards|into|away from <goal>"
  * Examples:
  *   "Steer Alice toward confronting Bob"
  *   "STEER bob to reveal the truth"
  *   "steer carol away from the safe"
  */
-const STEER_RE = /\bsteer\s+(\w+)\s+(?:to|toward|towards|away from|into|toward)\s+(.+)/i;
+const STEER_RE = /\bsteer\s+(\w+)\s+(away from|to|toward|towards|into)\s+(.+)/i;
 
 function parseSteer(text: string, sceneIdx: number): ParsedAuthorMove {
   const m = STEER_RE.exec(text);
@@ -97,7 +97,10 @@ function parseSteer(text: string, sceneIdx: number): ParsedAuthorMove {
     };
   }
   const charId = m[1].toLowerCase();
-  const target = m[2].trim();
+  const direction = m[2].toLowerCase();
+  const target = m[3].trim();
+  const isAway = direction === 'away from';
+  const predicate = isAway ? 'author_steers_away_from' : 'author_steers_toward';
 
   // STEER emits two ops:
   //   1. ADD_FACT: records the director's intention for this character
@@ -105,7 +108,7 @@ function parseSteer(text: string, sceneIdx: number): ParsedAuthorMove {
   const fact: AtomicFact = {
     factId: randomUUID(),
     subject: charId,
-    predicate: 'author_steers_toward',
+    predicate,
     object: target.slice(0, 120),
     addedAtTurn: sceneIdx,
     validFrom: sceneIdx,
@@ -117,10 +120,11 @@ function parseSteer(text: string, sceneIdx: number): ParsedAuthorMove {
     { op: 'UPDATE_READER_STATE', delta: { suspense: 1 } },
   ];
 
+  const arrow = isAway ? '↛' : '→';
   return {
     intent: { verb: 'STEER', charId, subject: charId, target },
     ops,
-    summary: `STEER ${charId} → "${target}"`,
+    summary: `STEER ${charId} ${arrow} "${target}"`,
     ambiguous: false,
   };
 }
@@ -148,6 +152,9 @@ function parseInject(text: string, sceneIdx: number): ParsedAuthorMove {
   }
   const kind = (m[1] ?? 'fact').toLowerCase() as 'fact' | 'clue' | 'pressure' | 'reveal' | 'secret';
   const content = m[2].trim();
+  if (!content) {
+    return { intent: { verb: 'INJECT' }, ops: [], summary: 'INJECT: empty content — ignored', ambiguous: true };
+  }
   const ops: StoryOp[] = [];
 
   if (kind === 'clue') {

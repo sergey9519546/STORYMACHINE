@@ -17,7 +17,9 @@ export type PassName =
   | 'pacing'
   | 'originality'
   | 'payoff'
-  | 'voice';
+  | 'voice'
+  | 'theme'
+  | 'relationship-arc';
 
 export interface ApprovedSpan {
   /** 1-based line number (inclusive) */
@@ -37,6 +39,17 @@ export interface RevisionIssue {
   suggestedFix?: string;
 }
 
+export interface StoryContext {
+  /** Story theme statement (e.g. "Power corrupts") */
+  theme?: string;
+  /** Genre (e.g. "thriller", "drama") */
+  genre?: string;
+  /** Director/style shorthand (e.g. "Hitchcock — slow build, subtext") */
+  directorStyle?: string;
+  /** Compact character summary — names + emotional state */
+  characters?: string;
+}
+
 export interface PassInput {
   /** Fountain text as currently revised (prior passes may have changed it) */
   fountain: string;
@@ -47,6 +60,11 @@ export interface PassInput {
   records: ScreenplaySceneRecord[];
   /** Spans the author has approved — rewriters must not change them */
   approvedSpans: ApprovedSpan[];
+  /** Live story context injected into every LLM rewrite prompt */
+  storyContext?: StoryContext;
+  /** Results from all passes that ran before this one — lets each pass avoid
+   *  undoing prior improvements and coordinate with earlier diagnostic work. */
+  priorPassResults?: PassResult[];
 }
 
 export interface PassResult {

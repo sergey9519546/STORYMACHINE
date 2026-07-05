@@ -5,7 +5,7 @@
 //
 // Implemented:
 //   - Specificity score (vague vs. concrete op content)
-//   - 10 Dialogue Validators (full spec)
+//   - 17 Dialogue Validators (DV1-DV17)
 //   - ArcDebt (what emotional beats is the story "owed")
 //   - Reveal Readiness (is the audience ready for a reveal?)
 //   - Necessity-as-form (every op must earn its place)
@@ -89,6 +89,17 @@ export interface QualityReport {
 const VAGUE_TERMS = [
   'something', 'things', 'stuff', 'happened', 'felt', 'said', 'did',
   'went', 'came', 'got', 'very', 'really', 'kind of', 'sort of',
+  // Additional qualifiers that signal under-specified content
+  'everything', 'nothing', 'everyone', 'someone', 'anyone', 'somehow',
+  'somewhere', 'sometime', 'certain', 'obvious', 'clearly', 'simply',
+  'just something', 'some kind', 'a lot', 'a bit',
+  // Placeholder action verbs — no concrete subject/object implied
+  'started to', 'began to', 'moved', 'looked at', 'seemed', 'appeared',
+  // Vague emotional weasel words — describe no specific internal state
+  'weird', 'strange', 'odd', 'unsettling', 'unnerving',
+  // Filler intensifiers that add no information
+  'quite', 'rather', 'somewhat', 'fairly', 'pretty much', 'basically',
+  'generally', 'mostly', 'usually', 'often',
 ];
 
 function opText(op: StoryOp): string {
@@ -107,15 +118,17 @@ function opText(op: StoryOp): string {
 export function specificityScore(ops: StoryOp[]): number {
   if (ops.length === 0) return 1;
   let totalScore = 0;
+  let scoredOps = 0;
   for (const op of ops) {
     const text = opText(op).toLowerCase();
-    if (!text) { totalScore += 1; continue; }
+    if (!text) continue; // skip ops with no extractable text (SEED_CLUE, RAISE_CLOCK, etc.)
+    scoredOps++;
     const vagueCount = VAGUE_TERMS.filter(t => text.includes(t)).length;
     const wordCount = text.split(/\s+/).length;
     const opScore = Math.max(0, 1 - (vagueCount * 0.25) - (wordCount < 3 ? 0.3 : 0));
     totalScore += opScore;
   }
-  return totalScore / ops.length;
+  return scoredOps === 0 ? 1 : totalScore / scoredOps;
 }
 
 // ── 2. Dialogue Validators (all 10) ──────────────────────────────────────────
@@ -145,15 +158,21 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
       }
     }
 
-    // DV3: Unmotivated emotion — no prior belief/fact change in same IR
+    // DV3: Unmotivated emotion — no prior belief/fact change in same IR.
+    // Only fires when BOTH: (a) no causal op precedes in this IR AND (b) the character
+    // has no prior beliefs AND the world has no facts. A character can be emotionally
+    // motivated by their existing beliefs or the pre-existing world state; checking
+    // objectiveReality alone was too strict and produced false positives.
     if (op.op === 'APPRAISE_EMOTION') {
       const priorCausal = ir.ops.slice(0, i).some(
         p => p.op === 'UPDATE_BELIEF' || p.op === 'ADD_FACT' || p.op === 'SHIFT_RELATIONSHIP',
       );
-      if (!priorCausal && state.objectiveReality.length === 0) {
+      const charBeliefs = state.characterBeliefs[op.charId] ?? [];
+      const noStateGrounding = state.objectiveReality.length === 0 && charBeliefs.length === 0;
+      if (!priorCausal && noStateGrounding) {
         warnings.push({
           engine: 'dialogue_validator', opIdx: i, rule: 'DV3_UNMOTIVATED_EMOTION',
-          message: `APPRAISE_EMOTION for ${op.charId} has no causal predecessor in this IR or state`,
+          message: `APPRAISE_EMOTION for ${op.charId} has no causal predecessor in this IR or prior state`,
           penalty: 25,
         });
       }
@@ -190,7 +209,15 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
 
     // DV7: Tension drop without resolution — emotion intensity falls sharply without relationship repair
     if (op.op === 'APPRAISE_EMOTION') {
-      const priorIntensity = state.characterEmotions[op.charId]?.intensity ?? 0;
+      // Check state first, then look for a prior APPRAISE_EMOTION in this same IR
+      let priorIntensity = state.characterEmotions[op.charId]?.intensity ?? 0;
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = ir.ops[j];
+        if (prev.op === 'APPRAISE_EMOTION' && prev.charId === op.charId) {
+          priorIntensity = prev.emotion.intensity;
+          break;
+        }
+      }
       if (priorIntensity > 0 && op.emotion.intensity < priorIntensity - 20) {
         const hasRepair = ir.ops.some(
           o => o.op === 'SHIFT_RELATIONSHIP' && o.delta.amount > 0.2 &&
@@ -237,6 +264,24 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
         });
       }
     }
+
+    // DV11: Unexplained pride — pride without a prior achievement in this IR or state
+    if (op.op === 'APPRAISE_EMOTION' && op.emotion.dominant === 'pride') {
+      const hasAchievement = ir.ops.slice(0, i).some(
+        p => p.op === 'PAYOFF_SETUP' ||
+             (p.op === 'SHIFT_RELATIONSHIP' && p.delta.amount > 0.3 && p.pair.includes(op.charId)),
+      );
+      const stateHasPositive = Object.entries(state.relationships)
+        .filter(([key]) => key.includes(op.charId))
+        .some(([, deltas]) => deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0) > 0.3);
+      if (!hasAchievement && !stateHasPositive) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: i, rule: 'DV11_UNEXPLAINED_PRIDE',
+          message: `APPRAISE_EMOTION pride for ${op.charId} without a prior PAYOFF_SETUP or positive relationship shift — what did they accomplish?`,
+          penalty: 18,
+        });
+      }
+    }
   });
 
   // DV6: Character monologue — same charId dominates ≥3 consecutive character ops
@@ -273,6 +318,158 @@ export function dialogueWarnings(ir: NarrativeTransitionIR, state: NarrativeStat
     }
   }
 
+  // DV12: Talking heads — pure dialogue with no physical/world/story consequence.
+  // ≥3 belief-update ops and zero ops that change the physical world or story state.
+  {
+    const beliefCount = ir.ops.filter(op => op.op === 'UPDATE_BELIEF').length;
+    const worldCount  = ir.ops.filter(op =>
+      op.op === 'ADD_FACT' || op.op === 'SHIFT_RELATIONSHIP' ||
+      op.op === 'ADVANCE_OBJECT_ARC' || op.op === 'RAISE_CLOCK' ||
+      op.op === 'RECORD_VISUAL_FACT' || op.op === 'RECORD_SONIC_FACT',
+    ).length;
+    if (beliefCount >= 3 && worldCount === 0) {
+      warnings.push({
+        engine: 'dialogue_validator', opIdx: null, rule: 'DV12_TALKING_HEADS',
+        message: `${beliefCount} dialogue ops with zero world/relationship/story consequence — scene is purely expository`,
+        penalty: 20,
+      });
+    }
+  }
+
+  // DV13: Clock without acknowledgment — a ticking pressure no character perceives.
+  // RAISE_CLOCK present but no UPDATE_BELIEF references the clock subject in this IR,
+  // and no prior character belief in state already acknowledges it from a past scene.
+  {
+    const clocks = ir.ops.filter((op): op is Extract<typeof op, { op: 'RAISE_CLOCK' }> => op.op === 'RAISE_CLOCK');
+    for (const clock of clocks) {
+      const subject = clock.clockId.toLowerCase();
+      const acknowledgedInIR = ir.ops.some(
+        op => op.op === 'UPDATE_BELIEF' &&
+              op.belief.proposition.toLowerCase().includes(subject),
+      );
+      const acknowledgedInState = Object.values(state.characterBeliefs).flat().some(
+        b => b.proposition.toLowerCase().includes(subject),
+      );
+      if (!acknowledgedInIR && !acknowledgedInState) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV13_UNACKNOWLEDGED_CLOCK',
+          message: `RAISE_CLOCK "${clock.clockId}" has no character belief acknowledging it — stakes invisible`,
+          penalty: 15,
+        });
+      }
+    }
+  }
+
+  // DV14: Emotional flatline — a character's emotion never arcs within the scene.
+  // ≥3 APPRAISE_EMOTION ops for the same character, all with the same dominant emotion.
+  {
+    const emotionsByChar = new Map<string, string[]>();
+    for (const op of ir.ops) {
+      if (op.op !== 'APPRAISE_EMOTION') continue;
+      const list = emotionsByChar.get(op.charId) ?? [];
+      list.push(op.emotion.dominant);
+      emotionsByChar.set(op.charId, list);
+    }
+    for (const [charId, dominants] of emotionsByChar) {
+      if (dominants.length < 3) continue;
+      const allSame = dominants.every(d => d === dominants[0]);
+      if (allSame) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV14_EMOTIONAL_FLATLINE',
+          message: `${charId} has ${dominants.length} emotion ops all as "${dominants[0]}" — no emotional arc within scene`,
+          penalty: 12,
+        });
+      }
+    }
+  }
+
+  // DV15: Goal-free scene — character activity with no story-level consequence.
+  // ≥4 ops but none advance the story structure (no arc/theme/payoff/clock).
+  if (ir.ops.length >= 4) {
+    const hasStoryProgress = ir.ops.some(op =>
+      op.op === 'ADVANCE_OBJECT_ARC' || op.op === 'ADVANCE_THEME_ARGUMENT' ||
+      op.op === 'PAYOFF_SETUP' || op.op === 'RAISE_CLOCK',
+    );
+    if (!hasStoryProgress) {
+      warnings.push({
+        engine: 'dialogue_validator', opIdx: null, rule: 'DV15_GOAL_FREE_SCENE',
+        message: `${ir.ops.length} ops with no arc/theme/payoff/clock progress — scene has no story consequence`,
+        penalty: 20,
+      });
+    }
+  }
+
+  // DV16: Unwitnessed clue — SEED_CLUE fires but no character in the same IR has an
+  // UPDATE_BELIEF. A clue planted without a character present to register it exists
+  // only as a world-fact with no narrative hook into anyone's consciousness.
+  {
+    const clueOps = ir.ops.filter(op => op.op === 'SEED_CLUE');
+    if (clueOps.length > 0) {
+      const hasWitness = ir.ops.some(op => op.op === 'UPDATE_BELIEF');
+      if (!hasWitness) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV16_UNWITNESSED_CLUE',
+          message: `${clueOps.length} SEED_CLUE op(s) planted with no character UPDATE_BELIEF — who observed this clue? Add a witness belief.`,
+          penalty: 16,
+        });
+      }
+    }
+  }
+
+  // DV17: Unreceived payoff — PAYOFF_SETUP fires but no character in the IR updates
+  // their beliefs in response. The audience sees a reveal; no character registers it.
+  {
+    const payoffOps = ir.ops.filter(op => op.op === 'PAYOFF_SETUP');
+    if (payoffOps.length > 0) {
+      const hasReaction = ir.ops.some(op =>
+        op.op === 'UPDATE_BELIEF' || op.op === 'APPRAISE_EMOTION',
+      );
+      if (!hasReaction) {
+        warnings.push({
+          engine: 'dialogue_validator', opIdx: null, rule: 'DV17_UNRECEIVED_PAYOFF',
+          message: `PAYOFF_SETUP fires but no character reacts (no UPDATE_BELIEF or APPRAISE_EMOTION). A payoff without a receiver is a non-event. Add a character reaction.`,
+          penalty: 22,
+        });
+      }
+    }
+  }
+
+  // DV18: Consequence-free belief flip — a new ADD_FACT shares subject keywords with
+  // a character's prior high-confidence told belief, but that character shows no
+  // emotional reaction (APPRAISE_EMOTION) in this IR. Reality contradicting what a
+  // character was told should produce an emotional consequence.
+  {
+    const addedFacts = ir.ops.filter((op): op is Extract<typeof op, { op: 'ADD_FACT' }> => op.op === 'ADD_FACT');
+    if (addedFacts.length > 0) {
+      for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
+        const highConfTold = beliefs.filter(b => b.source === 'told' && b.confidence > 0.7);
+        let firedForChar = false;
+        for (const belief of highConfTold) {
+          if (firedForChar) break;
+          const propWords = new Set(
+            belief.proposition.toLowerCase().split(/\W+/).filter(w => w.length > 4),
+          );
+          const contradicted = addedFacts.some(op => {
+            const factText = `${op.fact.subject} ${op.fact.predicate} ${op.fact.object}`.toLowerCase();
+            return factText.split(/\W+/).some(w => w.length > 4 && propWords.has(w));
+          });
+          if (!contradicted) continue;
+          const hasReaction = ir.ops.some(
+            op => op.op === 'APPRAISE_EMOTION' && op.charId === charId,
+          );
+          if (!hasReaction) {
+            warnings.push({
+              engine: 'dialogue_validator', opIdx: null, rule: 'DV18_CONSEQUENCE_FREE_BELIEF_FLIP',
+              message: `New fact may contradict ${charId}'s told belief "${belief.proposition.slice(0, 40)}" but ${charId} shows no emotional reaction`,
+              penalty: 18,
+            });
+            firedForChar = true;
+          }
+        }
+      }
+    }
+  }
+
   return warnings;
 }
 
@@ -303,6 +500,29 @@ export function computeArcDebt(state: NarrativeState, currentScene: number): str
     }
   }
 
+  // Emotional flatline: 3+ characters share the same dominant emotion in accumulated state.
+  // The ensemble has converged to a single emotional note — needs differentiation.
+  const dominantCounts = new Map<string, number>();
+  for (const emo of Object.values(state.characterEmotions)) {
+    if (emo.dominant !== 'neutral') {
+      dominantCounts.set(emo.dominant, (dominantCounts.get(emo.dominant) ?? 0) + 1);
+    }
+  }
+  for (const [emotion, count] of dominantCounts) {
+    if (count >= 3) {
+      debts.push(`${count} characters share dominant emotion "${emotion}" — ensemble is emotionally monotonous; differentiate their reactions`);
+    }
+  }
+
+  // Prolonged extreme negative relationship: 4+ shifts pushing a pair to net < -0.6
+  // signals an unresolved enmity with no repair arc — the story owes a confrontation.
+  for (const [key, deltas] of Object.entries(state.relationships)) {
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
+    if (net < -0.6 && deltas.length >= 4) {
+      debts.push(`${key} has a prolonged extreme negative relationship (net ${net.toFixed(2)}, ${deltas.length} shifts) — needs a confrontation or repair beat`);
+    }
+  }
+
   return debts;
 }
 
@@ -323,22 +543,82 @@ export function revealReady(state: NarrativeState): { ready: boolean; score: num
 
 // ── 5. Necessity-as-form ─────────────────────────────────────────────────────
 
-export function necessityScore(ops: StoryOp[]): number {
+export function necessityScore(ops: StoryOp[], state?: NarrativeState): number {
   if (ops.length === 0) return 1;
   const necessary = ops.filter((op, i) => {
     if (op.op === 'ADD_FACT') {
-      const referencedLater = ops.slice(i + 1).some(
-        later => later.op === 'UPDATE_BELIEF' &&
-                 later.belief.proposition.toLowerCase().includes(op.fact.factId.toLowerCase()),
-      );
+      // A fact is necessary if a later op structurally references the same subject/object,
+      // or if causal links declare it as a cause. Testing prose inclusion of the factId
+      // (a UUID) was always false, scoring every multi-fact scene as "padded".
+      const { subject, object: factObj } = op.fact;
+      const referencedLater = ops.slice(i + 1).some(later => {
+        if (later.op === 'UPDATE_BELIEF') {
+          return later.belief.proposition.toLowerCase().includes(subject.toLowerCase()) ||
+                 later.belief.proposition.toLowerCase().includes(factObj.toLowerCase());
+        }
+        if (later.op === 'ADD_FACT') {
+          return later.fact.subject === factObj || later.fact.object === subject;
+        }
+        if (later.op === 'APPRAISE_EMOTION') {
+          return later.charId === subject;
+        }
+        return false;
+      });
       return referencedLater || ops.filter(o => o.op === 'ADD_FACT').length === 1;
     }
     if (op.op === 'APPRAISE_EMOTION') {
-      const earlier = ops.slice(0, i).some(
+      // Redundant in this IR if same char+dominant appears earlier
+      const earlierInIR = ops.slice(0, i).some(
         e => e.op === 'APPRAISE_EMOTION' && e.charId === op.charId &&
              e.emotion.dominant === op.emotion.dominant,
       );
-      return !earlier;
+      if (earlierInIR) return false;
+      // Redundant against existing state: if char already has this dominant at near-same intensity
+      if (state) {
+        const existing = state.characterEmotions[op.charId];
+        if (existing &&
+            existing.dominant === op.emotion.dominant &&
+            typeof existing.intensity === 'number' && isFinite(existing.intensity) &&
+            typeof op.emotion.intensity === 'number' && isFinite(op.emotion.intensity) &&
+            Math.abs(existing.intensity - op.emotion.intensity) < 8) {
+          return false; // re-asserting virtually the same emotional state
+        }
+      }
+      return true;
+    }
+    if (op.op === 'SHIFT_RELATIONSHIP') {
+      // Redundant if the same pair was already shifted in the same direction earlier in this IR.
+      // Two positive (or two negative) shifts on Alice↔Bob are the same beat restated —
+      // they should be merged into one meaningful shift or replaced with an escalation.
+      const [pA, pB] = op.pair;
+      const sameSignEarlier = ops.slice(0, i).some(
+        e => e.op === 'SHIFT_RELATIONSHIP' &&
+             e.pair.includes(pA) && e.pair.includes(pB) &&
+             Math.sign(e.delta.amount) === Math.sign(op.delta.amount),
+      );
+      if (sameSignEarlier) return false;
+    }
+    if (op.op === 'RAISE_CLOCK' && op.amount === 0) {
+      // A zero-amount clock raise changes nothing — pure no-op in the state machine.
+      return false;
+    }
+    if (op.op === 'UPDATE_BELIEF') {
+      // Same charId + same proposition already appears earlier in this IR — redundant.
+      const propNorm = op.belief.proposition.toLowerCase().trim();
+      const dupEarlier = ops.slice(0, i).some(
+        e => e.op === 'UPDATE_BELIEF' &&
+             e.charId === op.charId &&
+             e.belief.proposition.toLowerCase().trim() === propNorm,
+      );
+      if (dupEarlier) return false;
+    }
+    if (op.op === 'ADVANCE_THEME_ARGUMENT') {
+      // Same claimId + same move twice in one IR is pure duplication.
+      const dupEarlier = ops.slice(0, i).some(
+        e => e.op === 'ADVANCE_THEME_ARGUMENT' &&
+             e.claimId === op.claimId && e.move === op.move,
+      );
+      if (dupEarlier) return false;
     }
     return true;
   });
@@ -392,7 +672,7 @@ export function relationshipRepairGaps(
 ): string[] {
   const gaps: string[] = [];
   for (const [key, deltas] of Object.entries(state.relationships)) {
-    const net = deltas.reduce((s, d) => s + d.amount, 0);
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
     if (net < -0.4) {
       const [a, b] = key.split('|');
       const hasRepair = ir.ops.some(
@@ -418,6 +698,7 @@ export function buildCausalGraph(ir: NarrativeTransitionIR): CausalPlotGraph {
 
   if (ir.causalLinks) {
     for (const link of ir.causalLinks) {
+      if (link.opIdx < 0 || link.opIdx >= ir.ops.length) continue; // out-of-bounds opIdx
       for (const causedBy of link.causedBy) {
         edges.push({ from: causedBy, toOpIdx: link.opIdx });
       }
@@ -428,11 +709,20 @@ export function buildCausalGraph(ir: NarrativeTransitionIR): CausalPlotGraph {
   // rootOps = not a causal target (nothing declares it as caused-by)
   const rootOps = nodes.filter(n => !targetSet.has(n.opIdx)).map(n => n.opIdx);
 
-  // leafOps = opIdx not referenced as a "from" by any edge (heuristic: numeric ids)
-  const causingIdxs = new Set(
-    edges.map(e => parseInt(e.from)).filter(n => !isNaN(n)),
-  );
-  const leafOps = nodes.filter(n => !causingIdxs.has(n.opIdx)).map(n => n.opIdx);
+  // leafOps = ops that are not declared as the cause of any other op.
+  // causalLinks use entity ids (factId/charId) as "from", not op indices — so
+  // `parseInt(e.from)` was always NaN, making every node a leaf. Instead we find
+  // the ops that produce entities referenced as causes, and mark those as non-leaf.
+  const causingEntityIds = new Set(edges.map(e => e.from));
+  // Map entities back to producer op indices (ADD_FACT produces a factId; UPDATE_BELIEF produces a beliefId)
+  const producerOpIdxs = new Set<number>();
+  nodes.forEach(n => {
+    const op = ir.ops[n.opIdx];
+    if (!op) return;
+    if (op.op === 'ADD_FACT' && causingEntityIds.has(op.fact.factId)) producerOpIdxs.add(n.opIdx);
+    if (op.op === 'UPDATE_BELIEF' && causingEntityIds.has(op.belief.id)) producerOpIdxs.add(n.opIdx);
+  });
+  const leafOps = nodes.filter(n => !producerOpIdxs.has(n.opIdx)).map(n => n.opIdx);
 
   return { nodes, edges, rootOps, leafOps };
 }
@@ -502,11 +792,11 @@ export function runQualityEngine(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
-  // Dialogue validators (all 10)
+  // Dialogue validators (DV1–DV18)
   warnings.push(...dialogueWarnings(ir, state));
 
-  // Necessity
-  const necessity = necessityScore(ir.ops);
+  // Necessity (state-aware: catches re-asserting existing emotions)
+  const necessity = necessityScore(ir.ops, state);
   if (necessity < 0.8) {
     warnings.push({
       engine: 'necessity', opIdx: null, rule: 'UNNECESSARY_OPS',
@@ -525,11 +815,31 @@ export function runQualityEngine(ir: NarrativeTransitionIR, state: NarrativeStat
     });
   }
 
+  // Op density overload: more than 10 ops in a single scene fragments attention.
+  // Screenplay scenes have rhythm — too many simultaneous beats destroy pacing.
+  if (ir.ops.length > 10) {
+    warnings.push({
+      engine: 'density', opIdx: null, rule: 'OP_DENSITY_OVERLOAD',
+      message: `Scene has ${ir.ops.length} ops — exceeds the 10-op attention ceiling; consolidate or split`,
+      penalty: Math.min(30, (ir.ops.length - 10) * 3),
+    });
+  }
+
   const arcDebt = computeArcDebt(state, ir.sceneIdx);
   const rr = revealReady(state);
   const repairGaps = relationshipRepairGaps(state, ir);
   const causalGraph = buildCausalGraph(ir);
   const proppAnalysis = proppMorphology(ir);
+
+  // Propp coverage warning: after scene 5, if less than 30% of narrative stages
+  // are present in this scene, the story is skipping too many structural beats.
+  if (ir.sceneIdx >= 5 && proppAnalysis.coverage < 0.3) {
+    warnings.push({
+      engine: 'propp', opIdx: null, rule: 'LOW_PROPP_COVERAGE',
+      message: `Propp coverage ${(proppAnalysis.coverage * 100).toFixed(0)}% — scene skips most narrative stages; missing: ${proppAnalysis.absent.slice(0, 3).join(', ')}`,
+      penalty: Math.round((0.3 - proppAnalysis.coverage) * 40),
+    });
+  }
 
   const totalPenalty = warnings.reduce((s, w) => s + w.penalty, 0);
   const score = Math.max(0, 100 - totalPenalty);

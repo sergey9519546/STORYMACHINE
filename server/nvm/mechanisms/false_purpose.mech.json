@@ -1,0 +1,22 @@
+{
+  "id": "false_purpose",
+  "kind": "false_purpose",
+  "themeClaimTemplate": "The work we do / The ends it serves",
+  "physicalCarrier": { "type": "mission_or_project", "required": true },
+  "lifecycleStates": ["committed", "doubting", "complicit", "confronted", "reckoning", "redirected"],
+  "transitionRules": [
+    { "from": "committed", "to": "doubting", "condition": "character_notices_inconsistency_between_stated_and_actual_purpose" },
+    { "from": "doubting", "to": "complicit", "condition": "character_chooses_not_to_investigate_further" },
+    { "from": "doubting", "to": "confronted", "condition": "a_victim_of_the_false_purpose_makes_direct_contact" },
+    { "from": "complicit", "to": "confronted", "condition": "the_true_purpose_is_revealed_to_all_parties" },
+    { "from": "confronted", "to": "reckoning", "condition": "character_must_account_for_what_they_enabled" },
+    { "from": "reckoning", "to": "redirected", "condition": "character_actively_opposes_or_dismantles_the_false_purpose" }
+  ],
+  "climaxProofPredicate": "protagonist_must_choose: continue_serving_false_purpose | expose_it_at_personal_cost",
+  "endingProofPredicate": "protagonist_relationship_to_the_mission_is_fundamentally_different_from_the_opening",
+  "invariants": [
+    "character_is_never_merely_a_passive_tool—they_have_chosen_to_continue",
+    "the_false_purpose_must_have_a_real_victim_whose_humanity_is_established",
+    "climax_requires_active_choice_not_passive_revelation"
+  ]
+}

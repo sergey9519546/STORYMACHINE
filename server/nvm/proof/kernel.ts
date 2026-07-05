@@ -16,6 +16,9 @@ import { earnedRevealProof } from './tier1/earnedReveal.ts';
 import { necessityProof } from './tier2/necessity.ts';
 import { specificityProof } from './tier2/specificity.ts';
 import { dialogueProof } from './tier2/dialogue.ts';
+import { polarityProof } from './tier2/polarity.ts';
+import { reincorporationProof } from './tier2/reincorporation.ts';
+import { characterAgencyProof } from './tier2/character-agency.ts';
 import { genericnessProof } from './tier3/genericness.ts';
 import { originalityProof } from './tier3/originality.ts';
 import { biasAuditProof } from './tier4/bias-audit.ts';
@@ -37,6 +40,7 @@ export function runTier1(ir: NarrativeTransitionIR, state: NarrativeState): Proo
 }
 
 export function tier1Passes(results: ProofResult[]): boolean {
+  if (results.length === 0) return false; // vacuous-true bypass: no proofs run = not safe
   return results.every(r => r.pass);
 }
 
@@ -51,13 +55,18 @@ export function runTier2(ir: NarrativeTransitionIR, state: NarrativeState): Proo
     necessityProof(ir, state),
     specificityProof(ir, state),
     dialogueProof(ir, state),
+    polarityProof(ir, state),
+    reincorporationProof(ir, state),
+    characterAgencyProof(ir, state),
   ];
 }
 
-// Summarize Tier 2 as a 0–100 score: 100 when all pass; deduct 33 per failure.
+// Summarize Tier 2 as a 0–100 score: 100 when all pass; deduct equal weight per failure.
+// Using float division (not Math.ceil) so each of N proofs contributes exactly 100/N points.
 export function tier2Score(results: ProofResult[]): number {
+  if (results.length === 0) return 100;
   const failures = results.filter(r => !r.pass).length;
-  return Math.max(0, 100 - failures * Math.ceil(100 / results.length));
+  return Math.max(0, Math.round(100 - failures * (100 / results.length)));
 }
 
 // Tier 3 ranking-signal proofs — do not block or flag; only influence candidate

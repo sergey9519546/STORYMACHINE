@@ -2,6 +2,7 @@
 // StoryCommit ledger makes mechanical. Removing a commit can leave downstream
 // commits referencing facts or characters that only the removed commit
 // introduced; this finds exactly those dangling references.
+// Wave 119: extended to detect dangling clock and clue/payoff references.
 
 import type { Stage } from '../../engine/Stage.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
@@ -28,6 +29,11 @@ function charsIntroduced(ops: StoryOp[]): string[] {
   return ops.flatMap(op => (op.op === 'UPDATE_BELIEF' ? [op.charId] : []));
 }
 
+// A clue is introduced by SEED_CLUE; its payoff references it via setupId.
+function cluesIntroduced(ops: StoryOp[]): string[] {
+  return ops.flatMap(op => (op.op === 'SEED_CLUE' ? [op.clueId] : []));
+}
+
 function factsReferenced(ops: StoryOp[]): string[] {
   return ops.flatMap(op => (op.op === 'EXPIRE_FACT' ? [op.factId] : []));
 }
@@ -40,6 +46,10 @@ function charsReferenced(ops: StoryOp[]): string[] {
   });
 }
 
+function payoffsReferenced(ops: StoryOp[]): string[] {
+  return ops.flatMap(op => (op.op === 'PAYOFF_SETUP' ? [op.setupId] : []));
+}
+
 export function whatBreaksIfRemoved(stage: Stage, commitId: string): BreakReport {
   const report: BreakReport = { removedCommit: commitId, breaks: [] };
   const target = stage.getCommit(commitId);
@@ -48,22 +58,26 @@ export function whatBreaksIfRemoved(stage: Stage, commitId: string): BreakReport
   const all = stage.getCommits();
   const downstream = stage.commitsAfter(commitId);
 
-  // Facts / characters the target commit introduces.
+  // Things the target commit introduces.
   const targetFacts = new Set(factsIntroduced(target.ops));
   const targetChars = new Set(charsIntroduced(target.ops));
+  const targetClues = new Set(cluesIntroduced(target.ops));
 
-  // Facts / characters any OTHER commit also introduces.
+  // Same things introduced by any OTHER commit.
   const otherFacts = new Set<string>();
   const otherChars = new Set<string>();
+  const otherClues = new Set<string>();
   for (const c of all) {
     if (c.commitId === commitId) continue;
     for (const f of factsIntroduced(c.ops)) otherFacts.add(f);
     for (const ch of charsIntroduced(c.ops)) otherChars.add(ch);
+    for (const cl of cluesIntroduced(c.ops)) otherClues.add(cl);
   }
 
   // The target commit is the SOLE source of these.
   const soleFacts = new Set([...targetFacts].filter(f => !otherFacts.has(f)));
   const soleChars = new Set([...targetChars].filter(c => !otherChars.has(c)));
+  const soleClues = new Set([...targetClues].filter(cl => !otherClues.has(cl)));
 
   for (const d of downstream) {
     for (const f of factsReferenced(d.ops)) {
@@ -79,6 +93,14 @@ export function whatBreaksIfRemoved(stage: Stage, commitId: string): BreakReport
         report.breaks.push({
           downstreamCommit: d.commitId, proof: 'IntentionalProof',
           reason: `op references character "${ch}" — introduced only by the removed commit`,
+        });
+      }
+    }
+    for (const cl of payoffsReferenced(d.ops)) {
+      if (soleClues.has(cl)) {
+        report.breaks.push({
+          downstreamCommit: d.commitId, proof: 'ProvenanceProof',
+          reason: `PAYOFF_SETUP "${cl}" — that clue is seeded only by the removed commit`,
         });
       }
     }

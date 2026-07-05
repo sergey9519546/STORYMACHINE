@@ -40,12 +40,23 @@ export interface ScreenplaySceneRecord {
   dialogueHighlights: string[];
   /** Clues planted but not yet resolved (SEED_CLUE without PAYOFF_SETUP) */
   unresolvedClues: string[];
+  /** Clue IDs seeded (SEED_CLUE) in this specific scene */
+  seededClueIds: string[];
+  /** Setup IDs paid off (PAYOFF_SETUP) in this specific scene */
+  payoffSetupIds: string[];
   /** Whether a clock was raised this scene */
   clockRaised: boolean;
+  /** Net clock pressure added this scene (sum of RAISE_CLOCK amounts) */
+  clockDelta: number;
   /** Total suspense delta from UPDATE_READER_STATE */
   suspenseDelta: number;
   /** Total curiosity delta */
   curiosityDelta: number;
+  /** Relationship shifts in this scene (from SHIFT_RELATIONSHIP ops). Each entry
+   *  is a sorted pair key + signed amount, used by the relationship-arc pass.
+   *  The builder always populates this; optional only so legacy/test fixtures that
+   *  predate the field still typecheck. Consumers should treat absence as []. */
+  relationshipShifts?: Array<{ pairKey: string; dimension: string; amount: number }>;
   /** createdAt timestamp */
   createdAt: number;
 }
@@ -96,10 +107,10 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
   // ── Emotional shift ───────────────────────────────────────────────────────
   const suspenseDelta = ops
     .filter(o => o.op === 'UPDATE_READER_STATE')
-    .reduce((s, o) => s + ((o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.suspense ?? 0), 0);
+    .reduce((s, o) => { const v = (o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.suspense ?? 0; return s + (isFinite(v) ? v : 0); }, 0);
   const curiosityDelta = ops
     .filter(o => o.op === 'UPDATE_READER_STATE')
-    .reduce((s, o) => s + ((o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.curiosity ?? 0), 0);
+    .reduce((s, o) => { const v = (o as Extract<StoryOp, {op:'UPDATE_READER_STATE'}>).delta.curiosity ?? 0; return s + (isFinite(v) ? v : 0); }, 0);
   const emotionOps = ops.filter(o => o.op === 'APPRAISE_EMOTION');
   const negativeEmotions = emotionOps.filter(o =>
     ['distress', 'anger', 'fear', 'shame'].includes(
@@ -110,8 +121,25 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     negativeEmotions.length > emotionOps.length / 2 ? 'negative' :
     emotionOps.length > 0 ? 'positive' : 'neutral';
 
+  // ── Relationship shifts ───────────────────────────────────────────────────
+  const relationshipShifts: ScreenplaySceneRecord['relationshipShifts'] = [];
+  for (const o of ops) {
+    if (o.op !== 'SHIFT_RELATIONSHIP') continue;
+    const rel = o as Extract<StoryOp, { op: 'SHIFT_RELATIONSHIP' }>;
+    const pair = rel.pair;
+    if (!Array.isArray(pair) || pair.length < 2) continue;
+    const pairKey = [pair[0], pair[1]].sort().join('|');
+    const amount = typeof rel.delta?.amount === 'number' && isFinite(rel.delta.amount) ? rel.delta.amount : 0;
+    const dimension = typeof rel.delta?.dimension === 'string' ? rel.delta.dimension : 'affinity';
+    relationshipShifts.push({ pairKey, dimension, amount });
+  }
+
   // ── Clock detection ───────────────────────────────────────────────────────
-  const clockRaised = ops.some(o => o.op === 'RAISE_CLOCK');
+  const clockOpsLocal = ops.filter(o => o.op === 'RAISE_CLOCK');
+  const clockRaised = clockOpsLocal.length > 0;
+  const clockDelta = clockOpsLocal.reduce(
+    (s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0,
+  );
 
   // ── Purpose ───────────────────────────────────────────────────────────────
   const purpose = derivePurpose(ops, commit.sceneIdx);
@@ -133,9 +161,13 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     visualBeats,
     dialogueHighlights,
     unresolvedClues,
+    seededClueIds: [...seededClueIds],
+    payoffSetupIds: [...paidOffSetupIds],
     clockRaised,
+    clockDelta,
     suspenseDelta,
     curiosityDelta,
+    relationshipShifts,
     createdAt: commit.createdAt,
   };
 }
@@ -144,7 +176,24 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
  * Build the full screenplay memory: one record per non-reverted commit.
  */
 export function buildScreenplayMemory(commits: StoryCommit[]): ScreenplaySceneRecord[] {
-  return commits.filter(c => !c.reverted).map(annotateCommit);
+  const active = commits.filter(c => !c.reverted);
+
+  // Two-pass: first collect ALL paid-off setupIds across the full ledger,
+  // then pass that set to annotateCommit so clues resolved in later scenes
+  // are correctly removed from earlier scenes' unresolvedClues lists.
+  const allPaidOffIds = new Set<string>();
+  for (const c of active) {
+    for (const op of c.ops) {
+      if (op.op === 'PAYOFF_SETUP') allPaidOffIds.add(op.setupId);
+    }
+  }
+
+  return active.map(c => {
+    const record = annotateCommit(c);
+    // Remove globally-paid-off clues from this record's unresolved list.
+    record.unresolvedClues = record.unresolvedClues.filter(id => !allPaidOffIds.has(id));
+    return record;
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -155,7 +204,7 @@ function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
   if (ops.some(o => o.op === 'SEED_CLUE')) return 'introduce_conflict';
   const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
   if (clockOps.length > 0) {
-    const totalAmount = clockOps.reduce((s, o) => s + (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount, 0);
+    const totalAmount = clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0);
     if (totalAmount >= 3) return 'climax';
     if (totalAmount >= 2) return 'raise_stakes';
     return 'complicate';

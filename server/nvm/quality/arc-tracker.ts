@@ -14,7 +14,7 @@ import type { StoryOp } from '../ops/StoryOp.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT';
+export type PromiseKind = 'CLUE' | 'CLOCK' | 'REL' | 'THEME' | 'OBJECT' | 'EMOTIONAL_DEBT';
 export type PromiseUrgency = 'overdue' | 'due_soon' | 'on_track' | 'not_yet';
 
 export interface OpenPromise {
@@ -51,12 +51,17 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
   const totalScenes = scenes.length;
 
   // Accumulate open/closed promises pass-over
-  const openClues       = new Map<string, number>();   // clueId → openedAtScene
-  const openClocks      = new Map<string, { scene: number; totalAmount: number }>();
-  const openRelNeg      = new Map<string, { scene: number; netAmount: number }>();
-  const openThemes      = new Map<string, { scene: number; moves: string[] }>();
-  const openObjects     = new Map<string, { scene: number; currentState: string }>();
-  let resolvedCount     = 0;
+  const openClues        = new Map<string, number>();   // clueId → openedAtScene
+  const openClocks       = new Map<string, { scene: number; totalAmount: number }>();
+  const openRelNeg       = new Map<string, { scene: number; netAmount: number }>();
+  const openThemes       = new Map<string, { scene: number; moves: string[] }>();
+  const openObjects      = new Map<string, { scene: number; currentState: string }>();
+  // EMOTIONAL_DEBT: character in peak distress/fear with no catharsis yet
+  const openEmotionalDebts = new Map<string, { scene: number; dominant: string; intensity: number }>();
+  let resolvedCount      = 0;
+
+  const HIGH_DISTRESS_EMOTIONS = new Set(['fear', 'distress', 'anger', 'shame']);
+  const CATHARTIC_EMOTIONS     = new Set(['joy', 'pride', 'neutral']);
 
   const TERMINAL_OBJECT_STATES = new Set(['destroyed', 'resolved', 'returned', 'complete', 'found', 'lost_permanently']);
 
@@ -68,14 +73,13 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
           break;
 
         case 'PAYOFF_SETUP': {
-          const matchedClue = [...openClues.keys()].find(id => id === op.setupId);
-          if (matchedClue) { openClues.delete(matchedClue); resolvedCount++; }
+          if (openClues.has(op.setupId)) { openClues.delete(op.setupId); resolvedCount++; }
           break;
         }
 
         case 'RAISE_CLOCK': {
           const existing = openClocks.get(op.clockId);
-          const newTotal = (existing?.totalAmount ?? 0) + op.amount;
+          const newTotal = (existing?.totalAmount ?? 0) + (isFinite(op.amount) ? op.amount : 0);
           if (newTotal <= 0) {
             if (existing) resolvedCount++;
             openClocks.delete(op.clockId);
@@ -88,7 +92,8 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
         case 'SHIFT_RELATIONSHIP': {
           const key = [...op.pair].sort().join('|');
           const existing = openRelNeg.get(key);
-          const net = (existing?.netAmount ?? 0) + op.delta.amount;
+          const deltaAmt = typeof op.delta?.amount === 'number' && isFinite(op.delta.amount) ? op.delta.amount : 0;
+          const net = (existing?.netAmount ?? 0) + deltaAmt;
           if (net >= -0.1) {
             if (existing) resolvedCount++;
             openRelNeg.delete(key);
@@ -119,6 +124,21 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
             openObjects.delete(op.objectId);
           } else {
             openObjects.set(op.objectId, { scene: sceneIdx, currentState: op.toState });
+          }
+          break;
+        }
+
+        case 'APPRAISE_EMOTION': {
+          const { dominant, intensity } = op.emotion;
+          if (HIGH_DISTRESS_EMOTIONS.has(dominant) && intensity >= 75) {
+            // Character enters peak distress — open an emotional debt
+            openEmotionalDebts.set(op.charId, { scene: sceneIdx, dominant, intensity });
+          } else if (openEmotionalDebts.has(op.charId)) {
+            // Cathartic resolution: calming emotion or intensity drops below 40
+            if (CATHARTIC_EMOTIONS.has(dominant) || intensity < 40) {
+              openEmotionalDebts.delete(op.charId);
+              resolvedCount++;
+            }
           }
           break;
         }
@@ -215,14 +235,37 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
     });
   }
 
+  // EMOTIONAL_DEBT promises — catharsis should follow within 2–5 scenes
+  for (const [charId, { scene: openedAtScene, dominant, intensity }] of openEmotionalDebts) {
+    const age = totalScenes - openedAtScene;
+    const targetWindow: [number, number] = [openedAtScene + 2, openedAtScene + 5];
+    const urgency = computeUrgency(totalScenes - 1, targetWindow);
+    openPromises.push({
+      promiseId: `debt:${charId}`,
+      kind: 'EMOTIONAL_DEBT',
+      description: `"${charId}" is stuck in ${dominant} (intensity ${intensity}) since scene ${openedAtScene} — owes a catharsis`,
+      openedAtScene,
+      targetWindow,
+      urgency,
+      suggestedOp: 'APPRAISE_EMOTION',
+      pacingScore: computePacingScore(age, 2, 5),
+    });
+  }
+
   // Sort: overdue first, then by pacing score ascending
   const urgencyOrder: Record<PromiseUrgency, number> = { overdue: 0, due_soon: 1, on_track: 2, not_yet: 3 };
   openPromises.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency] || a.pacingScore - b.pacingScore);
 
   const overdueCount = openPromises.filter(p => p.urgency === 'overdue').length;
+  const dueSoonCount = openPromises.filter(p => p.urgency === 'due_soon').length;
+  // Normalized 0–100: overdue weighted 80%, due_soon weighted 20%.
+  // Both terms are proportions (count/total) so the result stays in [0, 100].
   const debtScore = openPromises.length === 0
     ? 0
-    : Math.round((overdueCount / openPromises.length) * 100 + openPromises.filter(p => p.urgency === 'due_soon').length * 10);
+    : Math.round(
+        (overdueCount / openPromises.length) * 80 +
+        (dueSoonCount  / openPromises.length) * 20,
+      );
 
   return { totalScenes, openPromises, resolvedCount, overdueCount, debtScore: Math.min(100, debtScore) };
 }
@@ -232,13 +275,14 @@ export function analyzeArcCompletion(scenes: SceneOps[]): ArcCompletionReport {
 function computeUrgency(currentScene: number, [earliest, latest]: [number, number]): PromiseUrgency {
   if (currentScene > latest)    return 'overdue';
   if (currentScene >= earliest) return 'due_soon';
-  if (currentScene >= earliest - 2) return 'on_track';
+  // Clamp earliest - 2 to 0 so negative scene indices don't produce spurious 'on_track'.
+  if (currentScene >= Math.max(0, earliest - 2)) return 'on_track';
   return 'not_yet';
 }
 
 function computePacingScore(age: number, minAge: number, maxAge: number): number {
   if (age < minAge) return 1;
-  if (age <= maxAge) return 1 - ((age - minAge) / (maxAge - minAge)) * 0.5;
+  if (age <= maxAge) return maxAge === minAge ? 1 : 1 - ((age - minAge) / (maxAge - minAge)) * 0.5;
   const overdue = age - maxAge;
   return Math.max(0, 0.5 - overdue * 0.08);
 }

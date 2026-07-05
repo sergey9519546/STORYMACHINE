@@ -72,13 +72,14 @@ export function computeConflicts(
   const tickingClocks = detectTickingClocks(state);
   const leverageReversals = detectLeverageReversals(registry.intentions, state);
 
-  // Total pressure = weighted sum
+  // Total pressure = weighted sum; guard each term against NaN
+  const fin = (n: number): number => (isFinite(n) ? n : 0);
   const totalDramaticPressure = Math.min(100,
-    collisions.reduce((s, c) => s + c.severity * 0.4, 0) +
-    threatenedPlans.reduce((s, t) => s + t.urgency * 0.3, 0) +
+    collisions.reduce((s, c) => s + fin(c.severity) * 0.4, 0) +
+    threatenedPlans.reduce((s, t) => s + fin(t.urgency) * 0.3, 0) +
     tickingClocks.filter(c => c.urgency === 'critical').length * 20 +
     tickingClocks.filter(c => c.urgency === 'high').length * 10 +
-    leverageReversals.reduce((s, l) => s + l.tensionGain * 0.3, 0)
+    leverageReversals.reduce((s, l) => s + fin(l.tensionGain) * 0.3, 0)
   );
 
   return { collisions, threatenedPlans, tickingClocks, leverageReversals, totalDramaticPressure, builtAt: Date.now() };
@@ -117,6 +118,9 @@ function checkCollision(a: CharacterIntention, b: CharacterIntention): GoalColli
     ['expose', 'conceal'], ['reveal', 'hide'], ['find', 'destroy'],
     ['protect', 'harm'], ['accuse', 'defend'], ['arrest', 'escape'],
     ['keep', 'steal'], ['prove', 'deny'],
+    ['warn', 'silence'], ['cooperate', 'betray'], ['save', 'kill'],
+    ['trust', 'manipulate'], ['love', 'control'], ['support', 'undermine'],
+    ['include', 'exile'], ['remember', 'erase'],
   ];
 
   let conflictType = 'resource';
@@ -128,11 +132,14 @@ function checkCollision(a: CharacterIntention, b: CharacterIntention): GoalColli
     }
   }
 
+  // Guard against NaN urgency propagating into severity
+  const finUrgA = isFinite(a.urgency) ? a.urgency : 50;
+  const finUrgB = isFinite(b.urgency) ? b.urgency : 50;
   const severity = conflictType === 'directional'
-    ? Math.round((a.urgency + b.urgency) / 2)
-    : Math.round((a.urgency + b.urgency) / 4);
+    ? Math.round((finUrgA + finUrgB) / 2)
+    : Math.round((finUrgA + finUrgB) / 4);
 
-  if (severity < 20) return null; // Too mild to surface
+  if (severity < 15) return null; // Too mild to surface (lowered from 20 to catch more conflicts)
 
   const resource = shared[0] ?? 'the situation';
   const detonatingMove = conflictType === 'directional'

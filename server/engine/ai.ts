@@ -18,6 +18,10 @@ export function getAI(): GoogleGenAI {
 
 export interface LLMProvider {
   generate(params: GenerateContentParameters): Promise<GenerateContentResponse>;
+  /** Optional streaming generate. Yields response chunks (each with a `.text`).
+   *  Providers that don't support streaming can omit this; callers fall back to
+   *  a single non-streamed generate. */
+  generateStream?(params: GenerateContentParameters): Promise<AsyncIterable<GenerateContentResponse>>;
 }
 
 export interface EmbeddingProvider {
@@ -63,6 +67,7 @@ function pcmToWav(pcmData: Buffer, sampleRate: number, numChannels: number): Buf
 
 export const geminiProvider: LLMProvider = {
   generate: (params) => getAI().models.generateContent(params),
+  generateStream: (params) => getAI().models.generateContentStream(params),
 };
 
 export const geminiEmbeddingProvider: EmbeddingProvider = {
@@ -168,6 +173,55 @@ export function getModel(tier: 'fast' | 'pro' = 'pro'): string {
   return process.env.AI_MODEL ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-pro';
 }
 
+// ── P5: Multi-model routing by task type ─────────────────────────────────────
+// Maps a semantic task type to a model tier. High-reasoning / long-context /
+// quality-critical tasks route to the Pro tier; high-volume, low-latency, or
+// simple-transform tasks route to the Fast tier. Centralizing the mapping here
+// means callers declare WHAT they're doing, not WHICH model — so the whole
+// routing policy can be tuned in one place (or overridden per task via env:
+// e.g. AI_TASK_TIER_GHOST_TEXT=pro).
+export type TaskType =
+  | 'OUTLINE'      // structure / beat-sheet generation — high reasoning, long context
+  | 'CANDIDATE'    // NVM scene-candidate generation — quality critical
+  | 'REVISION'     // 12-pass revision rewrites — quality critical
+  | 'WORLDBUILD'   // ScriptIDE scene generation — quality critical
+  | 'DIALOGUE'     // dialogue doctoring — voice/subtext quality
+  | 'ANALYSIS'     // tension / structure analysis — reasoning
+  | 'CHARACTER'    // character profile synthesis — reasoning
+  | 'ACTION'       // clean-action transform — simple, mechanical
+  | 'AGENT_TURN'   // per-agent ToT action selection — high volume
+  | 'EPISTEMICS'   // per-agent belief update — high volume
+  | 'GHOST_TEXT';  // inline copilot completion — latency critical
+
+const TASK_TIER: Record<TaskType, 'fast' | 'pro'> = {
+  OUTLINE:    'pro',
+  // CANDIDATE and REVISION run in high-volume iterative loops (convergence emits
+  // up to 24 candidates/scene; revision runs 12 passes/scene). They default to
+  // fast to keep cost bounded; bump to pro per-deployment via
+  // AI_TASK_TIER_CANDIDATE=pro / AI_TASK_TIER_REVISION=pro when quality > cost.
+  CANDIDATE:  'fast',
+  REVISION:   'fast',
+  WORLDBUILD: 'pro',   // single-shot, user-triggered — quality worth the latency
+  DIALOGUE:   'pro',
+  ANALYSIS:   'pro',
+  CHARACTER:  'pro',
+  ACTION:     'fast',  // mechanical camera-direction strip — no reasoning needed
+  AGENT_TURN: 'fast',  // high volume per turn
+  EPISTEMICS: 'fast',  // high volume per turn
+  GHOST_TEXT: 'fast',  // latency critical (inline copilot)
+};
+
+/**
+ * Resolve the model name for a semantic task type. A per-task env override
+ * (AI_TASK_TIER_<TASK>=fast|pro) takes precedence over the default mapping.
+ */
+export function modelForTask(task: TaskType): string {
+  const override = process.env[`AI_TASK_TIER_${task}`];
+  const tier: 'fast' | 'pro' =
+    override === 'fast' || override === 'pro' ? override : TASK_TIER[task];
+  return getModel(tier);
+}
+
 // Returns the generation temperature to use for all Gemini calls.
 // Set GEMINI_TEMPERATURE=0 in .env to get near-deterministic outputs.
 // Defaults to 1.0 (Gemini default). Values outside 0–2 are clamped.
@@ -262,4 +316,45 @@ export async function generateContent(
       res ? (res as GenerateContentResponse & { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata : undefined,
     );
   }
+}
+
+// Streaming variant of generateContent — goes through the active LLM provider so
+// it can be stubbed in tests and stays consistent with the non-streaming path.
+// Records a single metrics entry once the stream is exhausted (latency = full
+// stream duration). If the active provider has no generateStream, falls back to
+// a one-shot generate yielded as a single chunk.
+export async function generateContentStream(
+  params: GenerateContentParameters,
+  opts: { label: string },
+): Promise<AsyncIterable<GenerateContentResponse>> {
+  const { label } = opts;
+  const started = Date.now();
+
+  if (!_provider.generateStream) {
+    // Fallback: single non-streamed call wrapped as a one-element async iterable.
+    const res = await generateContent(params, { label });
+    async function* single(): AsyncGenerator<GenerateContentResponse> { yield res; }
+    return single();
+  }
+
+  const inner = await _provider.generateStream(params);
+  async function* tracked(): AsyncGenerator<GenerateContentResponse> {
+    let ok = false;
+    let last: GenerateContentResponse | undefined;
+    try {
+      for await (const chunk of inner) {
+        last = chunk;
+        yield chunk;
+      }
+      ok = true;
+    } finally {
+      metrics.recordAiCall(
+        label,
+        Date.now() - started,
+        ok,
+        last ? (last as GenerateContentResponse & { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } }).usageMetadata : undefined,
+      );
+    }
+  }
+  return tracked();
 }

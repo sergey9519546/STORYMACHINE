@@ -233,6 +233,7 @@ export default function DirectorPanel({
   const [storyStructure, setStoryStructure] = useState<string>('');
   const [emotionalArc, setEmotionalArc] = useState<string>('');
   const [directorStyle, setDirectorStyle] = useState<string>('');
+  const [storyGenre, setStoryGenre] = useState<string>('');
   const [expectedTurns, setExpectedTurns] = useState<number>(20);
   const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
   const [applyingPreset, setApplyingPreset] = useState(false);
@@ -263,11 +264,12 @@ export default function DirectorPanel({
     fetch("/api/outline")
       .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
       .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
-      .catch(() => {});
+      .catch((e: unknown) => console.error('[DirectorPanel] outline fetch failed:', e));
     fetch("/api/story-config")
       .then(r => r.ok ? r.json() as Promise<{
         structure: string | null; emotional_arc: string | null;
         director_style: string | null; expected_turns: number; pacing_target: string | null;
+        story_genre: string | null;
       }> : null)
       .then(data => {
         if (!data) return;
@@ -276,8 +278,9 @@ export default function DirectorPanel({
         if (data.director_style) setDirectorStyle(data.director_style);
         if (data.expected_turns) setExpectedTurns(data.expected_turns);
         if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
+        if (data.story_genre) setStoryGenre(data.story_genre);
       })
-      .catch(() => {});
+      .catch((e: unknown) => console.error('[DirectorPanel] story-config fetch failed:', e));
   }, []);
 
   // ── Escape key ────────────────────────────────────────────────────────────
@@ -441,6 +444,16 @@ export default function DirectorPanel({
     }).catch(() => {});
   }, []);
 
+  const saveStoryGenre = useCallback(async (genre: string) => {
+    setStoryGenre(genre);
+    if (!genre) return;
+    await fetch("/api/story-genre", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ genre }),
+    }).catch(() => {});
+  }, []);
+
   const addOutlineBeat = () => {
     setOutlineBeats(prev => [...prev, {
       phase: "Setup",
@@ -590,7 +603,7 @@ export default function DirectorPanel({
                 </div>
                 <div className="space-y-4">
                   {currentScene.choices.map((choice, idx) => (
-                    <div key={idx} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
+                    <div key={`choice-${choice.text.slice(0, 20)}-${idx}`} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
                       {!availableIndices.has(idx) && (
                         <span
                           className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest cursor-help"
@@ -1028,7 +1041,7 @@ export default function DirectorPanel({
                 <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Active Secrets:</label>
                 <div className="space-y-2">
                   {directorState.activeSecrets?.map((secret, idx) => (
-                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`secret-${secret.owner}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{secret.owner}</span>
                       <span className="text-sm">{secret.content}</span>
                       <span className={`text-[10px] uppercase font-bold ${secret.revealed ? "text-red-600" : "text-green-600"}`}>
@@ -1043,7 +1056,7 @@ export default function DirectorPanel({
                 <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">NPCs:</label>
                 <div className="space-y-2">
                   {directorState.npcs?.map((npc, idx) => (
-                    <div key={idx} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`npc-${npc.name}-${npc.role}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{npc.name} ({npc.role})</span>
                       <span className="text-sm">Agenda: {npc.agenda}</span>
                       <span className="text-[10px] uppercase font-bold text-gray-500">Trust: {npc.trustworthiness}%</span>
@@ -1181,6 +1194,29 @@ export default function DirectorPanel({
                   <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
                 )}
               </div>
+
+              {/* Story genre */}
+              <div>
+                <label className="text-gray-500 text-[10px] uppercase font-bold tracking-widest block mb-1">Genre</label>
+                <select
+                  value={storyGenre}
+                  onChange={e => saveStoryGenre(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">— None —</option>
+                  <option value="thriller">Thriller — Propulsive Suspense</option>
+                  <option value="horror">Horror — Creeping Dread</option>
+                  <option value="drama">Drama — Internal Conflict</option>
+                  <option value="comedy">Comedy — Character-Driven Wit</option>
+                  <option value="romance">Romance — Yearning & Risk</option>
+                  <option value="sci_fi">Science Fiction — Premise-Driven</option>
+                  <option value="noir">Noir — Moral Fog</option>
+                  <option value="mystery">Mystery — Fair-Play Investigation</option>
+                </select>
+                {storyGenre && (
+                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Sets tone, register, and genre-specific clichés to avoid. Composes with cinematic style.</p>
+                )}
+              </div>
             </div>
 
             {/* Pacing Target */}
@@ -1229,7 +1265,7 @@ export default function DirectorPanel({
               ) : (
                 <div className="space-y-4">
                   {outlineBeats.map((beat, idx) => (
-                    <div key={idx} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
                       <button
                         onClick={() => removeOutlineBeat(idx)}
                         aria-label={`Remove beat ${idx + 1}`}

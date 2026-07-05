@@ -19,6 +19,7 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import { applyOperator, ALL_OPERATORS, type MutationOperator } from '../converge/operators.ts';
 import { scoreBranch, type BranchScore } from './score.ts';
 import { stateHash } from '../state/NarrativeState.ts';
+import { logger } from '../../lib/logger.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -90,8 +91,11 @@ export function generateBranchField(
         ops: mutatedIR.ops,
         scores,
       });
-    } catch {
-      // Operator failed (e.g. no applicable ops) — silently skip
+    } catch (err) {
+      // Operator failed (commonly: no applicable ops for this seed). Expected in
+      // the normal branching loop, so log at debug — available when diagnosing a
+      // genuinely broken operator without spamming production logs.
+      logger.debug('branch_operator_skipped', { operator, message: (err as Error).message });
     }
   }
 
@@ -142,6 +146,26 @@ function buildSeedIR(state: NarrativeState, sceneIdx: number): NarrativeTransiti
     }
   }
 
+  // Seed the most intense character emotion — gives operators emotional polarity to work with
+  const emotionEntries = Object.entries(state.characterEmotions);
+  if (emotionEntries.length > 0) {
+    const [charId, emo] = emotionEntries
+      .filter(([, e]) => isFinite(e.intensity))
+      .sort((a, b) => b[1].intensity - a[1].intensity)[0] ?? emotionEntries[0];
+    if (charId) ops.push({ op: 'APPRAISE_EMOTION', charId, emotion: { ...emo } });
+  }
+
+  // Seed the most active relationship — operators can escalate or reverse it
+  const relEntries = Object.entries(state.relationships);
+  if (relEntries.length > 0) {
+    const [key, deltas] = relEntries.sort((a, b) => b[1].length - a[1].length)[0];
+    const parts = key.split('|');
+    if (parts.length === 2 && deltas.length > 0) {
+      const [fromId, toId] = parts as [string, string];
+      ops.push({ op: 'SHIFT_RELATIONSHIP', pair: [fromId, toId], delta: { ...deltas[deltas.length - 1] } });
+    }
+  }
+
   // If there are facts in objective reality, reference the most recent one
   if (state.objectiveReality.length > 0) {
     const mostRecent = state.objectiveReality[state.objectiveReality.length - 1];
@@ -155,6 +179,14 @@ function buildSeedIR(state: NarrativeState, sceneIdx: number): NarrativeTransiti
       validTo: null,
     };
     ops.push({ op: 'ADD_FACT', fact });
+  }
+
+  // Seed theme argument — continue the most recent theme direction
+  if (state.themeArgument.length > 0) {
+    const last = state.themeArgument[state.themeArgument.length - 1];
+    // Continue the theme: if last was 'support' continue it; if 'attack', counter with 'support'
+    const nextMove = last.move === 'resolve' ? 'support' : last.move;
+    ops.push({ op: 'ADVANCE_THEME_ARGUMENT', claimId: last.claimId, move: nextMove });
   }
 
   // Fallback: always have at least one op so operators have something to mutate

@@ -43,6 +43,7 @@ export class Stage {
     // Skip for :memory: — pragmas don't persist there but the calls are harmless.
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('foreign_keys = ON');
     this.initSchema();
     this.runMigrations();
   }
@@ -228,7 +229,13 @@ export class Stage {
     ];
     for (let i = current; i < MIGRATIONS.length; i++) {
       this.db.transaction(() => {
-        MIGRATIONS[i]();
+        try {
+          MIGRATIONS[i]();
+        } catch (err) {
+          const msg = (err as Error).message ?? '';
+          // SQLite has no ADD COLUMN IF NOT EXISTS — treat duplicate-column as idempotent.
+          if (!msg.includes('duplicate column name')) throw err;
+        }
         this.db.pragma(`user_version = ${i + 1}`);
       })();
     }
@@ -720,6 +727,8 @@ export class Stage {
       emotional_arc: config.emotional_arc,
       director_style: config.director_style,
       expected_turns: config.expected_turns,
+      story_theme: config.story_theme,
+      story_genre: config.story_genre,
     };
   }
 
@@ -729,12 +738,21 @@ export class Stage {
     this.db.transaction(() => {
       const current = this.getIllusionState();
       const next = { ...current, ...state };
+      // Read the RAW config blob and merge — config_json also stores keys this
+      // method does not manage (tension_accumulator, tension_history, written by
+      // saveDirectorTensionState). Rebuilding config from scratch would wipe the
+      // Director's tension accumulator back to its default on every phase advance.
+      const rawRow = this.db.prepare('SELECT config_json FROM Illusion_State WHERE id = 1').get() as { config_json: string | null } | undefined;
+      const existingConfig = safeJsonParse<Record<string, unknown>>(rawRow?.config_json ?? '{}', {});
       const config = {
+        ...existingConfig,
         pacing_target: next.pacing_target,
         structure: next.structure,
         emotional_arc: next.emotional_arc,
         director_style: next.director_style,
         expected_turns: next.expected_turns,
+        story_theme: next.story_theme,
+        story_genre: next.story_genre,
       };
       this.db.prepare(`
         UPDATE Illusion_State
@@ -1204,7 +1222,9 @@ export class Stage {
       sceneIdx: r.scene_idx as number,
       ops: safeJsonParse<StoryOp[]>(r.ops_json as string, []),
       deltaSummary: safeJsonParse(r.delta_summary_json as string,
-        { facts: 0, beliefs: 0, relationships: 0 }),
+        { facts: 0, beliefs: 0, relationships: 0, emotions: 0, clues: 0, payoffs: 0,
+          clocks: 0, themeArguments: 0, objectArcs: 0, rules: 0, readerStateUpdates: 0,
+          visualFacts: 0, sonicFacts: 0 }),
       reverted: Boolean(r.reverted),
       createdAt: r.created_at as number,
     };
@@ -1278,6 +1298,8 @@ export class Stage {
           emotional_arc: s.emotional_arc,
           director_style: s.director_style,
           expected_turns: s.expected_turns,
+          story_theme: s.story_theme,
+          story_genre: s.story_genre,
         };
       })(),
       beat_traces: this.getAllBeatTraces(),
@@ -1343,15 +1365,25 @@ export class Stage {
   // ── Drama Positions (v11) ────────────────────────────────────────────────────
 
   public upsertDramaPosition(p: import('../nvm/valuation/futures.ts').DramaticPosition, sceneIdx: number): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE so that mark-to-market refreshes never
+    // overwrite the `closed` flag — a previously-closed position must stay closed.
     this.db.prepare(`
-      INSERT OR REPLACE INTO Drama_Positions
+      INSERT INTO Drama_Positions
         (position_id, kind, char_id, description, opened_at_scene,
          expected_payoff, time_decay, mark_to_market, closed, scene_idx, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      ON CONFLICT(position_id) DO UPDATE SET
+        kind           = excluded.kind,
+        char_id        = excluded.char_id,
+        description    = excluded.description,
+        expected_payoff = excluded.expected_payoff,
+        time_decay     = excluded.time_decay,
+        mark_to_market = excluded.mark_to_market,
+        scene_idx      = excluded.scene_idx
     `).run(
       p.positionId, p.kind, p.charId ?? null, p.description,
       p.openedAtScene, p.expectedPayoff, p.timeDecay, p.markToMarket,
-      0, sceneIdx, Date.now(),
+      sceneIdx, Date.now(),
     );
   }
 
@@ -1403,6 +1435,8 @@ export class Stage {
 
   // ── Ghost ledger (v9) ────────────────────────────────────────────────────────
 
+  private static readonly MAX_GHOST_COMMITS = 200;
+
   public ghostLedgerAppend(ghost: import('../nvm/repro/ghost-ledger.ts').GhostCommit): void {
     this.db.prepare(`
       INSERT OR IGNORE INTO Ghost_Commits
@@ -1412,6 +1446,13 @@ export class Stage {
       ghost.ghostId, ghost.parentCommitId ?? null, ghost.sceneIdx,
       JSON.stringify(ghost.ir), ghost.reason, ghost.rejectedAt,
     );
+    // Prune oldest entries beyond cap so the table doesn't grow unbounded
+    this.db.prepare(`
+      DELETE FROM Ghost_Commits WHERE ghost_id IN (
+        SELECT ghost_id FROM Ghost_Commits ORDER BY rejected_at ASC
+        LIMIT MAX(0, (SELECT COUNT(*) FROM Ghost_Commits) - ?)
+      )
+    `).run(Stage.MAX_GHOST_COMMITS);
   }
 
   public ghostLedgerGet(sceneIdx?: number): import('../nvm/repro/ghost-ledger.ts').GhostCommit[] {

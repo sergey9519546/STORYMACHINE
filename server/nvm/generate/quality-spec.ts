@@ -10,6 +10,7 @@
 import type { GenerationConstraint } from './proof-spec.ts';
 import type { QualityWarning, ProppAnalysis, ProppStage } from '../quality/index.ts';
 import type { OpenPromise } from '../quality/arc-tracker.ts';
+import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 
 // ── Quality warning → constraint ──────────────────────────────────────────────
 
@@ -55,6 +56,27 @@ export function qualityConstraintsFromWarnings(
       case 'DV10_STRUCTURAL_UNIFORMITY':
         constraints.push({ kind: 'free_form', description: 'Use at least 3 different op kinds in this scene. Structural variety creates rhythm: world fact → belief → emotion → relationship → theme.' });
         break;
+      case 'DV11_UNEXPLAINED_PRIDE':
+        constraints.push({ kind: 'free_form', description: 'A character\'s pride must follow an earned achievement. Add a PAYOFF_SETUP or a positive SHIFT_RELATIONSHIP before the APPRAISE_EMOTION pride to ground what they accomplished.' });
+        break;
+      case 'DV12_TALKING_HEADS':
+        constraints.push({ kind: 'free_form', description: 'This scene is pure dialogue — talking heads with no physical or story consequence. Add at least one world op: ADD_FACT, SHIFT_RELATIONSHIP, ADVANCE_OBJECT_ARC, or RAISE_CLOCK. Characters must DO something, not just exchange information.' });
+        break;
+      case 'DV13_UNACKNOWLEDGED_CLOCK':
+        constraints.push({ kind: 'free_form', description: 'A ticking clock (RAISE_CLOCK) was raised but no character perceives it. Add an UPDATE_BELIEF where at least one character\'s proposition references the clock subject — make the stakes visible to a human mind.' });
+        break;
+      case 'DV14_EMOTIONAL_FLATLINE':
+        constraints.push({ kind: 'free_form', description: 'A character\'s emotion never changes within this scene. Give them an emotional arc — they should enter and exit with a different dominant emotion, or at minimum a significant intensity shift caused by events.' });
+        break;
+      case 'DV15_GOAL_FREE_SCENE':
+        constraints.push({ kind: 'free_form', description: 'This scene has no story consequence: no arc advancement, no theme progress, no payoff, no ticking clock. Add at least one ADVANCE_OBJECT_ARC, ADVANCE_THEME_ARGUMENT, PAYOFF_SETUP, or RAISE_CLOCK to make this scene matter to the plot.' });
+        break;
+      case 'DV16_UNWITNESSED_CLUE':
+        constraints.push({ kind: 'free_form', description: 'A clue was planted (SEED_CLUE) but no character witnessed it — add at least one UPDATE_BELIEF for a character who was present to observe or discover the clue. A clue with no witness has no narrative hook.' });
+        break;
+      case 'DV17_UNRECEIVED_PAYOFF':
+        constraints.push({ kind: 'free_form', description: 'A payoff fires (PAYOFF_SETUP) but no character reacts with a belief update or emotional response. Add an UPDATE_BELIEF or APPRAISE_EMOTION immediately after the payoff so the reveal lands in a human mind.' });
+        break;
       case 'LOW_SPECIFICITY':
         constraints.push({ kind: 'free_form', description: 'Replace vague terms (something, happened, felt, things) with concrete specifics: named objects, precise actions, sensory details. Every op should be unmistakably this story, not any story.' });
         break;
@@ -65,9 +87,8 @@ export function qualityConstraintsFromWarnings(
         constraints.push({ kind: 'free_form', description: 'Give each character a distinct vocabulary. Characters should believe and express things in different ways — one speaks in absolutes, another in conditionals, etc.' });
         break;
       default:
-        if (w.penalty >= 15) {
-          constraints.push({ kind: 'free_form', description: `Quality fix required: ${w.message}` });
-        }
+        // Include all unrecognized quality warnings regardless of penalty so none silently disappear.
+        constraints.push({ kind: 'free_form', description: `Quality fix required: ${sanitizeForPrompt(w.message, 200)}` });
     }
   }
 
@@ -85,18 +106,29 @@ export function arcConstraintsFromTracker(
     .slice(0, maxConstraints);
 
   return urgentPromises.map(p => {
-    const base = p.description;
+    const base = sanitizeForPrompt(p.description, 200);
+    const urgencyPrefix = p.urgency === 'overdue'
+      ? 'URGENT (overdue): '
+      : 'Due soon: ';
     switch (p.kind) {
       case 'CLUE':
-        return { kind: 'must_seed_clue' as const, description: `Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: p.promiseId.replace('clue:', '') };
+        return { kind: 'must_seed_clue' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Use a PAYOFF_SETUP op.`, detail: sanitizeForPrompt(p.promiseId.replace('clue:', ''), 128) };
       case 'CLOCK':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add a RAISE_CLOCK with a negative amount to count it down.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add a RAISE_CLOCK with a negative amount to count it down — the audience has been waiting.` };
       case 'REL':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add a positive SHIFT_RELATIONSHIP to begin the recovery arc.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add a positive SHIFT_RELATIONSHIP to begin the recovery arc — the rift cannot be ignored any longer.` };
       case 'THEME':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve'.` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Add an ADVANCE_THEME_ARGUMENT with move='resolve' — the theme argument is overdue for a position.` };
       case 'OBJECT':
-        return { kind: 'free_form' as const, description: `Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found).` };
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Advance the ADVANCE_OBJECT_ARC to a terminal state (destroyed, resolved, returned, complete, found, lost_permanently).` };
+      case 'EMOTIONAL_DEBT':
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}. Give this character a cathartic release — an APPRAISE_EMOTION with joy, pride, or neutral at lower intensity. Characters cannot stay in peak distress indefinitely.` };
+      default: {
+        // Exhaustiveness guard — if a new OpenPromise kind is added without updating this switch,
+        // TypeScript will infer 'never' here and the build will fail.
+        const _exhaustive: never = p.kind;
+        return { kind: 'free_form' as const, description: `${urgencyPrefix}Resolve arc promise: ${base}.` };
+      }
     }
   });
 }

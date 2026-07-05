@@ -1,0 +1,21 @@
+{
+  "id": "identity_performance",
+  "kind": "identity_performance",
+  "themeClaimTemplate": "Who we pretend to be / Who we are",
+  "physicalCarrier": { "type": "costume_role_or_social_mask", "required": true },
+  "lifecycleStates": ["masked", "invested", "leak", "caught_in_mask", "forced_removal", "integrated"],
+  "transitionRules": [
+    { "from": "masked", "to": "invested", "condition": "character_begins_to_believe_their_own_performance" },
+    { "from": "invested", "to": "leak", "condition": "authentic_self_breaks_through_in_an_unguarded_moment" },
+    { "from": "leak", "to": "caught_in_mask", "condition": "another_character_exploits_or_confronts_the_contradiction" },
+    { "from": "caught_in_mask", "to": "forced_removal", "condition": "external_event_makes_the_mask_structurally_impossible_to_maintain" },
+    { "from": "forced_removal", "to": "integrated", "condition": "character_claims_authentic_identity_without_the_mask" }
+  ],
+  "climaxProofPredicate": "character_must_choose: recommit_to_the_mask | drop_it_permanently_in_front_of_the_person_who_matters_most",
+  "endingProofPredicate": "character_relationship_to_their_own_identity_is_different_from_the_opening",
+  "invariants": [
+    "the_mask_must_cost_the_character_something_real_if_exposed",
+    "at_least_one_other_character_must_love_the_mask_not_the_person",
+    "the_leak_must_be_genuinely_revealing_not_merely_symbolic"
+  ]
+}

@@ -64,25 +64,42 @@ export function analyzeStructure(
   const n = records.length;
   const suspenseValues = records.map(r => r.suspenseDelta);
 
+  // ── Dramatic-event signals (needed before act position) ───────────────────
+  // Revelations and reversals are accumulated dramatic progress: a story rich in
+  // turning points has advanced through its structure even if the author never
+  // raised an explicit clock. Computing these first lets act position blend them
+  // with raw clock pressure rather than relying on clocks alone.
+  const revelationCountEarly = records.filter(r => r.revelation !== null).length;
+  const reversalCountEarly = suspenseValues.filter(v => v < -1).length;
+
   // ── Act position ──────────────────────────────────────────────────────────
-  // Rough 3-act model: Act1 = first ~25%, Midpoint = ~50%, Act3 = last ~25%
-  // In a live story we don't know the total length, so we use clock totals as proxy
+  // Rough 3-act model. In a live story we don't know the total length, so we use
+  // a blended pressure proxy: explicit clock pressure PLUS dramatic-event weight.
+  // This prevents clock-less stories from being permanently stuck in act1.
   const totalClockPressure = commits
     .filter(c => !c.reverted)
     .flatMap(c => c.ops)
     .filter(o => o.op === 'RAISE_CLOCK')
-    .reduce((s, o) => s + (o as { amount: number }).amount, 0);
+    .reduce((s, o) => { const a = (o as { amount: number }).amount; return s + (isFinite(a) ? a : 0); }, 0);
+
+  // Each revelation is worth 2 pressure units; each reversal 1.5. These weights
+  // are calibrated so a story with ~4 revelations + a couple reversals reaches
+  // act3 territory (≈15) even with no clocks, matching the clock-only thresholds.
+  const REVELATION_WEIGHT = 2;
+  const REVERSAL_WEIGHT = 1.5;
+  const dramaticPressure = revelationCountEarly * REVELATION_WEIGHT + reversalCountEarly * REVERSAL_WEIGHT;
+  const blendedPressure = totalClockPressure + dramaticPressure;
 
   const actPosition: ActPosition =
-    totalClockPressure >= 15 ? 'act3' :
-    totalClockPressure >= 10 ? 'act2b' :
-    totalClockPressure >= 7 ? 'midpoint' :
-    totalClockPressure >= 4 ? 'act2a' :
+    blendedPressure >= 15 ? 'act3' :
+    blendedPressure >= 10 ? 'act2b' :
+    blendedPressure >= 7 ? 'midpoint' :
+    blendedPressure >= 4 ? 'act2a' :
     'act1';
 
   // ── Completion ────────────────────────────────────────────────────────────
-  // Proxy: clock pressure normalized by expected max (20)
-  const completionPercent = Math.min(100, Math.round((totalClockPressure / 20) * 100));
+  // Proxy: blended pressure normalized by expected max (20)
+  const completionPercent = Math.min(100, Math.round((blendedPressure / 20) * 100));
 
   // ── Escalation curve ──────────────────────────────────────────────────────
   const avgSuspensePerScene = n > 0
@@ -100,7 +117,7 @@ export function analyzeStructure(
   const escalating = secondHalfAvg > firstHalfAvg;
 
   // ── Reversals: scenes where suspense dropped significantly ────────────────
-  const reversalCount = suspenseValues.filter(v => v < -1).length;
+  const reversalCount = reversalCountEarly;
   const reversalDensity = n >= 10 ? Math.round((reversalCount / n) * 10) : reversalCount;
 
   // ── Climax approach ───────────────────────────────────────────────────────
@@ -109,17 +126,16 @@ export function analyzeStructure(
   const approachingClimax = recentClockRaises >= 2 || actPosition === 'act3';
 
   // ── Open clues ────────────────────────────────────────────────────────────
+  // Build a Set to deduplicate clue IDs — a single clue can appear in multiple
+  // records' unresolvedClues arrays, so a reduce-sum would overcount.
   const plantedClues = new Set<string>();
-  const paidOffClues = new Set<string>();
   for (const record of records) {
     for (const clueId of record.unresolvedClues) plantedClues.add(clueId);
-    // Payoffs would remove from unresolved (the commit that pays off won't have the clue in unresolvedClues)
   }
-  // unresolvedClues are from records — they're already filtered to seeds without payoffs
-  const openClues = records.reduce((s, r) => s + r.unresolvedClues.length, 0);
+  const openClues = plantedClues.size;
 
   // ── Revelation count ──────────────────────────────────────────────────────
-  const revelationCount = records.filter(r => r.revelation !== null).length;
+  const revelationCount = revelationCountEarly;
 
   // ── Midpoint pressure ─────────────────────────────────────────────────────
   const midIdx = Math.floor(n / 2);

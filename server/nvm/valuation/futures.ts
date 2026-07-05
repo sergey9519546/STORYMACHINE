@@ -14,7 +14,7 @@ import type { StoryOpKind } from '../ops/StoryOp.ts';
 
 export interface DramaticPosition {
   positionId: string;
-  kind: 'belief_conflict' | 'unexposed_lie' | 'open_payoff' | 'ticking_clock' | 'unresolved_relationship';
+  kind: 'belief_conflict' | 'unexposed_lie' | 'open_payoff' | 'ticking_clock' | 'unresolved_relationship' | 'dramatic_irony';
   charId?: string;
   description: string;
   openedAtScene: number;
@@ -66,25 +66,40 @@ export function markToMarket(
 // This is a heuristic scan — the Convergence Loop can also maintain positions explicitly.
 export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): TensionLedger {
   const positions: DramaticPosition[] = [];
-  const investment = Math.max(0.1, state.audienceState.investment / 100);
+  // Guard against a non-finite investment poisoning every position's markToMarket
+  // (and therefore totalTension, which feeds convergence scoring). `??`/`Math.max`
+  // do NOT catch NaN — Math.max(0.1, NaN) === NaN — so coerce explicitly first.
+  const rawInvestment = state.audienceState.investment;
+  const safeInvestment = (typeof rawInvestment === 'number' && isFinite(rawInvestment)) ? rawInvestment : 0;
+  const investment = Math.max(0.1, safeInvestment / 100);
 
   // Belief-vs-reality conflicts: character believes X, but objective reality says not-X.
   // Detected heuristically: look for character beliefs whose proposition mentions a
   // subject+predicate that appears in objective reality with a different object.
+  // Cross-checking the belief against factIndex gives us a higher-fidelity signal:
+  // a belief that references a fact subject is more likely to be a real contradiction.
   const factIndex = new Map<string, string>(); // "subject|predicate" → object
+  const factSubjects = new Set<string>();
   for (const f of state.objectiveReality) {
     factIndex.set(`${f.subject}|${f.predicate}`, f.object);
+    factSubjects.add(f.subject.toLowerCase());
   }
   for (const [charId, beliefs] of Object.entries(state.characterBeliefs)) {
     for (const belief of beliefs) {
       // Simple heuristic: if the belief was told (not witnessed) it may be false
       if (belief.source === 'told' && belief.confidence > 0.5) {
+        // Boost expectedPayoff if the belief proposition references a known fact subject —
+        // that means the character holds a told-belief about something in objective reality,
+        // which is a concrete contradiction setup rather than a vague potential deception.
+        const propLower = belief.proposition.toLowerCase();
+        const referencesKnownFact = factSubjects.size > 0 &&
+          [...factSubjects].some(s => propLower.includes(s));
         const pos = openPosition(
           `belief_conflict_${charId}_${belief.id}`,
           'belief_conflict',
           `${charId} holds a potentially false told-belief: "${belief.proposition.slice(0, 60)}"`,
           sceneIdx,
-          75,
+          referencesKnownFact ? 90 : 75,
           charId,
         );
         positions.push(markToMarket(pos, sceneIdx, investment));
@@ -92,14 +107,20 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
     }
   }
 
-  // Open payoffs: PAYOFF_SETUP ops whose setups haven't been paid off yet
-  for (const payoff of state.payoffs) {
+  // Open payoffs: PAYOFF_SETUP ops whose setups haven't been paid off yet.
+  // Urgency INCREASES with age — earlier setups are more overdue. We estimate
+  // planting order from array position (earlier index = older setup) and boost
+  // expectedPayoff by up to +25 for the oldest unresolved promise.
+  for (let pi = 0; pi < state.payoffs.length; pi++) {
+    const payoff = state.payoffs[pi];
+    const estimatedAge = Math.max(0, state.payoffs.length - 1 - pi);
+    const urgencyBoost = Math.min(25, estimatedAge * 5);
     const pos = openPosition(
       `payoff_${payoff.setupId}`,
       'open_payoff',
-      `Setup "${payoff.setupId}" is planted, payoff pending`,
+      `Setup "${payoff.setupId}" is planted, payoff ${urgencyBoost > 0 ? '(overdue) ' : ''}pending`,
       sceneIdx,
-      85,
+      85 + urgencyBoost,
     );
     positions.push(markToMarket(pos, sceneIdx, investment));
   }
@@ -138,9 +159,11 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
     }
   }
 
-  // Relationship tensions: large negative shift history
+  // Relationship tensions: large shifts in either direction.
+  // Negative net = unresolved conflict; positive net = charged anticipatory tension
+  // (romantic buildup, loyalty on the line). Both create dramatic pressure.
   for (const [key, deltas] of Object.entries(state.relationships)) {
-    const net = deltas.reduce((s, d) => s + d.amount, 0);
+    const net = deltas.reduce((s, d) => s + (isFinite(d.amount) ? d.amount : 0), 0);
     if (net < -0.3) {
       const pos = openPosition(
         `rel_tension_${key}`,
@@ -150,6 +173,42 @@ export function deriveTensionLedger(state: NarrativeState, sceneIdx: number): Te
         60,
       );
       positions.push(markToMarket(pos, sceneIdx, investment));
+    } else if (net > 0.3) {
+      // Positive anticipatory tension: high stake positive relationships create
+      // dramatic pressure when threatened (the more there is to lose, the higher
+      // the stakes of any scene that endangers this bond).
+      const pos = openPosition(
+        `rel_anticipation_${key}`,
+        'unresolved_relationship',
+        `Relationship ${key} has positive tension (net ${net.toFixed(2)}) — high-stakes bond at risk`,
+        sceneIdx,
+        Math.min(55, 30 + net * 25),
+      );
+      positions.push(markToMarket(pos, sceneIdx, investment));
+    }
+  }
+
+  // Dramatic irony: facts in objective reality that NO character has registered in beliefs.
+  // The audience sees a fact the cast is blind to — a privileged knowledge gap.
+  // Cap at 5 to avoid inflating tension on information-dense setup scenes.
+  const allBeliefText = Object.values(state.characterBeliefs)
+    .flat()
+    .map(b => b.proposition.toLowerCase());
+  let ironyCount = 0;
+  for (const fact of state.objectiveReality) {
+    if (ironyCount >= 5) break;
+    const subjectLower = fact.subject.toLowerCase();
+    const perceivedByAny = allBeliefText.some(text => text.includes(subjectLower));
+    if (!perceivedByAny) {
+      const pos = openPosition(
+        `dramatic_irony_${fact.factId}`,
+        'dramatic_irony',
+        `Fact "${fact.subject} ${fact.predicate} ${fact.object}" is unperceived by any character — audience knows what they don't`,
+        sceneIdx,
+        70,
+      );
+      positions.push(markToMarket(pos, sceneIdx, investment));
+      ironyCount++;
     }
   }
 

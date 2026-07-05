@@ -1,5 +1,5 @@
-// Wave 39 — The 12-Pass Revision Pipeline
-// Runs the compiled Fountain screenplay through 12 sequential revision passes.
+// Wave 134 — The 14-Pass Revision Pipeline
+// Runs the compiled Fountain screenplay through 14 sequential revision passes.
 // Each pass diagnoses a layer, marks weak spots, and rewrites (LLM or stub).
 // Approved spans are threaded through every pass unchanged.
 //
@@ -16,11 +16,14 @@
 // 10. originality      — clichés, generic descriptors
 // 11. payoff           — orphan clues, payoff timing
 // 12. voice            — tonal consistency, register mismatch
+// 13. theme            — theme resonance gaps, unresolved theme in Act 3
+// 14. relationship-arc — static/monotone relationships, idle emotional engine
 
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
-import type { PassResult, ApprovedSpan } from './passes/types.ts';
+import type { PassResult, ApprovedSpan, StoryContext } from './passes/types.ts';
+import { logger } from '../../lib/logger.ts';
 
 import { structurePass }    from './passes/structure.ts';
 import { causalityPass }    from './passes/causality.ts';
@@ -34,6 +37,8 @@ import { pacingPass }       from './passes/pacing.ts';
 import { originalityPass }  from './passes/originality.ts';
 import { payoffPass }       from './passes/payoff.ts';
 import { voicePass }        from './passes/voice.ts';
+import { themePass }        from './passes/theme.ts';
+import { relationshipArcPass } from './passes/relationship-arc.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,41 +89,72 @@ export async function runRevisionPipeline(
   structure: StructureState,
   approvedSpans: ApprovedSpan[] = [],
   onProgress?: (event: RevisionProgressEvent) => void,
+  storyContext?: StoryContext,
 ): Promise<RevisionResult> {
   const originalFountain = compiled.fountain;
-  const { annotations } = compiled;
+  const annotations = compiled.annotations ?? [];
+
+  // Guard: empty fountain means there's nothing to revise. Return early rather than
+  // running 12 passes on an empty string and silently reporting 0 issues found.
+  if (!originalFountain?.trim()) {
+    return {
+      passResults: [], finalFountain: originalFountain ?? '',
+      originalFountain: originalFountain ?? '',
+      totalIssuesFound: 0, passesWithChanges: 0,
+      completedAt: Date.now(),
+    };
+  }
 
   // The passes run sequentially; each receives the output of the prior pass.
-  const passes = [
-    structurePass,
-    causalityPass,
-    intentionPass,
-    beliefPass,
-    conflictPass,
-    characterArcPass,
-    dialoguePass,
-    rhythmPass,
-    pacingPass,
-    originalityPass,
-    payoffPass,
-    voicePass,
+  const passes: Array<{ name: import('./passes/types.ts').PassName; fn: import('./passes/types.ts').RevisionPass }> = [
+    { name: 'structure',     fn: structurePass },
+    { name: 'causality',     fn: causalityPass },
+    { name: 'intention',     fn: intentionPass },
+    { name: 'belief',        fn: beliefPass },
+    { name: 'conflict',      fn: conflictPass },
+    { name: 'character-arc', fn: characterArcPass },
+    { name: 'dialogue',      fn: dialoguePass },
+    { name: 'rhythm',        fn: rhythmPass },
+    { name: 'pacing',        fn: pacingPass },
+    { name: 'originality',   fn: originalityPass },
+    { name: 'payoff',        fn: payoffPass },
+    { name: 'voice',         fn: voicePass },
+    { name: 'theme',         fn: themePass },
+    { name: 'relationship-arc', fn: relationshipArcPass },
   ];
 
   const passResults: PassResult[] = [];
   let currentFountain = originalFountain;
 
   for (let i = 0; i < passes.length; i++) {
-    const result = await passes[i]({
-      fountain: currentFountain,
-      original: originalFountain,
-      annotations,
-      structure,
-      records,
-      approvedSpans,
-    });
-    passResults.push(result);
-    currentFountain = result.revisedFountain;
-    onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
+    const { name, fn } = passes[i];
+    try {
+      let result = await fn({
+        fountain: currentFountain,
+        original: originalFountain,
+        annotations,
+        structure,
+        records,
+        approvedSpans,
+        storyContext,
+        priorPassResults: passResults.length > 0 ? [...passResults] : undefined,
+      });
+      // Guard: if a pass returns empty fountain, keep prior pass output so empty
+      // results don't cascade through the remaining 11 passes.
+      if (result.revisedFountain?.trim()) {
+        currentFountain = result.revisedFountain;
+      } else if (result.revisedFountain !== undefined) {
+        logger.error('revision_pass_empty_fountain', { passName: name, passIndex: i });
+        result = { ...result, revisedFountain: currentFountain, changed: false };
+      }
+      passResults.push(result);
+      onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
+    } catch (err) {
+      logger.error('revision_pass_failed', { passIndex: i, passName: name, error: (err as Error).message });
+      const noopResult: PassResult = { pass: name, issues: [], revisedFountain: currentFountain, changed: false, summary: `Pass skipped due to error` };
+      passResults.push(noopResult);
+      onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: noopResult });
+    }
   }
 
   const totalIssuesFound = passResults.reduce((s, r) => s + r.issues.length, 0);

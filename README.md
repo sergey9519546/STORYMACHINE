@@ -8,7 +8,7 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 ## Run Locally
 
-**Prerequisites:** Node.js 20+
+**Prerequisites:** Node.js 22.6+ (the test suite runs via `node --experimental-strip-types`, and CI pins Node 22)
 
 1. Install dependencies:
    `npm install`

@@ -81,7 +81,8 @@ export class CausalSpine {
     if (lies.length === 0) return [];
 
     const target = this.stage.getAgent(targetId);
-    const targetName = target?.name ?? targetId;
+    if (!target) return [];
+    const targetName = target.name ?? targetId;
     const turnIndex = this.stage.getTurnCount();
 
     const newBeliefs: Belief[] = [];
@@ -258,7 +259,7 @@ export class CausalSpine {
     if (wordsA.size === 0 || wordsB.size === 0) return false;
     let shared = 0;
     for (const w of wordsA) if (wordsB.has(w)) shared++;
-    return shared / Math.min(wordsA.size, wordsB.size) >= 0.6;
+    return shared / Math.min(wordsA.size, wordsB.size) >= 0.75;
   }
 
   // 3. From contradiction edges: resolve WHO was lied to and by whom,
@@ -427,10 +428,16 @@ export class CausalSpine {
       const worstSeverity = Math.max(...edges.map(e => e.severity ?? 0));
       if (worstSeverity >= 75 && discoverer.goalStack) {
         const terminalDesc = discoverer.goalStack.terminal.description;
-        const contradictedText = edges
+        // Test overlap per-belief, not against a concatenation of all beliefs.
+        // Joining them creates a large blob where coincidental word matches across
+        // unrelated beliefs easily exceed the 0.4 threshold, causing spurious threats.
+        const contradictedPropositions = edges
           .map(e => allBeliefs.find(b => b.id === e.from_belief_id)?.proposition ?? '')
-          .join(' ');
-        if (this._overlap(contradictedText, terminalDesc)) {
+          .filter(Boolean);
+        const threatensTerminal = contradictedPropositions.some(
+          prop => this._overlap(prop, terminalDesc),
+        );
+        if (threatensTerminal) {
           const threatenedMutation: GoalMutation = {
             mutation_id: randomUUID(),
             char_id: discoverer_id,

@@ -8,7 +8,9 @@ import { AppraisalEngine } from './AppraisalEngine.ts';
 import { logger } from '../lib/logger.ts';
 // Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
 import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
-import { buildNarrativeState } from '../nvm/state/NarrativeState.ts';
+import { buildNarrativeState, emptyState } from '../nvm/state/NarrativeState.ts';
+import type { NarrativeState } from '../nvm/state/NarrativeState.ts';
+import { applyStoryOps } from '../nvm/ops/dispatcher.ts';
 
 // Events streamed to clients via SSE during a runRoomSimulation call.
 export type RoomProgressEvent =
@@ -26,6 +28,9 @@ export class Orchestrator {
   private locationMap: Map<string, Location> = new Map();
   // Wave 32: tracks the most-recent StoryCommit ID so parent chains are correct.
   private _lastCommitId: string | null = null;
+  // Wave 43: running NarrativeState accumulated from committed ops so the proof
+  // gate sees prior facts/clocks/relationships, not just the current IR's ops.
+  private _narrativeState: NarrativeState = emptyState();
 
   constructor(stage: Stage) {
     this.stage = stage;
@@ -45,6 +50,11 @@ export class Orchestrator {
     const existingCommits = this.stage.getCommits();
     if (existingCommits.length > 0) {
       this._lastCommitId = existingCommits[existingCommits.length - 1].commitId;
+    }
+    // Wave 43: fold existing commits into _narrativeState so the proof gate
+    // sees prior facts/clocks/relationships on every subsequent turn.
+    for (const c of existingCommits) {
+      this._narrativeState = applyStoryOps(this._narrativeState, c.ops);
     }
   }
 
@@ -97,7 +107,9 @@ export class Orchestrator {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error('Agent not found');
 
-    const currentNodeId = this.stage.getAgent(agentId)!.current_location_id;
+    const _stageAgent = this.stage.getAgent(agentId);
+    if (!_stageAgent) throw new Error(`Agent ${agentId} missing from stage`);
+    const currentNodeId = _stageAgent.current_location_id;
     const action = await agent.takeTurn();
 
     if (action.action_type === 'RELOCATE' && action.target) {
@@ -143,8 +155,12 @@ export class Orchestrator {
             contradicted_propositions: revealedBeliefs.map(b => b.proposition),
             source_event_id: action_id,
           };
-          this._runSpineForUpdate(revealUpdate, action_id, currentNodeId);
-          this.appraiser.appraise(revealUpdate);
+          try {
+            this._runSpineForUpdate(revealUpdate, action_id, currentNodeId);
+            this.appraiser.appraise(revealUpdate);
+          } catch (err) {
+            logger.warn('spine_reveal_failed', { agentId, error: (err as Error).message });
+          }
         }
       }
     }
@@ -152,8 +168,12 @@ export class Orchestrator {
     // Update the acting agent's epistemic state and run spine
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
     const update = await agent.updateEpistemics(recentActions);
-    this._runSpineForUpdate(update, action_id, currentNodeId);
-    this.appraiser.appraise(update);
+    try {
+      this._runSpineForUpdate(update, action_id, currentNodeId);
+      this.appraiser.appraise(update);
+    } catch (err) {
+      logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
+    }
 
     // ── Director evaluation ──
     // Single turns run the full Director pass (perspective evaluation, illusion-state
@@ -162,15 +182,31 @@ export class Orchestrator {
     const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
     const directorUpdates = await this.director.evaluateRoom(currentNodeId, roomActions);
     for (const u of directorUpdates) {
-      this._runSpineForUpdate(u, action_id, currentNodeId);
-      this.appraiser.appraise(u);
+      try {
+        this._runSpineForUpdate(u, action_id, currentNodeId);
+        this.appraiser.appraise(u);
+      } catch (err) {
+        logger.warn('spine_director_failed', { agentId, error: (err as Error).message });
+      }
     }
     this.appraiser.applyContagion(currentNodeId);
 
     // ── Wave 32: bridge action → StoryOp[] → StoryCommit (canon ledger) ────────
     // Snapshot the narrative state BEFORE the commit so the proof kernel can
     // verify preconditions against the pre-turn world.
-    const beforeState = buildNarrativeState(this.stage);
+    // Wave 43: use running _narrativeState (accumulated ops) so prior facts/
+    // clocks/relationships are visible to the proof gate (not just DB beliefs).
+    const beforeState: NarrativeState = {
+      ...this._narrativeState,
+      ...(() => {
+        const db = buildNarrativeState(this.stage);
+        return {
+          characterBeliefs:  { ...this._narrativeState.characterBeliefs,  ...db.characterBeliefs },
+          characterEmotions: { ...this._narrativeState.characterEmotions, ...db.characterEmotions },
+        };
+      })(),
+      turn: this.stage.getTurnCount(),
+    };
     const card = action.action_type !== 'WAIT'
       ? (this.stage.getEventCard(action_id) ?? null)
       : null;
@@ -187,6 +223,8 @@ export class Orchestrator {
     if (commit) {
       this.stage.appendCommit(commit);
       this._lastCommitId = commit.commitId;
+      // Wave 43: advance running state so next turn sees this commit's ops.
+      this._narrativeState = applyStoryOps(this._narrativeState, commit.ops);
     }
 
     return action;
@@ -234,7 +272,13 @@ export class Orchestrator {
         if (currentSheet?.is_alive === false) continue;
 
         logger.debug('agent_turn', { agent: currentSheet.name, location_id });
-        const action = await agent.takeTurn();
+        let action: import('./types.ts').NarrativeAction;
+        try {
+          action = await agent.takeTurn();
+        } catch (takeTurnErr) {
+          logger.warn('agent_take_turn_failed', { agent: currentSheet.name, error: (takeTurnErr as Error).message });
+          action = { action_type: 'WAIT', content: '(waits)', target: null };
+        }
         onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
 
         if (action.action_type === 'RELOCATE' && action.target) {
@@ -279,9 +323,9 @@ export class Orchestrator {
         if (action.action_type === 'LIE' && !incitingActionEmitted) {
           incitingActionEmitted = true;
           const liar = this.stage.getAgent(agentSheet.char_id);
-          const witnesses = this.spine.resolveVisibility(actionEntry,
+          const witnesses = (this.spine.resolveVisibility(actionEntry,
             this.stage.getAllAgents().map(a => ({ char_id: a.char_id, current_location_id: a.current_location_id })),
-          ).filter(id => id !== agentSheet.char_id);
+          ) ?? []).filter(id => id !== agentSheet.char_id);
           this.spine.createBeatTrace({
             triggerEventId: action_id,
             beatType: 'inciting_action',
@@ -329,16 +373,25 @@ export class Orchestrator {
         const epistemicUpdates: import('./types.ts').EpistemicUpdate[] = [];
         for (const sheet of agentsInRoom) {
           const agent = this.agents.get(sheet.char_id);
-          if (agent) epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+          if (!agent) continue;
+          try {
+            epistemicUpdates.push(await agent.updateEpistemics(recentActions));
+          } catch (epistemicsErr) {
+            logger.warn('agent_epistemics_failed', { agent: sheet.char_id, error: (epistemicsErr as Error).message });
+          }
         }
         for (const update of epistemicUpdates) {
-          this._runSpineForUpdate(update, lastActionId, location_id);
-          this.appraiser.appraise(update);
+          try {
+            this._runSpineForUpdate(update, lastActionId, location_id);
+            this.appraiser.appraise(update);
+          } catch (spineErr) {
+            logger.warn('epistemic_spine_appraise_error', { location_id, error: (spineErr as Error).message });
+          }
         }
         // Record persuasion outcomes: success when target's suspicion decreased
         const currentTurn = this.stage.getTurnCount();
         for (const agent of agentsInRoom) {
-          const log = this.stage.getPersuasionLog(agent.char_id, agentsInRoom.length * 2);
+          const log = this.stage.getPersuasionLog(agent.char_id, agentsInRoom.length * 2) ?? [];
           for (const rec of log.filter(r => r.turn === currentTurn && r.success === undefined)) {
             const target = this.stage.getAgent(rec.target_id);
             if (!target) continue;
@@ -354,7 +407,17 @@ export class Orchestrator {
         const lastEntry = this.stage.getActionById(lastActionId);
         if (lastEntry) {
           const roundCard = this.stage.getEventCard(lastActionId) ?? null;
-          const beforeStateRoom = buildNarrativeState(this.stage);
+          const beforeStateRoom: NarrativeState = {
+            ...this._narrativeState,
+            ...(() => {
+              const db = buildNarrativeState(this.stage);
+              return {
+                characterBeliefs:  { ...this._narrativeState.characterBeliefs,  ...db.characterBeliefs },
+                characterEmotions: { ...this._narrativeState.characterEmotions, ...db.characterEmotions },
+              };
+            })(),
+            turn: this.stage.getTurnCount(),
+          };
           const [primaryUp, ...extraUps] = epistemicUpdates;
           if (primaryUp) {
             const roundCommit = buildTurnCommit({
@@ -370,6 +433,8 @@ export class Orchestrator {
             if (roundCommit) {
               this.stage.appendCommit(roundCommit);
               this._lastCommitId = roundCommit.commitId;
+              // Wave 43: advance running state so next round sees this commit.
+              this._narrativeState = applyStoryOps(this._narrativeState, roundCommit.ops);
             }
           }
         }
@@ -386,12 +451,15 @@ export class Orchestrator {
 
       // ── Climax detection: emit a revelation beat and stop ──
       if (this._isClimaxReached(location_id)) {
-        const lastId = lastActionId || agentsInRoom[0]?.char_id || '';
+        if (!lastActionId) {
+          logger.warn('climax_no_trigger_action', { location_id });
+          break;
+        }
         this.spine.createBeatTrace({
-          triggerEventId: lastId,
+          triggerEventId: lastActionId,
           beatType: 'revelation',
           participants: agentsInRoom.map(a => a.char_id),
-          causalChain: [lastId],
+          causalChain: [lastActionId],
           locationId: location_id,
           narrativeSummary: 'The illusion has collapsed. Every contradiction has detonated. This is the Prestige.',
           fountainHint: 'HOLD on the faces. Everything has changed. The audience finally understands.',
@@ -414,16 +482,24 @@ export class Orchestrator {
     const directorUpdates = await this.director.evaluateRoom(location_id, allActions);
     const lastActionId = allActions[allActions.length - 1]?.action_id ?? '';
     for (const update of directorUpdates) {
-      this._runSpineForUpdate(update, lastActionId, location_id);
-      this.appraiser.appraise(update);
+      try {
+        this._runSpineForUpdate(update, lastActionId, location_id);
+        this.appraiser.appraise(update);
+      } catch (dirErr) {
+        logger.warn('director_spine_appraise_error', { location_id, error: (dirErr as Error).message });
+      }
     }
     onProgress?.({ type: 'director_eval', totalTurns: turnCount });
 
     // ── OCC contagion: emotions diffuse between co-present agents ──
-    this.appraiser.applyContagion(location_id);
-    // Suspicion contagion: distressed/fearful agents raise others' suspicion,
-    // weighted by distrust. Runs after Director updates to layer on top correctly.
-    this.appraiser.applySuspicionContagion(location_id);
+    try {
+      this.appraiser.applyContagion(location_id);
+      // Suspicion contagion: distressed/fearful agents raise others' suspicion,
+      // weighted by distrust. Runs after Director updates to layer on top correctly.
+      this.appraiser.applySuspicionContagion(location_id);
+    } catch (contagionErr) {
+      logger.warn('contagion_error', { location_id, error: (contagionErr as Error).message });
+    }
 
     onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
   }
@@ -455,8 +531,8 @@ export class Orchestrator {
         const agentsA = this.stage.getAgentsInLocation(a).filter(x => x.is_alive !== false);
         const agentsB = this.stage.getAgentsInLocation(b).filter(x => x.is_alive !== false);
         // Primary key: accumulated suspicion in the room (higher → more urgent)
-        const suspA = agentsA.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
-        const suspB = agentsB.reduce((s, ag) => s + (ag.suspicion_score ?? 0), 0);
+        const suspA = agentsA.reduce((s, ag) => s + (isFinite(ag.suspicion_score) ? ag.suspicion_score : 0), 0);
+        const suspB = agentsB.reduce((s, ag) => s + (isFinite(ag.suspicion_score) ? ag.suspicion_score : 0), 0);
         if (suspB !== suspA) return suspB - suspA;
         // Secondary key: number of agents (more agents → more narrative potential)
         if (agentsB.length !== agentsA.length) return agentsB.length - agentsA.length;

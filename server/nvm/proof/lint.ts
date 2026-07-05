@@ -89,5 +89,88 @@ export function lint(ir: NarrativeTransitionIR, _state: NarrativeState): LintWar
     });
   }
 
+  // Rule 7: Cognition-emotion mismatch — a character asserts high certainty (confidence
+  // > 0.85) while simultaneously feeling shame or distress (intensity > 60).
+  // This often signals disconnected psychological portrayal: the model wrote the belief
+  // and the emotion independently without integrating them. Suppress if a bridging
+  // SHIFT_RELATIONSHIP or PAYOFF_SETUP appears between the two ops (earned complexity).
+  const SHAME_EMOTIONS = new Set(['shame', 'distress']);
+  const charHighConfidenceBeliefAt = new Map<string, number>(); // charId → opIdx
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'UPDATE_BELIEF' && op.belief.confidence > 0.85) {
+      charHighConfidenceBeliefAt.set(op.charId, i);
+    }
+    if (op.op === 'APPRAISE_EMOTION' && SHAME_EMOTIONS.has(op.emotion.dominant) && op.emotion.intensity > 60) {
+      const beliefIdx = charHighConfidenceBeliefAt.get(op.charId);
+      if (beliefIdx !== undefined) {
+        // Check if a bridging event (SHIFT_RELATIONSHIP or PAYOFF_SETUP) appears between the two
+        const hasBridging = ir.ops.slice(beliefIdx + 1, i).some(
+          b => b.op === 'SHIFT_RELATIONSHIP' || b.op === 'PAYOFF_SETUP',
+        );
+        if (!hasBridging) {
+          warnings.push({
+            opIdx: i, op: op.op, rule: 'COGNITION_EMOTION_MISMATCH',
+            message: `${op.charId} asserts high confidence (>85%) but simultaneously feels ${op.emotion.dominant}(${op.emotion.intensity}) — disconnected psychological portrayal`,
+            severity: 'info',
+          });
+        }
+      }
+    }
+  });
+
+  // Rule 8: RAISE_CLOCK with amount ≤ 0 is either a no-op (0) or a clock defuse (negative).
+  // Zero-amount raises change nothing in state and waste an op slot; flag as info.
+  // Negative amounts are architecturally valid (defusing a clock) but unusual enough to flag.
+  ir.ops.forEach((op, i) => {
+    if (op.op === 'RAISE_CLOCK' && op.amount <= 0) {
+      warnings.push({
+        opIdx: i, op: op.op, rule: 'NOOP_CLOCK_RAISE',
+        message: `RAISE_CLOCK "${op.clockId}" amount=${op.amount} — ${op.amount === 0 ? 'zero-amount is a no-op (removes the op or use a positive amount)' : 'negative amount defuses the clock; verify this is intentional'}`,
+        severity: 'info',
+      });
+    }
+  });
+
+  // Rule 9: genre-aware tension / tone / mystery contracts
+  const genre = _state.authorIntent.genre;
+  if (genre) {
+    // Horror / thriller require meaningful suspense by scene 3
+    if ((genre === 'horror' || genre === 'thriller') && ir.sceneIdx >= 3 && _state.audienceState.suspense < 25) {
+      warnings.push({
+        opIdx: null, op: 'UPDATE_READER_STATE', rule: 'GENRE_SUSPENSE_FLOOR',
+        message: `${genre} story: audience suspense is ${_state.audienceState.suspense}/100 at scene ${ir.sceneIdx} — ${genre} contract requires meaningful tension by scene 3; use RAISE_CLOCK or SHIFT_RELATIONSHIP to escalate`,
+        severity: 'warn',
+      });
+    }
+
+    // Mystery requires at least one planted clue by scene 2
+    if (genre === 'mystery' && ir.sceneIdx >= 2) {
+      const hasSeedClueInIR = ir.ops.some(op => op.op === 'SEED_CLUE');
+      const hasClueInState = _state.clues.length > 0;
+      if (!hasSeedClueInIR && !hasClueInState) {
+        warnings.push({
+          opIdx: null, op: 'SEED_CLUE', rule: 'GENRE_MYSTERY_NO_CLUES',
+          message: `mystery story: no clues planted by scene ${ir.sceneIdx} — mystery contract requires at least one SEED_CLUE before the investigation can begin`,
+          severity: 'warn',
+        });
+      }
+    }
+
+    // Comedy requires at least one positive emotional beat per scene after scene 1
+    if (genre === 'comedy' && ir.sceneIdx >= 2) {
+      const POSITIVE_COMEDY = new Set(['joy', 'relief', 'admiration', 'trust']);
+      const hasPositiveEmotion = ir.ops.some(op =>
+        op.op === 'APPRAISE_EMOTION' && POSITIVE_COMEDY.has(op.emotion.dominant),
+      );
+      if (!hasPositiveEmotion) {
+        warnings.push({
+          opIdx: null, op: 'APPRAISE_EMOTION', rule: 'GENRE_COMEDY_TONE_DRIFT',
+          message: `comedy story: scene ${ir.sceneIdx} has no positive emotional beat (joy, relief, admiration, trust) — comedy loses its tonal contract without at least one lightness beat per scene`,
+          severity: 'info',
+        });
+      }
+    }
+  }
+
   return warnings;
 }

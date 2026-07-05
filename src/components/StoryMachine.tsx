@@ -24,6 +24,7 @@ import { CorpusPanel } from "./CorpusPanel";
 import { ArcTimelinePanel } from "./ArcTimelinePanel";
 import { ArcPlannerPanel } from "./ArcPlannerPanel";
 import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
+import { NarrativeAnalyticsPanel } from "./NarrativeAnalyticsPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
 import { SelfPlayPanel } from "./SelfPlayPanel";
@@ -129,6 +130,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showCharacterArc, setShowCharacterArc] = useState(false);
   const [showRegression, setShowRegression]     = useState(false);
   const [showMomentum, setShowMomentum]         = useState(false);
+  const [showAnalytics, setShowAnalytics]       = useState(false);
   const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
   const [showLivePlay, setShowLivePlay]         = useState(false);
   const [showRevision, setShowRevision]         = useState(false);
@@ -137,8 +139,10 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     try {
       const res = await fetch("/api/dramatic-pressure-all");
       if (res.ok && mountedRef.current) setActivePressures(await res.json() as Array<{ char_id: string; pressures: DramaticPressure[] }>);
-    } catch { /* non-critical background fetch */ }
-  }, []);
+    } catch (err) {
+      if (mountedRef.current) showError(`Dramatic pressure fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [showError]);
 
   // Close any in-flight SSE connection and mark unmounted
   useEffect(() => () => {
@@ -154,17 +158,28 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchActivePressures();
   }, [fetchActivePressures]);
 
+  // C5: unified fetch-failure notifier — shows a toast only when the component
+  // is still mounted (suppresses spurious errors fired during unmount).
+  const notifyFetchFailure = useCallback((endpoint: string, err: unknown) => {
+    if (!mountedRef.current) return; // unmounting — not a user-visible error
+    const msg = err instanceof Error ? err.message : String(err);
+    showError(`Background fetch failed (${endpoint}): ${msg}`);
+  }, [showError]);
+
   const fetchPersuasionLog = useCallback(async (agentIds: string[]) => {
-    const entries = await Promise.all(
-      agentIds.map(id =>
-        fetch(`/api/persuasion/${id}`).then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
-      )
-    );
-    if (!mountedRef.current) return;
-    const map: Record<string, PersuasionRecord[]> = {};
-    agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
-    setPersuasionLog(map);
-  }, []);
+    try {
+      const entries = await Promise.all(
+        agentIds.map(id =>
+          fetch(`/api/persuasion/${id}`)
+            .then(r => r.ok ? r.json() as Promise<PersuasionRecord[]> : [])
+        )
+      );
+      if (!mountedRef.current) return;
+      const map: Record<string, PersuasionRecord[]> = {};
+      agentIds.forEach((id, i) => { map[id] = entries[i] ?? []; });
+      setPersuasionLog(map);
+    } catch (err) { notifyFetchFailure('/api/persuasion', err); }
+  }, [notifyFetchFailure]);
 
   useEffect(() => {
     ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -236,6 +251,11 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     try {
       // Reset first so a new scenario never inherits stale agents/ledger from a
       // prior session (sessions now persist to disk between server restarts).
+      // Clear stale client state immediately so the UI doesn't show prior session data
+      // while the server is resetting.
+      setPersuasionLog({});
+      setActivePressures([]);
+      setStreamLog([]);
       const resetRes = await fetch("/api/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -330,6 +350,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   };
 
   const handleRunRoom = async (nodeId: string) => {
+    if (loading) return;  // prevent double-click from spawning concurrent SSE streams
     evtSourceRef.current?.close();
     setLoading(true);
     setStreamLog([]);
@@ -398,6 +419,52 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       setIsExporting(false);
     }
   }, [ledger.length, onExportToIDE, syuzhetMode, showError]);
+
+  // P6: export a single character's full memory bundle (beliefs, relationships,
+  // goal/arc history) as portable JSON for reuse across stories.
+  const handleExportCharacter = useCallback(async (charId: string, name: string) => {
+    try {
+      const res = await fetch('/api/characters/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ charId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `Export failed: ${res.status}` }));
+        throw new Error(body.error ?? `Export failed: ${res.status}`);
+      }
+      const bundle = await res.json();
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `character-${name.replace(/[^A-Za-z0-9_-]/g, '_') || charId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showError((e as Error).message ?? 'Character export failed.');
+    }
+  }, [showError]);
+
+  // P6: import a previously-exported character memory bundle into this story.
+  const handleImportCharacter = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      const bundle = JSON.parse(text);
+      const res = await fetch('/api/characters/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: `Import failed: ${res.status}` }));
+        throw new Error(body.error ?? `Import failed: ${res.status}`);
+      }
+      await refreshAll();
+    } catch (e) {
+      showError((e as Error).message ?? 'Character import failed (invalid bundle?).');
+    }
+  }, [refreshAll, showError]);
 
   const illusionColor =
     illusionState?.phase === "Prestige" ? "#FF4444"
@@ -615,6 +682,14 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <span className="hidden sm:inline">Momentum</span>
           </button>
           <button
+            onClick={() => setShowAnalytics(true)}
+            title="Narrative Analytics — tension ledger, story-shape archetype fit, and first-watch vs rewatch scoring"
+            className="bg-orange-950 hover:bg-orange-800 text-orange-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <span style={{ fontSize: 14 }}>🔬</span>
+            <span className="hidden sm:inline">Analytics</span>
+          </button>
+          <button
             onClick={() => setShowVoiceDNA(true)}
             title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
             className="bg-indigo-950 hover:bg-indigo-800 text-indigo-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
@@ -703,9 +778,27 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           </section>
 
           <section>
-            <h2 className="text-xl font-bold mb-4 uppercase text-black border-b-2 border-black pb-2">
-              Agents
-            </h2>
+            <div className="flex justify-between items-center mb-4 border-b-2 border-black pb-2">
+              <h2 className="text-xl font-bold uppercase text-black">
+                Agents
+              </h2>
+              <label
+                title="Import a character memory bundle (JSON) exported from another story"
+                className="text-[10px] font-bold uppercase tracking-widest cursor-pointer border-2 border-black px-2 py-1 hover:bg-black hover:text-white transition-colors"
+              >
+                ⬆ Import Memory
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleImportCharacter(f);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
             <div className="space-y-4">
               {agents.map((agent) => {
                 const isExpanded = expandedAgent === agent.char_id;
@@ -731,6 +824,13 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                         <span className="text-[10px] bg-black text-white px-2 py-1 uppercase font-bold tracking-widest">
                           {nodes.find(n => n.location_id === agent.current_location_id)?.name || agent.current_location_id}
                         </span>
+                        <button
+                          onClick={() => handleExportCharacter(agent.char_id, agent.name)}
+                          title="Export character memory bundle (beliefs, relationships, arc history) as JSON"
+                          className="p-1 border-2 border-black hover:bg-black hover:text-white transition-colors"
+                        >
+                          <FileDown className="w-3 h-3" />
+                        </button>
                         <button
                           onClick={() => setExpandedAgent(isExpanded ? null : agent.char_id)}
                           title="Toggle belief graph"
@@ -772,9 +872,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                             <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase ${EMOTION_COLOR[agent.emotionState.dominant]}`}>
                               {agent.emotionState.dominant} {agent.emotionState.intensity}/100
                             </span>
-                            {agent.emotionState.anger_target_id && (
+                            {agent.emotionState?.anger_target_id && (
                               <span className="text-[9px] text-[#FF4444] font-bold uppercase">
-                                → {agents.find(a => a.char_id === agent.emotionState!.anger_target_id)?.name ?? '?'}
+                                → {agents.find(a => a.char_id === agent.emotionState?.anger_target_id)?.name ?? '?'}
                               </span>
                             )}
                             {/* mini emotion bars */}
@@ -1291,6 +1391,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       {showRegression && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
           <RegressionPanel onClose={() => setShowRegression(false)} />
+        </div>
+      )}
+
+      {showAnalytics && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <NarrativeAnalyticsPanel onClose={() => setShowAnalytics(false)} />
         </div>
       )}
 

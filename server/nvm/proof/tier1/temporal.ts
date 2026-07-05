@@ -17,7 +17,13 @@ export function temporalProof(ir: NarrativeTransitionIR, state: NarrativeState):
   for (const op of ir.ops) {
     if (op.op !== 'EXPIRE_FACT') continue;
     const added = addedAtTurn.get(op.factId);
-    if (added !== undefined && op.atTurn < added) {
+    if (added === undefined) {
+      findings.push({
+        proof: 'TemporalProof', severity: 'block',
+        message: `EXPIRE_FACT ${op.factId} references a fact that was never added`,
+        subjectId: op.factId,
+      });
+    } else if (op.atTurn < added) {
       findings.push({
         proof: 'TemporalProof', severity: 'block',
         message: `EXPIRE_FACT ${op.factId} at turn ${op.atTurn} precedes its ADD_FACT turn ${added}`,

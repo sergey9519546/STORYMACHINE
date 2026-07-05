@@ -279,7 +279,7 @@ const CLOCK_RESOLVED: NarrativeInvariant = {
     if (clockOps.length === 0) return result(this, 'na', 'No clocks in story.');
     const clockTotals: Record<string, number> = {};
     for (const { op } of clockOps) {
-      clockTotals[op.clockId] = (clockTotals[op.clockId] ?? 0) + op.amount;
+      clockTotals[op.clockId] = (clockTotals[op.clockId] ?? 0) + (isFinite(op.amount) ? op.amount : 0);
     }
     const runaway = Object.entries(clockTotals).filter(([, total]) => total > 3);
     if (runaway.length === 0) return result(this, 'pass', 'All clocks are being counted down.');
@@ -302,11 +302,49 @@ const TENSION_ARC_EXISTS: NarrativeInvariant = {
     for (const { sceneIdx, op } of emos) {
       sceneIntensity[sceneIdx] = Math.max(sceneIntensity[sceneIdx] ?? 0, op.emotion.intensity ?? 0);
     }
-    const values = Object.values(sceneIntensity);
+    const values = Object.values(sceneIntensity).filter(v => isFinite(v));
+    if (values.length === 0) return result(this, 'warning', 'No finite intensity values in APPRAISE_EMOTION ops.');
     const range = Math.max(...values) - Math.min(...values);
     if (range >= 3) return result(this, 'pass', `Emotional intensity ranges ${Math.min(...values)}–${Math.max(...values)} — strong tension arc.`);
     if (range >= 1) return result(this, 'warning', `Emotional intensity range is ${range}. Expand peaks and valleys for a more dynamic arc.`);
     return result(this, 'fail', 'Emotional intensity is flat across all scenes. Story has no tension arc.');
+  },
+};
+
+const BELIEF_REVERSAL: NarrativeInvariant = {
+  id: 'BELIEF_REVERSAL',
+  name: 'Belief Reversal',
+  category: 'character',
+  description: 'A compelling story has characters who change their minds. At least one character should update the same belief proposition with a confidence shift ≥ 0.35.',
+  check(commits) {
+    if (commits.length < 3) return result(this, 'na', 'Fewer than 3 scenes — checking later.');
+    const beliefOps = opsOfKind(commits, 'UPDATE_BELIEF');
+    if (beliefOps.length < 2) return result(this, 'warning', 'Too few belief updates to assess belief reversals.');
+
+    // Group by charId + proposition prefix (first 40 chars to handle paraphrases)
+    const byKey: Record<string, Array<{ sceneIdx: number; confidence: number }>> = {};
+    for (const { sceneIdx, op } of beliefOps) {
+      const key = `${op.charId}::${op.belief.proposition.toLowerCase().slice(0, 40)}`;
+      (byKey[key] ??= []).push({ sceneIdx, confidence: op.belief.confidence });
+    }
+
+    // Look for any key with 2+ entries where confidence shifts by ≥ 0.35
+    for (const entries of Object.values(byKey)) {
+      if (entries.length < 2) continue;
+      const sorted = entries.slice().sort((a, b) => a.sceneIdx - b.sceneIdx);
+      for (let i = 1; i < sorted.length; i++) {
+        const delta = Math.abs(sorted[i].confidence - sorted[i - 1].confidence);
+        if (isFinite(delta) && delta >= 0.35) {
+          return result(this, 'pass', 'At least one character has undergone a significant belief reversal.');
+        }
+      }
+    }
+
+    if (commits.length >= 5) {
+      return result(this, 'warning',
+        'No belief reversals detected after 5+ scenes. Characters who never change their minds are less compelling.');
+    }
+    return result(this, 'pass', 'Story still in early scenes — belief reversals expected as it develops.');
   },
 };
 
@@ -326,6 +364,29 @@ const PROPP_COMPLICATION_EXISTS: NarrativeInvariant = {
   },
 };
 
+const THEME_ARGUMENT_PROGRESSES: NarrativeInvariant = {
+  id: 'THEME_ARGUMENT_PROGRESSES',
+  name: 'Theme Argument Progresses',
+  category: 'theme',
+  description: 'Stories without a developing theme argument feel hollow. At least one ADVANCE_THEME_ARGUMENT should appear by scene 4.',
+  check(commits) {
+    if (commits.length < 4) return result(this, 'na', 'Fewer than 4 scenes — theme development not yet expected.');
+    const themeOps = opsOfKind(commits, 'ADVANCE_THEME_ARGUMENT');
+    if (themeOps.length > 0) {
+      const moves = new Set(themeOps.map(t => t.op.move));
+      if (moves.has('resolve')) {
+        return result(this, 'pass', `Theme resolved after ${themeOps.length} argument move(s).`);
+      }
+      return result(this, 'pass', `Theme is developing with ${themeOps.length} move(s) [${[...moves].join(', ')}].`);
+    }
+    const sceneCount = maxScene(commits) + 1;
+    if (sceneCount >= 6) {
+      return result(this, 'fail', `${sceneCount} scenes with zero theme argument moves. Stories without a developing theme lack emotional stakes.`);
+    }
+    return result(this, 'warning', `${sceneCount} scenes with no ADVANCE_THEME_ARGUMENT. Introduce a thematic claim soon.`);
+  },
+};
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export const ALL_INVARIANTS: NarrativeInvariant[] = [
@@ -339,6 +400,7 @@ export const ALL_INVARIANTS: NarrativeInvariant[] = [
   EMOTIONAL_JOURNEY,
   RELATIONSHIP_ARC_EXISTS,
   CHARACTER_AGENCY_SPREAD,
+  BELIEF_REVERSAL,
   // Clues
   CLUE_BEFORE_PAYOFF,
   CLUE_PLANTED_BY_MIDPOINT,
@@ -348,4 +410,5 @@ export const ALL_INVARIANTS: NarrativeInvariant[] = [
   TENSION_ARC_EXISTS,
   // Theme
   THEME_SUPPORTED_BEFORE_RESOLVED,
+  THEME_ARGUMENT_PROGRESSES,
 ];

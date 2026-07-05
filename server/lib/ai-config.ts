@@ -8,6 +8,7 @@ import {
   geminiEmbeddingProvider, geminiImageProvider, geminiTTSProvider,
   noopImageProvider, noopTTSProvider, noopEmbeddingProvider,
 } from '../engine/ai.ts';
+import { logger } from './logger.ts';
 import {
   makeOpenAICompatLLMProvider,
   makeOpenAICompatEmbeddingProvider,
@@ -142,7 +143,7 @@ const VALID_MEDIA_PROVIDERS: readonly string[] = ['gemini', 'openai-compat', 'no
 
 function warnInvalidProvider(envVar: string, value: string | undefined, valid: readonly string[]): void {
   if (value !== undefined && !valid.includes(value)) {
-    console.warn(`[ai-config] Unknown ${envVar}="${value}" — falling back to "gemini". Valid values: ${valid.join(', ')}`);
+    logger.warn('ai_config_invalid_provider', { envVar, value, valid: valid.join(', ') });
   }
 }
 

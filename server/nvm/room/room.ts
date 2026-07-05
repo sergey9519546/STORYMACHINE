@@ -35,6 +35,7 @@ import { continuityCritic } from './critics/continuity.ts';
 import { characterAdvocateCritic } from './critics/character-advocate.ts';
 import { studioNoteCritic } from './critics/studio-note.ts';
 import { dramaturgeCritic } from './critics/dramaturge.ts';
+import { logger } from '../../lib/logger.ts';
 
 export type CriticFn = (
   ir: NarrativeTransitionIR,
@@ -56,17 +57,41 @@ export function runWritersRoom(
 ): WritersRoomResult {
   const allCritiques: Critique[] = [];
 
-  // Each critic inspects and bids
-  for (const { fn } of CRITICS) {
-    const c = fn(ir, state);
-    allCritiques.push(...c);
+  // Each critic inspects and bids — isolated so one crash can't silence others
+  for (const { id, fn } of CRITICS) {
+    try {
+      const c = fn(ir, state);
+      allCritiques.push(...c);
+    } catch (err) {
+      logger.error('critics_error', { criticId: id, error: (err as Error).message });
+    }
   }
 
-  // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed
+  // De-duplicate: if two critics raise the same objection text, keep only the
+  // highest-severity one to avoid inflating scores and confusing transcripts.
+  const seenObjections = new Map<string, number>();
+  const dedupedCritiques: Critique[] = [];
+  for (const c of allCritiques) {
+    const key = c.objection.slice(0, 120);
+    const idx = seenObjections.get(key);
+    if (idx === undefined) {
+      seenObjections.set(key, dedupedCritiques.length);
+      dedupedCritiques.push(c);
+    } else if (c.severity > (dedupedCritiques[idx]?.severity ?? 0)) {
+      dedupedCritiques[idx] = c; // replace with higher-severity version
+    }
+  }
+  allCritiques.length = 0;
+  allCritiques.push(...dedupedCritiques);
+
+  // Consensus: 100 if all critics agree (all same severity bucket), 0 if maximally opposed.
+  // Use spread only when array is non-empty — the empty case is already handled by the ternary.
+  // Adding 0 to Math.min/max would artificially anchor minSev at 0, making unanimous high-severity
+  // critiques look like low consensus (e.g., all at 70 → range 70 → consensus 30 instead of 100).
   const severities = allCritiques.map(c => c.severity);
-  const maxSev = Math.max(...severities, 0);
-  const minSev = Math.min(...severities, 0);
-  const consensus = allCritiques.length === 0 ? 100 : Math.round(100 - (maxSev - minSev));
+  const maxSev = severities.length > 0 ? Math.max(...severities) : 0;
+  const minSev = severities.length > 0 ? Math.min(...severities) : 0;
+  const consensus = allCritiques.length === 0 ? 100 : Math.max(0, Math.round(100 - (maxSev - minSev)));
 
   // Dominant critic: highest total attentionBid
   const bidsBycritic = new Map<string, number>();

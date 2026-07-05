@@ -6,6 +6,7 @@
 import type { NarrativeTransitionIR, SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
 import type { CandidateGenerator, GenerationSpec } from './proof-spec.ts';
+import { logger } from '../../lib/logger.ts';
 
 // ── Structural stub (used when LLM is unavailable) ────────────────────────────
 
@@ -35,30 +36,91 @@ function stubIR(spec: GenerationSpec, idx: number): NarrativeTransitionIR {
 
 function parseOp(raw: Record<string, unknown>): StoryOp | null {
   try {
-    const op = raw['op'] as string;
+    const opStr = raw['op'];
+    if (typeof opStr !== 'string') return null;
+    const op = opStr;
+    const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
     switch (op) {
-      case 'ADD_FACT':
-        return { op, fact: raw['fact'] as StoryOp & { op: 'ADD_FACT' } extends { fact: infer F } ? F : never };
-      case 'UPDATE_BELIEF':
-        return { op, charId: raw['charId'] as string, belief: raw['belief'] as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
-      case 'APPRAISE_EMOTION':
-        return { op, charId: raw['charId'] as string, emotion: raw['emotion'] as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
-      case 'SHIFT_RELATIONSHIP':
-        return { op, pair: raw['pair'] as [string, string], delta: raw['delta'] as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+      case 'ADD_FACT': {
+        const fact = raw['fact'];
+        if (!isObj(fact)) return null;
+        // Validate all required AtomicFact fields
+        if (typeof fact['factId'] !== 'string' ||
+            typeof fact['subject'] !== 'string' ||
+            typeof fact['predicate'] !== 'string' ||
+            typeof fact['object'] !== 'string') return null;
+        const addedAtTurn = typeof fact['addedAtTurn'] === 'number' ? fact['addedAtTurn'] : 0;
+        const validFrom   = typeof fact['validFrom']   === 'number' ? fact['validFrom']   : 0;
+        const validTo     = fact['validTo'] === null ? null : (typeof fact['validTo'] === 'number' ? fact['validTo'] : null);
+        return { op: 'ADD_FACT', fact: {
+          factId: fact['factId'] as string, subject: fact['subject'] as string,
+          predicate: fact['predicate'] as string, object: fact['object'] as string,
+          addedAtTurn, validFrom, validTo,
+        }};
+      }
+      case 'EXPIRE_FACT': {
+        if (typeof raw['factId'] !== 'string') return null;
+        return { op: 'EXPIRE_FACT', factId: raw['factId'], atTurn: typeof raw['atTurn'] === 'number' ? raw['atTurn'] : 0 };
+      }
+      case 'UPDATE_BELIEF': {
+        const belief = raw['belief'];
+        const charId = raw['charId'];
+        if (!isObj(belief) || typeof belief['proposition'] !== 'string' || typeof charId !== 'string') return null;
+        return { op: 'UPDATE_BELIEF', charId, belief: belief as unknown as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
+      }
+      case 'APPRAISE_EMOTION': {
+        const emotion = raw['emotion'];
+        const charId  = raw['charId'];
+        if (!isObj(emotion) || typeof charId !== 'string') return null;
+        return { op: 'APPRAISE_EMOTION', charId, emotion: emotion as unknown as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
+      }
+      case 'SHIFT_RELATIONSHIP': {
+        const pair = raw['pair'];
+        if (!Array.isArray(pair) || pair.length < 2 || typeof pair[0] !== 'string' || typeof pair[1] !== 'string') return null;
+        if (!isObj(raw['delta'])) return null;
+        return { op: 'SHIFT_RELATIONSHIP', pair: pair as [string, string], delta: raw['delta'] as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+      }
+      case 'ADVANCE_OBJECT_ARC': {
+        if (typeof raw['objectId'] !== 'string' || typeof raw['toState'] !== 'string') return null;
+        return { op: 'ADVANCE_OBJECT_ARC', objectId: raw['objectId'], toState: raw['toState'] };
+      }
+      case 'TRIGGER_RULE': {
+        if (typeof raw['mechanismId'] !== 'string' || typeof raw['ruleId'] !== 'string') return null;
+        return { op: 'TRIGGER_RULE', mechanismId: raw['mechanismId'], ruleId: raw['ruleId'] };
+      }
       case 'SEED_CLUE':
-        return { op, clueId: raw['clueId'] as string, carrier: (raw['carrier'] ?? 'object') as StoryOp & { op: 'SEED_CLUE' } extends { carrier: infer C } ? C : never };
+        if (typeof raw['clueId'] !== 'string') return null;
+        return { op, clueId: raw['clueId'], carrier: (raw['carrier'] ?? 'object') as StoryOp & { op: 'SEED_CLUE' } extends { carrier: infer C } ? C : never };
       case 'PAYOFF_SETUP':
-        return { op, setupId: raw['setupId'] as string, payoffEventId: raw['payoffEventId'] as string };
+        if (typeof raw['setupId'] !== 'string' || typeof raw['payoffEventId'] !== 'string') return null;
+        return { op, setupId: raw['setupId'], payoffEventId: raw['payoffEventId'] };
       case 'RAISE_CLOCK':
-        return { op, clockId: raw['clockId'] as string, amount: Number(raw['amount'] ?? 1) };
+        if (typeof raw['clockId'] !== 'string') return null;
+        const rawAmt = raw['amount'];
+        const parsedAmt = typeof rawAmt === 'number' ? rawAmt : (typeof rawAmt === 'string' ? parseFloat(rawAmt) : 1);
+        return { op, clockId: raw['clockId'], amount: isFinite(parsedAmt) ? parsedAmt : 1 };
       case 'ADVANCE_THEME_ARGUMENT':
-        return { op, claimId: raw['claimId'] as string, move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
-      case 'UPDATE_READER_STATE':
-        return { op, delta: raw['delta'] as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+        if (typeof raw['claimId'] !== 'string') return null;
+        return { op, claimId: raw['claimId'], move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
+      case 'UPDATE_READER_STATE': {
+        if (!isObj(raw['delta'])) return null;
+        return { op, delta: raw['delta'] as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+      }
+      case 'RECORD_VISUAL_FACT': {
+        if (typeof raw['fact'] !== 'string') return null;
+        return { op: 'RECORD_VISUAL_FACT', sceneId: String(raw['sceneId'] ?? ''), fact: raw['fact'] };
+      }
+      case 'RECORD_SONIC_FACT': {
+        if (typeof raw['fact'] !== 'string') return null;
+        return { op: 'RECORD_SONIC_FACT', sceneId: String(raw['sceneId'] ?? ''), fact: raw['fact'] };
+      }
       default:
+        // Unknown op kind from the model — drop it. Logged by the caller's
+        // partial-parse counter rather than here (per-op logging would be noisy).
         return null;
     }
-  } catch {
+  } catch (err) {
+    logger.debug('llm_op_parse_error', { message: (err as Error).message });
     return null;
   }
 }
@@ -84,6 +146,7 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
     provenance: { origin: 'model_generated', createdAt: Date.now(), model: 'gemini' },
     causalLinks: Array.isArray(obj['causalLinks'])
       ? (obj['causalLinks'] as Array<{ opIdx: number; causedBy: string[] }>)
+          .filter(link => typeof link.opIdx === 'number' && link.opIdx >= 0 && link.opIdx < ops.length)
       : undefined,
   };
 }
@@ -135,15 +198,25 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
   return async (spec: GenerationSpec, n: number): Promise<NarrativeTransitionIR[]> => {
     // Dynamic import to avoid circular dependency at module load time.
     let provider: import('../../engine/ai.ts').LLMProvider;
-    let getModel: (tier: 'fast' | 'pro') => string;
+    let candidateModel: string;
+    let temperature: number;
     try {
       const ai = await import('../../engine/ai.ts');
       provider = ai.geminiProvider;
-      getModel = ai.getModel;
+      candidateModel = ai.modelForTask('CANDIDATE');
+      // Candidate generation wants high diversity; bias the configured base
+      // temperature upward but never below 0.9 so the proof loop has variety
+      // to select from. Falls back to 0.9 if config is unavailable.
+      temperature = Math.max(0.9, ai.getTemperature());
       // Test that the provider is usable (key present)
       ai.getAI();
-    } catch {
-      // No key or provider unavailable — use stubs
+    } catch (err) {
+      // No key or provider unavailable — use stubs. Log so silent stub
+      // fallback is observable in metrics rather than invisible.
+      logger.warn('llm_generator_unavailable', {
+        sceneIdx: spec.target.sceneIdx,
+        message: (err as Error).message,
+      });
       return Array.from({ length: n }, (_, i) => stubIR(spec, i));
     }
 
@@ -154,19 +227,31 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
       'Each candidate must include: transitionId (unique string), sceneFunction, ops (array of StoryOps),',
       'preconditions (string[]), postconditions (string[]), and optionally causalLinks.',
       '',
-      'StoryOp kinds: ADD_FACT, UPDATE_BELIEF, APPRAISE_EMOTION, SHIFT_RELATIONSHIP,',
-      'SEED_CLUE, PAYOFF_SETUP, RAISE_CLOCK, ADVANCE_THEME_ARGUMENT, UPDATE_READER_STATE.',
-      'Use 3–6 ops per candidate. Include at least one tension-raising op.',
+      'StoryOp kinds and their REQUIRED fields (use exactly these structures):',
+      '  ADD_FACT: {"op":"ADD_FACT","fact":{"factId":"<unique-id>","subject":"<entity>","predicate":"<verb>","object":"<value>","addedAtTurn":' + spec.target.sceneIdx + ',"validFrom":' + spec.target.sceneIdx + ',"validTo":null}}',
+      '  UPDATE_BELIEF: {"op":"UPDATE_BELIEF","charId":"<charId>","belief":{"id":"<unique-id>","proposition":"<what they believe>","confidence":0.8,"source":"witnessed","source_event_id":"<eventId>","acquired_at":' + spec.target.sceneIdx + '}}',
+      '  APPRAISE_EMOTION: {"op":"APPRAISE_EMOTION","charId":"<charId>","emotion":{"joy":0,"distress":70,"anger":0,"fear":0,"pride":0,"shame":0,"dominant":"distress","intensity":70,"last_updated_at":' + spec.target.sceneIdx + '}}',
+      '  SHIFT_RELATIONSHIP: {"op":"SHIFT_RELATIONSHIP","pair":["<charA>","<charB>"],"delta":{"dimension":"trust","amount":-0.3,"reason":"<why it shifted>"}}',
+      '  SEED_CLUE: {"op":"SEED_CLUE","clueId":"<unique-id>","carrier":"line"}',
+      '  PAYOFF_SETUP: {"op":"PAYOFF_SETUP","setupId":"<clueId-from-state>","payoffEventId":"<eventId>"}',
+      '  RAISE_CLOCK: {"op":"RAISE_CLOCK","clockId":"<unique-id>","amount":2}',
+      '  ADVANCE_THEME_ARGUMENT: {"op":"ADVANCE_THEME_ARGUMENT","claimId":"<unique-id>","move":"support"}',
+      '  UPDATE_READER_STATE: {"op":"UPDATE_READER_STATE","delta":{"suspense":15,"curiosity":10}}',
+      '  RECORD_VISUAL_FACT: {"op":"RECORD_VISUAL_FACT","sceneId":"s' + spec.target.sceneIdx + '","fact":"<specific visual detail>"}',
+      '  RECORD_SONIC_FACT: {"op":"RECORD_SONIC_FACT","sceneId":"s' + spec.target.sceneIdx + '","fact":"<specific sound detail>"}',
+      '',
+      'Use 3–6 ops per candidate. Include at least one tension-raising op (RAISE_CLOCK, SHIFT_RELATIONSHIP, or APPRAISE_EMOTION).',
+      'causalLinks: array of {"opIdx": N, "causedBy": [M]} explaining which op caused which.',
     ].join('\n');
 
     try {
       const response = await provider.generate({
-        model: getModel('fast'),
+        model: candidateModel,
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
         config: {
           responseMimeType: 'application/json',
           responseSchema: IR_SCHEMA,
-          temperature: 0.9,
+          temperature,
         },
       });
 
@@ -175,10 +260,27 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
       const rawCandidates = parsed.candidates ?? [];
 
       const irs = rawCandidates.slice(0, n).map((c, i) => parseIR(c, spec, i));
+      // Track how many candidates degraded to stubs (empty/invalid ops) so quality
+      // erosion is visible. parseIR returns a stub when ops parse to empty.
+      const stubbedFromLLM = irs.filter(ir => ir.provenance.model === 'stub').length;
+      if (stubbedFromLLM > 0) {
+        logger.warn('llm_generator_partial_parse', {
+          sceneIdx: spec.target.sceneIdx,
+          requested: n,
+          returned: rawCandidates.length,
+          stubbed: stubbedFromLLM,
+        });
+      }
       // Pad with stubs if LLM returned fewer than requested
       while (irs.length < n) irs.push(stubIR(spec, irs.length));
       return irs;
-    } catch {
+    } catch (err) {
+      // Generation or JSON parse failed — log before falling back to stubs so the
+      // failure is observable rather than a silent quality regression.
+      logger.warn('llm_generator_failed', {
+        sceneIdx: spec.target.sceneIdx,
+        message: (err as Error).message,
+      });
       return Array.from({ length: n }, (_, i) => stubIR(spec, i));
     }
   };
