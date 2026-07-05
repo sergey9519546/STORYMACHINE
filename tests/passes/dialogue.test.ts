@@ -1598,6 +1598,90 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1176 — dialoguePass (distinct-mode pivot): dialogue highlight front-loaded, dialogue highlight-emotion decoupled, dialogue highlight-suspense decoupled', async () => {
+    const makeRec1176 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1176 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1176 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Half-loaded geometry n=10, half=5 (first half {0..4}, second half {5..9}), ratio 0.6, minCount 4.
+    // FIRE: highlights at {0,1,2,4} (4 in first half) + {9} (1 in second) → 4/5 = 0.8 > 0.6, other half ≥ 1.
+    // NO-FIRE: highlights at {0,1} + {8,9} → 2/4 = 0.5, not > 0.6 (balanced, so not front-skewed).
+    it('DIALOGUE_HIGHLIGHT_FRONT_LOADED fires when most standout dialogue clusters in the first half', async () => {
+      const records1176a = Array.from({ length: 10 }, (_, i) =>
+        [0, 1, 2, 4, 9].includes(i) ? makeRec1176(i, { dialogueHighlights: ['a memorable line'] }) : makeRec1176(i));
+      const res = await runD1176(buildScenes1176(10), records1176a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_FRONT_LOADED'), 'DIALOGUE_HIGHLIGHT_FRONT_LOADED should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_FRONT_LOADED does not fire when standout dialogue is balanced across halves', async () => {
+      const records1176an = Array.from({ length: 10 }, (_, i) =>
+        [0, 1, 8, 9].includes(i) ? makeRec1176(i, { dialogueHighlights: ['a memorable line'] }) : makeRec1176(i));
+      const res = await runD1176(buildScenes1176(10), records1176an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_FRONT_LOADED'), 'DIALOGUE_HIGHLIGHT_FRONT_LOADED should not fire');
+    });
+
+    // Decoupling geometry: ≥2 highlight scenes, ≥2 emotion scenes, zero shared scenes → fire.
+    // NO-FIRE: one scene carries BOTH a highlight and an emotional shift (they overlap somewhere).
+    it('DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED fires when standout dialogue never shares a scene with an emotional beat', async () => {
+      const records1176b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 1) return makeRec1176(i, { dialogueHighlights: ['a memorable line'] });
+        if (i === 5 || i === 6) return makeRec1176(i, { emotionalShift: 'positive' });
+        return makeRec1176(i);
+      });
+      const res = await runD1176(buildScenes1176(10), records1176b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED does not fire when one scene carries both a standout line and an emotional beat', async () => {
+      const records1176bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec1176(i, { dialogueHighlights: ['a memorable line'], emotionalShift: 'positive' });
+        if (i === 1) return makeRec1176(i, { dialogueHighlights: ['a memorable line'] });
+        if (i === 6) return makeRec1176(i, { emotionalShift: 'positive' });
+        return makeRec1176(i);
+      });
+      const res = await runD1176(buildScenes1176(10), records1176bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED fires when standout dialogue never shares a scene with a suspense spike', async () => {
+      const records1176c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 1) return makeRec1176(i, { dialogueHighlights: ['a memorable line'] });
+        if (i === 5 || i === 6) return makeRec1176(i, { suspenseDelta: 1 });
+        return makeRec1176(i);
+      });
+      const res = await runD1176(buildScenes1176(10), records1176c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED should fire');
+    });
+
+    it('DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED does not fire when one scene carries both a standout line and a suspense spike', async () => {
+      const records1176cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec1176(i, { dialogueHighlights: ['a memorable line'], suspenseDelta: 1 });
+        if (i === 1) return makeRec1176(i, { dialogueHighlights: ['a memorable line'] });
+        if (i === 6) return makeRec1176(i, { suspenseDelta: 1 });
+        return makeRec1176(i);
+      });
+      const res = await runD1176(buildScenes1176(10), records1176cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED'), 'DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 1162 — dialoguePass: dialogue revelation-emotional aftermath void, dialogue revelation-relational aftermath void, dialogue suspense-curiosity aftermath void', async () => {
     const makeRec1162 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

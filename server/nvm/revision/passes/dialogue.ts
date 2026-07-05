@@ -559,10 +559,26 @@
 // REVELATION_RELATIONAL_AFTERMATH_VOID give revelation its second and third channels
 // (emotionalShift, relationshipShifts); DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID gives
 // suspenseDelta its second channel (curiosityDelta).
+// Wave 1176 additions (deliberate pivot away from the sequence/aftermath monoculture that has
+// dominated recent waves toward the distinct analytical modes CLAUDE.md's standing task names):
+// this pass's central signal, dialogueHighlights, had only ever been audited via aftermath-void
+// (as a channel), a single zone-cluster (thirds distribution), and co-occurrence with
+// unresolvedClues. This wave audits it via two genuinely under-used modes.
+// (1) Distribution/timing via checkHalfLoaded (front/back split) -- the FIRST use of this shared
+//     helper anywhere in the codebase: DIALOGUE_HIGHLIGHT_FRONT_LOADED fires when the memorable
+//     lines clump in the first half while the back half still has some, a front/back skew that
+//     the thirds-based zone-cluster cannot express (halves != thirds, and half-loaded additionally
+//     requires the quieter half to be non-empty, so it targets skew rather than pure clustering).
+// (2) Co-occurrence/decoupling (only 3 prior uses in this pass, vs 41 aftermath-void): DIALOGUE_
+//     HIGHLIGHT_EMOTION_DECOUPLED and DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED fire when standout
+//     dialogue never once shares a scene with an emotional beat / a suspense spike respectively --
+//     same-scene absence, mechanically distinct from every windowed aftermath check, and both are
+//     fresh pairings (existing decoupling covers dialogueHighlights x unresolvedClues, climax x
+//     dialogueHighlights, payoffSetupIds x visualBeats only).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract dialogue lines from fountain text with speaker attribution */
 function extractDialogue(fountain: string): Array<{ speaker: string; line: string; lineNum: number }> {
@@ -6887,6 +6903,80 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1162c.triggerCount} scenes that raise suspense is followed by two scenes with no rise in curiosity, even though ${r1162c.aftermathCount} such rises occur elsewhere in the script. A spike in danger that never opens a fresh question right after it leaves the dialogue layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one suspense rise, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // DIALOGUE_HIGHLIGHT_FRONT_LOADED -- Distribution/timing (front/back half-loading) x
+  // dialogueHighlights. Built on checkHalfLoaded from the shared checks library -- the first use
+  // of this helper anywhere in the codebase. n>=8, >=4 scenes carrying a standout line, >60% of
+  // them in the first half, and the back half still holding >=1. Fires when the memorable
+  // dialogue is skewed toward the opening while the later story goes comparatively quiet.
+  // Distinct from DIALOGUE_HIGHLIGHT_ZONE_CLUSTER (thirds clustering) -- halves are not thirds,
+  // and half-loaded specifically requires the quieter half to be non-empty, so it isolates a
+  // front/back skew rather than a single-zone pile-up -- and mechanically distinct from every
+  // aftermath/window check, which measure what follows a trigger rather than where a signal sits.
+  {
+    const r1176a = checkHalfLoaded({
+      records, minRecords: 8, minCount: 4, ratioThreshold: 0.6, direction: 'front',
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+      minOtherHalfCount: 1,
+    });
+    if (r1176a.fires) {
+      issues.push({
+        location: `${r1176a.matchingHalfCount}/${r1176a.count} standout dialogue scenes in the first half`,
+        rule: 'DIALOGUE_HIGHLIGHT_FRONT_LOADED',
+        severity: 'minor',
+        description: `${r1176a.matchingHalfCount} of the story's ${r1176a.count} scenes carrying a standout line of dialogue fall in the first half, leaving only ${r1176a.otherHalfCount} in the second. The script's most memorable speech is front-loaded: the voice sparkles early and then thins out, so the back half -- where the stakes are highest -- carries proportionally less of what an audience will remember hearing.`,
+        suggestedFix: `Move or add at least one standout line into the second half so the memorable dialogue is not spent up front. The climax and its approach are where a quotable, character-defining line lands hardest; letting the verbal high points trail off before then leaves the ending underserved by the voice.`,
+      });
+    }
+  }
+
+  // DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED -- Co-occurrence/decoupling x dialogueHighlights x
+  // emotionalShift (non-neutral). Built on checkCoOccurrenceDecoupled from the shared checks
+  // library. n>=8, >=2 standout-dialogue scenes, >=2 emotionally-charged scenes, and ZERO scenes
+  // carrying both. Fires when the memorable lines and the felt emotional beats never once share a
+  // scene. Distinct from the pass's three existing decoupling pairs (dialogueHighlights x
+  // unresolvedClues, climax x dialogueHighlights, payoffSetupIds x visualBeats) -- a fresh
+  // pairing -- and distinct from DIALOGUE_HIGHLIGHT_*_AFTERMATH_VOID rules, which check the two
+  // scenes AFTER a trigger; this checks same-scene co-occurrence, a different structural position.
+  {
+    const r1176b = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1176b.fires) {
+      issues.push({
+        location: `${r1176b.aCount} standout-dialogue scenes and ${r1176b.bCount} emotional scenes never coincide`,
+        rule: 'DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r1176b.aCount} scenes with a standout line of dialogue and the ${r1176b.bCount} scenes carrying a felt emotional shift never once occur in the same scene -- the script's most memorable speech and its most emotional moments run on entirely separate tracks. When a character's best lines never land in a scene where they are actually feeling something, the dialogue reads as clever rather than earned, and the emotional beats pass without a line worth remembering to crystallize them.`,
+        suggestedFix: `Let at least one standout line fall in an emotionally charged scene -- give a character their most memorable words at the moment the feeling peaks. Dialogue that carries both wit and emotion in the same breath is what an audience quotes; keeping the two apart wastes each of them.`,
+      });
+    }
+  }
+
+  // DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED -- Co-occurrence/decoupling x dialogueHighlights x
+  // suspenseDelta (>0). Built on checkCoOccurrenceDecoupled from the shared checks library. n>=8,
+  // >=2 standout-dialogue scenes, >=2 suspense-spike scenes, and ZERO scenes carrying both. Fires
+  // when the memorable lines and the tension spikes never once share a scene. Distinct from
+  // DIALOGUE_HIGHLIGHT_EMOTION_DECOUPLED (this wave, emotionalShift channel) -- a different B
+  // signal -- and from every existing decoupling pair and aftermath check, as above.
+  {
+    const r1176c = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.dialogueHighlights ?? []).length > 0,
+      isB: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1176c.fires) {
+      issues.push({
+        location: `${r1176c.aCount} standout-dialogue scenes and ${r1176c.bCount} suspense-spike scenes never coincide`,
+        rule: 'DIALOGUE_HIGHLIGHT_SUSPENSE_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r1176c.aCount} scenes with a standout line of dialogue and the ${r1176c.bCount} scenes that spike suspense never once occur in the same scene -- the script's most memorable speech and its tensest moments run on separate tracks. When the danger peaks in silence and the best lines land only in safe scenes, the dialogue never gets to sharpen the tension: the audience is never made to hang on what a character says while the stakes are at their highest.`,
+        suggestedFix: `Let at least one standout line fall in a scene where suspense is rising -- a line delivered under pressure, when the outcome is uncertain, carries far more charge than the same words spoken in calm. Pairing memorable dialogue with tension is how a line becomes iconic; keeping them apart flattens both.`,
       });
     }
   }
