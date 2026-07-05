@@ -1,13 +1,14 @@
 import { randomUUID } from 'crypto';
 import { Stage } from './Stage.ts';
 import { Agent } from './Agent.ts';
-import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction } from './types.ts';
+import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction, TheoryOfMind, EmotionState } from './types.ts';
 import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
 import { logger } from '../lib/logger.ts';
 // Wave 32 — Action↔StoryOp Bridge: unify the live sim with the canon ledger.
 import { buildTurnCommit } from '../nvm/bridge/action-to-ops.ts';
+import type { RelationshipDeltaInput, EmotionAppraisalInput } from '../nvm/bridge/action-to-ops.ts';
 import { buildNarrativeState, emptyState } from '../nvm/state/NarrativeState.ts';
 import type { NarrativeState } from '../nvm/state/NarrativeState.ts';
 import { applyStoryOps } from '../nvm/ops/dispatcher.ts';
@@ -17,7 +18,85 @@ export type RoomProgressEvent =
   | { type: 'agent_action'; agentId: string; agentName: string; action: NarrativeAction; turnIndex: number }
   | { type: 'round_complete'; round: number; agentCount: number }
   | { type: 'director_eval'; totalTurns: number }
-  | { type: 'simulation_complete'; totalTurns: number; stoppedBy?: string };
+  // Fix C: additive — droppedCommits is only present when this call dropped
+  // at least one Tier-1-rejected commit from canon (see consumeDroppedCommits()).
+  | { type: 'simulation_complete'; totalTurns: number; stoppedBy?: string; droppedCommits?: DroppedCommits };
+
+// Fix C (silent canon drops): buildTurnCommit returns null and only logs a
+// warning when a turn's ops fail the Tier-1 proof gate — the user previously
+// had no way to learn a turn's narrative consequences never reached canon.
+export interface DroppedCommits {
+  count: number;
+  reasons: string[];
+}
+
+// Fix A: TheoryOfMind dimensions with a direct RelationshipDelta counterpart.
+// power_balance has NO matching StoryOp dimension (RelationshipDelta's union —
+// love/trust/intimacy/admiration/resentment/fear/contempt/guilt/obligation/
+// dependency — has nothing shaped like a 0=they-dominate..1=I-dominate power
+// axis) and is intentionally NOT bridged rather than force-mapped onto a
+// dimension that would misrepresent it.
+const TOM_TO_RELATIONSHIP_DIM: ReadonlyArray<{
+  tomKey: 'trust_level' | 'affinity' | 'debt';
+  dimension: RelationshipDeltaInput['dimension'];
+  label: string;
+}> = [
+  { tomKey: 'trust_level', dimension: 'trust',      label: 'trust' },
+  { tomKey: 'affinity',    dimension: 'love',        label: 'affinity' },
+  { tomKey: 'debt',        dimension: 'obligation',  label: 'felt obligation' },
+];
+
+// Pure diff: TheoryOfMind before/after (both snapshotted at the Orchestrator
+// call site, where the observing agent's own belief/emotion update is in
+// scope) → RelationshipDeltaInput[] the bridge can turn into SHIFT_RELATIONSHIP
+// ops. trust_level always has an engine-established neutral default (0.5 —
+// see Agent.ts's ToM-update block) so a brand-new subject still yields a
+// meaningful delta from that baseline; affinity/debt have no such documented
+// default, so a first-ever observation of a subject (no `before` entry) is
+// skipped for those two dimensions rather than inventing a baseline that
+// could misrepresent the character's actual first impression.
+function diffTheoryOfMind(
+  observerId: string,
+  before: Record<string, TheoryOfMind>,
+  after: Record<string, TheoryOfMind>,
+  turnIndex: number,
+): RelationshipDeltaInput[] {
+  const deltas: RelationshipDeltaInput[] = [];
+  for (const [subjectId, a] of Object.entries(after)) {
+    const b = before[subjectId];
+    const pair: [string, string] = [observerId, subjectId];
+    for (const { tomKey, dimension, label } of TOM_TO_RELATIONSHIP_DIM) {
+      const afterVal = a[tomKey];
+      if (afterVal === undefined) continue;
+      const beforeVal = tomKey === 'trust_level'
+        ? (b?.trust_level ?? 0.5)
+        : b?.[tomKey];
+      if (beforeVal === undefined) continue; // no honest baseline for this dimension yet
+      const amount = afterVal - beforeVal;
+      if (amount === 0) continue;
+      deltas.push({
+        pair, dimension, amount,
+        reason: `${observerId}'s ${label} in ${subjectId} shifted at turn ${turnIndex}`,
+      });
+    }
+  }
+  return deltas;
+}
+
+// Pure diff: EmotionState before/after (snapshotted immediately around the
+// AppraisalEngine.appraise() call for one char_id) → an EmotionAppraisalInput
+// candidate, or null when nothing changed. Significance thresholding (is this
+// appraisal worth a permanent StoryOp) is the bridge's job, not this diff's —
+// see emotionAppraisalsToOps in action-to-ops.ts.
+function diffEmotion(
+  charId: string,
+  before: EmotionState | undefined,
+  after: EmotionState | undefined,
+): EmotionAppraisalInput | null {
+  if (!after) return null;
+  if (before && before.dominant === after.dominant && before.intensity === after.intensity) return null;
+  return { charId, emotion: after };
+}
 
 export class Orchestrator {
   private agents: Map<string, Agent> = new Map();
@@ -31,6 +110,53 @@ export class Orchestrator {
   // Wave 43: running NarrativeState accumulated from committed ops so the proof
   // gate sees prior facts/clocks/relationships, not just the current IR's ops.
   private _narrativeState: NarrativeState = emptyState();
+  // Fix C: Tier-1 canon-drop bookkeeping. Accumulates across buildTurnCommit
+  // calls via the onTier1Reject hook; drained (read + reset) by
+  // consumeDroppedCommits() so a route handler gets exactly "what was dropped
+  // during MY call", not a lifetime total that keeps growing across a
+  // long-lived session's many turn/run-room requests.
+  private _droppedCount = 0;
+  private _droppedReasons: string[] = [];
+
+  private _onTier1Reject = (reasons: string): void => {
+    this._droppedCount++;
+    // Cap retained reason strings so a pathological run can't grow this
+    // unboundedly between consumeDroppedCommits() calls.
+    if (this._droppedReasons.length < 50) this._droppedReasons.push(reasons);
+  };
+
+  /** Drains (reads + resets) Tier-1 drops accumulated since the last drain.
+   *  Returns null when nothing was dropped so callers can splice an additive
+   *  `droppedCommits` field into a response only when nonzero (Fix C). */
+  public consumeDroppedCommits(): { count: number; reasons: string[] } | null {
+    if (this._droppedCount === 0) return null;
+    const result = { count: this._droppedCount, reasons: this._droppedReasons };
+    this._droppedCount = 0;
+    this._droppedReasons = [];
+    return result;
+  }
+
+  // Non-destructive peek — used only to annotate an in-flight SSE
+  // `simulation_complete` progress event with the running total so far,
+  // without resetting state that a wrapping runFullScene call (which emits
+  // its OWN final event after possibly many nested runRoomSimulation calls)
+  // still needs to see in full. Only the top-level route handler actually
+  // drains, via consumeDroppedCommits(), once the whole call has resolved.
+  private _peekDroppedCommits(): { count: number; reasons: string[] } | null {
+    if (this._droppedCount === 0) return null;
+    return { count: this._droppedCount, reasons: [...this._droppedReasons] };
+  }
+
+  // Fix A: snapshot helpers — read the live Stage-persisted ToM/emotion for one
+  // agent so the Orchestrator can diff before/after around the exact calls
+  // (Agent.updateEpistemics, AppraisalEngine.appraise) that mutate them.
+  private _snapshotTom(charId: string): Record<string, TheoryOfMind> {
+    return { ...(this.stage.getAgent(charId)?.theoryOfMind ?? {}) };
+  }
+
+  private _snapshotEmotion(charId: string): EmotionState | undefined {
+    return this.stage.getAgent(charId)?.emotionState;
+  }
 
   constructor(stage: Stage) {
     this.stage = stage;
@@ -166,6 +292,11 @@ export class Orchestrator {
     }
 
     // Update the acting agent's epistemic state and run spine
+    // Fix A: snapshot theory-of-mind BEFORE updateEpistemics — it's the only
+    // place ToM mutates (Agent.ts's "Update theory of mind" block) — so we can
+    // diff it into RelationshipDeltaInput[] once the call has run.
+    const tomBefore = this._snapshotTom(agentId);
+    const emotionBeforePrimary = this._snapshotEmotion(agentId);
     const recentActions = this.stage.getSensoryFilter(currentNodeId, 3);
     const update = await agent.updateEpistemics(recentActions);
     try {
@@ -174,6 +305,10 @@ export class Orchestrator {
     } catch (err) {
       logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
     }
+    const relationshipDeltas = diffTheoryOfMind(agentId, tomBefore, this._snapshotTom(agentId), turnIndex);
+    const emotionAppraisals: EmotionAppraisalInput[] = [];
+    const primaryEmotionDelta = diffEmotion(agentId, emotionBeforePrimary, this._snapshotEmotion(agentId));
+    if (primaryEmotionDelta) emotionAppraisals.push(primaryEmotionDelta);
 
     // ── Director evaluation ──
     // Single turns run the full Director pass (perspective evaluation, illusion-state
@@ -182,12 +317,15 @@ export class Orchestrator {
     const roomActions = this.stage.getSensoryFilter(currentNodeId, 6);
     const directorUpdates = await this.director.evaluateRoom(currentNodeId, roomActions);
     for (const u of directorUpdates) {
+      const emotionBeforeDirector = this._snapshotEmotion(u.char_id);
       try {
         this._runSpineForUpdate(u, action_id, currentNodeId);
         this.appraiser.appraise(u);
       } catch (err) {
         logger.warn('spine_director_failed', { agentId, error: (err as Error).message });
       }
+      const directorEmotionDelta = diffEmotion(u.char_id, emotionBeforeDirector, this._snapshotEmotion(u.char_id));
+      if (directorEmotionDelta) emotionAppraisals.push(directorEmotionDelta);
     }
     this.appraiser.applyContagion(currentNodeId);
 
@@ -215,6 +353,9 @@ export class Orchestrator {
       card,
       primaryUpdate: update,
       extraUpdates: directorUpdates,
+      relationshipDeltas,
+      emotionAppraisals,
+      onTier1Reject: this._onTier1Reject,
       turnIndex,
       beforeState,
       sceneIdx: turnIndex,
@@ -370,6 +511,12 @@ export class Orchestrator {
         const suspicionBefore = new Map<string, number>(
           agentsInRoom.map(a => [a.char_id, a.suspicion_score]),
         );
+        // Fix A: snapshot ToM per agent BEFORE the batch — updateEpistemics is
+        // the only place ToM mutates, so diffing before/after across this loop
+        // captures every agent's relationship shift for the round in one pass.
+        const tomSnapshots = new Map<string, Record<string, TheoryOfMind>>(
+          agentsInRoom.map(sheet => [sheet.char_id, this._snapshotTom(sheet.char_id)]),
+        );
         const epistemicUpdates: import('./types.ts').EpistemicUpdate[] = [];
         for (const sheet of agentsInRoom) {
           const agent = this.agents.get(sheet.char_id);
@@ -380,13 +527,25 @@ export class Orchestrator {
             logger.warn('agent_epistemics_failed', { agent: sheet.char_id, error: (epistemicsErr as Error).message });
           }
         }
+        const roundTurnIndexForDeltas = this.stage.getTurnCount();
+        const roundRelationshipDeltas: RelationshipDeltaInput[] = [];
+        for (const sheet of agentsInRoom) {
+          const before = tomSnapshots.get(sheet.char_id) ?? {};
+          roundRelationshipDeltas.push(
+            ...diffTheoryOfMind(sheet.char_id, before, this._snapshotTom(sheet.char_id), roundTurnIndexForDeltas),
+          );
+        }
+        const roundEmotionAppraisals: EmotionAppraisalInput[] = [];
         for (const update of epistemicUpdates) {
+          const emotionBeforeRound = this._snapshotEmotion(update.char_id);
           try {
             this._runSpineForUpdate(update, lastActionId, location_id);
             this.appraiser.appraise(update);
           } catch (spineErr) {
             logger.warn('epistemic_spine_appraise_error', { location_id, error: (spineErr as Error).message });
           }
+          const roundEmotionDelta = diffEmotion(update.char_id, emotionBeforeRound, this._snapshotEmotion(update.char_id));
+          if (roundEmotionDelta) roundEmotionAppraisals.push(roundEmotionDelta);
         }
         // Record persuasion outcomes: success when target's suspicion decreased
         const currentTurn = this.stage.getTurnCount();
@@ -425,6 +584,9 @@ export class Orchestrator {
               card: roundCard,
               primaryUpdate: primaryUp,
               extraUpdates: extraUps,
+              relationshipDeltas: roundRelationshipDeltas,
+              emotionAppraisals: roundEmotionAppraisals,
+              onTier1Reject: this._onTier1Reject,
               turnIndex: this.stage.getTurnCount(),
               beforeState: beforeStateRoom,
               sceneIdx: this.stage.getTurnCount(),
@@ -501,7 +663,15 @@ export class Orchestrator {
       logger.warn('contagion_error', { location_id, error: (contagionErr as Error).message });
     }
 
-    onProgress?.({ type: 'simulation_complete', totalTurns: turnCount });
+    // Fix C: peek (not drain) so a wrapping runFullScene call — which may run
+    // many rooms/rounds after this one and emits its OWN final event — still
+    // sees the full accumulated total. Only the top-level route handler
+    // actually drains, via consumeDroppedCommits(), once its call resolves.
+    const droppedSoFar = this._peekDroppedCommits();
+    onProgress?.({
+      type: 'simulation_complete', totalTurns: turnCount,
+      ...(droppedSoFar ? { droppedCommits: droppedSoFar } : {}),
+    });
   }
 
   // ── Multi-room orchestration ─────────────────────────────────────────────────
@@ -514,7 +684,8 @@ export class Orchestrator {
     turnsPerRoom = 3,
     maxRounds = 4,
     onProgress?: (event: RoomProgressEvent) => void,
-  ): Promise<void> {
+  ): Promise<{ totalTurns: number; roundsRun: number; locationIds: string[] }> {
+    let roundsRun = 0;
     // Resolve locations that have ≥1 agent
     let activeLocations = locationIds.filter(lid => {
       const agents = this.stage.getAgentsInLocation(lid);
@@ -523,6 +694,7 @@ export class Orchestrator {
 
     for (let round = 0; round < maxRounds; round++) {
       if (activeLocations.length === 0) break;
+      roundsRun = round + 1;
 
       // Sort rooms by dramatic tension: rooms with more agents and more accumulated
       // suspicion run first so pressure cascades naturally between scenes.
@@ -558,7 +730,16 @@ export class Orchestrator {
         s + this.stage.getAgentsInLocation(lid).filter(a => a.is_alive !== false).length, 0) });
     }
 
-    onProgress?.({ type: 'simulation_complete', totalTurns: this.stage.getTurnCount() });
+    // Fix C: peek (not drain) — see the identical comment on runRoomSimulation's
+    // own final event above. This is the outermost event runFullScene emits, so
+    // it aggregates drops from every room/round this call ran.
+    const droppedSoFar = this._peekDroppedCommits();
+    const totalTurns = this.stage.getTurnCount();
+    onProgress?.({
+      type: 'simulation_complete', totalTurns,
+      ...(droppedSoFar ? { droppedCommits: droppedSoFar } : {}),
+    });
+    return { totalTurns, roundsRun, locationIds };
   }
 
   // ── Spine wiring helper ─────────────────────────────────────────────────────

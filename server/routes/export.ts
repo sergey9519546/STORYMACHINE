@@ -1,8 +1,11 @@
-// P2 — Export pipeline: Fountain → FDX (Final Draft XML), DOCX, print-ready HTML.
-// All three endpoints accept { fountain: string } in the POST body so the client
-// can pass whatever Fountain text it already has loaded.
+// P2 — Export pipeline: Fountain → FDX (Final Draft XML), DOCX, print-ready HTML,
+// and the shareable Script Doctor coverage-report HTML. The first three accept
+// { fountain: string } in the POST body so the client can pass whatever
+// Fountain text it already has loaded; the coverage route additionally accepts
+// { fdx: string } (see DoctorBodySchema) since it re-runs the doctor itself.
 
 import express from 'express';
+import { createHash } from 'node:crypto';
 import {
   Document, Paragraph, TextRun, AlignmentType, Packer,
   convertInchesToTwip, PageOrientation,
@@ -11,6 +14,9 @@ import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
+import { validate, DoctorBodySchema } from '../lib/validation.ts';
+import { fdxToFountain } from '../lib/fdx-import.ts';
+import { renderCoverageHtml } from '../lib/coverage-html.ts';
 
 const router = express.Router();
 export default router;
@@ -414,5 +420,78 @@ router.post('/api/export/print-html', gameLimiter, asyncHandler(async (req, res)
   } catch (err) {
     logger.error('export_print_error', { message: (err as Error).message });
     res.status(500).json({ error: 'Print HTML conversion failed' });
+  }
+}));
+
+// ── Shareable coverage-report export (server/lib/coverage-html.ts) ────────────
+// POST /api/export/coverage — the studio-coverage-style HTML document writers
+// download, print to PDF, and hand to producers. Same two-format body contract
+// as POST /api/scriptide/doctor (server/routes/scriptide.ts), enforced by the
+// same DoctorBodySchema: exactly one of `fountain` / `fdx`, optional `title`.
+//
+// Deliberately RE-RUNS the doctor here instead of accepting a client-supplied
+// ScriptDoctorReport JSON in the request body. That's not laziness — it's the
+// point: because runScriptDoctor() is a pure, deterministic function of the
+// Fountain text (no LLM, no randomness — see doctor.ts's own header comment),
+// re-running it costs nothing extra in confidence for one more CPU-only pass,
+// and in exchange the exported document is always AUTHENTIC: a report the
+// engine actually produced for this exact script, not something a client
+// could have hand-edited (inflated health score, deleted a critical issue)
+// before asking the server to wrap it in a nice PDF-ready shell. A producer
+// reading a coverage report should never have to wonder whether the numbers
+// on the page are the numbers the tool actually computed.
+router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+
+  // Same fdx->Fountain resolution as POST /api/scriptide/doctor: convert here
+  // (fdxToFountain is small/pure/dependency-free, so — like that route —
+  // it's imported statically rather than dynamically) and 400 on either a
+  // conversion failure or a conversion that produced nothing to analyze.
+  let fountain: string;
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return;
+    }
+    fountain = converted.fountain;
+  } else {
+    fountain = fountainBody as string;
+  }
+
+  const rawTitle = typeof req.body?.title === 'string' ? req.body.title : 'Untitled';
+  const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
+
+  try {
+    // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
+    // passes, matching this router's convention elsewhere in this file (and
+    // scriptide.ts's doctor route) of lazily loading heavy analysis modules
+    // so routes that never call the doctor don't pay for it at startup.
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+    const report = await runScriptDoctor(fountain);
+
+    // ScriptDoctorReport.contentHash isn't populated by runScriptDoctor yet
+    // (see its doc comment in server/nvm/analyze/types.ts) — compute it here
+    // using the exact formula that comment documents (sha256 hex of the
+    // trimmed analyzed Fountain text) so every exported report still carries
+    // a verification hash. If a future doctor.ts revision starts populating
+    // it directly, that value wins here and this becomes a no-op fallback.
+    const contentHash = report.contentHash ?? createHash('sha256').update(fountain.trim()).digest('hex');
+
+    const html = renderCoverageHtml({ ...report, contentHash }, title);
+
+    const filename = `${encodeURIComponent(title)}-coverage.html`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(html);
+  } catch (err) {
+    logger.error('export_coverage_error', { message: (err as Error).message });
+    res.status(500).json({ error: 'Coverage export failed' });
   }
 }));

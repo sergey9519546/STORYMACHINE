@@ -27,6 +27,20 @@ describe('routes/config — HTTP behavior', async () => {
     }
   });
 
+  it('GET /api/ai-config exposes llmReady as a boolean and still never leaks key material', async () => {
+    const res = await fetch(`${server.baseUrl}/api/ai-config`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(typeof body.llmReady, 'boolean', 'llmReady must be a boolean flag');
+    for (const forbiddenKey of ['apiKey', 'imgApiKey', 'ttsApiKey', 'embApiKey']) {
+      assert.equal(body[forbiddenKey], undefined, `response must not include ${forbiddenKey}`);
+    }
+    // Belt-and-suspenders: no field anywhere in the payload should contain what
+    // looks like an actual secret value (only booleans/strings describing config).
+    const raw = JSON.stringify(body);
+    assert.doesNotMatch(raw, /sk-[A-Za-z0-9_-]{10,}/, 'response must not contain an API-key-shaped value');
+  });
+
   it('POST /api/ai-config rejects an invalid body with 400 (zod validation)', async () => {
     const res = await fetch(`${server.baseUrl}/api/ai-config`, {
       method: 'POST',

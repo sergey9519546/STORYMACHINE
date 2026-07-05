@@ -22,6 +22,11 @@ interface AiConfig {
   imgKeySet: boolean;
   ttsKeySet: boolean;
   embKeySet: boolean;
+  /** True when EITHER GEMINI_API_KEY (env, default provider) OR the
+   *  multi-provider key (keySet, above) is configured server-side. See
+   *  server/routes/config.ts — the two are independent sources and keySet
+   *  alone under-reports readiness for the (documented, default) Gemini path. */
+  llmReady: boolean;
 }
 
 interface SettingsPanelProps {
@@ -161,6 +166,12 @@ function LLMTab({
       {cfg.provider === "gemini" && (
         <p className="text-xs text-gray-500 font-mono">
           Using Gemini. Set <code>GEMINI_API_KEY</code> in your environment to configure the key.
+          <br />
+          {/* Finding E/A: live readiness from the server, not a guess — reflects
+              GEMINI_API_KEY OR the multi-provider key, whichever is set. */}
+          <span className={cfg.llmReady ? "text-green-700 font-bold" : "text-red-600 font-bold"}>
+            Detected: {cfg.llmReady ? "ready" : "no key detected"}
+          </span>
         </p>
       )}
     </div>

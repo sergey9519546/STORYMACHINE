@@ -57,6 +57,22 @@ export interface ScreenplaySceneRecord {
    *  The builder always populates this; optional only so legacy/test fixtures that
    *  predate the field still typecheck. Consumers should treat absence as []. */
   relationshipShifts?: Array<{ pairKey: string; dimension: string; amount: number }>;
+  /** Question-answer latency (Wave 1182 — Program v2 Type 1 signal channel).
+   *  Substantive dialogue questions raised/resolved this scene, lexically
+   *  fingerprinted and matched forward against later lines anywhere in the
+   *  document (see fountain-analyzer.ts's detectQuestionLatency — the only
+   *  builder that currently populates these). questionsResolvedSameScene is
+   *  always <= questionsResolved (the subset resolved before the scene that
+   *  raised them ends); questionsUnresolved counts this scene's questions
+   *  that are never matched anywhere in the document. Optional only so
+   *  legacy/test fixtures and the ops-derived path (StoryOps carry no raw
+   *  dialogue text to lex-match against) still typecheck; consumers should
+   *  treat absence as 0 for every field, matching the relationshipShifts
+   *  precedent above. */
+  questionsRaised?: number;
+  questionsResolved?: number;
+  questionsResolvedSameScene?: number;
+  questionsUnresolved?: number;
   /** createdAt timestamp */
   createdAt: number;
 }

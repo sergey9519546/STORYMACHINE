@@ -23,6 +23,7 @@ import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
 import { inlineComplete, CompletionContext } from './inline-complete.ts';
 import { fountainKeymap, FountainKeymapOptions } from './fountain-keymap.ts';
 import { createCollabSession, CollabSession } from './collab.ts';
+import { scriptDiagnostics } from './diagnostics.ts';
 
 export interface FountainEditorHandle {
   /** Navigate to a specific 1-indexed line number */
@@ -50,6 +51,13 @@ export interface FountainEditorProps {
   collabRoom?: string;
   /** Display name for this user's remote cursor in collaboration mode. */
   collabUserName?: string;
+  /**
+   * "Live Notes" — when true, the editor debounces after typing and diagnoses
+   * the script against POST /api/scriptide/diagnose, rendering issues as
+   * squiggle underlines with hover tooltips (see diagnostics.ts). Keyless
+   * feature, off by default (see Toolbar/ScriptIDE "Live Notes" toggle).
+   */
+  liveDiagnostics?: boolean;
 }
 
 // ── Shared base theme ─────────────────────────────────────────────────────────
@@ -99,6 +107,7 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
       onUserEdit,
       collabRoom,
       collabUserName,
+      liveDiagnostics = false,
     },
     ref,
   ) {
@@ -117,6 +126,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     // ── Compartments allow hot-swapping extensions without rebuilding state ────
     const themeCompartment = useRef(new Compartment());
     const completionCompartment = useRef(new Compartment());
+    // Live Notes: holds scriptDiagnostics() when enabled, [] when disabled —
+    // hot-swapped below the same way themeCompartment/completionCompartment are.
+    const diagnosticsCompartment = useRef(new Compartment());
     // P4: joining a collab room now requires fetching an auth token first
     // (see collab.ts), so the extension can't be included synchronously at
     // EditorState.create() time — this compartment starts empty and is
@@ -190,6 +202,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           ]),
           // ── Inline completions (Tab=accept sits inside this) ─────────────────
           completionCompartment.current.of(completionExt),
+          // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
+          diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
           // ── Fountain highlighting ───────────────────────────────────────────
           fountainHighlight,
           fountainTheme,
@@ -278,6 +292,17 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
         effects: completionCompartment.current.reconfigure(completionExt),
       });
     }, [completionExt]);
+
+    // ── Hot-swap Live Notes on/off ─────────────────────────────────────────────
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({
+        effects: diagnosticsCompartment.current.reconfigure(
+          liveDiagnostics ? scriptDiagnostics() : [],
+        ),
+      });
+    }, [liveDiagnostics]);
 
     return (
       <div

@@ -6,14 +6,27 @@ import { sessions, PERSIST_SESSIONS, SESSION_DB_DIR } from './server/lib/session
 import { createApp } from './server/app.ts';
 import { attachCollabServer } from './server/collab/yjs-server.ts';
 
+// A missing AI key is NOT fatal: the deterministic half of the product —
+// Script Doctor, live diagnostics, coverage export, What-If exploration,
+// Writers' Room critics, interview receipts — runs entirely without one,
+// and that keyless analysis surface is the product's front door. Every
+// generation path already degrades per-route (getAI() throws are caught,
+// aiLimiter routes return honest keyless shapes, /api/ai-config reports
+// llmReady:false so both apps show the banner). Exiting here — the app's
+// original generation-first behavior — made all of that unreachable.
 const AI_PROVIDER = process.env.AI_PROVIDER ?? 'gemini';
 if (AI_PROVIDER === 'gemini' && !process.env.GEMINI_API_KEY) {
-  console.error('FATAL: GEMINI_API_KEY environment variable is not set. Exiting.');
-  process.exit(1);
+  logger.warn('startup_keyless', {
+    message: 'GEMINI_API_KEY is not set — starting in analysis-only mode. ' +
+      'Diagnostics, coverage, and exploration work fully; generation (copilot, ' +
+      'simulation turns, rewrites, interview voices) stays disabled until a key is configured.',
+  });
 }
 if (AI_PROVIDER === 'openai-compat' && (!process.env.AI_BASE_URL || !process.env.AI_API_KEY)) {
-  console.error('FATAL: AI_PROVIDER=openai-compat requires AI_BASE_URL and AI_API_KEY. Exiting.');
-  process.exit(1);
+  logger.warn('startup_keyless', {
+    message: 'AI_PROVIDER=openai-compat is missing AI_BASE_URL and/or AI_API_KEY — ' +
+      'starting in analysis-only mode; generation stays disabled until both are configured.',
+  });
 }
 
 initFromEnv();

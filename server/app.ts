@@ -31,6 +31,30 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   const app = express();
   app.disable('x-powered-by'); // don't advertise the framework
   app.use(express.json({ limit: '1mb' }));
+  // requestLogger() (server/lib/logger.ts) logs { method, path, status, ms }
+  // per request, where `path` is Express's `req.path` — the parsed URL
+  // *pathname only*; per Express/Node's `url.parse` semantics, `req.path`
+  // never includes the query string (that's `req.url` / `req.originalUrl`,
+  // neither of which this logger reads). This is deliberate and load-bearing,
+  // not incidental: SSE call sites (e.g. GET /api/scriptide/complete) can't
+  // set the X-Session-Id header the way fetch()-based callers do, so
+  // src/lib/session.ts's withSession() instead appends the session id as a
+  // `?sessionId=...` query param (see server/lib/session-store.ts's
+  // sessionId() precedence-1 comment). A session id is a per-user isolation
+  // capability — logging it verbatim, request after request, would let
+  // anyone with log access impersonate that session's Stage. Because
+  // `req.path` structurally excludes the query string, that capability never
+  // reaches a log line today, on this route or any other.
+  //
+  // Verified with certainty this is the ONLY place in server/** that logs
+  // per-request path/URL data: the global error handler below (`path:
+  // req.path`) uses the same pathname-only field, and a repo-wide grep of
+  // server/** for `req.url` / `req.originalUrl` turns up exactly one other
+  // hit (server/collab/yjs-server.ts, parsing a WS upgrade request's room id
+  // and auth token — never logged raw; only the parsed `room` value is
+  // logged). Nothing in server/** logs a full URL or query string anywhere,
+  // so there is no redaction to wire in — this comment documents *why*
+  // that's true and safe by construction, rather than incidental.
   app.use(requestLogger());
   // Assign a trace ID to every request for correlation across logs.
   app.use((_req, res, next) => { res.locals.traceId = crypto.randomUUID(); next(); });
@@ -76,6 +100,10 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
       message: err.message,
       stack: err.stack,
       method: req.method,
+      // req.path, not req.url/req.originalUrl — same pathname-only,
+      // query-excluding rationale documented at requestLogger()'s call site
+      // above (capability-bearing query params like ?sessionId= must not
+      // reach logs).
       path: req.path,
     });
     res.status(500).json({ error: 'Internal Server Error' });

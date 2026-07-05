@@ -23,10 +23,21 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      - name: Run tests
+      # Mechanical enforcement of CLAUDE.md's "no console.* under server/**"
+      # rule — a written convention only reliably holds when CI holds it.
+      # grep exits 1 on no-match, so `!` inverts: any hit fails the build
+      # and prints the offending lines.
+      - name: Enforce no console.* under server/
+        run: "! grep -rn 'console\\.' server --include='*.ts'"
+
+      # Deliberately NO GEMINI_API_KEY here: the product's official keyless
+      # analysis-only mode is what CI must prove. With a fake key set, the
+      # "keyless" degradation paths construct a real client and attempt live
+      # HTTPS calls to the AI provider (passing only because failures degrade)
+      # — a flake source, an outbound network dependency, and a posture the
+      # suite was never meant to test. The full suite passes keyless.
+      - name: Run tests (keyless — analysis-only posture)
         run: npm test
-        env:
-          GEMINI_API_KEY: "test-key-ci"
 
       - name: Build
         run: npm run build

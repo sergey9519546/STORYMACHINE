@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
+import { buildScenarioFromScript } from "../lib/scenario-from-script";
 import { fountainToFdx } from "../lib/fdx";
 import { fountainToPdf } from "../lib/pdf";
 import { fountainToDocx } from "../lib/docx";
@@ -41,6 +42,7 @@ import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
 import AnalysisPanel from "./scriptide/AnalysisPanel";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
+import ScriptDoctorPanel from "./scriptide/ScriptDoctorPanel";
 import Toolbar from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
 
@@ -59,6 +61,8 @@ interface ScriptIDEProps {
     need: string;
   }>;
   onImportConsumed?: () => void;
+  /** Sends the user back to the setup wizard, clearing the persisted config (App.tsx). */
+  onNewStory?: () => void;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -111,6 +115,7 @@ export default function ScriptIDE({
   importedScript,
   importedCharacters,
   onImportConsumed,
+  onNewStory,
 }: ScriptIDEProps) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const [engineState, setEngineState] = useState<EngineState | null>(null);
@@ -126,6 +131,12 @@ export default function ScriptIDE({
     | "titlePage"
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
+  const [showScriptDoctor, setShowScriptDoctor] = useState(false);
+  // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
+  // a first pass doesn't want squiggles until they ask for them.
+  const [liveDiagnostics, setLiveDiagnostics] = useState(
+    () => lsGet("live_diagnostics") === "1"
+  );
   const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
@@ -161,6 +172,12 @@ export default function ScriptIDE({
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
   const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // "Simulate this script" — seeds an OASIS scenario from scriptText + characters
+  // (src/lib/scenario-from-script.ts), then opens Story Machine onto it. Mirrors
+  // StoryMachine.tsx's submitScenario() reset→init sequence exactly.
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulateStatus, setSimulateStatus] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
+  const simulateStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
   // P9: inline copilot persona (custom ghost-text voice/specialty).
   const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
   const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
@@ -170,6 +187,19 @@ export default function ScriptIDE({
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
   const [showCollabBar, setShowCollabBar] = useState(false);
+  // Keyless-honesty banner (finding E): whether generation-dependent features
+  // (copilot, simulation turns, rewriting) have an AI key behind them.
+  // null = not yet fetched; the banner only ever renders once we know for
+  // sure, so first paint never flashes a false "no key" warning.
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  const [llmBannerDismissed, setLlmBannerDismissed] = useState(
+    () => lsGet("llmready_banner_dismissed_scriptide") === "1"
+  );
+  // "Open a script file" → .fdx handoff (finding D): StartScreen can't convert
+  // .fdx client-side, so it hands off the filename via sessionStorage and
+  // lets the user land in the editor anyway, with this notice explaining why
+  // their file isn't sitting in the draft and pointing at Script Doctor.
+  const [fdxImportNotice, setFdxImportNotice] = useState<string | null>(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -274,6 +304,7 @@ export default function ScriptIDE({
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       analysisAbortRef.current?.abort();
       cleanActionAbortRef.current?.abort();
+      if (simulateStatusTimerRef.current) clearTimeout(simulateStatusTimerRef.current);
       if (audioCtxRef.current) {
         audioCtxRef.current.close().catch(() => { /* ignore */ });
         audioCtxRef.current = null;
@@ -548,8 +579,52 @@ export default function ScriptIDE({
     return () => { cancelled = true; };
   }, []);
 
+  // Finding E: fetch AI readiness once on mount so first-time users learn up
+  // front what works keyless (analysis, exports) vs what needs a key
+  // (generation). Non-fatal on failure — the banner simply never shows if we
+  // can't determine readiness, rather than guessing wrong.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => { /* non-critical — banner stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // StartScreen's "Open a script file" hands off a pending .fdx filename via
+  // sessionStorage when it couldn't convert the file client-side. Surface it
+  // once, then clear the flag so it never reappears on a later reload.
+  useEffect(() => {
+    try {
+      const pendingFdx = sessionStorage.getItem("sm_fdx_import_pending");
+      if (pendingFdx) {
+        setFdxImportNotice(
+          `"${pendingFdx}" is a Final Draft (.fdx) file — this app converts .fdx server-side. Open Script Doctor (below) and use its "Upload script" button to bring it in as Fountain.`
+        );
+        sessionStorage.removeItem("sm_fdx_import_pending");
+      }
+    } catch { /* sessionStorage unavailable — notice just never appears */ }
+  }, []);
+
   // Persist persona selection so it survives reloads.
   useEffect(() => { lsSet("copilot_persona", copilotPersona); }, [copilotPersona]);
+
+  // Persist the Live Notes toggle so it survives reloads (same idiom as
+  // typewriter sound's on/off flag).
+  useEffect(() => {
+    lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
+  }, [liveDiagnostics]);
+
+  // Dismissing the keyless-readiness banner is remembered per-app (finding E
+  // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
+  // separately since the two apps are shown/dismissed independently).
+  const dismissLlmBanner = () => {
+    setLlmBannerDismissed(true);
+    lsSet("llmready_banner_dismissed_scriptide", "1");
+  };
 
   const handleScriptChange = (text: string) => {
     setScriptText(text);
@@ -719,6 +794,53 @@ export default function ScriptIDE({
       setIsCleaning(null);
     }
   };
+
+  // ── Simulate this script ─────────────────────────────────────────────────────
+  const showSimulateStatus = useCallback((type: "success" | "warning" | "error", message: string) => {
+    setSimulateStatus({ type, message });
+    if (simulateStatusTimerRef.current) clearTimeout(simulateStatusTimerRef.current);
+    simulateStatusTimerRef.current = setTimeout(() => setSimulateStatus(null), 8000);
+  }, []);
+
+  const handleSimulateScript = useCallback(async () => {
+    if (isSimulating) return;
+    setIsSimulating(true);
+    try {
+      const { payload, warnings } = buildScenarioFromScript(scriptText, characters);
+      if (payload.agents.length === 0) {
+        showSimulateStatus("error", warnings[0] ?? "Nothing to simulate — add characters or dialogue first.");
+        return;
+      }
+
+      // Mirrors StoryMachine.tsx's submitScenario(): reset first so a new
+      // scenario never inherits stale agents/ledger from a prior session,
+      // then init with the built payload.
+      const resetRes = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resetRes.ok) throw new Error(`Reset failed: ${resetRes.status}`);
+
+      const initRes = await fetch("/api/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+
+      const castMsg = `Cast of ${payload.agents.length} seeded into ${payload.nodes.length} location${payload.nodes.length === 1 ? "" : "s"}.`;
+      showSimulateStatus(
+        warnings.length > 0 ? "warning" : "success",
+        warnings.length > 0 ? `${castMsg} ${warnings.join(" ")}` : castMsg,
+      );
+      onOpenStoryMachine?.();
+    } catch (err) {
+      showSimulateStatus("error", (err as Error).message || "Failed to seed simulation. Check the server.");
+    } finally {
+      setIsSimulating(false);
+    }
+  }, [scriptText, characters, isSimulating, onOpenStoryMachine, showSimulateStatus]);
 
   // ── Snapshot handlers ────────────────────────────────────────────────────────
   const takeSnapshot = () => {
@@ -970,15 +1092,26 @@ export default function ScriptIDE({
             <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
           </div>
         )}
+        {fdxImportNotice && (
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
+            <span>{fdxImportNotice}</span>
+            <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
         <Toolbar
           isSaving={isSaving}
           isAnalyzing={engineState.isAnalyzing}
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
+          showScriptDoctor={showScriptDoctor}
+          liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
+          isSimulating={isSimulating}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
+          onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
+          onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -989,8 +1122,70 @@ export default function ScriptIDE({
           onExportFDX={exportFDX}
           onExportPDF={exportPDF}
           onExportDOCX={exportDOCX}
+          onSimulateScript={handleSimulateScript}
           onOpenStoryMachine={onOpenStoryMachine}
         />
+
+        {/* "Simulate this script" result banner — success/warning/error, dismissible,
+            auto-clears after 8s (matches cleanError's timer idiom below). */}
+        {simulateStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`px-4 py-2 border-b-2 border-black text-[11px] font-mono flex items-center justify-between gap-3 ${
+              simulateStatus.type === "error"
+                ? "bg-red-600 text-white"
+                : simulateStatus.type === "warning"
+                ? "bg-[#FFF4CC] text-black"
+                : "bg-green-600 text-white"
+            }`}
+          >
+            <span>{simulateStatus.message}</span>
+            <button
+              onClick={() => setSimulateStatus(null)}
+              aria-label="Dismiss"
+              className="shrink-0 font-bold uppercase text-[10px] border-2 border-current px-2 py-0.5 hover:opacity-80"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Deliverable 2: "New story" — returns to the setup wizard, clearing
+            the persisted config (App.tsx's onNewStory). The script draft
+            itself is untouched; only which screen App shows on next load. */}
+        {onNewStory && (
+          <div className="px-4 py-1 border-b-2 border-black bg-gray-100 flex items-center">
+            <button
+              onClick={() => {
+                if (window.confirm("Start a new story? This returns you to the setup wizard — your current draft stays saved.")) {
+                  onNewStory();
+                }
+              }}
+              title="Return to the setup wizard (your script draft is not deleted)"
+              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black transition-colors"
+            >
+              ← New Story
+            </button>
+          </div>
+        )}
+
+        {/* Finding E: keyless-honesty banner — shown once we know the server
+            has no AI key configured, dismissible and remembered per-app. */}
+        {llmReady === false && !llmBannerDismissed && (
+          <div className="px-4 py-2 border-b-2 border-black bg-[#FFF4CC] text-black text-[11px] font-mono flex items-center justify-between gap-3">
+            <span>
+              Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
+            </span>
+            <button
+              onClick={dismissLlmBanner}
+              aria-label="Dismiss"
+              className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* P9: inline copilot persona picker — selects the ghost-text voice. */}
         <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2">
@@ -1122,6 +1317,7 @@ export default function ScriptIDE({
             collabRoom={collabRoom}
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
+            liveDiagnostics={liveDiagnostics}
           />
 
           {/* Action Prompt Modal */}
@@ -1583,6 +1779,25 @@ export default function ScriptIDE({
                 };
               });
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── SCRIPT DOCTOR OVERLAY ── */}
+      <AnimatePresence>
+        {showScriptDoctor && (
+          <ScriptDoctorPanel
+            fountain={scriptText}
+            title={titlePage.title}
+            onLoadFountain={(text) => {
+              // Same path as confirmRestore (snapshot restore): set the
+              // editor's script text and re-trigger analysis, so a loaded
+              // .fdx→Fountain conversion behaves identically to any other
+              // full-script replacement for undo/collab purposes.
+              setScriptText(text);
+              triggerAnalysis(text);
+            }}
+            onClose={() => setShowScriptDoctor(false)}
           />
         )}
       </AnimatePresence>

@@ -17,8 +17,8 @@
 // • Bridge is pure: Stage reads happen at call site; bridge only does mapping.
 
 import { randomUUID } from 'crypto';
-import type { ActionLogEntry, EpistemicUpdate, EventCard } from '../../engine/types.ts';
-import type { StoryOp, AtomicFact } from '../ops/StoryOp.ts';
+import type { ActionLogEntry, EpistemicUpdate, EventCard, EmotionState } from '../../engine/types.ts';
+import type { StoryOp, AtomicFact, RelationshipDelta } from '../ops/StoryOp.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { StoryCommit } from '../state/StoryCommit.ts';
@@ -158,6 +158,80 @@ export function epistemicUpdateToOps(update: EpistemicUpdate): StoryOp[] {
   return ops;
 }
 
+// ── Theory-of-mind → SHIFT_RELATIONSHIP ─────────────────────────────────────
+// Fix A (simulation↔NVM integration audit): the bridge previously only ever
+// emitted UPDATE_READER_STATE / UPDATE_BELIEF / ADD_FACT / RAISE_CLOCK — the
+// simulation's theory-of-mind deltas (trust/affinity/debt) and OCC emotion
+// appraisals, its richest per-turn signal, never became StoryOps, so every NVM
+// relationship analytic (reincorporation, genericness, character-agency,
+// attribution — see server/nvm/proof/tier{2,3,4}/*.ts, all of which already
+// branch on SHIFT_RELATIONSHIP/APPRAISE_EMOTION) was permanently blind to
+// simulated stories. This section + emotionAppraisalsToOps below complete
+// that vocabulary. The diff itself is computed at the Orchestrator call site
+// (where before/after TheoryOfMind and EmotionState snapshots are actually in
+// scope) — this module only turns an already-computed diff into StoryOps,
+// deterministically, per the bridge's existing "no LLM, no randomness" rule.
+
+/** One already-computed theory-of-mind (or other relationship) delta, ready to
+ *  become a SHIFT_RELATIONSHIP op once it clears the materiality threshold. */
+export interface RelationshipDeltaInput {
+  pair: [string, string];
+  dimension: RelationshipDelta['dimension'];
+  amount: number;   // signed -1..1 — the (after - before) diff, computed by the caller
+  reason: string;
+}
+
+/** One already-computed emotion appraisal, ready to become an APPRAISE_EMOTION
+ *  op once it clears the significance threshold. */
+export interface EmotionAppraisalInput {
+  charId: string;
+  emotion: EmotionState;
+}
+
+// Minimum |amount| for a relationship delta to be committed as a StoryOp.
+// TheoryOfMind dimensions drift by small fractions almost every turn (CICERO
+// trust decay alone moves unobserved agents by 0.01 per update — see
+// Agent.ts's "CICERO trust decay" block) — committing every such micro-drift
+// would flood NarrativeState.relationships with noise and defeat the
+// "material change" signal every downstream relationship analytic relies on
+// (reincorporationProof, genericnessProof, the fountain/novel/stage
+// projectors). 0.03 is ~3x the largest routine per-turn decay step, so it
+// only lets through deltas an audience would actually notice.
+const RELATIONSHIP_DELTA_THRESHOLD = 0.03;
+
+export function relationshipDeltasToOps(deltas: RelationshipDeltaInput[]): StoryOp[] {
+  const ops: StoryOp[] = [];
+  for (const d of deltas) {
+    if (!Number.isFinite(d.amount) || Math.abs(d.amount) < RELATIONSHIP_DELTA_THRESHOLD) continue;
+    ops.push({
+      op: 'SHIFT_RELATIONSHIP',
+      pair: d.pair,
+      delta: { dimension: d.dimension, amount: d.amount, reason: d.reason },
+    });
+  }
+  return ops;
+}
+
+// Minimum dominant-emotion intensity for an appraisal to be committed as a
+// StoryOp. AppraisalEngine's own setDominant() (server/engine/AppraisalEngine.ts)
+// already treats intensity <= 10 as 'neutral' — not a real appraisal, just
+// baseline noise around zero. We use a slightly higher bar (15) here because a
+// StoryOp is a permanent canon entry (unlike the engine's own per-turn,
+// decaying emotionState), so the bar for "this appraisal is worth writing into
+// the story forever" is intentionally a notch stricter than the bar for
+// "this is the character's current mood".
+const EMOTION_SIGNIFICANCE_THRESHOLD = 15;
+
+export function emotionAppraisalsToOps(appraisals: EmotionAppraisalInput[]): StoryOp[] {
+  const ops: StoryOp[] = [];
+  for (const a of appraisals) {
+    if (a.emotion.dominant === 'neutral') continue;
+    if (!Number.isFinite(a.emotion.intensity) || a.emotion.intensity < EMOTION_SIGNIFICANCE_THRESHOLD) continue;
+    ops.push({ op: 'APPRAISE_EMOTION', charId: a.charId, emotion: a.emotion });
+  }
+  return ops;
+}
+
 // ── Turn → StoryCommit ────────────────────────────────────────────────────────
 
 export interface BridgeInput {
@@ -177,6 +251,24 @@ export interface BridgeInput {
   sceneIdx: number;
   /** Parent commit ID (null if first commit) */
   parentId: string | null;
+  /** Fix A: theory-of-mind deltas computed at the Orchestrator call site
+   *  (before/after diff of TheoryOfMind per acting agent). Additive/optional —
+   *  omitted by every pre-existing caller, which preserves their exact prior
+   *  behavior (no SHIFT_RELATIONSHIP ops). Defaults to []. */
+  relationshipDeltas?: RelationshipDeltaInput[];
+  /** Fix A: emotion appraisals computed at the Orchestrator call site
+   *  (post-AppraisalEngine.appraise() EmotionState per updated agent).
+   *  Additive/optional — same backward-compat guarantee as above.
+   *  Defaults to []. */
+  emotionAppraisals?: EmotionAppraisalInput[];
+  /** Fix C: called with the joined Tier-1 failing-proof names when this
+   *  turn's ops fail the proof gate and the commit is dropped. Additive/
+   *  optional — every pre-existing caller omits it, so the original
+   *  silent-log-only behavior (a logger.warn and a null return) is preserved
+   *  exactly. The Orchestrator wires this to accumulate a droppedCommits
+   *  count/reasons list so route handlers can surface it to the user instead
+   *  of the drop being invisible outside the server log. */
+  onTier1Reject?: (reasons: string) => void;
 }
 
 /**
@@ -186,15 +278,42 @@ export interface BridgeInput {
 export function buildTurnCommit(input: BridgeInput): StoryCommit | null {
   const {
     entry, card, primaryUpdate, extraUpdates = [],
+    relationshipDeltas = [], emotionAppraisals = [], onTier1Reject,
     turnIndex, beforeState, sceneIdx, parentId,
   } = input;
 
   // ── Collect ops ──────────────────────────────────────────────────────────────
-  const ops: StoryOp[] = [
+  const baseOps: StoryOp[] = [
     ...entryToOps(entry, card, turnIndex),
     ...epistemicUpdateToOps(primaryUpdate),
     ...extraUpdates.flatMap(u => epistemicUpdateToOps(u)),
   ];
+
+  // Fix A: ground new SHIFT_RELATIONSHIP / APPRAISE_EMOTION ops against the
+  // EXACT SAME "known character" rule IntentionalProof (Tier 1) enforces
+  // (server/nvm/proof/tier1/intentional.ts) — a character is grounded once
+  // they have a belief/emotion already in beforeState, or earn an
+  // UPDATE_BELIEF in this turn's own ops. Pre-filtering here means a
+  // relationship/emotion op for a not-yet-grounded character can never sink
+  // the WHOLE commit (including this turn's otherwise-valid belief updates)
+  // through IntentionalProof — it is simply dropped from this turn and picked
+  // up honestly on a later turn once the character is grounded some other way.
+  const known = new Set<string>([
+    ...Object.keys(beforeState.characterBeliefs),
+    ...Object.keys(beforeState.characterEmotions),
+  ]);
+  for (const op of baseOps) {
+    if (op.op === 'UPDATE_BELIEF') known.add(op.charId);
+  }
+
+  const relationshipOps = relationshipDeltasToOps(relationshipDeltas)
+    .filter((op): op is Extract<StoryOp, { op: 'SHIFT_RELATIONSHIP' }> =>
+      op.op === 'SHIFT_RELATIONSHIP' && known.has(op.pair[0]) && known.has(op.pair[1]));
+  const emotionOps = emotionAppraisalsToOps(emotionAppraisals)
+    .filter((op): op is Extract<StoryOp, { op: 'APPRAISE_EMOTION' }> =>
+      op.op === 'APPRAISE_EMOTION' && known.has(op.charId));
+
+  const ops: StoryOp[] = [...baseOps, ...relationshipOps, ...emotionOps];
 
   if (ops.length === 0) {
     // WAIT turn with no epistemic change — skip committing (nothing to record)
@@ -226,6 +345,11 @@ export function buildTurnCommit(input: BridgeInput): StoryCommit | null {
       charId: entry.char_id,
       failing,
     });
+    // Fix C: let the caller (Orchestrator) know a commit was dropped and why,
+    // so it can surface `droppedCommits` in its route responses instead of
+    // the drop being visible only in the server log. Additive — omitted by
+    // every pre-existing caller, so their behavior is unchanged.
+    onTier1Reject?.(failing);
     // Tier-1 failure on a live turn → skip but do NOT throw (engine must not stall)
     return null;
   }

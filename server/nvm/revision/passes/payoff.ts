@@ -543,6 +543,25 @@
 // suspenseDelta its third channel (relationshipShifts); PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID
 // gives emotionalShift its third channel (suspenseDelta); PAYOFF_CLOCK_DELTA_RELATIONAL_
 // AFTERMATH_VOID gives clockDelta≠0 its third channel (relationshipShifts).
+// Wave 1182 additions (Program v2, Type 1 — first signal-channel wave, sets the template for
+// every v2 wave after it): fountain-analyzer.ts's new question-answer latency signal
+// (questionsRaised/questionsResolved/questionsResolvedSameScene/questionsUnresolved — a
+// lexically-fingerprinted cross-scene question→answer pairing, distinct from curiosityDelta's
+// intensity score and from the prop/token-based clue seed/payoff mechanism, neither of which
+// tracks an individual question as a resolvable entity at all) gets its first 3 consumers, all
+// in this pass because payoff/continuity is precisely "promises made vs. promises kept," and an
+// unanswered dialogue question is a promise exactly like a planted clue. UNANSWERED_QUESTION_
+// FLOOD (average/aggregate mode — document-wide raised-vs-resolved ratio) catches open-loop
+// overload; INSTANT_GRATIFICATION_PATTERN (average/aggregate mode on TIMING rather than rate —
+// fires even when the flood check doesn't, since a story can resolve everything and still
+// resolve it all instantly) catches tension that never survives a scene boundary; DEAD_QUESTION_
+// ZONE (zone presence/absence mode) catches localized abandonment the two document-wide averages
+// structurally cannot see (a story can pass both averages while one act's questions die
+// entirely, masked by another act's strong resolution rate). All three are hand-rolled rather
+// than built on lib/checks.ts templates: the shared library's shapes test scene-level boolean
+// predicates (occurrence, co-occurrence, zone clustering of a single boolean signal), not a
+// numeric-ratio comparison across summed fields — a genuinely different shape from anything it
+// currently expresses.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6560,6 +6579,109 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         description: `Every one of the story's ${r1168c.triggerCount} scenes that move the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1168c.aftermathCount} such shifts occur elsewhere. A deadline that shifts without ever moving how characters stand with each other leaves the payoff machinery's clock isolated from the interpersonal stakes the changing pressure should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one clock-delta shift, let it move a relationship — the changing pressure forcing an alliance or a rupture — so the deadline carries interpersonal weight, not just a shifting number.`,
       });
+    }
+  }
+
+  // UNANSWERED_QUESTION_FLOOD — average/aggregate mode over the new question-answer latency
+  // channel (Wave 1182). n≥6 scenes, ≥6 substantive dialogue questions raised story-wide.
+  // Fires when the document-wide resolution rate (questionsResolved / questionsRaised, any
+  // latency, same-scene or cross-scene) is ≤15% — an open-loop overload where the audience is
+  // asked to track far more threads than the story ever closes. Distinct from ORPHAN_CLUE
+  // (Wave 39, single prop/token instances against act position) and from every curiosityDelta-
+  // based check in this file (an intensity score with no per-question resolution tracking at
+  // all) — this is the first check in the pass, or the file, that can even ask "how many of the
+  // questions this story raised did it ever answer."
+  {
+    const totalRaised1182a = records.reduce((s, r) => s + (r.questionsRaised ?? 0), 0);
+    const totalResolved1182a = records.reduce((s, r) => s + (r.questionsResolved ?? 0), 0);
+    const MIN_RAISED_1182A = 6;
+    if (records.length >= 6 && totalRaised1182a >= MIN_RAISED_1182A) {
+      const resolutionRate1182a = totalResolved1182a / totalRaised1182a;
+      if (resolutionRate1182a <= 0.15) {
+        const pct1182a = Math.round(resolutionRate1182a * 100);
+        issues.push({
+          location: `${records.length} scenes — ${totalRaised1182a} substantive question(s) raised story-wide`,
+          rule: 'UNANSWERED_QUESTION_FLOOD',
+          severity: 'major',
+          description: `The story raises ${totalRaised1182a} substantive question(s) in dialogue across its scenes but resolves only ${totalResolved1182a} of them anywhere (${pct1182a}%) — the audience is left holding far more open threads than the script ever closes, and most of what's asked reads as a promise the story never intends to keep.`,
+          suggestedFix: `Pick the 2-3 questions that matter most to the plot or theme and give each an explicit answer scene later in the script; cut, merge, or consciously flag the rest as unresolved so the audience isn't tracking a dozen open questions with no path to a payoff.`,
+        });
+      }
+    }
+  }
+
+  // INSTANT_GRATIFICATION_PATTERN — average/aggregate mode on TIMING rather than RATE (the
+  // flood check's mirror): fires even when resolution rate is healthy, because it measures HOW
+  // FAST answers arrive, not HOW MANY. n≥6 scenes, ≥4 resolved questions story-wide. Fires when
+  // ≥80% of all resolved questions are answered in the very same scene they're raised in
+  // (questionsResolvedSameScene / questionsResolved), so tension never survives a scene boundary.
+  // Distinct from PAYOFF_TOO_QUICK (Wave 39, a single clue's plant-to-payoff scene gap ≤1) —
+  // that's a per-clue instance check against the token-based clue mechanism; this is a
+  // document-wide proportion against the question channel specifically, and a story can pass
+  // PAYOFF_TOO_QUICK entirely (no clue paid off same/next scene) while still instant-answering
+  // every dialogue question it raises, since clues and questions are tracked by unrelated
+  // extraction mechanisms.
+  {
+    const totalResolved1182b = records.reduce((s, r) => s + (r.questionsResolved ?? 0), 0);
+    const totalSameScene1182b = records.reduce((s, r) => s + (r.questionsResolvedSameScene ?? 0), 0);
+    const MIN_RESOLVED_1182B = 4;
+    if (records.length >= 6 && totalResolved1182b >= MIN_RESOLVED_1182B) {
+      const sameSceneRatio1182b = totalSameScene1182b / totalResolved1182b;
+      if (sameSceneRatio1182b >= 0.8) {
+        const pct1182b = Math.round(sameSceneRatio1182b * 100);
+        issues.push({
+          location: `${totalResolved1182b} resolved question(s) story-wide`,
+          rule: 'INSTANT_GRATIFICATION_PATTERN',
+          severity: 'major',
+          description: `${totalSameScene1182b} of ${totalResolved1182b} resolved question(s) (${pct1182b}%) are answered in the very same scene they're raised in — a character asks and the story answers before the scene is over, so curiosity never survives long enough to pull the audience into the next scene.`,
+          suggestedFix: `Hold at least a few of these questions open past the scene that raises them — let a character's question go unanswered while the story moves on, then pay it off several scenes later once the audience has had time to want the answer.`,
+        });
+      }
+    }
+  }
+
+  // DEAD_QUESTION_ZONE — zone presence/absence mode, the structural-localization counterpart to
+  // the two document-wide averages above (a story can pass both — healthy resolution rate,
+  // healthy latency — while one structural zone's questions die there entirely, masked by
+  // another zone's strong resolution). n≥8 scenes, divided into the file's standard four zones
+  // (FOUR_ZONE_NAMES). Fires when one zone raises ≥2 questions and resolves NONE of them (rate
+  // exactly 0) while another zone raises ≥2 and resolves ≥50% — proving the abandonment is
+  // localized to a specific act rather than a story-wide pattern the aggregate checks above would
+  // already have caught. Hand-rolled rather than checkZoneImbalance/checkZoneCluster: those
+  // templates test presence/absence or share-of-total of a single boolean signal, not a
+  // per-zone RESOLUTION-RATE comparison between two numeric sums — a shape neither expresses.
+  {
+    const n1182c = records.length;
+    if (n1182c >= 8) {
+      const zoneRaised1182c: [number, number, number, number] = [0, 0, 0, 0];
+      const zoneUnresolved1182c: [number, number, number, number] = [0, 0, 0, 0];
+      for (let i = 0; i < n1182c; i++) {
+        const zone = Math.min(3, Math.floor((i / n1182c) * 4));
+        zoneRaised1182c[zone] += records[i].questionsRaised ?? 0;
+        zoneUnresolved1182c[zone] += records[i].questionsUnresolved ?? 0;
+      }
+      const MIN_ZONE_RAISED_1182C = 2;
+      let deadZoneIdx1182c = -1;
+      let healthyZoneIdx1182c = -1;
+      let healthyRate1182c = 0;
+      for (let zone = 0; zone < 4; zone++) {
+        if (zoneRaised1182c[zone] < MIN_ZONE_RAISED_1182C) continue;
+        const rate = (zoneRaised1182c[zone] - zoneUnresolved1182c[zone]) / zoneRaised1182c[zone];
+        if (rate === 0 && deadZoneIdx1182c === -1) deadZoneIdx1182c = zone;
+        if (rate >= 0.5 && rate > healthyRate1182c) { healthyRate1182c = rate; healthyZoneIdx1182c = zone; }
+      }
+      if (deadZoneIdx1182c !== -1 && healthyZoneIdx1182c !== -1 && deadZoneIdx1182c !== healthyZoneIdx1182c) {
+        const deadRaised = zoneRaised1182c[deadZoneIdx1182c];
+        const healthyRaised = zoneRaised1182c[healthyZoneIdx1182c];
+        const healthyPct = Math.round(healthyRate1182c * 100);
+        issues.push({
+          location: `${FOUR_ZONE_NAMES[deadZoneIdx1182c]} — ${deadRaised} question(s) raised, none resolved`,
+          rule: 'DEAD_QUESTION_ZONE',
+          severity: 'major',
+          description: `${FOUR_ZONE_NAMES[deadZoneIdx1182c]} raises ${deadRaised} substantive question(s) and resolves none of them anywhere, while ${FOUR_ZONE_NAMES[healthyZoneIdx1182c]} raises ${healthyRaised} and resolves ${healthyPct}% of them — the abandonment is localized to one structural zone, not a story-wide payoff problem.`,
+          suggestedFix: `Give at least one of ${FOUR_ZONE_NAMES[deadZoneIdx1182c]}'s open questions a payoff before that zone ends, or relocate a couple of its questions to later in the script where the story already knows how to answer them.`,
+        });
+      }
     }
   }
 

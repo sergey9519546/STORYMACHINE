@@ -22,8 +22,9 @@
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
-import type { PassResult, ApprovedSpan, StoryContext } from './passes/types.ts';
+import type { PassResult, ApprovedSpan, StoryContext, PassName, RevisionPass, PassInput } from './passes/types.ts';
 import { logger } from '../../lib/logger.ts';
+import { isDiagnoseOnly } from './rewrite.ts';
 
 import { structurePass }    from './passes/structure.ts';
 import { causalityPass }    from './passes/causality.ts';
@@ -71,6 +72,44 @@ export interface RevisionProgressEvent {
 }
 
 /**
+ * Run a single pass inside the diagnose-only parallel fast path (see the
+ * isDiagnoseOnly() branch in runRevisionPipeline below for the full safety
+ * argument for why this is provably equivalent to the sequential path in
+ * that mode). Writes into resultsByIndex[index] rather than returning a
+ * value, so the final passResults order is pinned to pipeline order by
+ * array index regardless of which pass's promise settles first, and emits
+ * onProgress as soon as THIS pass's own result is ready — not gated on any
+ * other pass finishing first — while still tagging the event with this
+ * pass's fixed pipeline passIndex, exactly as the sequential loop does.
+ */
+async function runDiagnosePass(
+  entry: { name: PassName; fn: RevisionPass },
+  index: number,
+  totalPasses: number,
+  input: PassInput,
+  resultsByIndex: PassResult[],
+  onProgress?: (event: RevisionProgressEvent) => void,
+): Promise<void> {
+  const { name, fn } = entry;
+  let result: PassResult;
+  try {
+    result = await fn(input);
+    // Guard mirrors the sequential loop's below: a pass returning an empty
+    // string is still logged as an anomaly, even though diagnose-only mode
+    // never threads revisedFountain into a shared currentFountain.
+    if (!result.revisedFountain?.trim() && result.revisedFountain !== undefined) {
+      logger.error('revision_pass_empty_fountain', { passName: name, passIndex: index });
+      result = { ...result, revisedFountain: input.fountain, changed: false };
+    }
+  } catch (err) {
+    logger.error('revision_pass_failed', { passIndex: index, passName: name, error: (err as Error).message });
+    result = { pass: name, issues: [], revisedFountain: input.fountain, changed: false, summary: `Pass skipped due to error` };
+  }
+  resultsByIndex[index] = result;
+  onProgress?.({ type: 'pass_complete', passIndex: index, totalPasses, passResult: result });
+}
+
+/**
  * Run all 12 revision passes over a compiled screenplay.
  *
  * Each pass receives the fountain text as modified by all prior passes.
@@ -90,6 +129,13 @@ export async function runRevisionPipeline(
   approvedSpans: ApprovedSpan[] = [],
   onProgress?: (event: RevisionProgressEvent) => void,
   storyContext?: StoryContext,
+  /** TEST-ONLY escape hatch (tests/core/pipeline-parallel.test.ts): forces
+   *  the pre-existing sequential per-pass loop even when called from inside
+   *  runDiagnoseOnly(), so a test can build an independent reference report
+   *  from the exact same inputs and compare it against the parallel
+   *  diagnose-only fast path below. No production caller passes this —
+   *  runScriptDoctor (doctor.ts) never sets it, and it defaults to false. */
+  forceSequentialForTest = false,
 ): Promise<RevisionResult> {
   const originalFountain = compiled.fountain;
   const annotations = compiled.annotations ?? [];
@@ -106,7 +152,9 @@ export async function runRevisionPipeline(
   }
 
   // The passes run sequentially; each receives the output of the prior pass.
-  const passes: Array<{ name: import('./passes/types.ts').PassName; fn: import('./passes/types.ts').RevisionPass }> = [
+  // (Diagnose-only mode is the exception — see the isDiagnoseOnly() branch
+  // below, which runs all 14 concurrently instead.)
+  const passes: Array<{ name: PassName; fn: RevisionPass }> = [
     { name: 'structure',     fn: structurePass },
     { name: 'causality',     fn: causalityPass },
     { name: 'intention',     fn: intentionPass },
@@ -126,34 +174,85 @@ export async function runRevisionPipeline(
   const passResults: PassResult[] = [];
   let currentFountain = originalFountain;
 
-  for (let i = 0; i < passes.length; i++) {
-    const { name, fn } = passes[i];
-    try {
-      let result = await fn({
-        fountain: currentFountain,
-        original: originalFountain,
-        annotations,
-        structure,
-        records,
-        approvedSpans,
-        storyContext,
-        priorPassResults: passResults.length > 0 ? [...passResults] : undefined,
-      });
-      // Guard: if a pass returns empty fountain, keep prior pass output so empty
-      // results don't cascade through the remaining 11 passes.
-      if (result.revisedFountain?.trim()) {
-        currentFountain = result.revisedFountain;
-      } else if (result.revisedFountain !== undefined) {
-        logger.error('revision_pass_empty_fountain', { passName: name, passIndex: i });
-        result = { ...result, revisedFountain: currentFountain, changed: false };
+  if (isDiagnoseOnly() && !forceSequentialForTest) {
+    // ── Diagnose-only fast path: run all 14 passes concurrently ───────────
+    // Safe ONLY because of two properties verified by inspection of every
+    // pass file (server/nvm/revision/passes/*.ts) and of rewrite.ts:
+    //
+    // 1. revisedFountain never actually changes in this mode. Every pass's
+    //    trailing `rewritePass(...)` call hits rewrite.ts's diagnose-only
+    //    guard (`if (isDiagnoseOnly()) return { revised: fountain, usedLLM:
+    //    false }`) BEFORE it ever reads its priorPassResults argument or
+    //    does any prompt-building/LLM work — so `revised === fountain`
+    //    always and `changed` is always false. currentFountain therefore
+    //    never diverges from originalFountain in this mode even in the
+    //    sequential loop below, so every pass can safely receive
+    //    fountain: originalFountain directly with no thread-through.
+    //
+    // 2. No pass's DIAGNOSTIC (issue-producing) code reads priorPassResults.
+    //    Every pass file has exactly one read site for it — the same
+    //    trailing rewritePass(...) call from (1), whose body never runs in
+    //    this mode. So passing priorPassResults: undefined to every pass
+    //    changes no issue any pass reports.
+    //
+    // storyContext is NOT similarly inert, so it is still threaded through
+    // unchanged below: originality.ts's genre-cliché check and the whole of
+    // theme.ts read storyContext directly in diagnostic logic.
+    //
+    // records/annotations/structure/approvedSpans are read-only across all
+    // 14 passes (verified: no pass mutates them — every pass collects
+    // issues into its own pass-local `const issues = []`), so sharing the
+    // same references across concurrent invocations is safe.
+    //
+    // The sequential loop's `else` branch below is UNCHANGED and still runs
+    // byte-for-byte as before for rewrite mode (isDiagnoseOnly() false),
+    // where currentFountain genuinely threads pass-to-pass and
+    // priorPassResults genuinely coordinates the LLM rewrite prompts.
+    const resultsByIndex: PassResult[] = new Array(passes.length);
+    const sharedInput: PassInput = {
+      fountain: originalFountain,
+      original: originalFountain,
+      annotations,
+      structure,
+      records,
+      approvedSpans,
+      storyContext,
+      priorPassResults: undefined,
+    };
+    await Promise.all(
+      passes.map((entry, i) => runDiagnosePass(entry, i, passes.length, sharedInput, resultsByIndex, onProgress)),
+    );
+    passResults.push(...resultsByIndex);
+  } else {
+    for (let i = 0; i < passes.length; i++) {
+      const { name, fn } = passes[i];
+      try {
+        let result = await fn({
+          fountain: currentFountain,
+          original: originalFountain,
+          annotations,
+          structure,
+          records,
+          approvedSpans,
+          storyContext,
+          priorPassResults: passResults.length > 0 ? [...passResults] : undefined,
+        });
+        // Guard: if a pass returns empty fountain, keep prior pass output so empty
+        // results don't cascade through the remaining 11 passes.
+        if (result.revisedFountain?.trim()) {
+          currentFountain = result.revisedFountain;
+        } else if (result.revisedFountain !== undefined) {
+          logger.error('revision_pass_empty_fountain', { passName: name, passIndex: i });
+          result = { ...result, revisedFountain: currentFountain, changed: false };
+        }
+        passResults.push(result);
+        onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
+      } catch (err) {
+        logger.error('revision_pass_failed', { passIndex: i, passName: name, error: (err as Error).message });
+        const noopResult: PassResult = { pass: name, issues: [], revisedFountain: currentFountain, changed: false, summary: `Pass skipped due to error` };
+        passResults.push(noopResult);
+        onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: noopResult });
       }
-      passResults.push(result);
-      onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: result });
-    } catch (err) {
-      logger.error('revision_pass_failed', { passIndex: i, passName: name, error: (err as Error).message });
-      const noopResult: PassResult = { pass: name, issues: [], revisedFountain: currentFountain, changed: false, summary: `Pass skipped due to error` };
-      passResults.push(noopResult);
-      onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: noopResult });
     }
   }
 

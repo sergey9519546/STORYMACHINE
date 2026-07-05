@@ -1,81 +1,91 @@
 # STORYMACHINE — Project Memory
 
-## CRITICAL RULE — applies to EVERYTHING
+Orientation: `ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
+`server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` (binding quality spec for
+revision-engine work).
 
-For every feature or task, independently determine the strongest possible
-implementation and build it to the highest standard of **functionality,
-reliability, usability, performance, compatibility, and maintainability**.
+## Quality bar
 
-This is not optional and not scoped to one kind of work. Before writing code,
-decide what the best version of the change actually is — not the quickest one
-that passes — and build that. Concretely, for each task:
+Build the strongest version of a change, not the quickest one that passes:
+edge cases handled, inputs guarded, fire + no-fire tests for every new rule,
+consistency with the surrounding file's patterns. For revision waves this bar
+is binding and precisely specified — read the guarantee doc before authoring
+one.
 
-- **Functionality**: solve the real problem completely; handle the edge cases,
-  not just the happy path.
-- **Reliability**: guard inputs, fail safely, and prove it with tests (both
-  the firing case and the non-firing/no-op case).
-- **Usability**: clear names, clear messages, output that helps the next reader.
-- **Performance**: no needless passes over data; choose appropriate algorithms
-  and data structures.
-- **Compatibility**: match existing patterns, types, and conventions in the file
-  and the codebase; don't break callers.
-- **Maintainability**: distinct, well-documented logic; explain *why* in comments
-  where intent isn't obvious; keep changes consistent with surrounding code.
+## Commands
+
+`npm run dev|build|lint|test` are standard (`lint` = `tsc --noEmit`;
+Node ≥ 22.6). The one non-obvious command:
+
+```
+node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast
+```
+
+Run the file(s) you touched, then the full `npm test` (0 failures required)
+before every push. CI runs lint + test + build on every branch, plus a
+`console.` grep over `server/**` — a hit fails the build.
 
 ## Security constraints (must always hold)
 
-- API key MUST be written only to `.env` (gitignored) — never in tracked files.
-- All AI calls go through server-side Express routes — never from the frontend bundle.
-- All routes sit behind `gameLimiter` (or stricter endpoint-specific limiters).
-- No new `console.*` in `server/**`.
-- Pre-existing `apiKey` identifiers in `src/components/SettingsPanel.tsx` are
-  runtime input-field prop bindings, not embedded secrets — leave them alone.
+- API keys live only in `.env` (gitignored) and are never serialized to
+  clients — `getPublicConfig()` exposes boolean flags only. `/api/ai-config`
+  additionally reports `llmReady`, which ORs the TWO independent key sources
+  (env `GEMINI_API_KEY` and the multi-provider config) — checking only one is
+  a recurring trap.
+- All AI calls go through server-side Express routes — never from the
+  frontend bundle.
+- Every route takes `gameLimiter` — or the stricter `aiLimiter` when it can
+  trigger LLM calls — and zod-validates its body (`server/lib/validation.ts`).
+- No new `console.*` under `server/**` (CI-enforced); use
+  `server/lib/logger.ts`.
 
-## Standing task — NVM revision quality-check waves
+## Gotchas
 
-Continuously add **3 new narrative quality checks per wave** to the NVM revision
-engine, indefinitely, rotating through the pass files in
-`server/nvm/revision/passes/`:
+- The server deliberately boots WITHOUT an AI key into analysis-only mode —
+  the deterministic surface (doctor, diagnose, coverage, what-if, room,
+  interview receipts) is the product's front door. Do not reintroduce a
+  fatal key check in `server.ts`.
+- `apiKey` identifiers in `src/components/SettingsPanel.tsx` are input-field
+  prop bindings, not embedded secrets — leave them alone.
+- `.claude/` and `data/` are gitignored: nothing placed there is shared via
+  git unless `.gitignore` changes first.
+- Calibration corpus (`server/nvm/analyze/calibration/corpus.ts`): band
+  monotonicity is a property of the CONTROLLED-RICHNESS DESIGN — all 20
+  samples share scene/word budgets and structural-signal presence, so craft
+  is the only variable. Changing one band's richness without matching every
+  other band reintroduces the measured confound and the calibration tests
+  will (correctly) fail. See `reference.ts`'s header.
+- Formula constants in `server/nvm/analyze/doctor.ts` stay function-local:
+  module-level consts hit a temporal dead zone through the doctor↔reference
+  circular import and the failure is silently swallowed by a fallback
+  (documented at the site — it cost a real bug hunt).
+- Wave rotation order ≠ revision pipeline execution order — two different
+  14-pass orderings that are easy to conflate.
 
-```
-dialogue → character-arc → conflict → intention → originality → pacing →
-payoff → relationship-arc → rhythm → structure → theme → voice → belief →
-causality → (repeat)
-```
+## Standing task — Wave Program v2
 
-Each wave:
-1. Pick the next pass file in the rotation. Identify **empty cells** in that
-   pass's coverage matrix (signals × analytical modes × structural positions)
-   and implement the 3 checks that are *maximally distinct* from every existing
-   rule — strongest implementation per the CRITICAL RULE above.
-2. Every new check carries full guard conditions and a comment block explaining
-   the rule and an explicit **distinctness rationale** vs. related rules.
-3. Update the file's header comment with a "Wave N additions:" summary line.
-4. Add **6 tests** (fire + no-fire per check) in `tests/passes/<pass>.test.ts`
-   (e.g. `tests/passes/conflict.test.ts`), inserted BEFORE the most recent
-   prior wave's `describe` block in that file (newest-first order). The
-   monolithic root `test.ts` no longer exists — it was split one file per
-   pass (audit M2.1) specifically so each wave only touches a single ~3–5k
-   line file instead of a 64k-line one.
-5. Run `node --experimental-strip-types tests/passes/<pass>.test.ts` for the
-   file you touched — require **0 failures**. Run the full suite
-   (`npm test`) before pushing to confirm nothing else regressed.
-6. Commit and push to the working branch (`claude/review-merge-prs-IJKUO`).
+The matrix-filling era (waves 1–1181) is complete: the signals × modes ×
+positions coverage matrix is saturated and further cells are permutation
+farming. Waves continue at the same cadence and rigor — 3 new checks +
+6 tests (fire + no-fire) per wave, guarantee-doc acceptance standard —
+but rotate through four wave TYPES with genuine headroom:
 
-Analytical modes to draw distinct checks from: average/aggregate, single-peak
-isolation, co-occurrence/decoupling, distribution/timing, zone presence/absence,
-underweight/bloat, sequence/aftermath, backward-cause, run-based, valence.
+1. **Signal channels** — extract a genuinely new per-scene signal in
+   `server/nvm/analyze/fountain-analyzer.ts` (and, where applicable, the
+   ops-derived records in `screenplay/memory.ts`), then ship the first
+   3 checks consuming it.
+2. **Excellence detectors** — rules that detect what a script does WELL
+   (feeding the earned-strengths surface), with the same guard discipline
+   as defect rules. Never-padded: an excellence rule that fires on
+   mediocre input is a failing rule.
+3. **Genre-conditioned variants** — give the highest-firing generic rules
+   genre-aware thresholds via `server/lib/genre-router.ts`, so a slow-burn
+   drama and a thriller stop being judged by one pacing yardstick.
+4. **Root-cause templates** — new co-occurrence clusters in
+   `server/nvm/analyze/cluster.ts` that convert recurring symptom groups
+   into named, plain-language diagnoses.
 
-### Test runner
-
-```
-node --experimental-strip-types tests/passes/<pass>.test.ts   # the file you touched
-npm test                                                       # full suite before pushing
-```
-
-### Commit message trailer
-
-```
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01AAt5miy6V8g5uGQWqtvyZU
-```
+Rotation: cycle 1 → 2 → 3 → 4 → repeat, one type per wave. Full procedure
+and per-type acceptance criteria: `WAVE_QUALITY_GUARANTEE.md` § "Program v2".
+Commit to the branch designated for the current session — never a branch
+name hardcoded here.

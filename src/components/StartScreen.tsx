@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu } from "lucide-react";
+import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload } from "lucide-react";
 import { StoryConfig } from "../types";
 import { EXPLAINERS } from "./startscreen/explainers.config";
 import { ExplainerCard } from "./startscreen/ExplainerCard";
@@ -11,6 +11,28 @@ interface StartScreenProps {
   isGenerating: boolean;
   onOpenStoryMachine?: () => void;
 }
+
+// A minimal default config for the two "skip the wizard entirely" entry
+// points below (open editor directly / open a script file). Intentionally
+// duplicated rather than imported from App.tsx's DEFAULT_STORY_CONFIG: App
+// lazy-imports StartScreen, so a reverse static import here would form an
+// import cycle; this object is tiny and has no behavior to drift out of sync.
+const DEFAULT_STORY_CONFIG: StoryConfig = {
+  theme: "Untitled Story",
+  backstory: "",
+  format: "film",
+  structure: "save_the_cat",
+  directorStyle: "fincher",
+  emotionalArc: "man_in_a_hole",
+};
+
+// Journey-audit finding D/C: "open a script file" support. Only .fountain/.txt
+// can be dropped straight into the editor as Fountain source; .fdx is Final
+// Draft XML and this app has no client-side .fdx→Fountain converter (src/lib/
+// fdx.ts only exports the reverse direction, Fountain→FDX — the only .fdx
+// *import* conversion lives server-side, in ScriptDoctorPanel's upload flow).
+const OPEN_FILE_EXTS = /\.(fountain|txt|fdx)$/i;
+const MAX_OPEN_FILE_SIZE = 5 * 1024 * 1024; // 5 MB — generous for a feature-length script
 
 export default function StartScreen({
   onStart,
@@ -27,6 +49,11 @@ export default function StartScreen({
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  // "Open a script file" (finding D): a second, always-available entry point
+  // on step 1 that goes straight into the editor — distinct from the
+  // "Ingested Files" uploads above, which only ever become hidden AI context.
+  const [openFileError, setOpenFileError] = useState<string | null>(null);
+  const openFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -69,6 +96,58 @@ export default function StartScreen({
       };
       reader.readAsText(file);
     });
+  };
+
+  // Opens an uploaded script file straight into ScriptIDE, skipping the
+  // wizard. .fountain/.txt content becomes the editor's initial draft by
+  // writing the exact localStorage key ScriptIDE's lsGet("script_draft")
+  // reads on mount (see ScriptIDE.tsx). .fdx has no client-side converter, so
+  // it's handed off via sessionStorage for ScriptIDE to surface as a toast
+  // pointing at Script Doctor's server-side conversion instead of silently
+  // dumping raw Final Draft XML into the Fountain editor.
+  const handleOpenScriptFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (openFileInputRef.current) openFileInputRef.current.value = "";
+    if (!file) return;
+    setOpenFileError(null);
+
+    if (!OPEN_FILE_EXTS.test(file.name)) {
+      setOpenFileError(`"${file.name}" isn't a .fountain, .txt, or .fdx file.`);
+      return;
+    }
+    if (file.size === 0) {
+      setOpenFileError(`"${file.name}" is empty — there's nothing to open.`);
+      return;
+    }
+    if (file.size > MAX_OPEN_FILE_SIZE) {
+      setOpenFileError(`"${file.name}" is over the 5 MB limit for a single script.`);
+      return;
+    }
+
+    const isFdx = /\.fdx$/i.test(file.name);
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setOpenFileError(`Couldn't read "${file.name}" — try re-saving it and uploading again.`);
+    };
+    reader.onload = (ev) => {
+      const text = ev.target?.result;
+      if (typeof text !== "string" || text.trim() === "") {
+        setOpenFileError(`"${file.name}" is empty — there's nothing to open.`);
+        return;
+      }
+      try {
+        if (isFdx) {
+          sessionStorage.setItem("sm_fdx_import_pending", file.name);
+        } else {
+          localStorage.setItem("script_draft", text);
+        }
+      } catch {
+        setOpenFileError(`Couldn't open "${file.name}" — your browser is blocking local storage (private mode?).`);
+        return;
+      }
+      onStart(DEFAULT_STORY_CONFIG);
+    };
+    reader.readAsText(file);
   };
 
   const handleStart = () => {
@@ -141,6 +220,48 @@ export default function StartScreen({
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 />
+
+                {/* Finding C/D: the wizard is mandatory for nobody. Both paths
+                    below skip straight to the editor with a default config —
+                    Next (below) stays theme-gated for the wizard itself, but
+                    these are always available regardless of theme. */}
+                <div className="pt-2 border-t-4 border-black flex flex-col sm:flex-row gap-4">
+                  <button
+                    type="button"
+                    onClick={() => onStart(DEFAULT_STORY_CONFIG)}
+                    disabled={isGenerating}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
+                  >
+                    <FileText className="w-4 h-4" /> I Have A Script — Open The Editor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openFileInputRef.current?.click()}
+                    disabled={isGenerating}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
+                  >
+                    <Upload className="w-4 h-4" /> Open A Script File
+                  </button>
+                  <input
+                    type="file"
+                    accept=".fountain,.txt,.fdx"
+                    ref={openFileInputRef}
+                    onChange={handleOpenScriptFile}
+                    className="hidden"
+                  />
+                </div>
+                {openFileError && (
+                  <div className="text-xs font-mono text-red-600 border-2 border-red-600 bg-red-50 px-3 py-2 flex items-center justify-between gap-3">
+                    <span>{openFileError}</span>
+                    <button
+                      onClick={() => setOpenFileError(null)}
+                      aria-label="Dismiss"
+                      className="font-bold leading-none hover:opacity-70"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
 

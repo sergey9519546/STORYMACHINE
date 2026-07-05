@@ -12,7 +12,7 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 import SettingsPanel from "./SettingsPanel";
 import WhatIfPanel from "./WhatIfPanel";
@@ -27,6 +27,7 @@ import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
 import { NarrativeAnalyticsPanel } from "./NarrativeAnalyticsPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
+import { withSession } from "../lib/session.ts";
 import { SelfPlayPanel } from "./SelfPlayPanel";
 import { ProofInspectorPanel } from "./ProofInspectorPanel";
 import { QualityEnginesPanel } from "./QualityEnginesPanel";
@@ -39,6 +40,8 @@ import { MomentumPanel } from "./MomentumPanel";
 import { VoiceDNAPanel } from "./VoiceDNAPanel";
 import { LivePlayPanel } from "./LivePlayPanel";
 import { RevisionPanel } from "./RevisionPanel";
+import InterviewPanel from "./InterviewPanel";
+import { RoomPanel } from "./RoomPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -134,6 +137,23 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
   const [showLivePlay, setShowLivePlay]         = useState(false);
   const [showRevision, setShowRevision]         = useState(false);
+  const [showInterview, setShowInterview]       = useState(false);
+  const [showRoom, setShowRoom]                 = useState(false);
+
+  // Keyless-honesty banner (finding E): null until the readiness check
+  // resolves, so the banner never flashes an incorrect "no key" warning on
+  // first paint. Dismissal is remembered per-app, independently of ScriptIDE's
+  // own banner (different localStorage key — the two apps are shown/hidden
+  // independently and each has its own idiom for "don't nag again").
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  const [llmBannerDismissed, setLlmBannerDismissed] = useState(() => {
+    try { return localStorage.getItem("sm_llmready_banner_dismissed_storymachine") === "1"; }
+    catch { return false; }
+  });
+  const dismissLlmBanner = useCallback(() => {
+    setLlmBannerDismissed(true);
+    try { localStorage.setItem("sm_llmready_banner_dismissed_storymachine", "1"); } catch { /* best-effort */ }
+  }, []);
 
   const fetchActivePressures = useCallback(async () => {
     try {
@@ -157,6 +177,20 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchSpineData();
     fetchActivePressures();
   }, [fetchActivePressures]);
+
+  // Finding E: fetch AI readiness once on mount. Non-fatal on failure — the
+  // banner just never renders if we can't determine readiness rather than
+  // guessing wrong and nagging a user who's already configured a key.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => { /* non-critical — banner stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // C5: unified fetch-failure notifier — shows a toast only when the component
   // is still mounted (suppresses spurious errors fired during unmount).
@@ -328,11 +362,19 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const handleTurn = async (agentId: string) => {
     setLoading(true);
     try {
-      await fetch("/api/turn", {
+      const res = await fetch("/api/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agentId }),
       });
+      // Finding A: this previously never checked res.ok, so a failed turn
+      // (most commonly: no AI key configured) surfaced as silent nothing —
+      // the UI just sat there with no feedback at all.
+      if (!res.ok) {
+        throw new Error(
+          "Turn failed — if you haven't configured an AI key, generation is unavailable. Analysis features still work."
+        );
+      }
       await refreshAll();
     } catch (e) {
       showError((e as Error).message ?? 'Turn failed.');
@@ -347,7 +389,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     setLoading(true);
     setStreamLog([]);
     try {
-      const url = `/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`;
+      const url = withSession(`/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`);
       const evtSource = new EventSource(url);
       evtSourceRef.current = evtSource;
       await new Promise<void>((resolve, reject) => {
@@ -472,6 +514,21 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         >
           <span>{errorMsg}</span>
           <button onClick={() => setErrorMsg(null)} className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+        </div>
+      )}
+      {/* Finding E: keyless-honesty banner — non-nagging (dismissible,
+          remembered per-app) and only rendered once readiness is known. */}
+      {llmReady === false && !llmBannerDismissed && (
+        <div className="mb-6 border-4 border-black bg-[#FFF4CC] text-black px-4 py-3 font-mono text-xs flex items-center justify-between gap-4">
+          <span>
+            Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
+          </span>
+          <button
+            onClick={dismissLlmBanner}
+            className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-1 hover:bg-black hover:text-white transition-colors"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">
@@ -704,6 +761,22 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>✒</span>
             <span className="hidden sm:inline">Revise</span>
+          </button>
+          <button
+            onClick={() => setShowInterview(true)}
+            title="Character Interview — talk to a character, grounded in their real psychology"
+            className="bg-fuchsia-950 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Interview</span>
+          </button>
+          <button
+            onClick={() => setShowRoom(true)}
+            title="Writers' Room — convene six critics to debate the current story state"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Room</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1412,6 +1485,16 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showRevision && (
         <RevisionPanel onClose={() => setShowRevision(false)} />
+      )}
+
+      {showInterview && (
+        <InterviewPanel onClose={() => setShowInterview(false)} agents={agents} />
+      )}
+
+      {showRoom && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <RoomPanel onClose={() => setShowRoom(false)} />
+        </div>
       )}
     </div>
   );

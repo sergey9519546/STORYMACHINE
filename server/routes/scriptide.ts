@@ -7,12 +7,17 @@ import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS
 import { composePromptModifiers, GENRE_NAMES } from '../lib/genre-router.ts';
 import {
   asyncHandler, requireString, safeJsonParse, sessionId, getOrCreateSession,
-  gameLimiter, aiLimiter, sessions,
+  gameLimiter, aiLimiter, heavyBodyLimiter, sessions,
 } from '../lib/session-store.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
+import { validate, DoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
+import { fdxToFountain } from '../lib/fdx-import.ts';
+import { locateIssues } from '../nvm/analyze/locate.ts';
+import { clusterIssues } from '../nvm/analyze/cluster.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
+import type { DoctorSource, LiveDiagnosis } from '../nvm/analyze/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
 const AnalyzeScriptSchema = {
@@ -215,6 +220,234 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
     return;
   }
   res.json({ status: 'ok', ...saved });
+}));
+
+// ── Script Doctor (bridge half 3) ────────────────────────────────────────────
+// POST /api/scriptide/doctor — run the deterministic 14-pass revision-engine
+// checkup and return the aggregated ScriptDoctorReport. Two-format contract,
+// enforced by DoctorBodySchema (exactly one of the two fields is present):
+//   - { fountain }   — raw Fountain text, run through the doctor as-is.
+//   - { fdx }        — a Final Draft (.fdx) export. Converted to Fountain via
+//                       fdxToFountain() (server/lib/fdx-import.ts) first; a
+//                       conversion failure (not valid FDX) or an empty
+//                       converted script both short-circuit with a 400 before
+//                       the doctor ever runs. fdxToFountain is a small, pure,
+//                       dependency-free module, so — unlike doctor.ts below —
+//                       it's imported statically rather than dynamically.
+// Either way the response is the ScriptDoctorReport plus `source`, set here
+// (never by runScriptDoctor itself — see DoctorSource's doc comment) so the
+// client knows which format was submitted and, for fdx, can load the
+// converted Fountain text and see any non-fatal conversion warnings.
+// gameLimiter, NOT aiLimiter: every other analysis route in this file calls an
+// LLM and sits behind aiLimiter, but the doctor never does — runScriptDoctor()
+// runs the revision pipeline inside runDiagnoseOnly() (server/nvm/revision/
+// rewrite.ts), an AsyncLocalStorage-scoped flag that gates every pass's rewrite
+// step so no pass can reach the model even if a future pass regresses that
+// guard. It's pure CPU work over the request body, so it belongs on the
+// higher-throughput gameLimiter like the other stateless/non-AI routes above.
+// Stateless by design: no sessionId, no getOrCreateSession/Stage — the doctor
+// only needs the script text itself, so nothing here touches `sessions`.
+router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+
+  let fountain: string;
+  let source: DoctorSource;
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return;
+    }
+    fountain = converted.fountain;
+    source = {
+      format: 'fdx',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+  } else {
+    fountain = fountainBody as string;
+    source = { format: 'fountain' };
+  }
+
+  // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
+  // passes, matching this file's convention of lazily loading heavy modules
+  // (see the engine/ai.ts and engine/character-memory.ts imports below) so
+  // routes that never call the doctor don't pay for it at startup.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain);
+
+  // Root-cause clustering is attached HERE, at the route, rather than inside
+  // runScriptDoctor/aggregateReport (doctor.ts) for two reasons: (1) doctor.ts
+  // is a fixed contract owned by a parallel agent and out of scope to modify,
+  // and (2) locateIssues/clusterIssues need only the report's own `passes`
+  // array plus the same raw `fountain` string this route already has in
+  // scope — there's no reason to thread them through the aggregation step
+  // when a plain object spread does the job afterward. The spread preserves
+  // every existing field untouched (including any percentile fields a
+  // parallel agent adds to `dimensions`), so this can never regress an
+  // existing consumer of the report shape.
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+  res.json({ ...report, rootCauses, source });
+}));
+
+// POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
+// submitted as a PDF (the single most common real-world screenplay format —
+// Final Draft/WriterDuet/Arc Studio/etc. all export to it). Converts to
+// Fountain via pdfToFountain() (server/lib/pdf-import.ts) and then runs the
+// exact same doctor pipeline as the /doctor route above, so this is the
+// three-format sibling to that route's { fountain } / { fdx } contract:
+//   - PDF has no JSON-serializable text of its own (it's a binary format), so
+//     it can't share DoctorBodySchema/{ fountain, fdx } — it gets its own
+//     route with its own body-parsing middleware instead of a third field on
+//     the JSON schema.
+// Middleware chain:
+//   heavyBodyLimiter    — NOT gameLimiter, deliberately. This route accepts up
+//                         to 15mb of raw body per request (see express.raw()
+//                         below) where every other gameLimiter-tier route in
+//                         this file caps its JSON body at 1mb (server/app.ts's
+//                         global express.json({limit:'1mb'})). At gameLimiter's
+//                         120/min, a single client could force ~1.8GB/min of
+//                         PDF-parsing work (pdfjs-dist buffering + parsing) —
+//                         a materially different DoS profile from the rest of
+//                         this file's gameLimiter routes, so it gets its own,
+//                         much lower budget (10/min — see the DoS-math comment
+//                         at heavyBodyLimiter's definition in session-store.ts)
+//                         instead of sharing gameLimiter's. It REPLACES
+//                         gameLimiter here rather than stacking alongside it:
+//                         a PDF upload is a single logical action, and making
+//                         it also consume the general 120/min budget would
+//                         double-penalize this route's callers against a
+//                         ceiling that exists for unrelated lightweight
+//                         JSON routes, without adding any further protection
+//                         (heavyBodyLimiter's 10/min is already the binding
+//                         constraint for this route in every case).
+//   express.raw(...)    — the request body is opaque PDF bytes, not JSON.
+//                         server/app.ts's global express.json({limit:'1mb'})
+//                         is content-type-gated to application/json and
+//                         leaves any other content type's body untouched, so
+//                         a route-local express.raw() scoped to
+//                         application/pdf (plus application/octet-stream,
+//                         since some HTTP clients/proxies mislabel binary
+//                         uploads generically) doesn't conflict with it.
+//                         limit:'15mb', well above the JSON routes' 1mb cap:
+//                         real screenplay PDFs — dozens of pages, often with
+//                         embedded font subsets — routinely land in the low
+//                         single-digit megabytes, so 1mb would reject
+//                         ordinary scripts, not just abuse.
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage.
+router.post(
+  '/api/scriptide/doctor/pdf',
+  heavyBodyLimiter,
+  express.raw({ type: ['application/pdf', 'application/octet-stream'], limit: '15mb' }),
+  asyncHandler(async (req, res) => {
+    const body = req.body as unknown;
+
+    // Empty body (no bytes at all, or Content-Type didn't match the raw
+    // parser above so req.body was never populated as a Buffer) — reject
+    // before ever touching pdfToFountain.
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: 'Request body is empty — expected raw PDF bytes.' });
+      return;
+    }
+
+    // Fast, exact magic-byte guard ahead of the real parse: pdfToFountain()
+    // itself re-checks more leniently (a bounded scan for "%PDF-" that can
+    // appear a little later in the stream, matching how real PDF readers
+    // locate it) — this route-level check only needs to catch the common
+    // case (wrong content, not a PDF at all) cheaply, without spending a full
+    // pdfjs parse on obviously-non-PDF input.
+    if (body.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      res.status(400).json({ error: 'This does not look like a PDF file (missing %PDF header).' });
+      return;
+    }
+
+    // Dynamic import: pdf-import.ts's own pdfjs-dist dependency is a large
+    // parser this route is the only caller of — matching this file's
+    // lazy-load convention for heavy modules (see fdx-import's static-import
+    // note on the /doctor route above, and doctor.ts's dynamic import below,
+    // for the same reasoning applied to the other two shapes of "heavy but
+    // situational" dependency).
+    const { pdfToFountain } = await import('../lib/pdf-import.ts');
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = await pdfToFountain(new Uint8Array(body));
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The PDF converted to an empty script — nothing to analyze.' });
+      return;
+    }
+
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+    const report = await runScriptDoctor(converted.fountain);
+    const source: DoctorSource = {
+      format: 'pdf',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+
+    // Route-level enrichment, same reasoning as the /doctor route above: kept
+    // out of doctor.ts (fixed contract, parallel agent's), and only needs the
+    // report's own `passes` plus the converted Fountain text already in scope.
+    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+    const rootCauses = clusterIssues(locateIssues(issuesWithPass, converted.fountain));
+    res.json({ ...report, rootCauses, source });
+  }),
+);
+
+// ── Live diagnostics (bridge half 3, lightweight sibling of /doctor) ────────
+// POST /api/scriptide/diagnose — the debounce-friendly "diagnostics as you
+// type" endpoint that powers editor squiggles (LiveDiagnosis, ./analyze/types.ts).
+// Deliberately NOT the full /doctor report: this returns only located issues +
+// root-cause clusters + the headline numbers, so it stays cheap enough to call
+// on every keystroke-pause tick without the client waiting on (or discarding
+// most of) a multi-KB payload.
+//
+// This endpoint is deterministic and LLM-free — diagnose-only, exactly like
+// /doctor — and that's deliberate, not incidental: it's what lets "live notes
+// while you type" work with NO API key configured at all. Every AI-backed
+// route in this file degrades to an error without a key; /doctor and this one
+// are the two the product can always offer, key or no key.
+//
+// gameLimiter, not aiLimiter — identical reasoning to /doctor above: pure CPU
+// work, no LLM ever reachable from runDiagnoseOnly(). Stateless: no
+// sessionId, no getOrCreateSession/Stage, matching /doctor's contract.
+router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema), asyncHandler(async (req, res) => {
+  const { fountain } = req.body as { fountain: string };
+
+  // Dynamic import — same lazy-load convention as the /doctor route above.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain);
+
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const locatedIssues = locateIssues(issuesWithPass, fountain);
+  const rootCauses = clusterIssues(locatedIssues);
+
+  const diagnosis: LiveDiagnosis = {
+    health: report.health,
+    grade: report.grade,
+    verdict: report.verdict,
+    sceneCount: report.sceneCount,
+    locatedIssues,
+    rootCauses,
+    // runScriptDoctor always populates contentHash — both on the normal
+    // aggregateReport path and on the zero-scene degenerate-report path
+    // (server/nvm/analyze/doctor.ts) — so this is a safe non-null read, not
+    // an optimistic guess.
+    contentHash: report.contentHash!,
+    analyzedAt: Date.now(),
+  };
+  res.json(diagnosis);
 }));
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────

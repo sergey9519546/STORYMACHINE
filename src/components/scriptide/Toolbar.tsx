@@ -1,20 +1,26 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2 } from "lucide-react";
+import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope, SpellCheck, Sparkles } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
   isAnalyzing: boolean;
   showDirectorHUD: boolean;
   directorsLayer: boolean;
+  showScriptDoctor: boolean;
+  liveDiagnostics: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
+  isSimulating: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
+  onToggleScriptDoctor: () => void;
+  onToggleLiveDiagnostics: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
   onExportPDF: () => void;
   onExportDOCX: () => void;
+  onSimulateScript?: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -23,15 +29,21 @@ export default function Toolbar({
   isAnalyzing,
   showDirectorHUD,
   directorsLayer,
+  showScriptDoctor,
+  liveDiagnostics,
   wordCount,
   isTypewriterSound,
+  isSimulating,
   onToggleHUD,
   onToggleDirectorsLayer,
+  onToggleScriptDoctor,
+  onToggleLiveDiagnostics,
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
   onExportPDF,
   onExportDOCX,
+  onSimulateScript,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -98,6 +110,35 @@ export default function Toolbar({
           <Layers className="w-3 h-3" aria-hidden="true" /> Director&apos;s Layer
         </button>
         <button
+          onClick={onToggleScriptDoctor}
+          aria-label={showScriptDoctor ? "Hide Script Doctor" : "Show Script Doctor"}
+          aria-pressed={showScriptDoctor}
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            showScriptDoctor
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
+        </button>
+        <button
+          onClick={onToggleLiveDiagnostics}
+          aria-label={liveDiagnostics ? "Hide Live Notes" : "Show Live Notes"}
+          aria-pressed={liveDiagnostics}
+          title={
+            liveDiagnostics
+              ? "Live Notes ON — narrative issues underline as you write"
+              : "Live Notes OFF — enable in-editor squiggle diagnostics"
+          }
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            liveDiagnostics
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <SpellCheck className="w-3 h-3" aria-hidden="true" /> Live Notes
+        </button>
+        <button
           onClick={onExportFountain}
           aria-label="Export script as Fountain file"
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
@@ -127,6 +168,27 @@ export default function Toolbar({
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
+        </button>
+        <button
+          onClick={onSimulateScript}
+          disabled={isSimulating || !onSimulateScript}
+          aria-label={isSimulating ? "Simulating script…" : "Simulate this script in Story Machine"}
+          title="Seed an OASIS scenario from this script's scenes and characters, then open Story Machine"
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            isSimulating
+              ? "bg-gray-500 text-gray-200 cursor-wait"
+              : "bg-purple-600 text-white hover:bg-white hover:text-black disabled:opacity-40"
+          }`}
+        >
+          {isSimulating ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Simulating…
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3 h-3" aria-hidden="true" /> Simulate
+            </>
+          )}
         </button>
         <button
           onClick={onOpenStoryMachine}
