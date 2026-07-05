@@ -169,6 +169,45 @@ function findingId(memberRules: string[], startLine?: number, endLine?: number, 
 //     samples; the assertion run's line range falls inside a zero-entropy
 //     scene's span in 14/20 samples (real overlap, not mere co-presence).
 //
+// ── Wave 1189 additions (Program v2, Type 4 — root-cause templates, second
+// of its kind) — three more named templates, same method as Wave 1185
+// (runScriptDoctor + locateIssues over all 20 calibration corpus samples,
+// tallied for rule-pair co-occurrence and span overlap), re-run because the
+// corpus evolved under Waves 1186-1188. Several candidates suggested by the
+// wave brief turned out to be non-viable on inspection of locate.ts, not by
+// assumption: ACT1_BOUNDARY_WEAK ("End of Act 1 (Scene ~N)" — the "~" breaks
+// SCENE_RE), NO_REVERSALS / NO_REVERSALS_LONG_STORY ("Overall structure" /
+// "Conflict layer"), TOLD_BELIEF_DOMINATION ("Belief/revelation layer"), and
+// EXPOSITION_DUMP / MISSING_INCITING_INCIDENT / REVELATION_DROUGHT ("Scenes
+// N–M", the plural form SCENE_RE deliberately excludes) all resolve to
+// anchor 'document' with no line span — locate.ts's own module comment says
+// so explicitly for the plural case. A template needs real spans to overlap,
+// so none of those pairs can ever join this mechanism; the three below were
+// chosen from what DOES carry a scene/lines anchor, keeping the same
+// evidentiary bar the brief asked for:
+//
+//   COLD_OPEN_INERT + ACTION_CONSECUTIVE_LONG_RUN — co-fire in 14/20 samples;
+//     land in overlapping spans 13/14 times (COLD_OPEN_INERT always anchors
+//     to Scene 0's full span, and the corpus's earliest dense-action run
+//     lands at line ~3, inside it, in all but one sample).
+//   REVELATION_UNEARNED + REVELATION_WITHOUT_REACTION — co-fire in 7/20
+//     samples; land in the identical scene span all 7/7 times (an unearned
+//     revelation and "the next scene didn't react to it" are frequently the
+//     SAME revelation scene, read by two different checks).
+//   BELIEF_REVERSAL_UNSUPPORTED + UNMOTIVATED_DECISION — co-fire in 5/20
+//     samples; every one of those 5 has at least one overlapping pair (both
+//     rules independently flag the identical scene as an unsupported swing —
+//     an emotional/belief reversal by one check, a major decision by the
+//     other).
+//
+// Rule sets are kept fully disjoint from Wave 1185's three templates AND
+// from each other (no member rule reused across any two templates in this
+// file) — matchOverlapTemplate scans the full located[] for every template
+// independently (see clusterIssues below), so a shared rule between two
+// templates risks the same issue getting claimed by both and surfacing as
+// two overlapping named findings for one convergence; disjoint rule sets
+// make that structurally impossible rather than merely unlikely.
+//
 // ── Design choice: claim-before-generic-clustering, not enrich-after ──────
 // Two designs were available: (a) let overlapClusters/characterClusters run
 // as today and afterward re-title any resulting cluster whose memberRules
@@ -240,6 +279,39 @@ const ROOT_CAUSE_TEMPLATES: RootCauseTemplate[] = [
       + `dialogue in that same stretch — nobody asks a question, nobody pushes back, nothing is at `
       + `stake in how it's said or what it moves. Give one character in this scene a want that `
       + `collides with another's; the friction fixes the momentum and the dialogue in the same stroke.`,
+  },
+  {
+    id: 'airless-opening',
+    requiredRules: ['COLD_OPEN_INERT', 'ACTION_CONSECUTIVE_LONG_RUN'],
+    title: 'Page one has no hook and no air',
+    explanation: (members, where) =>
+      `${where} opens the story with no narrative hook at all — no revelation, clue, clock pressure, `
+      + `or relationship shift, and flat suspense — and in that same stretch also runs a wall of `
+      + `consecutive dense action lines with no short beat to let the reader exhale. That's one failing `
+      + `first impression wearing two rule-name hats: give the opening a single concrete stake, and `
+      + `break the dense run with one short, sharp beat — both symptoms clear together.`,
+  },
+  {
+    id: 'hollow-reveal',
+    requiredRules: ['REVELATION_UNEARNED', 'REVELATION_WITHOUT_REACTION'],
+    title: 'The reveal comes from nowhere and changes nothing',
+    explanation: (members, where) =>
+      `${where} delivers a revelation with no prior misinformation for it to overturn, and the very `
+      + `next scene shows no emotional, relational, or suspense ripple from it either — the truth is `
+      + `weak going in and inert coming out. Plant a false belief a scene or two earlier that this `
+      + `moment overturns, and let the following scene visibly react to it — one fix seeds both ends `
+      + `of the reveal.`,
+  },
+  {
+    id: 'causeless-turn',
+    requiredRules: ['BELIEF_REVERSAL_UNSUPPORTED', 'UNMOTIVATED_DECISION'],
+    title: 'A character turns, and nothing caused it',
+    explanation: (members, where) =>
+      `${where} shows a character making a major decision and swinging sharply in belief or emotion — `
+      + `on two separate readings of the same scene, with no setup in the two scenes before it to `
+      + `justify either. The decision and the feeling are the same missing beat: add one scene shortly `
+      + `before where the character learns something, faces pressure, or confronts a choice, and both `
+      + `the reversal and the decision earn their moment.`,
   },
 ];
 

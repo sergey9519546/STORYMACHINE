@@ -297,3 +297,138 @@ describe('clusterIssues — corpus-level proof (real script, real pipeline)', ()
     assert.ok(firedOn, 'expected at least one root-cause template to fire on at least one real corpus sample');
   });
 });
+
+// ── Wave 1189 additions (Program v2, Type 4 — root-cause templates, second
+// of its kind) — three more named templates, chosen from measured co-fire
+// evidence re-run across all 20 calibration corpus samples after Waves
+// 1186-1188 (see cluster.ts's own "Wave 1189 additions" comment for the full
+// top-pairs table, the rules that turned out to be document-anchored and
+// therefore non-viable, and the disjoint-rule-set rationale):
+//   airless-opening   — COLD_OPEN_INERT + ACTION_CONSECUTIVE_LONG_RUN
+//                        (14/20 samples co-fire; 13/14 of those land in the
+//                        identical scene span).
+//   hollow-reveal      — REVELATION_UNEARNED + REVELATION_WITHOUT_REACTION
+//                        (7/20 samples co-fire; 7/7 of those land in the
+//                        identical scene span).
+//   causeless-turn     — BELIEF_REVERSAL_UNSUPPORTED + UNMOTIVATED_DECISION
+//                        (5/20 samples co-fire; 5/5 of those have at least
+//                        one overlapping pair).
+// Each gets a fire test (the two rules land in the same/overlapping span)
+// and a no-fire test (same two rules, but in unrelated, non-overlapping
+// scenes — the named template must not form, even though nothing else stops
+// the flat issue list from containing both rules somewhere in the script).
+
+describe('clusterIssues — root-cause template: "Page one has no hook and no air" (airless-opening)', () => {
+  it('fires when COLD_OPEN_INERT and ACTION_CONSECUTIVE_LONG_RUN land in the same opening span', () => {
+    const issues = [
+      located('COLD_OPEN_INERT', 'Scene 0 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
+      located('ACTION_CONSECUTIVE_LONG_RUN', 'Action lines near line 3 — consecutive long-line run (5 lines ≥9w)', 'lines', 'rhythm', { severity: 'minor', startLine: 3, endLine: 3 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Page one has no hook and no air');
+    assert.ok(finding, 'expected the airless-opening template to fire');
+    assert.ok(finding!.id.startsWith('airless-opening-'), 'template id should be recorded in the finding id');
+    assert.equal(finding!.memberCount, 2);
+    assert.equal(finding!.severity, 'minor');
+    assert.deepEqual(finding!.sceneIdxs, [0]);
+    assert.deepEqual([...finding!.memberRules].sort(), ['ACTION_CONSECUTIVE_LONG_RUN', 'COLD_OPEN_INERT']);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not form when the dense-line run falls outside the cold-open scene span', () => {
+    const issues = [
+      located('COLD_OPEN_INERT', 'Scene 0 (cold open)', 'scene', 'structure', { severity: 'minor', startLine: 1, endLine: 10 }),
+      located('ACTION_CONSECUTIVE_LONG_RUN', 'Action lines near line 500 — consecutive long-line run (5 lines ≥9w)', 'lines', 'rhythm', { severity: 'minor', startLine: 500, endLine: 500 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.ok(
+      !findings.some(f => f.title === 'Page one has no hook and no air'),
+      'the named airless-opening template must not appear when the spans do not overlap',
+    );
+  });
+});
+
+describe('clusterIssues — root-cause template: "The reveal comes from nowhere and changes nothing" (hollow-reveal)', () => {
+  it('fires when REVELATION_UNEARNED and REVELATION_WITHOUT_REACTION land in the same revelation scene', () => {
+    const issues = [
+      located('REVELATION_UNEARNED', 'Scene 5', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
+      located('REVELATION_WITHOUT_REACTION', 'Scene 5 → Scene 6', 'scene', 'causality', { severity: 'minor', startLine: 39, endLine: 48 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'The reveal comes from nowhere and changes nothing');
+    assert.ok(finding, 'expected the hollow-reveal template to fire');
+    assert.ok(finding!.id.startsWith('hollow-reveal-'), 'template id should be recorded in the finding id');
+    assert.equal(finding!.memberCount, 2);
+    assert.equal(finding!.severity, 'major');
+    assert.deepEqual(finding!.sceneIdxs, [5]);
+    assert.deepEqual([...finding!.memberRules].sort(), ['REVELATION_UNEARNED', 'REVELATION_WITHOUT_REACTION']);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not form when the same two rules land in unrelated, distant scenes', () => {
+    const issues = [
+      located('REVELATION_UNEARNED', 'Scene 5', 'scene', 'belief', { severity: 'major', startLine: 39, endLine: 48 }),
+      located('REVELATION_WITHOUT_REACTION', 'Scene 9 → Scene 10', 'scene', 'causality', { severity: 'minor', startLine: 300, endLine: 320 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.ok(
+      !findings.some(f => f.title === 'The reveal comes from nowhere and changes nothing'),
+      'the named hollow-reveal template must not appear when the rules are spatially unrelated',
+    );
+  });
+});
+
+describe('clusterIssues — root-cause template: "A character turns, and nothing caused it" (causeless-turn)', () => {
+  it('fires when BELIEF_REVERSAL_UNSUPPORTED and UNMOTIVATED_DECISION land in the same scene', () => {
+    const issues = [
+      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
+      located('UNMOTIVATED_DECISION', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'causality', { severity: 'major', startLine: 73, endLine: 81 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'A character turns, and nothing caused it');
+    assert.ok(finding, 'expected the causeless-turn template to fire');
+    assert.ok(finding!.id.startsWith('causeless-turn-'), 'template id should be recorded in the finding id');
+    assert.equal(finding!.memberCount, 2);
+    assert.equal(finding!.severity, 'major');
+    assert.deepEqual(finding!.sceneIdxs, [9]);
+    assert.deepEqual([...finding!.memberRules].sort(), ['BELIEF_REVERSAL_UNSUPPORTED', 'UNMOTIVATED_DECISION']);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not form when the same two rules land in unrelated, distant scenes', () => {
+    const issues = [
+      located('BELIEF_REVERSAL_UNSUPPORTED', 'Scene 9 (INT. HOSPITAL CORRIDOR - MORNING)', 'scene', 'belief', { severity: 'major', startLine: 73, endLine: 81 }),
+      located('UNMOTIVATED_DECISION', 'Scene 3 (INT. OFFICE - DAY)', 'scene', 'causality', { severity: 'major', startLine: 20, endLine: 25 }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.ok(
+      !findings.some(f => f.title === 'A character turns, and nothing caused it'),
+      'the named causeless-turn template must not appear when the rules are spatially unrelated',
+    );
+  });
+});
+
+describe('clusterIssues — Wave 1189 corpus-level proof (real script, real pipeline)', () => {
+  it('at least one Wave 1189 root-cause template fires end-to-end on a real calibration corpus sample', async () => {
+    const templateTitles = new Set([
+      'Page one has no hook and no air',
+      'The reveal comes from nowhere and changes nothing',
+      'A character turns, and nothing caused it',
+    ]);
+    let firedOn: string | undefined;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+      const located2 = locateIssues(issuesWithPass, sample.fountain);
+      const findings = clusterIssues(located2);
+      if (findings.some(f => templateTitles.has(f.title))) {
+        firedOn = sample.label;
+        break;
+      }
+    }
+    assert.ok(firedOn, 'expected at least one Wave 1189 root-cause template to fire on at least one real corpus sample');
+  });
+});
