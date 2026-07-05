@@ -3,7 +3,29 @@
 // only the flagged layer, preserving approved spans.
 // Falls back (returns original) when LLM is unavailable.
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { RevisionIssue, ApprovedSpan, PassName, PassResult, StoryContext } from './passes/types.ts';
+
+// ── Script Doctor diagnose-only scope ────────────────────────────────────────
+// The doctor (server/nvm/analyze/doctor.ts) runs all 14 revision passes purely
+// to collect their diagnostic issue lists — it must never trigger an LLM
+// rewrite, even when GEMINI_API_KEY is configured, since a "checkup" endpoint
+// silently mutating the author's screenplay would violate its own contract.
+// AsyncLocalStorage lets this flag propagate through the pipeline's ordinary
+// async call chain (runRevisionPipeline -> pass fn -> rewritePass) without
+// threading an extra parameter through every pass's signature.
+const diagnoseOnlyStore = new AsyncLocalStorage<boolean>();
+
+/** Run `fn` with every rewritePass() call inside it forced to diagnose-only
+ *  (issues are still collected; no LLM is ever invoked). */
+export function runDiagnoseOnly<T>(fn: () => Promise<T>): Promise<T> {
+  return diagnoseOnlyStore.run(true, fn);
+}
+
+/** True when called from inside a runDiagnoseOnly() scope. */
+export function isDiagnoseOnly(): boolean {
+  return diagnoseOnlyStore.getStore() === true;
+}
 
 export interface RewriteInput {
   fountain: string;
@@ -68,6 +90,11 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
 export async function rewritePass(input: RewriteInput): Promise<RewriteResult> {
   const { fountain, issues, passName, approvedSpans, storyContext, priorPassResults } = input;
   if (issues.length === 0) return { revised: fountain, usedLLM: false };
+  // Script Doctor diagnose-only contract: skip straight to the unchanged
+  // fallback before any prompt-building or LLM work happens below, so
+  // diagnose-only mode has zero LLM cost and zero risk of a network call
+  // even when a key is configured.
+  if (isDiagnoseOnly()) return { revised: fountain, usedLLM: false };
 
   const { sanitizeForPrompt } = await import('../../lib/prompt-utils.ts');
 
