@@ -4,7 +4,12 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
+import {
+  analyzeFountainText,
+  computeBetrayalSignals,
+  computePowerDynamicsIntensity,
+  computeIronyMarkerCount,
+} from '../../server/nvm/analyze/fountain-analyzer.ts';
 
 describe('analyzeFountainText — scene segmentation', () => {
   it('splits on 3 sluglines into 3 records with the correct slugs', () => {
@@ -788,5 +793,340 @@ describe('analyzeFountainText — speaking-character count (monologue vs exchang
 
     const analysis = analyzeFountainText(fountain);
     assert.equal(analysis.records[0].speakingCharacterCount, 3);
+  });
+});
+
+// Wave E1-c — lexicon exhaustiveness pass. Each expanded lexicon gets one
+// fire test (a newly-added word registers in the signal it backs) and one
+// no-fire guard (a deliberately unadded, plausible-looking word does NOT
+// register), proving the expansion is both real and bounded.
+
+describe('analyzeFountainText — expanded POSITIVE_VALENCE_WORDS (tenderness/elation family)', () => {
+  it('fires positive emotionalShift on newly-added tenderness/elation words ("elated", "triumphant")', () => {
+    const fountain = [
+      'INT. ARENA - NIGHT',
+      '',
+      'The team is elated and triumphant after the long, hard season.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].emotionalShift, 'positive');
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("sharp")', () => {
+    const fountain = [
+      'INT. KITCHEN - MORNING',
+      '',
+      'The morning air feels sharp, and the coffee tastes sharp too.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].emotionalShift, 'neutral');
+  });
+});
+
+describe('analyzeFountainText — expanded NEGATIVE_VALENCE_WORDS (grief/shame family)', () => {
+  it('fires negative emotionalShift on newly-added grief/shame words ("devastated", "heartbroken")', () => {
+    const fountain = [
+      'INT. HOSPITAL HALLWAY - NIGHT',
+      '',
+      'She is devastated and heartbroken by the news from the doctor.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].emotionalShift, 'negative');
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("blue")', () => {
+    const fountain = [
+      'INT. STUDIO - DAY',
+      '',
+      'The paint on the wall is blue, and the sky outside looks blue as well.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].emotionalShift, 'neutral');
+  });
+});
+
+describe('analyzeFountainText — expanded DANGER_TENSION_WORDS (weapon/pursuit/injury family)', () => {
+  it('fires positive suspenseDelta on a newly-added danger word ("ambushed")', () => {
+    const fountain = [
+      'INT. RAVINE - NIGHT',
+      '',
+      'Soldiers ambushed the convoy in the ravine.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(analysis.records[0].suspenseDelta > 0, `expected positive suspenseDelta, got ${analysis.records[0].suspenseDelta}`);
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("sharp")', () => {
+    const fountain = [
+      'INT. WORKSHOP - DAY',
+      '',
+      'The old pencil looks sharp on the wooden desk.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].suspenseDelta, 0);
+  });
+});
+
+describe('analyzeFountainText — expanded RELIEF_WORDS (safety/de-escalation family)', () => {
+  it('lets suspenseDelta swing negative on newly-added relief words ("soothed", "reassured")', () => {
+    const fountain = [
+      'INT. NURSERY - NIGHT',
+      '',
+      'She finally soothed the frightened child and reassured him gently.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(analysis.records[0].suspenseDelta < 0, `expected negative suspenseDelta, got ${analysis.records[0].suspenseDelta}`);
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("fine")', () => {
+    const fountain = [
+      'INT. LIVING ROOM - DAY',
+      '',
+      'Everything feels fine and normal around the house today.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].suspenseDelta, 0);
+  });
+});
+
+describe('analyzeFountainText — expanded MYSTERY_WORDS (investigation/anomaly family)', () => {
+  it('fires positive curiosityDelta on newly-added investigation/anomaly words', () => {
+    const fountain = [
+      'INT. PRECINCT - NIGHT',
+      '',
+      'The investigation revealed a puzzling anomaly nobody could explain.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(analysis.records[0].curiosityDelta > 0, `expected positive curiosityDelta, got ${analysis.records[0].curiosityDelta}`);
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("odd")', () => {
+    const fountain = [
+      'INT. PORCH - DUSK',
+      '',
+      'Something felt odd about the odd afternoon light today.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].curiosityDelta, 0);
+  });
+});
+
+describe('analyzeFountainText — expanded TURN_VERB_WORDS (expose/switch-sides/vow family)', () => {
+  it('fires dramaticTurn on a newly-added turn verb ("surrendered")', () => {
+    const fountain = [
+      'INT. BUNKER - DAWN',
+      '',
+      'The general finally surrendered to the rebel forces.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.notEqual(analysis.records[0].dramaticTurn, '');
+  });
+
+  it('does not fire on an ambiguous word deliberately left out of the lexicon ("changed")', () => {
+    const fountain = [
+      'INT. BUNKER - DAWN',
+      '',
+      'The weather changed dramatically overnight.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].dramaticTurn, '');
+  });
+});
+
+describe('analyzeFountainText — expanded DEADLINE_TERMS (temporal-pressure idiom family)', () => {
+  it('fires clockRaised on a newly-added deadline idiom ("against the clock")', () => {
+    const fountain = [
+      'INT. CONTROL ROOM - NIGHT',
+      '',
+      'The team races against the clock to disarm the device.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].clockRaised, true);
+    assert.ok(analysis.records[0].clockDelta >= 1, `expected clockDelta >= 1, got ${analysis.records[0].clockDelta}`);
+  });
+
+  it('does not fire on a phrase deliberately left out of the lexicon ("later this week")', () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'They plan to meet again sometime later this week.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].clockRaised, false);
+    assert.equal(analysis.records[0].clockDelta, 0);
+  });
+});
+
+describe('analyzeFountainText — expanded CONCRETE_NOUNS (furniture + evidence-class families)', () => {
+  it('selects an action line containing a newly-added furniture noun ("sofa") as a visual beat', () => {
+    const fountain = [
+      'INT. APARTMENT - NIGHT',
+      '',
+      'She collapses onto the old sofa.',
+      '',
+      'She sits quietly instead.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(
+      analysis.records[0].visualBeats.some(line => /sofa/.test(line)),
+      `expected a visual beat mentioning "sofa", got ${JSON.stringify(analysis.records[0].visualBeats)}`,
+    );
+  });
+
+  it('does not select an action line with no concrete noun, even one using an ambiguous word ("sharp")', () => {
+    const fountain = [
+      'INT. APARTMENT - NIGHT',
+      '',
+      'The room feels sharp and cold this morning.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.deepEqual(analysis.records[0].visualBeats, []);
+  });
+});
+
+describe('analyzeFountainText — expanded ACCUSATORY_TERMS (deliberate-harm/direct-blame family)', () => {
+  it('gives the speaker of newly-added accusatory phrases powerHolder, at matched dialogue length', () => {
+    const fountain = [
+      'INT. LOFT - NIGHT',
+      '',
+      'A',
+      'You set me up and you manipulated me completely.',
+      '',
+      'B',
+      'That is simply not accurate at all today.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, 'A');
+    assert.ok((analysis.records[0].powerBalance ?? 0) > 0.15, `expected clearly positive balance, got ${analysis.records[0].powerBalance}`);
+  });
+
+  it('does not fire on a comparable negative-but-non-accusatory line of matched length', () => {
+    const fountain = [
+      'INT. LOFT - NIGHT',
+      '',
+      'A',
+      'That situation really was not fair to anyone.',
+      '',
+      'B',
+      'That is simply not accurate at all today.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, null);
+  });
+});
+
+describe('analyzeFountainText — expanded IMPERATIVE_LEAD_TERMS (standoff/compliance command family)', () => {
+  it('gives the speaker of a newly-added standoff command ("Freeze") powerHolder, at matched dialogue length', () => {
+    const fountain = [
+      'INT. ALLEY - NIGHT',
+      '',
+      'COP',
+      'Freeze. Kneel down. Drop your weapon now.',
+      '',
+      'SUSPECT',
+      'Okay, that seems fine to me.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, 'COP');
+    assert.ok((analysis.records[0].powerBalance ?? 0) > 0.15, `expected clearly positive balance, got ${analysis.records[0].powerBalance}`);
+  });
+
+  it('does not fire on a comparable non-command line of matched length starting with an ambiguous word ("Sharp")', () => {
+    const fountain = [
+      'INT. ALLEY - NIGHT',
+      '',
+      'COP',
+      'Sharp words rarely fix a real problem here.',
+      '',
+      'SUSPECT',
+      'Okay, that seems fine to me.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, null);
+  });
+});
+
+// Wave E1-c — three candidate standalone signal functions (not wired onto
+// ScreenplaySceneRecord; see the "Standalone lexicon-backed signals" section
+// of fountain-analyzer.ts for why). Each gets fire / no-fire / empty-input
+// coverage, matching this file's per-signal convention.
+describe('computeBetrayalSignals', () => {
+  it('fires a positive delta on betrayal-dominant scene text', () => {
+    const result = computeBetrayalSignals([
+      'He was a traitor who betrayed everyone who ever trusted him.',
+      'Nothing of note happens in this scene.',
+    ]);
+    assert.equal(result[0], 2);
+    assert.equal(result[1], 0);
+  });
+
+  it('fires a negative delta on loyalty-dominant scene text (the other half of the same axis)', () => {
+    const result = computeBetrayalSignals(['She remained faithful and loyal to her allies.']);
+    assert.equal(result[0], -3);
+  });
+
+  it('does not fire on neutral scene text with neither betrayal nor loyalty vocabulary', () => {
+    const result = computeBetrayalSignals(['The weather today is calm and unremarkable.']);
+    assert.equal(result[0], 0);
+  });
+
+  it('returns an empty array for empty input', () => {
+    assert.deepEqual(computeBetrayalSignals([]), []);
+  });
+});
+
+describe('computePowerDynamicsIntensity', () => {
+  it('fires a positive count on dominance/submission verb-dense scene text', () => {
+    const result = computePowerDynamicsIntensity([
+      'The soldiers overpowered the rebels and forced them to submit.',
+    ]);
+    assert.equal(result[0], 2);
+  });
+
+  it('does not fire on scene text with no dominance/submission vocabulary', () => {
+    const result = computePowerDynamicsIntensity(['They walked through the quiet garden together.']);
+    assert.equal(result[0], 0);
+  });
+
+  it('returns an empty array for empty input', () => {
+    assert.deepEqual(computePowerDynamicsIntensity([]), []);
+  });
+});
+
+describe('computeIronyMarkerCount', () => {
+  it('fires a positive count on scene text dense with verbal-irony markers', () => {
+    const result = computeIronyMarkerCount([
+      'Of course the one day I forget my umbrella, it rains. Naturally.',
+    ]);
+    assert.equal(result[0], 2);
+  });
+
+  it('does not fire on plain, sincere scene text with no irony markers', () => {
+    const result = computeIronyMarkerCount(['The weather today is calm and clear.']);
+    assert.equal(result[0], 0);
+  });
+
+  it('returns an empty array for empty input', () => {
+    assert.deepEqual(computeIronyMarkerCount([]), []);
   });
 });

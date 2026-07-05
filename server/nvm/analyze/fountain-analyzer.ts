@@ -120,6 +120,29 @@
 // overlap, feeding the same seed/payoff/unresolved bookkeeping the
 // exact-token channel already produced. The exact-token channel itself is
 // untouched.
+//
+// Wave E1-c additions (lexicon exhaustiveness pass): every module-constant
+// lexicon in this file (valence, danger, relief, mystery, turn verbs,
+// deadline terms, concrete nouns, accusatory phrases, imperative leads) was
+// expanded roughly 50-100% with genuinely common screenwriting vocabulary
+// families the original, deliberately-compact lists hadn't yet covered
+// (grief/tenderness/elation for valence; weapon/pursuit/injury for danger;
+// safety/de-escalation for relief; investigation/anomaly for mystery;
+// expose/switch-sides/vow for turn verbs; temporal-pressure idioms for
+// deadlines; furniture + evidence-class nouns for concrete nouns, with
+// CLUE_GENERIC_OBJECT_WORDS kept in lockstep for the new furniture entries;
+// deliberate-harm phrasing for accusatory; standoff/compliance commands for
+// imperative leads) — see each lexicon's own "Wave E1-c addition" comment for
+// the per-family distinctness rationale. Every expansion was measured against
+// tests/core/calibration.test.ts's band-monotonicity/no-saturation/length-
+// invariance checks and tests/core/discrimination.test.ts's harness before
+// being kept (see this wave's commit message / final report for the measured
+// deltas). Three candidate per-scene signals from the charter
+// (betrayalTrustDelta, powerDynamicsIntensity, ironyMarkerCount) are
+// implemented as standalone exported functions rather than wired onto
+// ScreenplaySceneRecord — see the "Standalone lexicon-backed signals" section
+// below for why (record-parity.test.ts's matrix and types.ts's
+// FountainAnalysis shape are both outside this wave's file ownership).
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -131,11 +154,26 @@ import type { FountainAnalysis } from './types.ts';
 // Kept compact and topic-scoped on purpose: each list backs exactly one signal,
 // so tuning one heuristic never accidentally shifts another's behavior.
 
+// Wave E1-c additions: both valence lexicons expanded toward exhaustive
+// coverage of common screenwriting emotional vocabulary — positive gains a
+// tenderness/elation family (beyond the original generic warmth/joy set),
+// negative gains a grief/shame family (beyond the original anger/fear set).
+// Distinctness of the new terms from each other and from the pre-existing
+// entries was checked by hand; a few terms (e.g. 'gentle'/'devoted') are
+// deliberately echoed by RELIEF_WORDS/the new betrayal-loyalty lexicon below
+// under a different signal — cross-lexicon reuse of a word for a DIFFERENT
+// heuristic is this file's established pattern (see 'relief'/'relieved'
+// already shared between POSITIVE_VALENCE_WORDS and RELIEF_WORDS above).
 const POSITIVE_VALENCE_WORDS = [
   'love', 'loves', 'loved', 'happy', 'happiness', 'joy', 'joyful', 'laugh', 'laughs', 'laughing',
   'smile', 'smiles', 'smiling', 'relief', 'relieved', 'hope', 'hopeful', 'trust', 'trusts',
   'proud', 'grateful', 'gratitude', 'warmth', 'kind', 'kindness', 'gentle', 'delight', 'delighted',
   'embrace', 'embraces', 'reunite', 'reunited', 'forgive', 'forgives', 'forgave',
+  // Tenderness/elation family (Wave E1-c):
+  'tender', 'tenderly', 'adore', 'adores', 'adored', 'cherish', 'cherishes', 'cherished',
+  'affectionate', 'comfort', 'comforted', 'comforting', 'ecstatic', 'elated', 'euphoric',
+  'thrilled', 'overjoyed', 'blissful', 'bliss', 'content', 'admire', 'admires', 'admired',
+  'devoted', 'compassionate', 'fond', 'cheerful', 'triumphant', 'triumph', 'jubilant',
 ];
 
 const NEGATIVE_VALENCE_WORDS = [
@@ -143,16 +181,31 @@ const NEGATIVE_VALENCE_WORDS = [
   'terrified', 'rage', 'betray', 'betrays', 'betrayed', 'cry', 'cries', 'crying', 'sob', 'sobs',
   'sobbing', 'pain', 'hurt', 'hurts', 'grief', 'despair', 'alone', 'lonely', 'cold', 'threat',
   'threatens', 'threatened', 'resent', 'resents', 'resentment',
+  // Grief/shame family (Wave E1-c):
+  'grieve', 'grieves', 'grieving', 'mourn', 'mourns', 'mourning', 'devastated', 'devastation',
+  'heartbroken', 'heartbreak', 'anguish', 'anguished', 'misery', 'miserable', 'dread', 'dreaded',
+  'bitter', 'bitterness', 'shame', 'ashamed', 'guilt', 'guilty', 'humiliated', 'humiliation',
+  'disgust', 'disgusted', 'contempt', 'jealous', 'jealousy', 'envy', 'envious',
 ];
 
 /** Danger/physical-tension lexicon for suspenseDelta — distinct from the
  *  MYSTERY_WORDS lexicon (curiosity is about unanswered questions, not
  *  physical peril: a scene can be tense without being mysterious). */
+// Wave E1-c addition: weapon/pursuit/injury families beyond the original
+// generic danger set (guns/blood/screaming/chasing/etc.) — a distinct axis
+// from that set in that these name the specific MEANS of physical harm
+// (a stabbing, a chokehold, an ambush) rather than the generic aftermath
+// (blood, dead) or generic pursuit (chase, run) the original list already
+// covers, so overlap with existing entries was checked term-by-term.
 const DANGER_TENSION_WORDS = [
   'gun', 'guns', 'knife', 'blade', 'blood', 'scream', 'screams', 'screaming', 'kill', 'kills',
   'killed', 'dead', 'death', 'danger', 'dangerous', 'run', 'runs', 'running', 'chase', 'chases',
   'chasing', 'trapped', 'dark', 'darkness', 'fire', 'explosion', 'attack', 'attacks', 'attacked',
   'hide', 'hides', 'hiding', 'gunfire', 'shot', 'shots', 'shoot', 'shoots', 'panic', 'panicked',
+  // Weapon/pursuit/injury families (Wave E1-c):
+  'rifle', 'pistol', 'weapon', 'weapons', 'stab', 'stabs', 'stabbed', 'strangle', 'strangled',
+  'choke', 'choked', 'wound', 'wounded', 'bleeding', 'ambush', 'ambushed', 'pursuit', 'pursued',
+  'flee', 'flees', 'fleeing', 'cornered', 'assault', 'assaulted', 'punch', 'punched',
 ];
 
 /** Calm/relief lexicon — lets suspenseDelta swing negative (a scene that
@@ -160,38 +213,80 @@ const DANGER_TENSION_WORDS = [
  *  simply absent. Distinct from POSITIVE_VALENCE_WORDS: relief is about
  *  physical/tension safety, positive valence is about emotional warmth — a
  *  scene can be safe without being warm (an empty, silent room). */
+// Wave E1-c addition: safety/warmth/de-escalation vocabulary beyond the
+// original calm/quiet/settle set — 'secure'/'shelter' name a state of safety
+// FROM something, 'soothe'/'reassure' name an active de-escalating gesture
+// (someone calming someone else down), and 'sigh'/'ease'/'truce' name the
+// physical/narrative release after tension — all distinct axes on the same
+// "tension going down" signal the original list didn't cover.
 const RELIEF_WORDS = [
   'calm', 'calmly', 'peace', 'peaceful', 'safe', 'safety', 'rest', 'rests', 'resting', 'exhale',
   'exhales', 'exhaled', 'relief', 'relieved', 'quiet', 'stillness', 'settle', 'settles', 'settled',
+  // Safety/de-escalation family (Wave E1-c):
+  'secure', 'security', 'shelter', 'sheltered', 'soothe', 'soothes', 'soothed', 'soothing',
+  'reassure', 'reassured', 'reassuring', 'sigh', 'sighed', 'ease', 'eased', 'truce',
 ];
 
 /** Unanswered-question lexicon for curiosityDelta — distinct from
  *  DANGER_TENSION_WORDS (curiosity is cognitive/epistemic, not physical). */
+// Wave E1-c addition: investigation/anomaly vocabulary beyond the original
+// secret/hidden/strange set — 'investigate'/'detective' name the ACTIVE
+// pursuit of an answer (a procedural axis the original list, which is mostly
+// about the unanswered thing itself, doesn't cover), and 'anomaly'/'puzzle'/
+// 'enigma'/'cryptic' name a THING that doesn't add up, distinct from
+// 'strange' (a generic descriptor already present) by naming a specific
+// unsolved-puzzle framing.
 const MYSTERY_WORDS = [
   'secret', 'secrets', 'why', 'who', 'hidden', 'hides', 'truth', 'mystery', 'mysterious', 'unknown',
   'disappear', 'disappears', 'disappeared', 'missing', 'clue', 'clues', 'strange', 'wonder',
   'wonders', 'wondering', 'suspicious', 'suspicion',
+  // Investigation/anomaly family (Wave E1-c):
+  'investigate', 'investigates', 'investigated', 'investigation', 'detective', 'puzzle',
+  'puzzling', 'baffled', 'bewildered', 'enigma', 'enigmatic', 'riddle', 'unexplained',
+  'inexplicable', 'conceal', 'conceals', 'concealed', 'cryptic', 'anomaly', 'anomalies',
 ];
 
 /** Turn-verb lexicon for dramaticTurn — verbs that mark an irreversible
  *  change of state (as opposed to mere description), which is what makes a
  *  line "the single dramatic thing that changes this scene" rather than
  *  scene-setting. */
+// Wave E1-c addition: turn verbs beyond the original discover/confess/die set
+// — 'expose'/'unmask' name a THIRD PARTY forcing a disclosure (distinct from
+// 'reveal'/'confess', which are self-initiated), 'surrender'/'defect' name a
+// change of allegiance/side (distinct from 'abandon', which is leaving a
+// person/place, not switching camps), and 'vow'/'swear' name a NEW
+// irreversible commitment being made (distinct from 'admit'/'confess', which
+// disclose something already true) — each a state-change verb not already
+// covered.
 const TURN_VERB_WORDS = [
   'betray', 'betrays', 'betrayed', 'discover', 'discovers', 'discovered', 'confess', 'confesses',
   'confessed', 'die', 'dies', 'died', 'leave', 'leaves', 'left', 'reveal', 'reveals', 'revealed',
   'kill', 'kills', 'killed', 'lie', 'lies', 'lied', 'forgive', 'forgives', 'forgave', 'sacrifice',
   'sacrifices', 'sacrificed', 'choose', 'chooses', 'chose', 'abandon', 'abandons', 'abandoned',
   'admit', 'admits', 'admitted',
+  // Expose/switch-sides/vow family (Wave E1-c):
+  'expose', 'exposes', 'exposed', 'unmask', 'unmasks', 'unmasked', 'surrender', 'surrenders',
+  'surrendered', 'defect', 'defects', 'defected', 'vow', 'vows', 'vowed', 'swear', 'swears',
+  'swore', 'renounce', 'renounces', 'renounced',
 ];
 
 /** Deadline/stakes lexicon for clockRaised/clockDelta. Includes multi-word
  *  phrases (e.g. "running out of time") — countHits' word-boundary regex
  *  handles these fine since \b only anchors the phrase's outer edges. */
+// Wave E1-c addition: temporal-pressure idioms beyond the original
+// midnight/deadline/countdown set — these are the stock "the clock is the
+// antagonist" phrases screenwriters reach for that don't literally use
+// "time"/"clock"/"deadline" as a bare noun (e.g. "eleventh hour", "high
+// noon"), so the multi-word phrase form matters exactly as it does for the
+// pre-existing "running out of time"/"time's up" entries.
 const DEADLINE_TERMS = [
   'midnight', 'deadline', 'hours left', 'before dawn', 'running out of time', 'countdown',
   "time's up", 'minutes left', 'almost too late', 'out of time', 'sunrise', 'dawn breaks',
   "o'clock", 'ticking clock', 'final hour', 'last chance',
+  // Temporal-pressure idiom family (Wave E1-c):
+  'against the clock', 'clock is ticking', 'time is running out', 'eleventh hour',
+  'final countdown', 'no time left', 'seconds left', 'race against time', 'closing window',
+  'high noon', 'last-minute', 'final seconds',
 ];
 
 /** First-match-wins patterns for an explicit on-page revelation — distinct
@@ -212,6 +307,15 @@ const REVEAL_PATTERNS: RegExp[] = [
 /** Concrete nouns that make an action line a filmable "visual beat" rather
  *  than an abstract description. Deliberately generic props/settings so the
  *  heuristic generalizes across genres. */
+// Wave E1-c addition: both scene-furniture AND evidence-class nouns beyond
+// the original list. Furniture additions ('lamp', 'sofa', 'cabinet', …) are
+// ordinary ambient dressing, exactly the category CLUE_GENERIC_OBJECT_WORDS
+// (below) exists to blocklist from the rare-anchor-alone clue shortcut — see
+// that Set's own additions just below, kept in lockstep with these.
+// Evidence-class additions ('fingerprints', 'lighter', 'scarf', …) are
+// personal/identity-bearing items in the same spirit as the pre-existing
+// 'badge'/'wallet'/'watch' (kept OFF the generic blocklist, i.e. left
+// eligible for the rare-anchor-alone shortcut, exactly like those three).
 const CONCRETE_NOUNS = [
   'gun', 'knife', 'blood', 'car', 'door', 'window', 'photo', 'photograph', 'letter', 'phone',
   'box', 'key', 'mirror', 'fire', 'rain', 'road', 'table', 'chair', 'hand', 'hands', 'eyes',
@@ -219,6 +323,12 @@ const CONCRETE_NOUNS = [
   'flashlight', 'candle', 'clock', 'map', 'envelope', 'suitcase', 'bag', 'coat', 'shoes', 'blade',
   'bullet', 'trigger', 'smoke', 'ash', 'shadow', 'floor', 'wall', 'stairs', 'bed', 'desk', 'drawer',
   'knife', 'truck', 'gunfire',
+  // Scene-furniture family (Wave E1-c — ALSO added to CLUE_GENERIC_OBJECT_WORDS below):
+  'lamp', 'curtain', 'curtains', 'sofa', 'couch', 'sink', 'cabinet', 'shelf', 'ceiling', 'ladder',
+  'fence', 'gate', 'sidewalk', 'bench', 'porch', 'bloodstain', 'lock', 'padlock',
+  // Evidence-class family (Wave E1-c — deliberately NOT in the generic blocklist):
+  'fingerprints', 'lighter', 'cigarette', 'syringe', 'newspaper', 'headline',
+  'scarf', 'glove', 'gloves', 'earring', 'button',
 ];
 
 /** All-caps tokens that read as emphasis or scene-heading vocabulary rather
@@ -241,10 +351,19 @@ const EMOTIONAL_SHIFT_THRESHOLD = 1;
  *  VALENCE_WORDS), which can appear with no addressee at all (a character
  *  fuming alone). Accusation specifically targets the OTHER speaker, which is
  *  what makes it a power-balance proxy rather than an emotional-tone one. */
+// Wave E1-c addition: second-person accusatory phrases beyond the original
+// set — 'you set me up'/'you manipulated me' name deliberate engineered
+// harm (distinct from 'you broke'/'you ruined', which are about the RESULT,
+// not the deliberateness), and 'you owe me'/'this is your fault' are the
+// stock direct-blame openers real dialogue reaches for that don't happen to
+// already be covered.
 const ACCUSATORY_TERMS = [
   'you always', 'you never', 'your fault', 'you did this', 'you lied', 'you knew',
   'you ruined', 'you broke', 'you betrayed', 'you promised', 'how could you',
   'you left me', 'you abandoned', 'you used me',
+  // Deliberate-harm/direct-blame family (Wave E1-c):
+  'you owe me', 'you humiliated me', 'you manipulated me', 'you set me up', 'this is your fault',
+  'you deceived me', 'you cheated', 'you stole from me', 'you never cared', 'you started this',
 ];
 
 // ── Precompiled lexicon regexes ──────────────────────────────────────────────
@@ -283,12 +402,23 @@ const ACCUSATORY_RE = buildLexiconRegex(ACCUSATORY_TERMS);
  *  betrays, confesses) — a fact about the STORY; this marks a conversational
  *  command aimed at the other speaker — a fact about who is dictating the
  *  exchange, regardless of whether anything narratively irreversible occurs. */
+// Wave E1-c addition: standoff/law-enforcement command phrases beyond the
+// original set — 'freeze'/'kneel'/'on your knees'/'drop your weapon' are the
+// stock physical-compliance commands of a standoff scene, a register the
+// original list's more conversational commands ('sit down', 'come here')
+// doesn't cover; 'do it now'/'speak now' add urgency-inflected variants of
+// the existing bare 'stop'/'go'/'wait' entries.
 const IMPERATIVE_LEAD_TERMS = [
   'sit down', 'get out', 'get up', 'get over here', 'get down', 'give me', 'tell me',
   'come here', 'come on', 'come with me', 'shut up', 'back off', 'let go', 'let me',
   'hands up', 'answer me', 'drop it', 'put it down', 'open the', 'close the', 'follow me',
   'watch it', "don't", 'move', 'run', 'explain', 'quiet', 'enough', 'stop', 'go', 'wait',
   'listen', 'look',
+  // Standoff/compliance command family (Wave E1-c):
+  'kneel', 'kneel down', 'freeze', 'surrender', 'hands where i can see them', 'on your knees',
+  'get in the car', 'step back', 'stay back', 'stay there', 'stand still', "don't move",
+  'drop your weapon', 'lower your weapon', 'answer the question', 'speak now', 'do it now',
+  'get down on the ground',
 ].sort((a, b) => b.length - a.length);
 
 /** True when `text` OPENS with an imperative-lead phrase (a command directed
@@ -819,12 +949,22 @@ const CLUE_MIN_SHARED_NON_ANCHOR_WORDS = 2;
  *  sample and expects near-flat displayed health. Only nouns whose narrative
  *  role is closer to "keepsake/evidence/weapon" than "scene dressing" keep
  *  the rare-alone shortcut — see the nouns absent from this list. */
+// Wave E1-c addition: the new scene-furniture nouns added to CONCRETE_NOUNS
+// above ('lamp'…'padlock') are exactly the ambient-dressing kind this Set's
+// header comment describes ("ordinary scene dressing, in almost any
+// screenplay") — added here in lockstep so the blocklist doesn't silently
+// drift out of sync with CONCRETE_NOUNS the way an earlier, narrower version
+// of this list once did (see the header comment's own account of that bug).
 const CLUE_GENERIC_OBJECT_WORDS = new Set([
   'door', 'window', 'table', 'chair', 'floor', 'wall', 'hand', 'hands',
   'eyes', 'road', 'bed', 'desk', 'stairs', 'smoke', 'ash', 'shadow', 'coat',
   'shoes', 'rain', 'fire', 'car', 'truck', 'glass', 'bag', 'phone', 'mirror',
   'drawer', 'box', 'trigger', 'blood', 'wound', 'scar', 'rope', 'chain',
   'bottle', 'candle', 'clock', 'flashlight', 'gunfire',
+  // Wave E1-c furniture additions (mirrors CONCRETE_NOUNS's new furniture family):
+  'lamp', 'curtain', 'curtains', 'sofa', 'couch', 'sink', 'cabinet', 'shelf',
+  'ceiling', 'ladder', 'fence', 'gate', 'sidewalk', 'bench', 'porch',
+  'bloodstain', 'lock', 'padlock',
 ]);
 
 /** Splits a document into sentence-like chunks so clue candidates are scoped
@@ -1376,6 +1516,132 @@ function detectSpeakingCharacterCount(scene: SceneUnit): number {
     if (d.speaker) speakers.add(d.speaker);
   }
   return speakers.size;
+}
+
+// ── Standalone lexicon-backed signals (Wave E1-c) — NOT wired to records ────
+// Three candidate per-scene signals from the E1-c charter: betrayalTrustDelta,
+// powerDynamicsIntensity, ironyMarkerCount. All three are genuinely new axes
+// (none restates an existing signal — see each function's own distinctness
+// note) and all three are cheap, honest, lexicon-only extractions in this
+// file's established style. They are shipped as STANDALONE EXPORTED
+// FUNCTIONS over an array of per-scene text, deliberately NOT wired onto
+// ScreenplaySceneRecord or FountainAnalysis's return shape, for a concrete
+// structural reason rather than an oversight:
+//
+//   1. Every new ScreenplaySceneRecord field requires a matching entry in
+//      tests/core/record-parity.test.ts's compile-time parity matrix — that
+//      matrix (and memory.ts, the record's other producer) belong to a
+//      different file-ownership boundary than this wave's
+//      (server/nvm/analyze/fountain-analyzer.ts + this file's own test file
+//      only), so adding a field here would either go untested by the parity
+//      harness or require editing a file this wave does not own.
+//   2. FountainAnalysis (./types.ts) — the only other place a new value
+//      could ride along on analyzeFountainText's return — exposes exactly
+//      records/annotations/structure/characters/sceneCount/dialogueLineCount/
+//      actionLineCount/wordCount (checked directly against that file): no
+//      side-channel exists today for a signal that isn't a full record field,
+//      and types.ts is likewise outside this wave's ownership.
+//
+// So: each function below takes `sceneTexts: string[]` — one already-
+// assembled string per scene (a future wiring wave can pass
+// sceneUnits[i].rawText, i.e. the exact per-scene text surface every other
+// heuristic in this file already reads) — and returns one number per scene,
+// fully deterministic and lexicon-driven, unit-tested in
+// tests/core/fountain-analyzer.test.ts exactly like every other exported
+// signal here. This leaves the extraction work done and verified, ready for
+// a future wave (one that owns memory.ts + record-parity.test.ts's matrix)
+// to wire a field in without re-deriving the lexicon or the heuristic.
+
+/** Betrayal vocabulary — an act of trust violated, distinct from generic
+ *  negative valence (NEGATIVE_VALENCE_WORDS' 'hate'/'anger'/'grief' etc. carry
+ *  no notion of a BROKEN TRUST, just negative feeling) and from
+ *  ACCUSATORY_TERMS (a direct second-person accusation is a power-balance
+ *  control move, not necessarily about trust at all — "you always" carries no
+ *  betrayal content). */
+const BETRAYAL_WORDS = [
+  'betray', 'betrays', 'betrayed', 'traitor', 'treachery', 'treacherous', 'backstab',
+  'backstabbed', 'double-cross', 'doublecross', 'sold out', 'sell out', 'sells out', 'turncoat',
+  'deceive', 'deceives', 'deceived', 'disloyal', 'disloyalty', 'informant', 'snitch', 'snitched',
+];
+
+/** Loyalty vocabulary — the counterweight half of the same betrayal/trust
+ *  axis, so betrayalTrustDelta can swing toward LOYALTY (a scene actively
+ *  reaffirming trust) rather than merely sitting at zero when betrayal words
+ *  are simply absent, mirroring RELIEF_WORDS' role against DANGER_TENSION_WORDS. */
+const LOYALTY_WORDS = [
+  'loyal', 'loyalty', 'faithful', 'faithfulness', 'allegiance', 'vouch', 'vouches', 'vouched',
+  'stand by', 'stands by', 'stood by', 'ride or die', 'trustworthy', 'steadfast', 'ally', 'allies',
+];
+
+const BETRAYAL_RE = buildLexiconRegex(BETRAYAL_WORDS);
+const LOYALTY_RE = buildLexiconRegex(LOYALTY_WORDS);
+
+/** BETRAYAL/TRUST DELTA (candidate signal, Wave E1-c): net betrayal-minus-
+ *  loyalty lexicon hits per scene. Positive = betrayal-dominant, negative =
+ *  loyalty-affirming, zero = neither present or perfectly balanced. Unlike
+ *  relationshipShifts (detectRelationshipShifts above), which needs a
+ *  two-character dialogue pair and reads generic valence, this reads a
+ *  narrower, more specific vocabulary axis and works over ANY scene text
+ *  (action included) regardless of how many characters speak. */
+export function computeBetrayalSignals(sceneTexts: string[]): number[] {
+  return sceneTexts.map(text => countHits(text, BETRAYAL_RE) - countHits(text, LOYALTY_RE));
+}
+
+/** Dominance/submission verbs — control expressed as a NAMED ACT ("commands",
+ *  "obeys", "yields") anywhere in the scene text, distinct from
+ *  IMPERATIVE_LEAD_TERMS (which fingerprints a conversational COMMAND PHRASE
+ *  only at the START of a line, e.g. "Sit down") and from ACCUSATORY_TERMS
+ *  (second-person blame, not a description of who controls whom). A scene
+ *  can be dense with this vocabulary in narration ("She obeyed without
+ *  question") with zero imperative-lead lines and zero accusatory phrases. */
+const DOMINANCE_SUBMISSION_WORDS = [
+  'command', 'commands', 'commanded', 'dominate', 'dominates', 'dominated', 'submit', 'submits',
+  'submitted', 'obey', 'obeys', 'obeyed', 'overpower', 'overpowers', 'overpowered', 'yield',
+  'yields', 'yielded', 'defer', 'defers', 'deferred', 'control', 'controls', 'controlled',
+  'dictate', 'dictates', 'dictated', 'subjugate', 'subjugates', 'subjugated', 'overrule',
+  'overrules', 'overruled',
+];
+
+const DOMINANCE_SUBMISSION_RE = buildLexiconRegex(DOMINANCE_SUBMISSION_WORDS);
+
+/** POWER-DYNAMICS INTENSITY (candidate signal, Wave E1-c): count of
+ *  dominance/submission verb hits per scene — a magnitude, not a signed
+ *  balance (unlike detectPowerBalance's powerBalance, which is signed toward
+ *  a specific character and requires a two-person dyad). This reads how
+ *  CONTROL-CHARGED the scene's vocabulary is, at any dialogue-participant
+ *  count (including zero-dialogue action-only scenes, e.g. "The guards
+ *  overpowered him before he could run"), independent of who — if anyone —
+ *  is identified as holding that control. */
+export function computePowerDynamicsIntensity(sceneTexts: string[]): number[] {
+  return sceneTexts.map(text => countHits(text, DOMINANCE_SUBMISSION_RE));
+}
+
+/** Verbal-irony markers — stock phrases that flag the GAP between what's said
+ *  and what's meant/expected ("of course", "naturally" used sarcastically,
+ *  "what could go wrong") rather than sincere statement. Distinct from every
+ *  existing signal in this file: none of them track TONE-VS-CONTENT mismatch
+ *  — MYSTERY_WORDS is about unanswered questions, DANGER_TENSION_WORDS about
+ *  physical peril, POSITIVE/NEGATIVE_VALENCE about sincere emotional charge.
+ *  This is a heuristic gap, not exact NLU (a sincere, non-ironic "of course"
+ *  also matches — the same accepted lightweight-lexicon tradeoff this file
+ *  makes elsewhere, e.g. TURN_VERB_WORDS matching a verb regardless of
+ *  narrative weight). */
+const IRONY_MARKER_TERMS = [
+  'of course', 'naturally', 'what could go wrong', "wouldn't you know it", 'just my luck',
+  'how ironic', 'go figure', 'just perfect', "isn't that just perfect", 'of all the luck',
+  'as luck would have it',
+];
+
+const IRONY_MARKER_RE = buildLexiconRegex(IRONY_MARKER_TERMS);
+
+/** IRONY MARKER COUNT (candidate signal, Wave E1-c): count of verbal-irony
+ *  marker hits per scene. A cheap, honest lexical proxy — it cannot tell
+ *  sincere "of course" from sarcastic "of course", so it is offered as a
+ *  candidate count signal only, not a verdict on whether irony is genuinely
+ *  present (the same honesty boundary detectRevelation/detectDramaticTurn
+ *  draw around their own pattern-matching). */
+export function computeIronyMarkerCount(sceneTexts: string[]): number[] {
+  return sceneTexts.map(text => countHits(text, IRONY_MARKER_RE));
 }
 
 // ── Empty-input shortcut ──────────────────────────────────────────────────────
