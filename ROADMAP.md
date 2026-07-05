@@ -497,6 +497,43 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## 13b. Blueprint integration (OASIS architecture docs, 2026-07-05)
+
+User supplied a 53-page architecture blueprint + research memo. Two mapping
+sweeps verified: strongest concepts already exist (Fabula/Syuzhet ≈ state +
+projections + two-reader; setup/payoff ops; 5 room critics; proof kernel;
+ghost-commit branching; 6 Vonnegut tension curves w/ interpolation; 10
+projection targets; 8-genre router w/ rule-threshold modifiers). Genuinely
+missing or thin, ranked by product value:
+
+- [ ] **B-wave 1 (dispatched):** (a) Genre engine expansion — 8 → 20+
+  genres, TONE as a separate composable axis (bleak/cozy/paranoid/...),
+  per-genre required-behaviors/forbidden-shortcuts/info-position defaults,
+  noir rule-modifiers (currently none); (b) Sin-check detector pack —
+  PLOT_ARMOR, IDIOT_PLOT, COINCIDENCE_RESOLUTION + unseeded-twist
+  hardening (deus-ex-machina exists at causality.ts:155); (c) Narrative
+  metrics module — cliffhangerStrength, pivotStrength, twistImpact,
+  suspense-entropy as deterministic formulas over scene records, new
+  /api/nvm/metrics; (d) Projection targets — treatment, outline/beat-sheet,
+  dialogue_only, epistolary, simulation_log, director_commentary, comic →
+  true panel-by-panel script.
+- [ ] **B-wave 2 (after Run 17/18 files free up):** Semantic Firewall —
+  knowledge-boundary check on AUTHORED text (character acts on facts they
+  couldn't know — killer doctor feature, only enforced on sim path today);
+  menace target-curve delta audit (expectedTensionAt exists, nothing
+  compares measured scene tension against it); contradiction families
+  (PHYSICAL/KNOWLEDGE/MOTIVATION/TIMELINE) layered over rootCauses.
+- [ ] **B-wave 3:** Setup/payoff TYPING (plot/character/emotional/mystery/
+  visual/irony/thematic + visibility + required window on SEED_CLUE/
+  PAYOFF_SETUP — StoryOp contract change, sequence with parity);
+  defense-cascade states (arousal→freeze→flight→fight→fawn→collapse) +
+  Id/Ego/Superego arbitration in agent decisions; arc meter (Ghost/Lie/
+  Want/Need + lie-belief/need-awareness/internal-conflict 0-100);
+  narrator-reliability score + dissonance types; cognitive-illusion
+  ledger (decoy focus, weaponized assumptions — IllusionState has
+  setup/turn/prestige already); retrieval scoring w/ recency + emotional
+  salience (embeddings.ts is semantic-only).
+
 ### Run 17b — Polish (retained, after function work)
 
 - [ ] **(M)** Panel consolidation: 24+ flat buttons in the UI → grouped nav
