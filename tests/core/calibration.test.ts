@@ -1,0 +1,248 @@
+// Script Doctor — tests for the calibration layer: percentile math
+// (calibration/percentile.ts), the reference distribution
+// (calibration/reference.ts), and computeRawCraftScore's saturation-safe
+// ranking statistic (doctor.ts), plus end-to-end percentile population
+// through the real runScriptDoctor pipeline. See doctor.ts's aggregateReport
+// calibration-layer comment and calibration/reference.ts's header for the
+// full design (why RAW/unclamped, why lazy-build, why the recursion can't
+// happen).
+//
+// Fixtures deliberately stay minimal: band-ordering + distribution tests
+// below already run the 14-pass pipeline via corpus samples that
+// getReferenceDistribution() loads once at module scope, plus one small
+// original fixture for the plain-call/termination case — never a second
+// large hand-authored screenplay.
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { percentileRank, percentileDescriptor } from '../../server/nvm/analyze/calibration/percentile.ts';
+import { getReferenceDistribution } from '../../server/nvm/analyze/calibration/reference.ts';
+import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
+import { runScriptDoctor, computeRawCraftScore, computeHealthScore } from '../../server/nvm/analyze/doctor.ts';
+import type { DimensionKey } from '../../server/nvm/analyze/types.ts';
+
+const DIMENSION_KEYS: DimensionKey[] = [
+  'structure-pacing', 'character', 'dialogue-voice', 'plot-logic', 'theme-originality',
+];
+
+/** Small original 4-scene fixture — deliberately minimal (unlike
+ *  script-doctor.test.ts's richer buildMultiSceneFountain): this file's job
+ *  is exercising the calibration layer, not re-proving pass diagnostics, so
+ *  the one fixture that isn't an already-loaded corpus sample stays cheap. */
+function buildSmallFountain(): string {
+  return [
+    'INT. OFFICE - DAY',
+    '',
+    'Jules reviews a stack of overdue invoices.',
+    '',
+    'JULES',
+    'Nothing about this adds up.',
+    '',
+    'INT. OFFICE - NIGHT',
+    '',
+    "Priya finds a discrepancy buried in last quarter's ledger.",
+    '',
+    'PRIYA',
+    'This changes everything.',
+    '',
+    'EXT. PARKING LOT - NIGHT',
+    '',
+    'Jules and Priya compare notes under a flickering streetlight.',
+    '',
+    'JULES',
+    'We should have caught this months ago.',
+    '',
+    'INT. OFFICE - MORNING',
+    '',
+    'The two file their findings before the review board convenes.',
+    '',
+    'PRIYA',
+    "Let's see what they make of it.",
+  ].join('\n');
+}
+
+describe('percentileRank', () => {
+  const dist = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+  it('is monotonic: a higher value never ranks lower than a lower one', () => {
+    const values = [-50, 0, 10, 25, 55, 75, 100, 150];
+    let prevRank = -1;
+    for (const v of values) {
+      const rank = percentileRank(v, dist);
+      assert.ok(rank >= prevRank, `rank regressed at value ${v}: ${rank} < ${prevRank}`);
+      prevRank = rank;
+    }
+  });
+
+  it('lands below 50 at the distribution minimum and above 50 at the maximum', () => {
+    assert.ok(percentileRank(10, dist) < 50, 'value at the exact minimum should rank low, not neutral');
+    assert.ok(percentileRank(100, dist) > 50, 'value at the exact maximum should rank high, not neutral');
+  });
+
+  it('clamps to 0 below the minimum and 100 above the maximum', () => {
+    assert.equal(percentileRank(-1000, dist), 0);
+    assert.equal(percentileRank(1000, dist), 100);
+  });
+
+  it('returns 50 for an empty distribution (neutral, no opinion)', () => {
+    assert.equal(percentileRank(42, []), 50);
+  });
+
+  it('is sane for a single-element distribution: below/equal/above land at 0/50/100', () => {
+    assert.equal(percentileRank(5, [10]), 0);
+    assert.equal(percentileRank(10, [10]), 50);
+    assert.equal(percentileRank(15, [10]), 100);
+  });
+});
+
+describe('percentileDescriptor', () => {
+  const subject = 'Dialogue & Voice';
+  const bands = [0, 5, 15, 30, 50, 70, 85, 95, 100];
+
+  it('returns a non-empty string across low, mid, and high bands', () => {
+    for (const pct of bands) {
+      assert.ok(percentileDescriptor(pct, subject).length > 0, `empty descriptor at pct=${pct}`);
+    }
+  });
+
+  it('every variant mentions "the reference set"', () => {
+    for (const pct of bands) {
+      assert.ok(
+        percentileDescriptor(pct, subject).includes('the reference set'),
+        `descriptor at pct=${pct} doesn't name "the reference set"`,
+      );
+    }
+  });
+
+  it('never leaks an ALL_CAPS rule-style token', () => {
+    for (const pct of bands) {
+      const desc = percentileDescriptor(pct, subject);
+      // A rule constant looks like PAYOFF_TOO_QUICK: 3+ uppercase letters
+      // (optionally underscore-joined). None of that vocabulary belongs in a
+      // writer-facing sentence — only the caller-supplied `subject` and plain
+      // lowercase prose should appear.
+      assert.ok(!/\b[A-Z][A-Z_]{2,}\b/.test(desc), `descriptor leaked an ALL_CAPS token: "${desc}"`);
+    }
+  });
+});
+
+describe('getReferenceDistribution', () => {
+  const dist = getReferenceDistribution();
+
+  it('has 20 health scores and 20 scores per dimension, matching corpus.ts size', () => {
+    assert.equal(dist.health.length, 20, 'health distribution must match REFERENCE_CORPUS size');
+    assert.equal(REFERENCE_CORPUS.length, 20, 'sanity: corpus itself must be 20 samples');
+    for (const key of DIMENSION_KEYS) {
+      assert.equal(dist.dimensions[key].length, 20, `dimension ${key} distribution must match REFERENCE_CORPUS size`);
+    }
+  });
+
+  it('is sorted ascending for health and every dimension', () => {
+    const isSorted = (arr: number[]) => arr.every((v, i) => i === 0 || arr[i - 1] <= v);
+    assert.ok(isSorted(dist.health), 'health distribution must be sorted ascending');
+    for (const key of DIMENSION_KEYS) {
+      assert.ok(isSorted(dist.dimensions[key]), `dimension ${key} distribution must be sorted ascending`);
+    }
+  });
+
+  it('has non-degenerate spread (max > min) for health and at least 3 of 5 dimensions', () => {
+    assert.ok(
+      dist.health[dist.health.length - 1] > dist.health[0],
+      'health distribution must not collapse to a single repeated value across 4 quality bands',
+    );
+    const dimensionsWithSpread = DIMENSION_KEYS.filter(key => {
+      const arr = dist.dimensions[key];
+      return arr[arr.length - 1] > arr[0];
+    });
+    assert.ok(
+      dimensionsWithSpread.length >= 3,
+      `expected at least 3 of 5 dimensions to show spread, got ${dimensionsWithSpread.length} ` +
+      `(${dimensionsWithSpread.join(', ')})`,
+    );
+  });
+});
+
+describe('computeRawCraftScore vs computeHealthScore', () => {
+  it('equals computeHealthScore (up to 0.1 rounding) when unsaturated', () => {
+    const bySeverity = { critical: 1, major: 1, minor: 1 };
+    const sceneCount = 10;
+    const raw = computeRawCraftScore(bySeverity, sceneCount);
+    const health = computeHealthScore(bySeverity, sceneCount);
+    assert.equal(Math.round(raw * 10) / 10, health);
+    assert.ok(raw > 0 && raw < 100, 'sanity: this fixture should be comfortably unsaturated');
+  });
+
+  it('goes negative (not 0) once the penalty exceeds 100', () => {
+    const bySeverity = { critical: 20, major: 0, minor: 0 };
+    const sceneCount = 5;
+    const raw = computeRawCraftScore(bySeverity, sceneCount);
+    const health = computeHealthScore(bySeverity, sceneCount);
+    assert.ok(raw < 0, `expected a negative raw score, got ${raw}`);
+    assert.equal(health, 0, 'the displayed score should still clamp to 0');
+  });
+
+  it('strictly orders two saturated severity mixes that computeHealthScore ties at 0', () => {
+    const sceneCount = 10;
+    const lighter = { critical: 20, major: 0, minor: 0 };
+    const heavier = { critical: 60, major: 0, minor: 0 };
+
+    assert.equal(computeHealthScore(lighter, sceneCount), 0);
+    assert.equal(computeHealthScore(heavier, sceneCount), 0, 'both mixes must tie at the clamped floor');
+
+    const rawLighter = computeRawCraftScore(lighter, sceneCount);
+    const rawHeavier = computeRawCraftScore(heavier, sceneCount);
+    assert.ok(
+      rawLighter > rawHeavier,
+      `raw score must keep the lighter mix ranked above the heavier one: ${rawLighter} vs ${rawHeavier}`,
+    );
+  });
+});
+
+describe('band ordering through the real runScriptDoctor pipeline', () => {
+  it('a strong corpus sample outranks a troubled one on healthPercentile', async () => {
+    const strongSample = REFERENCE_CORPUS.find(s => s.band === 'strong');
+    const troubledSample = REFERENCE_CORPUS.find(s => s.band === 'troubled');
+    assert.ok(strongSample, 'corpus must contain at least one strong sample');
+    assert.ok(troubledSample, 'corpus must contain at least one troubled sample');
+
+    const [strongReport, troubledReport] = await Promise.all([
+      runScriptDoctor(strongSample!.fountain),
+      runScriptDoctor(troubledSample!.fountain),
+    ]);
+
+    assert.equal(typeof strongReport.healthPercentile, 'number', 'strong report must carry a healthPercentile');
+    assert.equal(typeof troubledReport.healthPercentile, 'number', 'troubled report must carry a healthPercentile');
+
+    for (const pct of [strongReport.healthPercentile!, troubledReport.healthPercentile!]) {
+      assert.ok(pct >= 0 && pct <= 100, `healthPercentile out of range: ${pct}`);
+    }
+    assert.ok(
+      strongReport.healthPercentile! > troubledReport.healthPercentile!,
+      `expected strong (${strongReport.healthPercentile}) > troubled (${troubledReport.healthPercentile})`,
+    );
+
+    for (const report of [strongReport, troubledReport]) {
+      assert.ok(report.dimensions, 'dimensions must be populated');
+      for (const dim of report.dimensions!) {
+        assert.ok(
+          typeof dim.percentileDescriptor === 'string' && dim.percentileDescriptor.length > 0,
+          `dimension ${dim.key} missing percentileDescriptor`,
+        );
+      }
+    }
+  });
+});
+
+describe('termination / no-recursion', () => {
+  it('a plain runScriptDoctor call on a small fixture resolves with healthPercentile defined', async () => {
+    // Success here implicitly proves calibration/reference.ts's module-load
+    // top-level-await distribution build already settled without deadlocking
+    // against this same call path — see reference.ts's header comment on
+    // breaking the recursion cycle (this module's own getReferenceDistribution()
+    // call above already exercised the synchronous accessor; this proves the
+    // full runScriptDoctor path resolves too, not just the accessor).
+    const report = await runScriptDoctor(buildSmallFountain());
+    assert.equal(typeof report.healthPercentile, 'number');
+    assert.ok(report.healthPercentile! >= 0 && report.healthPercentile! <= 100);
+  });
+});

@@ -484,3 +484,62 @@ describe('runScriptDoctor — contentHash', () => {
     assert.equal(a.contentHash, expected);
   });
 });
+
+// ── Calibration percentiles ──────────────────────────────────────────────────
+// healthPercentile / DimensionScore.percentile+percentileDescriptor, populated
+// by aggregateReport's calibration layer (doctor.ts) via calibration/
+// reference.ts's reference-corpus distribution. See tests/core/calibration.test.ts
+// for percentile math, distribution shape, and cross-band ordering coverage —
+// this block only exercises the fields as seen through runScriptDoctor's own
+// report shape and determinism guarantee, using this file's existing fixture.
+describe('runScriptDoctor — calibration percentiles', () => {
+  it('populates healthPercentile and a per-dimension percentile/percentileDescriptor for a normal script', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+
+    assert.equal(typeof report.healthPercentile, 'number', 'healthPercentile must be populated');
+    assert.ok(
+      report.healthPercentile! >= 0 && report.healthPercentile! <= 100,
+      `healthPercentile out of range: ${report.healthPercentile}`,
+    );
+
+    assert.ok(report.dimensions, 'dimensions must be populated');
+    for (const dim of report.dimensions!) {
+      assert.equal(typeof dim.percentile, 'number', `dimension ${dim.key} missing percentile`);
+      assert.ok(
+        dim.percentile! >= 0 && dim.percentile! <= 100,
+        `dimension ${dim.key} percentile out of range: ${dim.percentile}`,
+      );
+      assert.ok(
+        typeof dim.percentileDescriptor === 'string' && dim.percentileDescriptor.length > 0,
+        `dimension ${dim.key} missing a non-empty percentileDescriptor`,
+      );
+    }
+  });
+
+  it('leaves healthPercentile and every dimension percentile undefined for degenerate whitespace-only input', async () => {
+    const report = await runScriptDoctor('   \n\n  \t  ');
+
+    assert.equal(report.healthPercentile, undefined, 'the zero-scene report must never populate healthPercentile');
+    assert.ok(report.dimensions, 'dimensions must still be present on the degenerate report');
+    for (const dim of report.dimensions!) {
+      assert.equal(dim.percentile, undefined, `dimension ${dim.key} must not carry a percentile on the degenerate report`);
+      assert.equal(
+        dim.percentileDescriptor, undefined,
+        `dimension ${dim.key} must not carry a percentileDescriptor on the degenerate report`,
+      );
+    }
+  });
+
+  it('is deterministic: two runs on the same input produce identical healthPercentile and per-dimension percentiles', async () => {
+    const fountain = buildMultiSceneFountain();
+    const [first, second] = await Promise.all([runScriptDoctor(fountain), runScriptDoctor(fountain)]);
+
+    assert.equal(first.healthPercentile, second.healthPercentile);
+    assert.ok(first.dimensions && second.dimensions);
+    assert.equal(first.dimensions!.length, second.dimensions!.length);
+    for (let i = 0; i < first.dimensions!.length; i++) {
+      assert.equal(first.dimensions![i].percentile, second.dimensions![i].percentile);
+      assert.equal(first.dimensions![i].percentileDescriptor, second.dimensions![i].percentileDescriptor);
+    }
+  });
+});
