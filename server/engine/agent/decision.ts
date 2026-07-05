@@ -32,6 +32,13 @@ import {
   PERSUASION_HINT,
   selectPersuasionStrategy,
   getReadyGoals,
+  deriveCascadeInputs,
+  computeDefenseCascadeState,
+  cascadeBehaviorProfile,
+  cascadeActionBias,
+  arbitrateTrinity,
+  describeTrinityGuidance,
+  trinityActionBias,
 } from './psychology.ts';
 
 // ── buildPrompt ───────────────────────────────────────────────────────────────
@@ -184,6 +191,20 @@ export function buildPrompt(
   const activeDefense = selectActiveDefense(sheet.defenseMechanisms, sheet.emotionState);
   const defenseStr = activeDefense ? `ACTIVE DEFENSE: ${DEFENSE_DESCRIPTIONS[activeDefense]}` : '';
 
+  // ── Threat-response cascade (arousal/freeze/flight/fight/fawn/collapse) ──
+  // Distinct from the defense mechanism above (see psychology.ts's header
+  // comment): this is the somatic threat response, not the psyche's cognitive
+  // distortion. Drives both the prompt's behavioral guidance AND (in
+  // selectBestAction below) a scoring bias so a frozen character's candidates
+  // are actually penalized, not merely narrated as frozen.
+  const cascade = computeDefenseCascadeState(deriveCascadeInputs(sheet, stage, node, otherAgents));
+  const cascadeProfile = cascadeBehaviorProfile(cascade.state);
+  const cascadeStr = `THREAT-RESPONSE STATE: ${cascade.state.toUpperCase()} (intensity ${cascade.intensity}/100, choice space: ${cascadeProfile.choiceSpace}). ${cascadeProfile.dialogueStyle} ${cascadeProfile.promptInstruction}`;
+
+  // ── Trinity (Id/Ego/Superego) decision arbitration ──
+  const trinity = arbitrateTrinity(sheet);
+  const trinityStr = `DECISION ARBITRATION: ${describeTrinityGuidance(trinity)} (id=${trinity.idProposal} ego=${trinity.egoAssessment} superego=${trinity.superegoPressure})`;
+
   // ── ToM trust gate ──
   const lowTrustNames = otherAgents.flatMap(a => {
     const tom = sheet.theoryOfMind?.[a.char_id];
@@ -203,6 +224,8 @@ ${describeAttachment(sheet.attachmentStyle)}
 ${defenseStr}
 CURRENT DEFENSE LEVEL: ${defenseLevel}
 ${speechPattern ? `SPEECH PATTERN: ${speechPattern}` : ''}
+${cascadeStr}
+${trinityStr}
 
 YOUR CURRENT GOALS:
 ${goalStr}
@@ -315,6 +338,25 @@ export async function selectBestAction(
   const activeDefense = selectActiveDefense(sheet.defenseMechanisms, sheet.emotionState);
   const attachStyle = sheet.attachmentStyle;
 
+  // Threat-response cascade + Trinity arbitration bias the CHOICE among
+  // candidates, not just the prompt that generated them — otherwise a
+  // frozen/collapsing character could still have its highest-goal-score
+  // (bold, confrontational) candidate picked despite the prompt telling it
+  // not to generate one. Recomputed here (rather than threaded from
+  // buildPrompt) because selectBestAction only receives (sheet, stage,
+  // prompt); both derivations are pure reads of the SAME live stage state
+  // buildPrompt itself just used, so they agree turn-for-turn.
+  const currentNode = stage.getLocation(sheet.current_location_id);
+  const roomAgents = currentNode
+    ? stage.getAgentsInLocation(sheet.current_location_id).filter(a => a.char_id !== sheet.char_id)
+    : [];
+  const cascadeState = currentNode
+    ? computeDefenseCascadeState(deriveCascadeInputs(sheet, stage, currentNode, roomAgents)).state
+    : 'arousal';
+  const cascadeBias = cascadeActionBias(cascadeState);
+  const trinity = arbitrateTrinity(sheet);
+  const trinityBias = trinityActionBias(trinity.winner, trinity.colorer);
+
   // Record defense activation as a beat trace
   if (activeDefense) {
     const lastAction = stage.getLastActionForAgent(sheet.char_id);
@@ -337,8 +379,10 @@ export async function selectBestAction(
     (top, c) => {
       const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
       const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
-      const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle);
-      const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle);
+      const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle)
+        * (cascadeBias[cType] ?? 1.0) * (trinityBias[cType] ?? 1.0);
+      const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle)
+        * (cascadeBias[tType] ?? 1.0) * (trinityBias[tType] ?? 1.0);
       return cScore > tScore ? c : top;
     },
     (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },
