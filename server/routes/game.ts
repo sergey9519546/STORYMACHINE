@@ -7,11 +7,13 @@ import type { CharacterSheet, StageSnapshot } from '../engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from '../lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES } from '../lib/structure-presets.ts';
 import { logger } from '../lib/logger.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema } from '../lib/validation.ts';
+import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema } from '../lib/validation.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
+import { buildInterviewGrounding } from '../lib/interview.ts';
+import { generateContent, modelForTask, getTemperature } from '../engine/ai.ts';
 import {
   asyncHandler, requireString, sessionId, getOrCreateSession, destroySession,
-  gameLimiter, sessions, runningRooms, PERSIST_SESSIONS, SESSION_DB_DIR,
+  gameLimiter, aiLimiter, sessions, runningRooms, PERSIST_SESSIONS, SESSION_DB_DIR,
 } from '../lib/session-store.ts';
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
@@ -111,6 +113,82 @@ router.post('/api/turn', gameLimiter, validate(TurnBodySchema), asyncHandler(asy
     res.json({ action });
   } finally {
     resolveSlot();
+  }
+}));
+
+// ── Character interview ───────────────────────────────────────────────────
+// POST /api/game/interview — talk to a simulated character; every answer is
+// grounded in their ACTUAL psychological state, with citable receipts.
+//
+// Rate limiter contrast: every other route in this file (/api/turn,
+// /api/run-room, ...) drives the deterministic simulation engine — no LLM
+// call on the request path unless an agent's turn happens to need one deep
+// inside the orchestrator, and even then it's bounded by the engine's own
+// per-turn call budget. This route calls generateContent directly, once per
+// request, purely to GENERATE PROSE (the in-character answer) — that's a much
+// more expensive, less bounded operation than the analysis/state routes above,
+// so it sits behind aiLimiter (20/min) rather than gameLimiter (120/min).
+//
+// Keyless-analysis principle: receipts (the grounding) are ALWAYS computed and
+// returned regardless of whether the LLM call succeeds. The deterministic half
+// of this feature — showing exactly which beliefs, emotion, defense,
+// attachment, goals, and relationships shape the answer — works with no API
+// key at all, matching the rest of the product. Only the spoken `answer` text
+// requires a working LLM; its absence is never a 500, only a 200 with a note.
+router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asyncHandler(async (req, res) => {
+  const sid = sessionId(req);
+  const { agentName, question, history } = req.body as {
+    agentName: string;
+    question: string;
+    history?: Array<{ role: 'user' | 'character'; text: string }>;
+  };
+  const { stage } = getOrCreateSession(sid);
+
+  // Name lookup (case-insensitive) rather than by char_id — the interview UI
+  // works from the character's display name, not its internal identifier.
+  const agents = stage.getAllAgents();
+  const agent = agents.find(a => a.name === agentName)
+    ?? agents.find(a => a.name.toLowerCase() === agentName.toLowerCase());
+  if (!agent) {
+    res.status(404).json({ error: `No character named '${agentName}' exists in this session` });
+    return;
+  }
+
+  const { receipts, systemPrompt } = buildInterviewGrounding(agent, question, stage);
+
+  const MAX_ANSWER_LEN = 4000;
+  const keylessNote = `${sanitizeForPrompt(agent.name, 256)}'s grounding is shown below — add an AI key in Settings to hear them actually speak.`;
+
+  try {
+    const contents = [
+      ...(history ?? []).map(h => ({
+        // Gemini's assistant role is 'model', not 'character' — map at the boundary.
+        role: h.role === 'character' ? 'model' : 'user',
+        parts: [{ text: sanitizeForPrompt(h.text, 2000) }],
+      })),
+      { role: 'user', parts: [{ text: sanitizeForPrompt(question, 2000) }] },
+    ];
+
+    const response = await generateContent({
+      model: modelForTask('DIALOGUE'),
+      contents,
+      config: { temperature: getTemperature(), systemInstruction: systemPrompt },
+    }, { label: 'game-interview', timeoutMs: 30_000 });
+
+    const rawAnswer = typeof response.text === 'string' ? response.text.trim() : '';
+    if (!rawAnswer) {
+      // Empty completion (safety block, empty candidate, etc.) — fall through
+      // to the keyless shape rather than returning a blank `answer`.
+      res.json({ receipts, usedLLM: false, note: keylessNote });
+      return;
+    }
+    const answer = rawAnswer.length > MAX_ANSWER_LEN ? rawAnswer.substring(0, MAX_ANSWER_LEN) : rawAnswer;
+    res.json({ answer, receipts, usedLLM: true });
+  } catch {
+    // Missing GEMINI_API_KEY, network failure, or timeout — NEVER a 500 here.
+    // No raw error text is exposed to the client; the grounding still stands
+    // on its own per the keyless-analysis principle described above.
+    res.json({ receipts, usedLLM: false, note: keylessNote });
   }
 }));
 
