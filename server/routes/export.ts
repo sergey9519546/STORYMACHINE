@@ -14,7 +14,8 @@ import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
-import { validate, DoctorBodySchema, SlateBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, SlateBodySchema, VerifyBodySchema } from '../lib/validation.ts';
+import type { CoverageVerdict } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { renderCoverageHtml } from '../lib/coverage-html.ts';
 import { buildBreakdownRows, breakdownRowsToCsv, analyzeSceneCharacters } from '../lib/breakdown.ts';
@@ -646,5 +647,128 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
   } catch (err) {
     logger.error('export_pitchkit_error', { message: (err as Error).message });
     res.status(500).json({ error: 'Pitch kit export failed' });
+  }
+}));
+
+// ── Determinism-badge verify (Run 15, ROADMAP §11) ───────────────────────────
+// POST /api/export/verify — this is the determinism badge made checkable: a
+// coverage report's footer "Verification hash" and the headline numbers next
+// to it (health, verdict, totalIssues, healthPercentile — coverage-html.ts's
+// buildFooterSection/buildHealthSection/buildHeaderSection) are claims. This
+// route is how ANYONE holding the original script text can independently
+// re-attest those claims without trusting whoever produced the export in the
+// first place. Always keyless/deterministic: runScriptDoctor's diagnose-only
+// pipeline never invokes an LLM (doctor.ts's own header comment establishes
+// this), so no generation feature (deep read, AI rewrite, etc.) can ever
+// influence what this route recomputes — it can only ever reproduce what the
+// deterministic engine itself would produce for the identical text.
+//
+// Order of checks matters and is deliberately cheap-first: contentHash is
+// recomputed from the submitted text BEFORE the doctor ever runs. If it
+// doesn't match `expected.contentHash`, the text the caller submitted isn't
+// the text the original report was about — full stop, no report field is
+// even meaningful to compare — so the route returns immediately with a named
+// hash mismatch and never pays for a 14-pass pipeline run. Only a matching
+// hash unlocks the (quick, deterministic) doctor re-run that the rest of
+// `expected`'s fields are checked against.
+const VERIFY_FLOAT_TOLERANCE = 0.05;
+// health/healthPercentile are displayed and typically re-typed/re-serialized
+// as one-decimal numbers (coverage-html.ts's `.toFixed(1)`, doctor.ts's
+// Math.round(x*10)/10 for health; healthPercentile is unrounded but derived
+// from the same one-decimal-rounded inputs upstream) — a caller quoting a
+// number back from a printed/exported report, or whose own JSON round-trip
+// reformatted a float, can legitimately differ from the freshly computed
+// value by less than one full unit in the last decimal place. 0.05 is half of
+// that one-decimal step: it accepts any difference explainable purely by
+// display/round-trip rounding while still catching a genuinely wrong number.
+
+interface VerifyMismatch { field: string; expected: unknown; actual: unknown }
+
+router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), asyncHandler(async (req, res) => {
+  const { expected } = req.body as {
+    expected: {
+      contentHash: string;
+      health?: number;
+      verdict?: CoverageVerdict;
+      totalIssues?: number;
+      healthPercentile?: number;
+    };
+  };
+
+  const fountain = resolveFountainOrRespond(req, res);
+  if (fountain === undefined) return;
+
+  try {
+    const actualContentHash = createHash('sha256').update(fountain.trim()).digest('hex');
+    const verifiedAt = Date.now();
+
+    // Cheap-first exit: the text isn't the text. Deliberately does NOT import
+    // or call runScriptDoctor on this path — `recomputed` below carries only
+    // contentHash, and `checked` names only contentHash, which is the honest
+    // signal that no report field was ever compared (see comment above).
+    if (actualContentHash !== expected.contentHash) {
+      res.json({
+        verified: false,
+        checked: ['contentHash'],
+        mismatches: [{ field: 'contentHash', expected: expected.contentHash, actual: actualContentHash }] as VerifyMismatch[],
+        recomputed: { contentHash: actualContentHash },
+        verifiedAt,
+      });
+      return;
+    }
+
+    // Dynamic import: same rationale as every other doctor-consuming route in
+    // this file — doctor.ts pulls in the full analyzer + all 14 revision
+    // passes, so routes that never call the doctor shouldn't pay for it at
+    // startup. Diagnose-only, no LLM, no randomness: same input always
+    // produces the same report (doctor.ts's own header comment).
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+    const report = await runScriptDoctor(fountain);
+
+    const checked: string[] = ['contentHash'];
+    const mismatches: VerifyMismatch[] = [];
+
+    if (expected.health !== undefined) {
+      checked.push('health');
+      if (Math.abs(expected.health - report.health) > VERIFY_FLOAT_TOLERANCE) {
+        mismatches.push({ field: 'health', expected: expected.health, actual: report.health });
+      }
+    }
+    if (expected.verdict !== undefined) {
+      checked.push('verdict');
+      if (expected.verdict !== report.verdict) {
+        mismatches.push({ field: 'verdict', expected: expected.verdict, actual: report.verdict });
+      }
+    }
+    if (expected.totalIssues !== undefined) {
+      checked.push('totalIssues');
+      if (expected.totalIssues !== report.totalIssues) {
+        mismatches.push({ field: 'totalIssues', expected: expected.totalIssues, actual: report.totalIssues });
+      }
+    }
+    if (expected.healthPercentile !== undefined) {
+      checked.push('healthPercentile');
+      const actualPercentile = report.healthPercentile;
+      if (actualPercentile === undefined || Math.abs(expected.healthPercentile - actualPercentile) > VERIFY_FLOAT_TOLERANCE) {
+        mismatches.push({ field: 'healthPercentile', expected: expected.healthPercentile, actual: actualPercentile });
+      }
+    }
+
+    res.json({
+      verified: mismatches.length === 0,
+      checked,
+      mismatches,
+      recomputed: {
+        contentHash: actualContentHash,
+        health: report.health,
+        verdict: report.verdict,
+        totalIssues: report.totalIssues,
+        healthPercentile: report.healthPercentile,
+      },
+      verifiedAt,
+    });
+  } catch (err) {
+    logger.error('export_verify_error', { message: (err as Error).message });
+    res.status(500).json({ error: 'Verification failed' });
   }
 }));

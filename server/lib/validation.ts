@@ -487,6 +487,35 @@ export const SlateBodySchema = z.object({
   },
 );
 
+// POST /api/export/verify — Run 15 (ROADMAP §11) determinism-badge verify
+// endpoint. Same two-format contract as DoctorBodySchema (exactly one of
+// fountain/fdx), plus an `expected` object naming which fields of a
+// previously-exported report the caller wants re-attested against a fresh
+// run. `contentHash` is REQUIRED inside `expected` — it's the anchor fact
+// ("is this even the same text?") the route checks before it ever bothers
+// re-running the doctor; see server/routes/export.ts's route comment. Every
+// other field is optional so a caller can check only the subset of numbers
+// their exported copy actually shows (e.g. a plain-text summary that quotes
+// health but not healthPercentile).
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
+
+const VerifyExpectedSchema = z.object({
+  contentHash: z.string().regex(CONTENT_HASH_RE, 'contentHash must be a 64-character lowercase hex sha256 digest'),
+  health: z.number().min(0).max(100).optional(),
+  verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),
+  totalIssues: z.number().int().min(0).optional(),
+  healthPercentile: z.number().min(0).max(100).optional(),
+});
+
+export const VerifyBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000).optional(),
+  fdx: z.string().min(1).max(900_000).optional(),
+  expected: VerifyExpectedSchema,
+}).refine(
+  (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
+  'provide exactly one of fountain or fdx',
+);
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
