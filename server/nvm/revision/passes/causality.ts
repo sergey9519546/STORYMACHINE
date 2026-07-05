@@ -582,6 +582,12 @@
 // VOID give revelation its second and third channels (emotionalShift, relationshipShifts);
 // CAUSALITY_SUSPENSE_CURIOSITY_AFTERMATH_VOID gives suspenseDelta its second channel
 // (curiosityDelta).
+// Wave 1175 additions (closes rotation cycle 44, dialogue.ts Wave 1162 - causality.ts Wave
+// 1175): after Wave 1161, revelation stood at three of six channels (curiosityDelta,
+// emotionalShift, relationshipShifts) and suspenseDelta at two (emotionalShift, curiosityDelta).
+// CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID and CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID
+// give revelation its fourth and fifth channels (suspenseDelta, visualBeats); CAUSALITY_
+// SUSPENSE_RELATIONAL_AFTERMATH_VOID gives suspenseDelta its third channel (relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6845,6 +6851,83 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1161c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1161c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the causal chain's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // rise in suspense, while such rises occur elsewhere. Distinct from CAUSALITY_REVELATION_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1147) and CAUSALITY_REVELATION_EMOTIONAL_AFTERMATH_VOID /
+  // CAUSALITY_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 1161, same trigger paired with
+  // curiosityDelta/emotionalShift/relationshipShifts) — this is the fourth consequence channel
+  // for this trigger.
+  {
+    const r1175a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1175a.fires) {
+      issues.push({
+        location: `${r1175a.triggerCount} revelation scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1175a.triggerCount} revelation scenes is followed by two scenes with no rise in suspense, even though ${r1175a.aftermathCount} such rises occur elsewhere. A truth that surfaces without ever sharpening danger or uncertainty in its wake leaves the causal chain's disclosures reading as settled facts rather than information that raises the stakes of what follows.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information tighten the tension around what comes next, so disclosure keeps building pressure instead of only resolving questions.`,
+      });
+    }
+  }
+
+  // CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from CAUSALITY_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1147), CAUSALITY_REVELATION_EMOTIONAL_AFTERMATH_
+  // VOID, CAUSALITY_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 1161), and CAUSALITY_REVELATION_
+  // SUSPENSE_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/emotionalShift/
+  // relationshipShifts/suspenseDelta) — this is the fifth consequence channel for this trigger.
+  {
+    const r1175b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1175b.fires) {
+      issues.push({
+        location: `${r1175b.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'CAUSALITY_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1175b.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1175b.aftermathCount} such scenes exist elsewhere in the script. A revelation that never earns a visually charged follow-through leaves the causal chain's disclosures registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CAUSALITY_SUSPENSE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a
+  // recorded relationship shift, 2-scene lookahead. Fires when every suspense-spike's two-scene
+  // aftermath carries no relationship movement, while such movement occurs elsewhere. Distinct
+  // from CAUSALITY_SUSPENSE_EMOTIONAL_AFTERMATH_VOID (Wave 1147) and CAUSALITY_SUSPENSE_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1161, same trigger paired with emotionalShift/curiosityDelta)
+  // — this is the third consequence channel for this trigger.
+  {
+    const r1175c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1175c.fires) {
+      issues.push({
+        location: `${r1175c.triggerCount} suspense-spike scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'CAUSALITY_SUSPENSE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1175c.triggerCount} suspense-spike scenes is followed by two scenes with no recorded relationship shift, even though ${r1175c.aftermathCount} such shifts occur elsewhere. A spike in danger that never moves how a pair of characters stand with each other right after it lands leaves the causal chain's tension isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it shift a relationship — an alliance strained or forced by the danger — so the tension carries interpersonal weight, not just structural pressure.`,
       });
     }
   }
