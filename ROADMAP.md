@@ -238,6 +238,34 @@ the rotation to run unattended for hundreds of future waves.
 Record each wave's type in its own commit message so the rotation cursor
 stays legible to the next session without re-deriving it from history.
 
+### Wave economics — how many waves, and when to stop grinding
+
+The value-maximizing schedule, decided after Wave 1182's warning sign (its 3
+new checks fire on ZERO corpus samples — a rule that never fires is
+inventory, not capability; v1 died of exactly this at scale):
+
+- [ ] **(M)** Extend Run 12 to TWO full cycles: waves 1183–1190 (the four
+  types twice). ~24 new checks and, more importantly, two passes of the
+  health gate below.
+- [ ] **(S)** **Wave-health gate — run at the end of EVERY cycle, forever:**
+  (a) corpus band separation must hold or improve (calibration tests +
+  band-average deltas reported in the cycle's last commit message);
+  (b) fire-rate audit: fraction of the cycle's new rules that have ever
+  fired on any corpus sample or realistic fixture — zero-fire rules get
+  their guards re-examined or the corpus enriched (e.g. 1182's silence
+  means either conservative thresholds or a corpus without question-dense
+  dialogue — measure, don't assume). This gate is what keeps v2 from
+  silently becoming v1.
+- **STOP grinding after cycle 2** (~wave 1190): pre-deep-read lexical
+  extraction supports only ~8–12 more genuinely new signals total. Do
+  Run 10 (deep-read sensing) NEXT — it reopens the signal axis with
+  semantic channels (irony, subtext, motivation coherence), making each
+  post-deep-read wave worth several of today's. Then resume sustained
+  cycles indefinitely under the gate.
+- **Horizon estimate for "absolute best outcome": ~40–50 v2 waves
+  (~120–150 checks) across this roadmap — 8 before deep-read, the rest
+  after — with the per-cycle gate as the real stopping rule, not a count.**
+
 ---
 
 ## 9. Run 13 — Keyless deterministic simulation
