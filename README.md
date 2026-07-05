@@ -14,7 +14,9 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
    `npm install`
 2. Copy `.env.example` to `.env` and fill in your key:
    `cp .env.example .env`
-   Then set `GEMINI_API_KEY` to your Gemini API key.
+   Then set `GEMINI_API_KEY` to your Gemini API key — or skip this step
+   entirely to run in analysis-only mode (all deterministic features work
+   without a key; generation features stay off until one is configured).
 3. Run the app:
    `npm run dev`
 
@@ -22,7 +24,7 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | ✅ | Gemini AI API key — never commit this |
+| `GEMINI_API_KEY` | Optional | Gemini AI API key — never commit this. Without it the server boots in **analysis-only mode**: Script Doctor, live diagnostics, coverage export, What-If Lab, Writers' Room, and interview receipts all work; generation (copilot, simulation dialogue, rewrites) stays disabled until a key is set. |
 | `APP_URL` | Optional | Hosting URL (injected automatically by AI Studio) |
 
 > **Security note:** `.env` is gitignored via `.env*` in `.gitignore`. Only `.env.example` is tracked. Never commit real keys.

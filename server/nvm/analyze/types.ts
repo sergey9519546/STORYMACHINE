@@ -174,9 +174,15 @@ export interface LiveDiagnosis {
 }
 
 export interface ScriptDoctorReport {
-  /** 0–100 deterministic health score. 100 = zero issues. Formula:
-   *  100 − (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)),
-   *  clamped to [0, 100] — i.e. issue weight normalized per 30-scene feature. */
+  /** 0–100 deterministic health score. 100-ceiling, opportunity-normalized:
+   *  weighted issues (4·critical + 1.5·major + 0.5·minor) are read as a
+   *  DENSITY against script size (wordCount^0.7), amplified to a readable
+   *  spread, plus a scarcity penalty (140/sceneCount) so tiny scripts can't
+   *  score high purely from having too little material to judge. Exact
+   *  constants and their empirical tuning live in doctor.ts's craftPenalty —
+   *  that function is the single source of truth; this comment describes
+   *  shape, not constants, so it can't silently drift. Length-invariant by
+   *  regression test: same craft at 1×/2×/3× length scores within ~10 pts. */
   health: number;
   /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled */
   grade: DoctorGrade;
