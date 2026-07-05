@@ -60,6 +60,14 @@ export interface NarrativeAction {
   action_type: ActionType;
   content: string;
   target: string | null;
+  // Run 13 (keyless deterministic simulation): true when this action was
+  // composed by the rule-based fallback (agent/deterministic.ts) rather than
+  // an LLM. Additive — omitted entirely (not just `false`) on every
+  // LLM-produced action, so a successful-provider turn's JSON stays
+  // byte-identical to pre-Run-13 output. Surfaced by /api/turn's response and
+  // /api/run-room-stream's `agent_action` events so the UI can label
+  // rule-based turns.
+  deterministic?: boolean;
 }
 
 // ── Psychology substrate ─────────────────────────────────────────────────────
@@ -428,6 +436,10 @@ export interface EpistemicUpdate {
   contradiction_detected: boolean;
   contradicted_propositions: string[];    // text of beliefs that were contradicted
   source_event_id?: string;              // primary trigger event for this update
+  // Run 13: true when this update was produced by the keyless rule-based
+  // fallback (agent/deterministic.ts's buildDeterministicEpistemics) rather
+  // than an LLM call. Additive — omitted (not `false`) on the LLM path.
+  deterministic?: boolean;
 }
 
 // ── Director evaluation result ───────────────────────────────────────────────

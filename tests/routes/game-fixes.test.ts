@@ -260,3 +260,97 @@ describe('routes/game — Fix D (POST /api/run-scene)', async () => {
     assert.equal(res.status, 400);
   });
 });
+
+// ── Run 13 — keyless deterministic simulation ───────────────────────────────
+// Unit coverage for the rule-based composer/epistemics fallback themselves
+// lives in tests/core/deterministic-sim.test.ts — this describe block is the
+// HTTP-surface, end-to-end proof: a keyless /api/turn produces a real
+// (non-frozen) ledger entry AND a StoryCommit with real ops, and a keyless
+// /api/run-room actually moves a character's beliefs (checked via the
+// existing /api/game/interview receipts, before vs after — the same
+// "receipts are the front door" proof pattern Run 1 established).
+describe('routes/game — Run 13 (keyless deterministic simulation)', async () => {
+  let server: TestServer;
+  before(async () => { resetLLMProvider(); server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  async function initTwoAgents(sid: string, locationId = 'gallery') {
+    return fetch(`${server.baseUrl}/api/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        nodes: [{ location_id: locationId, name: 'Gallery', description: 'A quiet gallery.', adjacent_locations: [] }],
+        agents: [
+          {
+            char_id: 'nora', name: 'Nora Vance', public_mask: 'A composed art dealer.',
+            hidden_motive: 'Protect the forged painting.', current_location_id: locationId,
+            goalStack: {
+              terminal: { id: 'g0', description: 'clear her name', value: 90, achieved: false },
+              instrumental: [{ id: 'g1', description: 'find out who forged the painting', value: 70, achieved: false }],
+              last_planned_at: 0,
+            },
+          },
+          { char_id: 'milo', name: 'Milo Cross', public_mask: 'A nervous curator.', hidden_motive: 'Cover his tracks.', current_location_id: locationId },
+        ],
+      }),
+    });
+  }
+
+  it('keyless POST /api/turn: the ledger entry is deterministic (not the old hollow "..."), and a StoryCommit with real ops lands in canon', async () => {
+    const sid = freshSessionId();
+    assert.equal((await initTwoAgents(sid)).status, 200);
+
+    const turnRes = await fetch(`${server.baseUrl}/api/turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, agentId: 'nora' }),
+    });
+    assert.equal(turnRes.status, 200);
+    const turnBody = await turnRes.json();
+    assert.equal(turnBody.action.deterministic, true, 'keyless action must carry the deterministic flag');
+    assert.notEqual(turnBody.action.content, '...', 'must not be the pre-Run-13 hollow ellipsis');
+    assert.ok(turnBody.action.content.length > 0);
+
+    const commitsRes = await fetch(`${server.baseUrl}/api/nvm/commits?sessionId=${sid}`);
+    assert.equal(commitsRes.status, 200);
+    const commitsBody = await commitsRes.json();
+    assert.ok(Array.isArray(commitsBody.commits) && commitsBody.commits.length > 0, 'the turn produced at least one StoryCommit');
+    const lastCommit = commitsBody.commits[commitsBody.commits.length - 1];
+    assert.ok(Array.isArray(lastCommit.ops) && lastCommit.ops.length > 0, 'the commit carries real ops, not an empty shell');
+  });
+
+  it('keyless POST /api/run-room: beliefs actually move — interview receipts differ before vs after', async () => {
+    const sid = freshSessionId();
+    assert.equal((await initTwoAgents(sid)).status, 200);
+
+    const before = await fetch(`${server.baseUrl}/api/game/interview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, agentName: 'Nora Vance', question: 'What do you believe about Milo right now?' }),
+    });
+    assert.equal(before.status, 200);
+    const beforeBody = await before.json();
+    const beforeBeliefCount = beforeBody.receipts.beliefs.length;
+
+    const roomRes = await fetch(`${server.baseUrl}/api/run-room`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, nodeId: 'gallery', maxTurns: 4 }),
+    });
+    assert.equal(roomRes.status, 200);
+
+    const after = await fetch(`${server.baseUrl}/api/game/interview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, agentName: 'Nora Vance', question: 'What do you believe about Milo right now?' }),
+    });
+    assert.equal(after.status, 200);
+    const afterBody = await after.json();
+
+    assert.ok(
+      afterBody.receipts.beliefs.length > beforeBeliefCount,
+      `run-room must produce genuine belief movement keylessly (before=${beforeBeliefCount}, after=${afterBody.receipts.beliefs.length})`,
+    );
+  });
+});

@@ -26,6 +26,12 @@ import { getReadyGoals } from './agent/psychology.ts';
 import { buildPrompt, selectBestAction } from './agent/decision.ts';
 // M4: delegate reflection synthesis and goal replanning to agent/memory.ts
 import { synthesizeReflectionsFor, replanGoalsFor } from './agent/memory.ts';
+// Run 13 (keyless deterministic simulation): rule-based fallbacks for both
+// takeTurn (when selectBestAction returns null) and updateEpistemics (when
+// the LLM call fails/is absent) — see agent/deterministic.ts's header for
+// the full design.
+import { buildDeterministicEpistemics, composeDeterministicAction } from './agent/deterministic.ts';
+import type { EpistemicsFallbackResult } from './agent/deterministic.ts';
 
 // ── Agent class ──────────────────────────────────────────────────────────────
 
@@ -87,7 +93,11 @@ export class Agent {
       this.stage.markPressureApplied(pressureId);
     }
 
-    return action ?? { action_type: 'SPEAK' as const, content: '...', target: null };
+    // Run 13: selectBestAction returns null only on missing key / timeout /
+    // parse failure — the rule-based composer reuses this SAME turn's
+    // (sheet, currentNode, otherAgents) so the fallback action is grounded in
+    // identical state to what the LLM prompt would have seen.
+    return action ?? composeDeterministicAction(this.sheet, this.stage, currentNode, otherAgents);
   }
 
   // ── Epistemic update (replaces evaluateState) ────────────────────────────────
@@ -250,35 +260,28 @@ Based on what you just witnessed:
       return null;
     });
 
-    if (!response) return empty;
-
-    const epistemicsRawText = response.text ?? '{}';
-    const result = safeJsonParse<{
-      newSuspicionScore: number;
-      newBeliefs: Array<{ proposition: string; confidence: number; source: string; source_action_index?: number | null }>;
-      updatedTheoryOfMind: Array<{
-        agent_name: string;
-        believed_motive: string;
-        trust_level: number;
-        affinity?: number | null;
-        power_balance?: number | null;
-        debt?: number | null;
-        new_believed_knowledge?: string[];
-        shared_history_event?: string | null;
-      }>;
-      contradiction_detected: boolean;
-      contradicted_propositions: string[];
-      goal_stack_update?: { add_subgoal?: string | null; mark_achieved?: string | null } | null;
-      level2_tom?: Array<{ about_agent: string; they_believe_about_you: string; confidence: number }>;
-      level3_tom?: Array<{ about_agent: string; they_believe_you_believe: string; confidence: number }>;
-    }>(epistemicsRawText, {
-      newSuspicionScore: this.sheet.suspicion_score,
-      newBeliefs: [],
-      updatedTheoryOfMind: [],
-      contradiction_detected: false,
-      contradicted_propositions: [],
-    });
-    if (!result.newBeliefs?.length && epistemicsRawText.length > 10) {
+    // Run 13: previously `if (!response) return empty;` here — beliefs/ToM
+    // were completely frozen keylessly. Instead, synthesize a rule-based
+    // `result` in the IDENTICAL shape the LLM branch parses its JSON into
+    // (EpistemicsFallbackResult mirrors the inline type below field-for-
+    // field). Every line AFTER this block — belief merge, ToM merge,
+    // goal-stack mutation, deadlock detection, reflection scheduling — is
+    // then genuinely shared by both paths; the Orchestrator's before/after
+    // ToM/emotion diffing (→ SHIFT_RELATIONSHIP / APPRAISE_EMOTION ops) needs
+    // no special-casing to see a keyless turn's output, because by this point
+    // there is no distinction left to special-case.
+    const epistemicsRawText = response?.text ?? '{}';
+    const result: EpistemicsFallbackResult = response
+      ? safeJsonParse<EpistemicsFallbackResult>(epistemicsRawText, {
+          newSuspicionScore: this.sheet.suspicion_score,
+          newBeliefs: [],
+          updatedTheoryOfMind: [],
+          contradiction_detected: false,
+          contradicted_propositions: [],
+        })
+      : buildDeterministicEpistemics(this.sheet, observableActions, otherAgentsInRoom);
+    const usedDeterministicFallback = !response;
+    if (response && !result.newBeliefs?.length && epistemicsRawText.length > 10) {
       logger.warn('agent_parse_fallback', { agent: this.sheet.name, method: 'updateEpistemics', preview: epistemicsRawText.substring(0, 120) });
     }
 
@@ -545,6 +548,7 @@ Based on what you just witnessed:
       contradiction_detected: result.contradiction_detected ?? false,
       contradicted_propositions: result.contradicted_propositions ?? [],
       source_event_id: observableActions.length > 0 ? observableActions[observableActions.length - 1].action_id : undefined,
+      ...(usedDeterministicFallback ? { deterministic: true } : {}),
     };
   }
 
