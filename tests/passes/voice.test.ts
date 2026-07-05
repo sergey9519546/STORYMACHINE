@@ -1438,6 +1438,80 @@ Good riddance to you.`;
   });
 
 
+  describe('Wave 1159 — voicePass: voice revelation-dialogue-highlight aftermath void, voice revelation-staging aftermath void, voice open-thread-relational aftermath void', async () => {
+    const runV1159 = async (records: ScreenplaySceneRecord[]) => {
+      const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');
+      return voicePass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID fires when every revelation is followed by two scenes with no highlighted dialogue', async () => {
+      const recs1159a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID does not fire when a revelation is followed by highlighted dialogue within its window', async () => {
+      const recs1159an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { dialogueHighlights: ['a memorable line'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID'), 'VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_REVELATION_STAGING_AFTERMATH_VOID fires when every revelation is followed by two scenes with no heavily-staged scene', async () => {
+      const recs1159b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_STAGING_AFTERMATH_VOID'), 'VOICE_REVELATION_STAGING_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_REVELATION_STAGING_AFTERMATH_VOID does not fire when a revelation is followed by a heavily-staged scene within its window', async () => {
+      const recs1159bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'a hidden truth surfaces' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { visualBeats: ['beat one', 'beat two'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_REVELATION_STAGING_AFTERMATH_VOID'), 'VOICE_REVELATION_STAGING_AFTERMATH_VOID should not fire');
+    });
+
+    it('VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID fires when every heavily-unresolved scene is followed by two scenes with no relationship shift', async () => {
+      const recs1159c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID does not fire when a heavily-unresolved scene is followed by a relationship shift within its window', async () => {
+      const recs1159cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { unresolvedClues: ['c1', 'c2', 'c3'] });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeSharedRecord(i);
+      });
+      const res = await runV1159(recs1159cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID'), 'VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1145 — voicePass: voice revelation-relational aftermath void, voice open-thread-suspense aftermath void, voice open-thread-emotional aftermath void', async () => {
     const runV1145 = async (records: ScreenplaySceneRecord[]) => {
       const { voicePass } = await import('../../server/nvm/revision/passes/voice.ts');

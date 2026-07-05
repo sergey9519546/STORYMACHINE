@@ -505,6 +505,13 @@
 // fourth channel (relationshipShifts); VOICE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID and VOICE_
 // OPEN_THREAD_EMOTIONAL_AFTERMATH_VOID give unresolvedClues its third and fourth channels
 // (suspenseDelta, emotionalShift).
+// Wave 1159 additions: after Wave 1145, revelation was at four of six channels (curiosityDelta,
+// emotionalShift, suspenseDelta, relationshipShifts) and unresolvedClues (>=3) at four
+// (visualBeats, curiosityDelta, suspenseDelta, emotionalShift). VOICE_REVELATION_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID and VOICE_REVELATION_STAGING_AFTERMATH_VOID give revelation its
+// fifth and sixth channels (dialogueHighlights, visualBeats), completing full six-channel
+// saturation for this trigger. VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID gives unresolvedClues
+// its fifth channel (relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6886,6 +6893,88 @@ export async function voicePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every scene carrying three or more unresolved threads (${r1145c.triggerCount} instances) is followed by two scenes with no emotional shift, even though ${r1145c.aftermathCount} such shifts occur elsewhere in the script. A pile-up of open questions that never registers on any character's felt state right after it leaves the voice's accumulating uncertainty reading as inert bookkeeping rather than something anyone actually carries a feeling about.`,
         suggestedFix: `In the two scenes following a heavily-unresolved scene, let it visibly weigh on a character's emotional register, so the voice's lingering questions land as felt, not just tracked.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation trigger
+  // → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes anywhere with
+  // a highlighted line of dialogue, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from VOICE_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1117), VOICE_REVELATION_EMOTIONAL_
+  // AFTERMATH_VOID, VOICE_REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1131), and VOICE_REVELATION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1145, same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1159a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1159a.fires) {
+      issues.push({
+        location: `${r1159a.triggerCount} revelation scene(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1159a.triggerCount} revelation scenes is followed by two scenes with no highlighted dialogue, even though ${r1159a.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a memorable line right after it lands leaves the voice's revelations unvoiced — no character's speech processes what was just learned.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a line that reckons with what was discovered, so the reckoning with new information registers in speech, not just in plot state.`,
+      });
+    }
+  }
+
+  // VOICE_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from VOICE_REVELATION_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1117), VOICE_REVELATION_EMOTIONAL_AFTERMATH_VOID, VOICE_
+  // REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1131), VOICE_REVELATION_RELATIONAL_AFTERMATH_VOID
+  // (Wave 1145), and VOICE_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID (this wave, same trigger
+  // paired with curiosityDelta/emotionalShift/suspenseDelta/relationshipShifts/
+  // dialogueHighlights) — this is the sixth and final consequence channel for this trigger,
+  // completing full six-channel saturation.
+  {
+    const r1159b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1159b.fires) {
+      issues.push({
+        location: `${r1159b.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'VOICE_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1159b.triggerCount} revelation scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1159b.aftermathCount} such scenes exist elsewhere in the script. A truth that surfaces without earning a visually charged follow-through leaves the voice's revelations registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × unresolvedClues (>=3)
+  // trigger → relationshipShifts absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying heavily-unresolved scenes (pos<n-2), ≥2 scenes anywhere with a
+  // recorded relationship shift, 2-scene lookahead. Fires when every such scene's two-scene
+  // aftermath carries no relationship movement, while such movement occurs elsewhere. Distinct
+  // from VOICE_OPEN_THREAD_STAGING_AFTERMATH_VOID (Wave 1019), VOICE_OPEN_THREAD_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1131), and VOICE_OPEN_THREAD_SUSPENSE_AFTERMATH_VOID / VOICE_OPEN_
+  // THREAD_EMOTIONAL_AFTERMATH_VOID (Wave 1145, same trigger paired with visualBeats/
+  // curiosityDelta/suspenseDelta/emotionalShift) — this is the fifth consequence channel for
+  // this trigger.
+  {
+    const r1159c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.unresolvedClues ?? []).length >= 3,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1159c.fires) {
+      issues.push({
+        location: `${r1159c.triggerCount} heavily-unresolved scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'VOICE_OPEN_THREAD_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every scene carrying three or more unresolved threads (${r1159c.triggerCount} instances) is followed by two scenes with no recorded relationship shift, even though ${r1159c.aftermathCount} such shifts occur elsewhere in the script. A pile-up of open questions that never moves how characters stand with each other right after it registers as isolated bookkeeping rather than pressure the relationships actually carry.`,
+        suggestedFix: `In the two scenes following a heavily-unresolved scene, let the accumulating uncertainty shift a relationship — a bond strained or an alliance tested by everything still unanswered — so the voice's lingering questions carry interpersonal weight.`,
       });
     }
   }
