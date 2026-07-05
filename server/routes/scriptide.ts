@@ -12,10 +12,12 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import { validate, DoctorBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
+import { locateIssues } from '../nvm/analyze/locate.ts';
+import { clusterIssues } from '../nvm/analyze/cluster.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
-import type { DoctorSource } from '../nvm/analyze/types.ts';
+import type { DoctorSource, LiveDiagnosis } from '../nvm/analyze/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
 const AnalyzeScriptSchema = {
@@ -280,7 +282,20 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // routes that never call the doctor don't pay for it at startup.
   const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
   const report = await runScriptDoctor(fountain);
-  res.json({ ...report, source });
+
+  // Root-cause clustering is attached HERE, at the route, rather than inside
+  // runScriptDoctor/aggregateReport (doctor.ts) for two reasons: (1) doctor.ts
+  // is a fixed contract owned by a parallel agent and out of scope to modify,
+  // and (2) locateIssues/clusterIssues need only the report's own `passes`
+  // array plus the same raw `fountain` string this route already has in
+  // scope — there's no reason to thread them through the aggregation step
+  // when a plain object spread does the job afterward. The spread preserves
+  // every existing field untouched (including any percentile fields a
+  // parallel agent adds to `dimensions`), so this can never regress an
+  // existing consumer of the report shape.
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+  res.json({ ...report, rootCauses, source });
 }));
 
 // POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
@@ -365,9 +380,60 @@ router.post(
       convertedFountain: converted.fountain,
       ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
     };
-    res.json({ ...report, source });
+
+    // Route-level enrichment, same reasoning as the /doctor route above: kept
+    // out of doctor.ts (fixed contract, parallel agent's), and only needs the
+    // report's own `passes` plus the converted Fountain text already in scope.
+    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+    const rootCauses = clusterIssues(locateIssues(issuesWithPass, converted.fountain));
+    res.json({ ...report, rootCauses, source });
   }),
 );
+
+// ── Live diagnostics (bridge half 3, lightweight sibling of /doctor) ────────
+// POST /api/scriptide/diagnose — the debounce-friendly "diagnostics as you
+// type" endpoint that powers editor squiggles (LiveDiagnosis, ./analyze/types.ts).
+// Deliberately NOT the full /doctor report: this returns only located issues +
+// root-cause clusters + the headline numbers, so it stays cheap enough to call
+// on every keystroke-pause tick without the client waiting on (or discarding
+// most of) a multi-KB payload.
+//
+// This endpoint is deterministic and LLM-free — diagnose-only, exactly like
+// /doctor — and that's deliberate, not incidental: it's what lets "live notes
+// while you type" work with NO API key configured at all. Every AI-backed
+// route in this file degrades to an error without a key; /doctor and this one
+// are the two the product can always offer, key or no key.
+//
+// gameLimiter, not aiLimiter — identical reasoning to /doctor above: pure CPU
+// work, no LLM ever reachable from runDiagnoseOnly(). Stateless: no
+// sessionId, no getOrCreateSession/Stage, matching /doctor's contract.
+router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema), asyncHandler(async (req, res) => {
+  const { fountain } = req.body as { fountain: string };
+
+  // Dynamic import — same lazy-load convention as the /doctor route above.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain);
+
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const locatedIssues = locateIssues(issuesWithPass, fountain);
+  const rootCauses = clusterIssues(locatedIssues);
+
+  const diagnosis: LiveDiagnosis = {
+    health: report.health,
+    grade: report.grade,
+    verdict: report.verdict,
+    sceneCount: report.sceneCount,
+    locatedIssues,
+    rootCauses,
+    // runScriptDoctor always populates contentHash — both on the normal
+    // aggregateReport path and on the zero-scene degenerate-report path
+    // (server/nvm/analyze/doctor.ts) — so this is a safe non-null read, not
+    // an optimistic guess.
+    contentHash: report.contentHash!,
+    analyzedAt: Date.now(),
+  };
+  res.json(diagnosis);
+}));
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
 router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {

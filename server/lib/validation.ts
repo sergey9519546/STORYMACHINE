@@ -287,6 +287,20 @@ export const DoctorBodySchema = z.object({
   'provide exactly one of fountain or fdx',
 );
 
+// POST /api/scriptide/diagnose — stateless (no sessionId), fountain-only. This
+// is the debounce-friendly "diagnostics as you type" sibling of /doctor: it
+// has no fdx/pdf variant because it runs on every keystroke-pause tick against
+// whatever Fountain text is already live in the editor, not an uploaded file
+// that needs conversion first (the client already has fdx/pdf covered via the
+// existing /doctor and /doctor/pdf routes). Same 900_000-char ceiling and the
+// same rationale as DoctorBodySchema above: deliberately below the express
+// `express.json({ limit: '1mb' })` body cap (server/app.ts) so THIS schema's
+// max-length check is the one that actually fires and returns a clean,
+// specific 400 instead of the body parser's generic 413.
+export const DiagnoseBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
