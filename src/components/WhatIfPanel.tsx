@@ -521,8 +521,12 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
       const res = await fetch('/api/nvm/whatif/explore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // Flat body per WhatIfExploreBodySchema (server/lib/validation.ts):
+        // { opId, replacement?, branchLimit? } — the server's contract is
+        // authoritative; an earlier draft nested these under `intervention`.
         body: JSON.stringify({
-          intervention: { opId: selectedOpId, replacement: null },
+          opId: selectedOpId,
+          replacement: null,
           branchLimit,
         }),
         signal: controller.signal,

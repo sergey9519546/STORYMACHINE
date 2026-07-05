@@ -214,6 +214,31 @@ export const ConvergeArcBodySchema = z.object({
   scenes: z.array(z.unknown()).min(1).max(8),
 });
 
+// POST /api/nvm/whatif/explore — What-If Lab compose endpoint (Run 6).
+// Deliberately the SAME intervention vocabulary as TwinDoBodySchema (opId +
+// optional replacement StoryOp) — server/nvm/whatif/explore.ts calls the
+// exact same doIntervention() the twin/do route does, just as one step inside
+// a larger composition, so there is no reason for the two request shapes to
+// diverge. branchLimit is new: how many ranked forward branches to return.
+// server/nvm/whatif/explore.ts also clamps this defensively, but validating
+// it here means a malformed value 400s with a clear message instead of being
+// silently clamped deep inside the composition module.
+export const WhatIfExploreBodySchema = z.object({
+  sessionId: sessionIdField,
+  opId: z.string().min(1),
+  replacement: z.unknown().optional(),
+  branchLimit: z.number().int().min(1).max(5).optional(),
+});
+
+// POST /api/nvm/room/critique — on-demand Writers' Room (Run 6). The 6
+// critics (server/nvm/room/critics/*.ts) take a whole (ir, state) pair with
+// no per-scene or per-critic targeting parameter — room.ts has no concept of
+// "critique just this op" or "just this critic" — so there is nothing else
+// for this schema to validate beyond the shared sessionId field.
+export const RoomCritiqueBodySchema = z.object({
+  sessionId: sessionIdField,
+});
+
 export const SelfplayBodySchema = z.object({
   sessionId: sessionIdField,
   scenarios: z.array(z.unknown()).min(1).max(5),
@@ -299,6 +324,22 @@ export const DoctorBodySchema = z.object({
 // specific 400 instead of the body parser's generic 413.
 export const DiagnoseBodySchema = z.object({
   fountain: z.string().min(1).max(900_000),
+});
+
+// POST /api/game/interview — character-interview feature. History entries are
+// capped at 2000 chars each (matches `question`'s cap so a caller can't smuggle
+// an oversized turn into context via history instead of the question field) and
+// the whole transcript is capped at 20 turns to bound prompt size per request.
+const InterviewHistoryItemSchema = z.object({
+  role: z.enum(['user', 'character']),
+  text: z.string().max(2000),
+});
+
+export const InterviewBodySchema = z.object({
+  sessionId: sessionIdField,
+  agentName: z.string().min(1).max(80),
+  question: z.string().min(1).max(2000),
+  history: z.array(InterviewHistoryItemSchema).max(20).optional(),
 });
 
 // ── Middleware factory ───────────────────────────────────────────────────────

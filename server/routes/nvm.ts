@@ -11,7 +11,7 @@ import {
   FixedPointsBodySchema, BackchainBodySchema, InjectOpsBodySchema, ConvergeBodySchema,
   ConvergeCommitBodySchema, ConvergeArcBodySchema, SelfplayBodySchema, GenomeDiffBodySchema,
   GenomeBreedBodySchema, RepairBodySchema, LiveMoveBodySchema, LiveAdvanceBodySchema,
-  CompileBodySchema, ReviseBodySchema,
+  CompileBodySchema, ReviseBodySchema, WhatIfExploreBodySchema, RoomCritiqueBodySchema,
 } from '../lib/validation.ts';
 
 const router = express.Router();
@@ -171,6 +171,130 @@ router.post('/api/nvm/twin/do', gameLimiter, validate(TwinDoBodySchema), asyncHa
   const scm = buildSCM(stage);
   const intervention = { opId, replacement: replacement ?? null };
   res.json(doIntervention(scm, intervention));
+}));
+
+// POST /api/nvm/whatif/explore — What-If Lab compose endpoint (Run 6).
+// DETERMINISTIC, KEYLESS: this route makes zero LLM calls. It composes the
+// causal twin (buildSCM + doIntervention, same as POST /api/nvm/twin/do
+// above) with the Forward Latent Branch Field (server/nvm/branch/field.ts,
+// same machinery GET /api/nvm/branch/field uses) to answer "what if I
+// changed X?" with a plain-language diff and ranked alternate continuations —
+// identical inputs always produce identical output (server/nvm/whatif/
+// explore.ts derives its branch-field seed from the intervention itself, not
+// from wall-clock time). gameLimiter, not aiLimiter, for the same reason
+// /api/nvm/converge/commit uses gameLimiter: no model call, same cost profile
+// as any other proof/replay route.
+//
+// This route deliberately does NOT build a second "adopt" / commit path.
+// Once the writer picks a branch from `branches[]`, its `ops` are the exact
+// same shape POST /api/nvm/converge/commit already accepts (and re-proves
+// against current session state before writing a StoryCommit) — routing the
+// adopted branch through that existing endpoint means there is still exactly
+// one commit pen and one re-proof gate in the whole system, instead of a
+// second bespoke commit path here that could drift out of sync with it.
+router.post('/api/nvm/whatif/explore', gameLimiter, validate(WhatIfExploreBodySchema), asyncHandler(async (req, res) => {
+  const { stage } = getOrCreateSession(sessionId(req));
+  const { buildSCM } = await import('../nvm/twin/scm.ts');
+  const { exploreWhatIf } = await import('../nvm/whatif/explore.ts');
+  type StoryOpT = import('../nvm/ops/StoryOp.ts').StoryOp;
+  const { opId, replacement, branchLimit } = req.body as {
+    opId: string; replacement?: StoryOpT | null; branchLimit?: number;
+  };
+
+  const state = buildEnrichedState(stage);
+  const commits = stage.getCommits().filter(c => !c.reverted);
+  const scm = buildSCM(stage);
+
+  const result = exploreWhatIf({
+    state,
+    commits,
+    scm,
+    intervention: { opId, replacement: replacement ?? null },
+    branchLimit,
+  });
+
+  res.json(result);
+}));
+
+// POST /api/nvm/room/critique — on-demand Writers' Room (Run 6). Previously
+// the 6 critics (server/nvm/room/room.ts, server/nvm/room/critics/*.ts) only
+// ever ran INSIDE the convergence loop, judging a same-iteration LLM
+// candidate — there was no way to ask "what would the room say about the
+// story right now?" without paying for a full converge cycle. The critics are
+// pure functions of (ir, state) — confirmed against server/nvm/room/critics/
+// showrunner.ts et al.: no randomness, no I/O, no LLM call — so running them
+// on demand costs nothing beyond a replay of already-committed ops.
+// gameLimiter (deterministic, no LLM).
+//
+// What IR do we critique when there is no in-flight candidate? Inside the
+// loop, runWritersRoom(best, state) is called with `best` = the NOT-YET-
+// COMMITTED leading candidate for the current scene and `state` = the state
+// as it stood BEFORE that candidate's ops apply (server/nvm/converge/loop.ts
+// — `state` is the convergeScene() argument, fixed for the whole scene; it is
+// never re-derived per candidate, see loop.ts:260-261). The closest on-demand
+// equivalent, using only data that already exists rather than inventing a
+// synthetic candidate: treat the most recent commit's ops as if they were
+// still "the candidate" under argument, and evaluate the room against the
+// state as it stood immediately BEFORE that commit landed (every commit
+// except the last one, folded the same way buildEnrichedState() folds all of
+// them). That reproduces the loop's exact input shape — a not-yet-final IR
+// judged against its own precondition state. A fresh session with no commits
+// yet has no candidate to argue over, so the room runs on an empty-ops shell
+// IR against the (also empty) live state; critics defensively no-op on
+// ir.ops.length === 0 the same way they already no-op on any other IR with no
+// matching ops.
+router.post('/api/nvm/room/critique', gameLimiter, validate(RoomCritiqueBodySchema), asyncHandler(async (req, res) => {
+  const { stage } = getOrCreateSession(sessionId(req));
+  const { runWritersRoom } = await import('../nvm/room/room.ts');
+  const { buildNarrativeState, emptyState, stateHash } = await import('../nvm/state/NarrativeState.ts');
+  const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
+  type NarrativeTransitionIRT = import('../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
+
+  const commits = stage.getCommits().filter(c => !c.reverted);
+  const lastCommit = commits.length > 0 ? commits[commits.length - 1] : null;
+  const priorCommits = lastCommit ? commits.slice(0, -1) : [];
+
+  // Mirrors server/nvm/state/enrichedState.ts's buildEnrichedState() merge
+  // policy exactly, but replays only priorCommits — so the room sees the
+  // state as it stood right before the candidate-under-critique's own ops
+  // applied, not the current session state (which already includes them).
+  const live = buildNarrativeState(stage);
+  let replayed = emptyState();
+  for (const c of priorCommits) replayed = applyStoryOps(replayed, c.ops);
+  const priorState = {
+    ...replayed,
+    characterBeliefs: live.characterBeliefs,
+    characterEmotions: live.characterEmotions,
+    authorIntent: live.authorIntent,
+    audienceState: (replayed.audienceState.suspense > 0 || replayed.audienceState.curiosity > 0)
+      ? replayed.audienceState
+      : live.audienceState,
+    turn: live.turn,
+  };
+
+  // StoryCommit (server/nvm/state/StoryCommit.ts) carries no sceneFunction
+  // field, so there is nothing authentic to read here — 'advance_plot' is the
+  // same placeholder default POST /api/nvm/converge/commit's shellIR already
+  // uses when re-proving a bare ops[] with no declared scene function.
+  const ir: NarrativeTransitionIRT = {
+    transitionId: lastCommit ? `critique-${lastCommit.commitId}` : 'critique-empty-session',
+    sceneIdx: lastCommit ? lastCommit.sceneIdx : priorState.turn,
+    sceneFunction: 'advance_plot',
+    activeMechanisms: [],
+    beforeStateHash: stateHash(priorState),
+    ops: lastCommit ? lastCommit.ops : [],
+    preconditions: [],
+    postconditions: [],
+    provenance: { origin: 'user_authored', createdAt: lastCommit ? lastCommit.createdAt : 0 },
+  };
+
+  const room = runWritersRoom(ir, priorState);
+  res.json({
+    critiques: room.critiques,
+    dominant: room.dominantCritic,
+    suggestedOperator: room.suggestedOperator,
+    consensus: room.consensus,
+  });
 }));
 
 // POST /api/nvm/author/fixed-points — backward-chain toward a narrative attractor
