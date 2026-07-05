@@ -528,6 +528,10 @@
 // trigger — it has never anchored an isTrigger side of a check anywhere in this file.
 // INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta;
 // INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID pairs it with emotionalShift.
+// Wave 1165 additions: after Wave 1151, revelation stood at two of six channels (curiosityDelta,
+// emotionalShift). INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID, INTENTION_REVELATION_RELATIONAL_
+// AFTERMATH_VOID, and INTENTION_REVELATION_STAGING_AFTERMATH_VOID give it its third, fourth, and
+// fifth channels (suspenseDelta, relationshipShifts, visualBeats).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6678,6 +6682,83 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1151c.triggerCount} scenes that reveal something is followed by two scenes with no emotional shift, even though ${r1151c.aftermathCount} such shifts occur elsewhere in the script. A revelation that lands without ever registering on a character's felt state leaves the intention layer's disclosures reading as information delivered to the audience rather than something that visibly changes what the character wants or how they feel about pursuing it.`,
         suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the new information lands as something felt, not just something known.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 suspense-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath carries no
+  // rise in suspense, while such rises occur elsewhere. Distinct from INTENTION_REVELATION_
+  // CURIOSITY_AFTERMATH_VOID and INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID (Wave 1151, same
+  // trigger paired with curiosityDelta/emotionalShift) — this is the third consequence channel
+  // for this trigger.
+  {
+    const r1165a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1165a.fires) {
+      issues.push({
+        location: `${r1165a.triggerCount} revelation scene(s) — no suspense rise within 2 scenes`,
+        rule: 'INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1165a.triggerCount} scenes that reveal something is followed by two scenes with no rise in suspense, even though ${r1165a.aftermathCount} such rises occur elsewhere in the script. A revelation that never sharpens danger or urgency about what the character now wants leaves the intention layer's disclosures reading as settled facts rather than information that raises the stakes of the pursuit.`,
+        suggestedFix: `In the two scenes following at least one revelation, let the new information tighten the tension around what the character is after, so disclosure keeps building pressure instead of only resolving it.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes anywhere with a
+  // recorded relationship shift, 2-scene lookahead. Fires when every revelation's two-scene
+  // aftermath carries no relationship movement, while such movement occurs elsewhere. Distinct
+  // from INTENTION_REVELATION_CURIOSITY_AFTERMATH_VOID, INTENTION_REVELATION_EMOTIONAL_AFTERMATH_
+  // VOID (Wave 1151), and INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID (this wave, same trigger
+  // paired with curiosityDelta/emotionalShift/suspenseDelta) — this is the fourth consequence
+  // channel for this trigger.
+  {
+    const r1165b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1165b.fires) {
+      issues.push({
+        location: `${r1165b.triggerCount} revelation scene(s) — no relationship shift within 2 scenes`,
+        rule: 'INTENTION_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1165b.triggerCount} scenes that reveal something is followed by two scenes with no recorded relationship shift, even though ${r1165b.aftermathCount} such shifts occur elsewhere in the script. A revelation that never moves how a pair of characters stand with each other leaves the intention layer's disclosures isolated from the interpersonal stakes the character's pursuit should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it shift a relationship — an alliance tested by what the character now knows or wants — so the new information registers between characters, not only in the plot.`,
+      });
+    }
+  }
+
+  // INTENTION_REVELATION_STAGING_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 visually-dense scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath has no
+  // heavily-staged scene, while such staging occurs elsewhere. Distinct from INTENTION_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID, INTENTION_REVELATION_EMOTIONAL_AFTERMATH_VOID (Wave
+  // 1151), INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID, and INTENTION_REVELATION_RELATIONAL_
+  // AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/emotionalShift/
+  // suspenseDelta/relationshipShifts) — this is the fifth consequence channel for this trigger.
+  {
+    const r1165c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1165c.fires) {
+      issues.push({
+        location: `${r1165c.triggerCount} revelation scene(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'INTENTION_REVELATION_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1165c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1165c.aftermathCount} such scenes exist elsewhere in the script. A revelation that never earns a visually charged follow-through leaves the intention layer's disclosures registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information about what the character wants registers in image, not just in plot bookkeeping.`,
       });
     }
   }
