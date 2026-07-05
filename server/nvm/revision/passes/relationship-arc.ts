@@ -545,6 +545,13 @@
 // AFTERMATH_VOID, RELATIONSHIP_SHIFT_PAYOFF_AFTERMATH_VOID), never as the trigger itself.
 // RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with curiosityDelta;
 // RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID pairs payoffSetupIds with suspenseDelta.
+// Wave 1169 additions: after Wave 1155, dramaticTurn stood at one channel (curiosityDelta) and
+// payoffSetupIds at one (suspenseDelta). RELATIONSHIP_TURN_EMOTIONAL_AFTERMATH_VOID gives
+// dramaticTurn its second channel (emotionalShift); RELATIONSHIP_TURN_AFTERMATH_VOID gives it
+// its third — relationshipShifts, this pass's own central signal, following the same no-suffix
+// naming convention used for RELATIONSHIP_CLOCK_AFTERMATH_VOID / RELATIONSHIP_REVELATION_
+// AFTERMATH_VOID (Wave 1127). RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID gives payoffSetupIds
+// its second channel (emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6787,6 +6794,81 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         severity: 'minor',
         description: `Every one of the story's ${r1155c.triggerCount} payoff scenes is followed by two scenes with no rise in suspense, even though ${r1155c.aftermathCount} such rises occur elsewhere in the script. A resolved thread that leaves no tension in its immediate aftermath reads as a relationship settling into calm rather than one that remains under some new pressure once the old promise is spent.`,
         suggestedFix: `In the two scenes following at least one payoff, let the resolution introduce a fresh source of tension in a relationship, so the payoff's aftermath keeps some pressure alive rather than closing the relational stakes entirely.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath registers no emotional shift, while
+  // such shifts occur elsewhere. Distinct from RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID (Wave
+  // 1155, same trigger paired with curiosityDelta) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1169a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1169a.fires) {
+      issues.push({
+        location: `${r1169a.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'RELATIONSHIP_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1169a.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1169a.aftermathCount} such shifts occur elsewhere. A pivot that never registers on any character's felt emotional state leaves the relational arc's turns reading as plot mechanics rather than moments that change how someone feels about where a relationship stands.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt about the relationship, not just executed as a structural beat.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_TURN_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every turn's two-scene aftermath carries no relationship
+  // movement, while such movement occurs elsewhere. This channel pairs dramaticTurn with this
+  // pass's own central signal (relationshipShifts), following the no-suffix naming convention
+  // used for RELATIONSHIP_CLOCK_AFTERMATH_VOID / RELATIONSHIP_REVELATION_AFTERMATH_VOID (Wave
+  // 1127). Distinct from RELATIONSHIP_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1155) and RELATIONSHIP_
+  // TURN_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift) — this is the third consequence channel for this trigger.
+  {
+    const r1169b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1169b.fires) {
+      issues.push({
+        location: `${r1169b.triggerCount} dramatic-turn aftermath(s) — no relationship shift within 2 scenes`,
+        rule: 'RELATIONSHIP_TURN_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1169b.triggerCount} pivots) is followed by two scenes with no recorded relationship shift, even though ${r1169b.aftermathCount} such shifts occur elsewhere. A pivot that never moves how two characters stand with each other treats the turn as an isolated plot event rather than something that reshapes the relational world the arc is tracking.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly move a relationship — a trust gained or lost, an alliance tested — so the turn registers between characters, not just in the plot.`,
+      });
+    }
+  }
+
+  // RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × payoffSetupIds trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying payoff scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every payoff's two-scene aftermath registers no emotional shift, while
+  // such shifts occur elsewhere. Distinct from RELATIONSHIP_PAYOFF_SUSPENSE_AFTERMATH_VOID (Wave
+  // 1155, same trigger paired with suspenseDelta) — this is the second consequence channel for
+  // this trigger.
+  {
+    const r1169c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.payoffSetupIds ?? []).length > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1169c.fires) {
+      issues.push({
+        location: `${r1169c.triggerCount} payoff scene(s) — no emotional shift within 2 scenes`,
+        rule: 'RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1169c.triggerCount} payoff scenes is followed by two scenes with no emotional shift, even though ${r1169c.aftermathCount} such shifts occur elsewhere. A resolved thread that never registers on any character's felt state right after it lands leaves the relational arc's payoffs reading as plot bookkeeping rather than moments that change how a relationship feels once an old promise is spent.`,
+        suggestedFix: `In the two scenes following at least one payoff, let the resolution visibly shift a character's emotional register toward a relationship, so the payoff lands as something felt, not just a thread closed.`,
       });
     }
   }
