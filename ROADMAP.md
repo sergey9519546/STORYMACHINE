@@ -386,24 +386,56 @@ endpoint. NEXT RUN: Run 16 — deployment hardening.)
 
 ---
 
-## 12. Run 16 — Deployment hardening
+## 12. Run 16 — Deployment hardening — ✅ COMPLETE
+(Session idle-TTL env-tunable + eviction tests; TRUST_PROXY opt-in;
+docs/AUTH.md trust-model doc; README deployment/backup section; formula
+drift re-measured — zero drift vs post-1190 numbers. Companion fix:
+Dockerfile runner stage was BROKEN — missing src/lib and data/sessions
+mkdir — fixed and boot-proofed keyless; .env.example now exhaustive.
+NEXT RUN: Run 17 — function-first (see §13).)
 
-- [ ] **(M)** Session TTL / eviction audit, plus `data/` disk growth caps
+- [x] **(M)** Session TTL / eviction audit, plus `data/` disk growth caps
   (one SQLite DB per session — this grows unbounded today).
-- [ ] **(M)** Real auth decision: session ids are unguessable capabilities
+- [x] **(M)** Real auth decision: session ids are unguessable capabilities
   today but there is no authentication layer. Decide and document the
-  intended trust model before this ships wider.
-- [ ] **(S)** Rate-limit keying review (currently per-process; verify it's
-  correct per-session with `X-Session-Id` now in play).
-- [ ] **(S)** Backup story for persisted sessions (no durability story exists
-  today beyond the SQLite file on disk).
-- [ ] **(S)** Residual formula bias follow-up: the opportunity-normalization
+  intended trust model before this ships wider. → `docs/AUTH.md`
+- [x] **(S)** Rate-limit keying review (currently per-process; verify it's
+  correct per-session with `X-Session-Id` now in play). → TRUST_PROXY
+- [x] **(S)** Backup story for persisted sessions (no durability story exists
+  today beyond the SQLite file on disk). → README Deployment section
+- [x] **(S)** Residual formula bias follow-up: the opportunity-normalization
   constants in `doctor.ts` are tied to current rule density. Revisit after
   Waves 1183–1186 land, since those waves will shift rule density.
+  → re-measured post-1190: strong 61.62 / competent 53.07 / weak 37.28 /
+  troubled 34.43 — no drift, no retune needed.
 
 ---
 
-## 13. Run 17 — Polish
+## 13. Run 17 — Function-first (REPLANNED — answers "is the app at its
+finest in function?" honestly: not yet)
+
+Four function gaps take priority over all polish. Anchors verified:
+
+- [ ] **(L)** E2E browser verification of the core journeys (upload→doctor→
+  fix-verify; what-if; interview; coverage export) via preinstalled
+  Chromium + Playwright — nothing has ever been clicked end-to-end.
+  Fix whatever it finds.
+- [ ] **(M)** Compiler richness: `projectFountain`
+  (`server/nvm/project/index.ts:57`) renders only 3 of 14 StoryOp kinds
+  (UPDATE_BELIEF, SHIFT_RELATIONSHIP, RECORD_VISUAL_FACT) — SEED_CLUE,
+  RAISE_CLOCK, APPRAISE_EMOTION, RECORD_SONIC_FACT, ADD_FACT, etc. vanish
+  silently from compiled screenplays.
+- [ ] **(M)** Clue-payoff content-word matcher: `detectClueLifecycle`
+  (`fountain-analyzer.ts:602`) is exact-token only — verbatim-quote
+  matching makes clue signals mostly dead on real scripts.
+- [ ] **(M)** Squiggle→fix bridge: `src/components/editor/diagnostics.ts`
+  shows `suggestedFix` as tooltip text only — no path from an editor
+  squiggle to the fix-and-verify endpoint.
+
+A 4-agent ultrareview (3 inventory sweeps + 1 fresh-eyes product critic)
+is auditing the whole product; its findings shape Runs 17–31.
+
+### Run 17b — Polish (retained, after function work)
 
 - [ ] **(M)** Panel consolidation: 24+ flat buttons in the UI → grouped nav
   with progressive disclosure.
