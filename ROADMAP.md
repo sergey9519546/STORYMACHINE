@@ -127,19 +127,19 @@ test posture (see Run 1 commit log — these landed as "Blindspot batch 1").
 
 Remaining:
 
-- [ ] **(M)** Draft-history formula versioning: `ScriptDoctorPanel`'s
+- [x] **(M)** Draft-history formula versioning: `ScriptDoctorPanel`'s
   `localStorage` entries store health scores from the OLD (length-biased)
   formula. A first diagnosis under the new opportunity-normalized formula
   shows a phantom ~50-point drop. Add `formulaVersion` to stored entries
   (current = 2); cross-version comparisons must render "scoring model
   updated — not comparable" instead of a numeric delta.
-- [ ] **(S)** PDF route DoS margin: `/api/scriptide/doctor/pdf` accepts up to
+- [x] **(S)** PDF route DoS margin: `/api/scriptide/doctor/pdf` accepts up to
   15MB behind the general `gameLimiter` (120/min) — theoretical ~1.8GB/min
   per client. Add a dedicated, stricter limiter (e.g. 10/min) to this route.
-- [ ] **(S)** Log hygiene: session ids ride SSE query strings. Audit
+- [x] **(S)** Log hygiene: session ids ride SSE query strings. Audit
   `server/app.ts` request logging so full query strings (session ids are
   isolation capabilities, not opaque identifiers) are not written to logs.
-- [ ] **(S)** PR #173 body refresh at close: update test count, session
+- [x] **(S)** PR #173 body refresh at close: update test count, session
   identity note, Wave 1182 mention; verify the formula-version fix above
   landed before closing the description says it did.
 
@@ -154,7 +154,7 @@ modules behavior-identical; frontend code-split, StoryMachine chunk −81%,
 `ARCHITECTURE.md` is stale and actively misleading in places (see below) —
 fix it before it misleads another session further.
 
-- [ ] **(M)** Rewrite `ARCHITECTURE.md` around the real organizing principle:
+- [x] **(M)** Rewrite `ARCHITECTURE.md` around the real organizing principle:
   a **deterministic core** (audit/verdicts/percentiles/counterfactuals/
   critics/receipts — keyless) inside a **generative shell** (candidates/
   rewrites/voices — opt-in, labeled, degradable). Add `analyze/`, `whatif/`,
@@ -163,16 +163,16 @@ fix it before it misleads another session further.
   `/commit` re-proves), **not** "the best candidate is committed," which is
   no longer true. Add a Program v2 pointer, the keyless boot posture, and
   session identity to the doc.
-- [ ] **(L)** Record-parity harness: two producers of `ScreenplaySceneRecord`
+- [x] **(L)** Record-parity harness: two producers of `ScreenplaySceneRecord`
   exist — ops-derived (`screenplay/memory.ts`) and text-derived
   (`fountain-analyzer.ts`) — and Wave 1182 added text-only optional fields to
   the latter. Build a golden-story parity test: author the same story both
   as ops and as Fountain text, assert signal agreement within tolerances, so
   the two halves can't silently drift apart. This is the trust foundation for
   any future sim-driven doctor report (see Run 9's dependency into Run 13).
-- [ ] **(M)** Split `server/routes/nvm.ts` (~1,900 lines, 50+ routes) into
+- [x] **(M)** Split `server/routes/nvm.ts` (~1,900 lines, 50+ routes) into
   cohesive modules — it was the #1 agent-collision file this entire session.
-- [ ] **(S)** Frontend chunk splitting: the `ScriptIDE` chunk is >530KB;
+- [x] **(S)** Frontend chunk splitting: the `ScriptIDE` chunk is >530KB;
   lazy-load its heavy panels.
 
 ### CYCLE 1 HEALTH GATE VERDICT (waves 1183-1186 — first gate run)
@@ -183,7 +183,7 @@ short controlled fixtures without dense dyad dialogue — while Type 2/4 waves
 (aggregating corpus-proven signals) land LIVE immediately; Type 3 is
 structurally exempt (corpus runs genre-absent, permanently). Guards were NOT
 loosened to manufacture fire (precision over vanity, per guarantee doc).
-- [ ] **(S)** PREREQUISITE before cycle 2's Type-1 wave (1190): either
+- [x] **(S)** PREREQUISITE before cycle 2's Type-1 wave (1190): either
   measure the target signal's corpus density BEFORE committing thresholds,
   or enrich the corpus with 1-2 denser two-hander samples (richness-matched
   across all bands per the controlled-design constraint!).
@@ -223,19 +223,19 @@ scene for subtext, motivation, irony, and stakes can sense far more than
 string-matching ever will — while rules keep doing the judging, so the
 product's determinism claim is undisturbed.
 
-- [ ] **(L)** LLM reads each scene and emits the **same** deterministic
+- [x] **(L)** LLM reads each scene and emits the **same** deterministic
   record-signal schema consumed by the revision passes today. Model senses,
   rules verdict — no new judgment surface, only a richer signal source.
-- [ ] **(S)** Cache by scene-content hash (the `repro/` LLM cache already
+- [x] **(S)** Cache by scene-content hash (the `repro/` LLM cache already
   exists — reuse it, don't build a second one).
-- [ ] **(S)** Keyless fallback: when no AI key is configured, fall back to
+- [x] **(S)** Keyless fallback: when no AI key is configured, fall back to
   the existing lexicon signals untouched — Deep Read must degrade honestly,
   never 500 or silently return worse data unlabeled.
-- [ ] **(S)** Opt-in "Deep read" toggle on the doctor/diagnose UI, off by
+- [x] **(S)** Opt-in "Deep read" toggle on the doctor/diagnose UI, off by
   default.
-- [ ] **(S)** New `aiLimiter`-gated route variant (Deep Read fans out to an
+- [x] **(S)** New `aiLimiter`-gated route variant (Deep Read fans out to an
   LLM per scene — it cannot ride `gameLimiter`).
-- [ ] **(M)** Prompt-injection hardening: scene text is untrusted input into
+- [x] **(M)** Prompt-injection hardening: scene text is untrusted input into
   the prompt. Schema-constrained outputs only; treat this the same as any
   other untrusted-input-into-LLM surface in the codebase.
 
@@ -251,15 +251,15 @@ health gate; cursor: 1183 = Type 2, excellence detectors.)
 suggestion actually worked. This closes that loop and becomes the product's
 strongest trust claim.
 
-- [ ] **(L)** From a root-cause finding (Run 5's cluster work, or any
+- [x] **(L)** From a root-cause finding (Run 5's cluster work, or any
   existing pass issue), let the writer request a targeted rewrite of the
   affected span(s) only — labeled generative output, `aiLimiter`-gated,
   `approvedSpans` (span-lock mechanism from this session) honored so locked
   text is never touched.
-- [ ] **(M)** Doctor re-runs automatically after the rewrite lands.
-- [ ] **(M)** Before/after delta proof: health score delta, issues cleared,
+- [x] **(M)** Doctor re-runs automatically after the rewrite lands.
+- [x] **(M)** Before/after delta proof: health score delta, issues cleared,
   issues introduced — shown to the writer, not just implied.
-- [ ] **(S)** Writer accepts the diff into the editor (or rejects it — the
+- [x] **(S)** Writer accepts the diff into the editor (or rejects it — the
   original stays authoritative until accepted).
 
 ---
