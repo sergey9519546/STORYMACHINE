@@ -592,6 +592,12 @@
 // ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID give the positive-emotion trigger its second and third
 // channels; ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID gives the negative-emotion trigger its
 // second channel.
+// Wave 1163 additions: after Wave 1149, the positive-emotion trigger stood at three of six
+// channels (relationshipShifts, curiosityDelta, suspenseDelta) and the negative-emotion trigger
+// at two (relationshipShifts, curiosityDelta). ARC_POSITIVE_STAGING_AFTERMATH_VOID and ARC_
+// POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID give the positive-emotion trigger its fourth and
+// fifth channels (visualBeats, dialogueHighlights); ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID gives
+// the negative-emotion trigger its third channel (suspenseDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6663,6 +6669,83 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every negative-emotion scene (${r1149c.triggerCount} qualifying) is followed by two scenes with no rise in curiosity, even though ${r1149c.aftermathCount} such rises occur elsewhere in the script. A setback is most narratively productive when it also opens a new question — how the protagonist will recover, what the loss now costs, what path remains. When every defeat closes without provoking fresh curiosity, the story's losses read as dead ends rather than pivots that reroute the audience's attention forward.`,
         suggestedFix: `After at least one negative-emotion scene, let the following scene or two raise a new question — what the setback now threatens or what path it forces open — so defeat generates forward pull instead of only closure.`,
+      });
+    }
+  }
+
+  // ARC_POSITIVE_STAGING_AFTERMATH_VOID — Sequence/aftermath × positive-emotion trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying positive-emotion scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every positive beat's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID
+  // (Wave 477), ARC_POSITIVE_CURIOSITY_AFTERMATH_VOID, and ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1149, same trigger paired with relationshipShifts/curiosityDelta/suspenseDelta) —
+  // this is the fourth channel for the positive-emotion trigger.
+  {
+    const r1163a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.emotionalShift === 'positive',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1163a.fires) {
+      issues.push({
+        location: `${r1163a.triggerCount} positive-emotion scene aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'ARC_POSITIVE_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every positive-emotion scene (${r1163a.triggerCount} qualifying) is followed by two scenes with no heavily-staged visual beat, even though ${r1163a.aftermathCount} such scenes exist elsewhere in the script. A triumph that never earns a visually charged follow-through leaves the arc's joys registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `After at least one positive-emotion scene, stage at least two concrete visual beats in the scene or two that follows, so the triumph registers in image, not just in what a character says or feels.`,
+      });
+    }
+  }
+
+  // ARC_POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × positive-emotion
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying positive-emotion scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every positive beat's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from ARC_POSITIVE_RELATIONAL_AFTERMATH_VOID (Wave 477), ARC_POSITIVE_CURIOSITY_AFTERMATH_
+  // VOID, ARC_POSITIVE_SUSPENSE_AFTERMATH_VOID (Wave 1149), and ARC_POSITIVE_STAGING_AFTERMATH_
+  // VOID (this wave, same trigger paired with relationshipShifts/curiosityDelta/suspenseDelta/
+  // visualBeats) — this is the fifth channel for the positive-emotion trigger.
+  {
+    const r1163b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.emotionalShift === 'positive',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1163b.fires) {
+      issues.push({
+        location: `${r1163b.triggerCount} positive-emotion scene aftermath(s) — no highlighted dialogue within 2 scenes`,
+        rule: 'ARC_POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every positive-emotion scene (${r1163b.triggerCount} qualifying) is followed by two scenes with no highlighted dialogue, even though ${r1163b.aftermathCount} such scenes exist elsewhere in the script. A triumph that never earns a memorable line right after it happens leaves the arc's joys unvoiced — no character's speech processes what the win means.`,
+        suggestedFix: `After at least one positive-emotion scene, give a character a standout line that reckons with the win in the scene or two that follows, so the triumph registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × negative-emotion trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying negative-emotion scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every negative beat's two-scene aftermath carries no rise in suspense,
+  // while such rises occur elsewhere. Distinct from ARC_NEGATIVE_RELATIONAL_AFTERMATH_VOID
+  // (Wave 547) and ARC_NEGATIVE_CURIOSITY_AFTERMATH_VOID (Wave 1149, same trigger paired with
+  // relationshipShifts/curiosityDelta) — this is the third channel for the negative-emotion
+  // trigger. A setback that never tightens the story's tension in its wake reads as a contained,
+  // resolved loss rather than one whose consequences are still actively unfolding.
+  {
+    const r1163c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.emotionalShift === 'negative',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1163c.fires) {
+      issues.push({
+        location: `${r1163c.triggerCount} negative-emotion scene aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every negative-emotion scene (${r1163c.triggerCount} qualifying) is followed by two scenes with no rise in suspense, even though ${r1163c.aftermathCount} such rises occur elsewhere in the script. A setback that never tightens tension in its immediate wake reads as a contained, resolved loss — the story never lets the audience feel that the defeat's consequences are still actively unfolding.`,
+        suggestedFix: `After at least one negative-emotion scene, let the following scene or two sharpen the danger — a new threat the setback exposes, a complication it creates — so the loss keeps generating tension instead of settling into a closed chapter.`,
       });
     }
   }
