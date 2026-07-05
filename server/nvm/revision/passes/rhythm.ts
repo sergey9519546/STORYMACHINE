@@ -511,6 +511,14 @@
 // and sixth channels (dialogueHighlights, visualBeats), completing full six-channel saturation
 // for this trigger. RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID gives clockRaised its fourth channel
 // (relationshipShifts).
+// Wave 1170 additions: after Wave 1156, clockRaised stood at four of six channels
+// (curiosityDelta, suspenseDelta, emotionalShift, relationshipShifts). RHYTHM_CLOCK_DIALOGUE_
+// HIGHLIGHT_AFTERMATH_VOID and RHYTHM_CLOCK_STAGING_AFTERMATH_VOID give it its fifth and sixth
+// channels (dialogueHighlights, visualBeats), completing full six-channel saturation for this
+// trigger. With clockRaised and unresolvedClues both exhausted, this wave introduces
+// suspenseDelta>0 as a genuinely fresh checkAftermathVoid trigger — it has only ever appeared
+// as an aftermath channel in this file, never as the isTrigger side of a check. RHYTHM_SUSPENSE_
+// CURIOSITY_AFTERMATH_VOID pairs suspenseDelta with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6081,6 +6089,84 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1156c.triggerCount} scenes that raise the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1156c.aftermathCount} such shifts occur elsewhere. Time pressure that never moves how characters stand with each other leaves the rhythm's clock isolated from the interpersonal stakes it should eventually complicate.`,
         suggestedFix: `In the two scenes following at least one clock-raise, let it shift how a pair of characters relate — the deadline forcing an alliance or a rupture — so the clock carries interpersonal weight, not just a tightening number.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger →
+  // dialogueHighlights absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-raise scenes (pos<n-2), ≥2 scenes anywhere with a highlighted line of
+  // dialogue, 2-scene lookahead. Fires when every clock-raise's two-scene aftermath contains no
+  // highlighted dialogue, while such dialogue occurs elsewhere. Distinct from RHYTHM_CLOCK_
+  // CURIOSITY_AFTERMATH_VOID (Wave 1128), RHYTHM_CLOCK_SUSPENSE_AFTERMATH_VOID, RHYTHM_CLOCK_
+  // EMOTIONAL_AFTERMATH_VOID (Wave 1142), and RHYTHM_CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 1156,
+  // same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/relationshipShifts) —
+  // this is the fifth consequence channel for this trigger.
+  {
+    const r1170a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1170a.fires) {
+      issues.push({
+        location: `${r1170a.triggerCount} clock-raise scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1170a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no highlighted dialogue, even though ${r1170a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a memorable line in its wake leaves the rhythm's clock voiced only in narration, never in what a character says.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, give a character a standout line that reckons with the mounting pressure, so the deadline registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // RHYTHM_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every clock-raise's two-scene aftermath has no heavily-staged scene, while such staging
+  // occurs elsewhere. Distinct from RHYTHM_CLOCK_CURIOSITY_AFTERMATH_VOID (Wave 1128), RHYTHM_
+  // CLOCK_SUSPENSE_AFTERMATH_VOID, RHYTHM_CLOCK_EMOTIONAL_AFTERMATH_VOID (Wave 1142), RHYTHM_
+  // CLOCK_RELATIONAL_AFTERMATH_VOID (Wave 1156), and RHYTHM_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_
+  // VOID (this wave, same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts/dialogueHighlights) — this is the sixth and final consequence channel for
+  // this trigger, completing full six-channel saturation.
+  {
+    const r1170b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1170b.fires) {
+      issues.push({
+        location: `${r1170b.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'RHYTHM_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1170b.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1170b.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the rhythm's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // RHYTHM_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from every existing suspenseDelta
+  // reference in this file: prior rules use it only as an aftermath channel for other triggers,
+  // never as the isTrigger side of a check — this is the first check to use suspenseDelta as a
+  // trigger in this pass.
+  {
+    const r1170c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1170c.fires) {
+      issues.push({
+        location: `${r1170c.triggerCount} suspense-spike scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'RHYTHM_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1170c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1170c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the rhythm's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
       });
     }
   }
