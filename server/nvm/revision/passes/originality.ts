@@ -560,10 +560,23 @@
 // channel; ORIGINALITY_TURN_STAGING_AFTERMATH_VOID and ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_
 // AFTERMATH_VOID give dramaticTurn its fifth and sixth channels (visualBeats, dialogueHighlights),
 // completing full six-channel saturation for both triggers.
+// Wave 1180 additions (distinct-mode pivot — see Waves 1176-1179 in dialogue.ts/character-
+// arc.ts/conflict.ts/intention.ts): reconnaissance found this file's ten channels (clockDelta,
+// suspense, curiosity, emotion, seed, payoff, revelation, dramaticTurn, relationship, staging,
+// highlight, open-thread, plus purpose-based zones) saturated across zone-cluster (22),
+// zone-imbalance (22), drought-run (23), peak-uncaused (9), and aftermath-void (42) — but
+// checkHalfLoaded had zero uses, and unlike intention.ts, this file has *no* hand-rolled binary
+// half-partition check anywhere at all (grep for FRONTLOADED/BACKLOADED/FRONT_LOADED/BACK_LOADED
+// returns nothing). This wave introduces the mode for the first time, on three channels that
+// already carry the full zone-cluster/zone-imbalance/drought-run/peak-uncaused quartet:
+// ORIGINALITY_SUSPENSE_BACK_LOADED, ORIGINALITY_REVELATION_FRONT_LOADED, and ORIGINALITY_
+// SEED_BACK_LOADED. Thresholds (minRecords 9, minCount 3) match this file's own zone-cluster
+// precedent for each channel; ratioThreshold 0.70 matches the half-partition convention
+// established in dialogue.ts/character-arc.ts/conflict.ts/intention.ts.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
@@ -7102,6 +7115,84 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every dramatic-turn scene in the story (${r1166c.triggerCount} pivots) is followed by two scenes with no standout line of dialogue, even though ${r1166c.aftermathCount} such lines occur elsewhere. Once the audience notices the pattern, a pivot never earning a memorable exchange in its wake becomes a learnable absence — every turn reads as a plot event the dialogue itself never rises to meet.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, give a character a standout line that responds to what just changed, so the pivot lands in what people say, not just in what happens.`,
+      });
+    }
+  }
+
+  // ── Wave 1180 (distinct-mode pivot): ORIGINALITY_SUSPENSE_BACK_LOADED,
+  //              ORIGINALITY_REVELATION_FRONT_LOADED, ORIGINALITY_SEED_BACK_LOADED ─────────────
+
+  // ORIGINALITY_SUSPENSE_BACK_LOADED — Distribution/timing × suspenseDelta>0 × binary half-
+  // partition. Built on checkHalfLoaded from the shared checks library (first use of this helper
+  // in this pass). n≥9, ≥3 suspense-rising scenes, fires when >70% fall in the second half while
+  // the first half still has at least one. This channel already carries zone-cluster (thirds),
+  // zone-imbalance, drought-run, and peak-uncaused coverage — the binary half-partition mode has
+  // never been applied to it. Distinct from ORIGINALITY_SUSPENSE_ZONE_CLUSTER (a single-third
+  // concentration >75%, which can fire on a middle-third-only cluster this check would score as
+  // an even half-split) and ORIGINALITY_SUSPENSE_DROUGHT_RUN (consecutive-run absence, not a
+  // global hemispheric ratio — suspense that alternates in and out of the front half all story
+  // would never trip a drought but would still trip this check).
+  {
+    const r1180a = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1180a.fires) {
+      issues.push({
+        location: `suspense-rising scenes: ${r1180a.matchingHalfCount} back-half / ${r1180a.otherHalfCount} front-half`,
+        rule: 'ORIGINALITY_SUSPENSE_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1180a.matchingHalfCount / r1180a.count) * 100)}% of the story's suspense-rising scenes (${r1180a.matchingHalfCount} of ${r1180a.count}) fall in the second half, leaving the first half with only ${r1180a.otherHalfCount}. Tension is a back-half phenomenon here: the first half reads flat by comparison, and once the audience notices the pattern, the story's early stretch predictably signals "nothing tense happens yet."`,
+        suggestedFix: `Give at least one scene in the first half a genuine rise in suspense — establishing that tension can spike early keeps the story's early stretch from reading as a predictably safe zone.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_FRONT_LOADED — Distribution/timing × revelation × binary half-
+  // partition. Built on checkHalfLoaded. n≥9, ≥3 revelation scenes, fires when >70% fall in the
+  // first half while the second half still has at least one. Revelation already carries
+  // zone-cluster, zone-imbalance, drought-run, and peak-uncaused coverage in this file; the
+  // half-partition mode has never been applied to it. Distinct from
+  // ORIGINALITY_REVELATION_ZONE_CLUSTER (single-third concentration >75%, which a middle-third-
+  // only cluster can trigger while this check would treat it as an even half-split) and the six
+  // ORIGINALITY_REVELATION_*_AFTERMATH_VOID checks (sequence/aftermath mode: whether a specific
+  // consequence signal follows each revelation, not where revelations fall in the timeline).
+  {
+    const r1180b = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'front',
+      isPresent: r => r.revelation != null,
+    });
+    if (r1180b.fires) {
+      issues.push({
+        location: `revelation scenes: ${r1180b.matchingHalfCount} front-half / ${r1180b.otherHalfCount} back-half`,
+        rule: 'ORIGINALITY_REVELATION_FRONT_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1180b.matchingHalfCount / r1180b.count) * 100)}% of the story's revelation scenes (${r1180b.matchingHalfCount} of ${r1180b.count}) fall in the first half, leaving the second half with only ${r1180b.otherHalfCount}. Once the audience notices that every twist arrives early, the back half reads as a predictable stretch where nothing new is disclosed — the story front-loads its surprises instead of spacing them unpredictably across the whole runtime.`,
+        suggestedFix: `Hold at least one revelation for the second half — spacing disclosures across the full story keeps the audience unable to predict when the next twist is coming.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_SEED_BACK_LOADED — Distribution/timing × seededClueIds × binary half-partition.
+  // Built on checkHalfLoaded. n≥9, ≥3 seed scenes, fires when >70% fall in the second half while
+  // the first half still has at least one. Seed already carries zone-cluster, zone-imbalance,
+  // drought-run, and peak-uncaused coverage; the half-partition mode has never been applied to
+  // it. Distinct from ORIGINALITY_SEED_ZONE_CLUSTER (single-third concentration >75%, which a
+  // middle-third-only cluster can trigger while this check would treat it as an even half-split)
+  // and the six ORIGINALITY_SEED_*_AFTERMATH_VOID checks (sequence/aftermath mode: whether a
+  // consequence signal follows each seed, not where seeds fall in the timeline).
+  {
+    const r1180c = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.seededClueIds ?? []).length > 0,
+    });
+    if (r1180c.fires) {
+      issues.push({
+        location: `clue-planting scenes: ${r1180c.matchingHalfCount} back-half / ${r1180c.otherHalfCount} front-half`,
+        rule: 'ORIGINALITY_SEED_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1180c.matchingHalfCount / r1180c.count) * 100)}% of the story's clue-planting scenes (${r1180c.matchingHalfCount} of ${r1180c.count}) fall in the second half, leaving the first half with only ${r1180c.otherHalfCount}. Foreshadowing arrives almost entirely late — once the audience notices the pattern, new clues in the second half read as hastily inserted setup rather than material the story was patiently seeding throughout.`,
+        suggestedFix: `Plant at least one clue in the first half — foreshadowing established early and paid off late reads as deliberate craft, not a late scramble to justify the ending.`,
       });
     }
   }

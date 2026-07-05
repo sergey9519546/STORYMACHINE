@@ -1210,6 +1210,108 @@ He sits at his desk.
   });
 
 
+  describe('Wave 1180 — originalityPass (distinct-mode pivot): originality suspense back-loaded, originality revelation front-loaded, originality seed back-loaded', async () => {
+    // Same truncation pitfall as Waves 592/606/…/1152/1166 above — every fixture cycles purpose/
+    // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
+    // 'minor' checks out of originality's top-8-by-severity slice. The tested signals here
+    // (suspenseDelta / revelation string / seededClueIds) never overlap the filler purpose pool,
+    // so cycling never contaminates a fixture.
+    const PURPOSE_POOL_1180 = ['complicate', 'introduce_conflict', 'establish_world', 'character_moment'];
+    const SENTENCE_POOL_1180 = [
+      'Alice studies the map by lamplight.', 'Bob paces the length of the corridor.',
+      'Rain streaks the tall window.', 'A phone buzzes on the counter.',
+      'Footsteps echo down the stairwell.', 'The kettle whistles on the stove.',
+      'A drawer sticks halfway open.', 'Wind rattles the loose shutter.',
+      'Dust settles on the piano keys.', 'A cat leaps onto the windowsill.',
+      'The lamp flickers once and steadies.', 'Someone taps twice on the door.',
+    ];
+    const slugFor1180 = (idx: number) => `${idx % 2 === 0 ? 'INT.' : 'EXT.'} LOCATION ${idx} - ${idx % 3 === 0 ? 'DAY' : idx % 3 === 1 ? 'NIGHT' : 'DUSK'}`;
+    const makeRec1180 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: slugFor1180(idx),
+      emotionalShift: 'neutral',
+      suspenseDelta: 0, curiosityDelta: 0, clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [],
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], visualBeats: [], purpose: PURPOSE_POOL_1180[idx % PURPOSE_POOL_1180.length],
+      dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildFountain1180 = (count: number): string =>
+      Array.from({ length: count }, (_, i) => `${slugFor1180(i)}\n\n${SENTENCE_POOL_1180[i % SENTENCE_POOL_1180.length]}`).join('\n\n');
+    const runO1180 = async (records: any[], fountain?: string) => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      const f = fountain ?? buildFountain1180(records.length);
+      return originalityPass({
+        fountain: f, original: f, records,
+        structure: { escalating: false, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 0, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Half-partition geometry n=10, half=5: 4 qualifying scenes total.
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 2) has 1 — 3/4=75%>70%, front still >=1.
+    it('ORIGINALITY_SUSPENSE_BACK_LOADED fires when suspense-rising scenes concentrate in the back half', async () => {
+      const recs1180a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 6 || i === 7 || i === 8) return makeRec1180(i, { suspenseDelta: 1 });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_BACK_LOADED'), 'ORIGINALITY_SUSPENSE_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 2,3) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('ORIGINALITY_SUSPENSE_BACK_LOADED does not fire when suspense-rising scenes are evenly split across halves', async () => {
+      const recs1180an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 3 || i === 6 || i === 7) return makeRec1180(i, { suspenseDelta: 1 });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SUSPENSE_BACK_LOADED'), 'ORIGINALITY_SUSPENSE_BACK_LOADED should not fire');
+    });
+
+    // FIRE: front half (idx 1,2,3) has 3, back half (idx 7) has 1 — 3/4=75%>70%, back still >=1.
+    it('ORIGINALITY_REVELATION_FRONT_LOADED fires when revelation scenes concentrate in the front half', async () => {
+      const recs1180b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 3 || i === 7) return makeRec1180(i, { revelation: 'a hidden truth surfaces' });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_FRONT_LOADED'), 'ORIGINALITY_REVELATION_FRONT_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('ORIGINALITY_REVELATION_FRONT_LOADED does not fire when revelation scenes are evenly split across halves', async () => {
+      const recs1180bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) return makeRec1180(i, { revelation: 'a hidden truth surfaces' });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_REVELATION_FRONT_LOADED'), 'ORIGINALITY_REVELATION_FRONT_LOADED should not fire');
+    });
+
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 1) has 1 — 3/4=75%>70%, front still >=1.
+    it('ORIGINALITY_SEED_BACK_LOADED fires when clue-planting scenes concentrate in the back half', async () => {
+      const recs1180c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 6 || i === 7 || i === 8) return makeRec1180(i, { seededClueIds: ['clue-1'] });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_BACK_LOADED'), 'ORIGINALITY_SEED_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('ORIGINALITY_SEED_BACK_LOADED does not fire when clue-planting scenes are evenly split across halves', async () => {
+      const recs1180cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) return makeRec1180(i, { seededClueIds: ['clue-1'] });
+        return makeRec1180(i);
+      });
+      const res = await runO1180(recs1180cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ORIGINALITY_SEED_BACK_LOADED'), 'ORIGINALITY_SEED_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 1166 — originalityPass: originality revelation-dialogue-highlight aftermath void, originality turn-staging aftermath void, originality turn-dialogue-highlight aftermath void', async () => {
     // Same truncation pitfall as Waves 592/606/…/1138/1152 above — every fixture cycles purpose/
     // sentence/slug per scene to avoid tripping unrelated 'major' rules that would crowd these
