@@ -1598,6 +1598,92 @@ I think we can solve this together.
   });
 
 
+  describe('Wave 1162 — dialoguePass: dialogue revelation-emotional aftermath void, dialogue revelation-relational aftermath void, dialogue suspense-curiosity aftermath void', async () => {
+    const makeRec1162 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const buildScenes1162 = (count: number): string => {
+      let f = '';
+      for (let i = 0; i < count; i++) {
+        f += `INT. SCENE ${i} - DAY\n\nA figure moves through the room.\n\n`;
+      }
+      return f;
+    };
+    const runD1162 = async (fountain: string, records: any[] = []) => {
+      const { dialoguePass } = await import('../../server/nvm/revision/passes/dialogue.ts');
+      return dialoguePass({ fountain, original: fountain, records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const records1162a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeRec1162(i, { emotionalShift: 'positive' });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const records1162an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeRec1162(i, { emotionalShift: 'positive' });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no relationship shift', async () => {
+      const records1162b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeRec1162(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID does not fire when a revelation is followed by a relationship shift within its window', async () => {
+      const records1162bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeRec1162(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID'), 'DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID fires when every suspense rise is followed by two scenes with no curiosity rise', async () => {
+      const records1162c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { suspenseDelta: 1 });
+        if (i === 8 || i === 9) return makeRec1162(i, { curiosityDelta: 1 });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID does not fire when a suspense rise is followed by a curiosity rise within its window', async () => {
+      const records1162cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeRec1162(i, { suspenseDelta: 1 });
+        if (i === 1 || i === 9) return makeRec1162(i, { curiosityDelta: 1 });
+        return makeRec1162(i);
+      });
+      const res = await runD1162(buildScenes1162(10), records1162cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1148 — dialoguePass: dialogue turn-highlight aftermath void, dialogue revelation-curiosity aftermath void, dialogue suspense-emotional aftermath void', async () => {
     const makeRec1148 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

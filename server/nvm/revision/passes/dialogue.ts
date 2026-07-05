@@ -554,6 +554,11 @@
 // neither has ever anchored the isTrigger side of a check in this file. DIALOGUE_REVELATION_
 // CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta; DIALOGUE_SUSPENSE_EMOTIONAL_
 // AFTERMATH_VOID pairs suspenseDelta with emotionalShift.
+// Wave 1162 additions (opens rotation cycle 44): revelation and suspenseDelta each had only
+// their one Wave-1148 channel. DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID and DIALOGUE_
+// REVELATION_RELATIONAL_AFTERMATH_VOID give revelation its second and third channels
+// (emotionalShift, relationshipShifts); DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID gives
+// suspenseDelta its second channel (curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6809,6 +6814,79 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1148c.triggerCount} scenes that raise suspense is followed by two scenes with no emotional shift, even though ${r1148c.aftermathCount} such shifts occur elsewhere in the script. Tension that mounts without ever registering on a character's felt state leaves the dialogue layer's suspense as plot pressure the audience tracks but no one on screen seems to feel.`,
         suggestedFix: `In the two scenes following at least one suspense rise, let it visibly shift a character's emotional register, so the tension lands as something felt, not just something ticking.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID -- Sequence/aftermath x revelation trigger ->
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying revelation scenes (pos<n-2, revelation non-null), >=2 emotionally-shifted
+  // scenes anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath
+  // registers no emotional shift, while such shifts occur elsewhere. Distinct from DIALOGUE_
+  // REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1148, same trigger paired with curiosityDelta) --
+  // this is the second consequence channel for this trigger.
+  {
+    const r1162a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1162a.fires) {
+      issues.push({
+        location: `${r1162a.triggerCount} revelation scene(s) -- no emotional shift within 2 scenes`,
+        rule: 'DIALOGUE_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1162a.triggerCount} scenes that reveal something is followed by two scenes with no emotional shift, even though ${r1162a.aftermathCount} such shifts occur elsewhere in the script. A revelation that lands without ever registering on a character's felt state leaves the dialogue layer's disclosures reading as information delivered to the audience rather than something that visibly changes how anyone feels.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the new information lands as something felt, not just something known.`,
+      });
+    }
+  }
+
+  // DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID -- Sequence/aftermath x revelation trigger ->
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n>=8, >=2 qualifying revelation scenes (pos<n-2, revelation non-null), >=2 scenes anywhere
+  // with a recorded relationship shift, 2-scene lookahead. Fires when every revelation's
+  // two-scene aftermath carries no relationship movement, while such movement occurs elsewhere.
+  // Distinct from DIALOGUE_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1148) and DIALOGUE_
+  // REVELATION_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift) -- this is the third consequence channel for this trigger.
+  {
+    const r1162b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1162b.fires) {
+      issues.push({
+        location: `${r1162b.triggerCount} revelation scene(s) -- no relationship shift within 2 scenes`,
+        rule: 'DIALOGUE_REVELATION_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1162b.triggerCount} scenes that reveal something is followed by two scenes with no recorded relationship shift, even though ${r1162b.aftermathCount} such shifts occur elsewhere in the script. A revelation that lands without ever moving how a pair of characters stand with each other leaves the dialogue layer's disclosures isolated from the interpersonal stakes they should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it shift a relationship -- trust gained or lost -- so the new information registers between characters, not only in what the audience now knows.`,
+      });
+    }
+  }
+
+  // DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID -- Sequence/aftermath x suspenseDelta trigger ->
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n>=8,
+  // >=2 qualifying suspense-rise scenes (pos<n-2, suspenseDelta>0), >=2 curiosity-rising scenes
+  // anywhere, 2-scene lookahead. Fires when every suspense rise's two-scene aftermath carries no
+  // rise in curiosity, while such rises occur elsewhere. Distinct from DIALOGUE_SUSPENSE_
+  // EMOTIONAL_AFTERMATH_VOID (Wave 1148, same trigger paired with emotionalShift) -- this is the
+  // second consequence channel for this trigger.
+  {
+    const r1162c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1162c.fires) {
+      issues.push({
+        location: `${r1162c.triggerCount} suspense-rise scene(s) -- no curiosity rise within 2 scenes`,
+        rule: 'DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1162c.triggerCount} scenes that raise suspense is followed by two scenes with no rise in curiosity, even though ${r1162c.aftermathCount} such rises occur elsewhere in the script. A spike in danger that never opens a fresh question right after it leaves the dialogue layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense rise, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
       });
     }
   }
