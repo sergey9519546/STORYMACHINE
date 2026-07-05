@@ -131,6 +131,11 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [showScriptDoctor, setShowScriptDoctor] = useState(false);
+  // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
+  // a first pass doesn't want squiggles until they ask for them.
+  const [liveDiagnostics, setLiveDiagnostics] = useState(
+    () => lsGet("live_diagnostics") === "1"
+  );
   const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
@@ -599,6 +604,12 @@ export default function ScriptIDE({
   // Persist persona selection so it survives reloads.
   useEffect(() => { lsSet("copilot_persona", copilotPersona); }, [copilotPersona]);
 
+  // Persist the Live Notes toggle so it survives reloads (same idiom as
+  // typewriter sound's on/off flag).
+  useEffect(() => {
+    lsSet("live_diagnostics", liveDiagnostics ? "1" : "0");
+  }, [liveDiagnostics]);
+
   // Dismissing the keyless-readiness banner is remembered per-app (finding E
   // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
   // separately since the two apps are shown/dismissed independently).
@@ -1038,11 +1049,13 @@ export default function ScriptIDE({
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
           showScriptDoctor={showScriptDoctor}
+          liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
           onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
+          onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -1222,6 +1235,7 @@ export default function ScriptIDE({
             collabRoom={collabRoom}
             collabUserName={collabUserName}
             isDarkMode={isDarkMode}
+            liveDiagnostics={liveDiagnostics}
           />
 
           {/* Action Prompt Modal */}

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope } from "lucide-react";
+import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope, SpellCheck } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
@@ -7,11 +7,13 @@ interface ToolbarProps {
   showDirectorHUD: boolean;
   directorsLayer: boolean;
   showScriptDoctor: boolean;
+  liveDiagnostics: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
   onToggleScriptDoctor: () => void;
+  onToggleLiveDiagnostics: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
@@ -26,11 +28,13 @@ export default function Toolbar({
   showDirectorHUD,
   directorsLayer,
   showScriptDoctor,
+  liveDiagnostics,
   wordCount,
   isTypewriterSound,
   onToggleHUD,
   onToggleDirectorsLayer,
   onToggleScriptDoctor,
+  onToggleLiveDiagnostics,
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
@@ -112,6 +116,23 @@ export default function Toolbar({
           }`}
         >
           <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
+        </button>
+        <button
+          onClick={onToggleLiveDiagnostics}
+          aria-label={liveDiagnostics ? "Hide Live Notes" : "Show Live Notes"}
+          aria-pressed={liveDiagnostics}
+          title={
+            liveDiagnostics
+              ? "Live Notes ON — narrative issues underline as you write"
+              : "Live Notes OFF — enable in-editor squiggle diagnostics"
+          }
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            liveDiagnostics
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <SpellCheck className="w-3 h-3" aria-hidden="true" /> Live Notes
         </button>
         <button
           onClick={onExportFountain}
