@@ -24,6 +24,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { diffLines, type DiffLine } from '../lib/diff.ts';
+import { withSession } from '../lib/session.ts';
 
 interface RevisionIssue {
   location: string;
@@ -399,7 +400,7 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
     resetForNewRun();
     setLastRunSpanCount(null);
 
-    const es = new EventSource('/api/nvm/revise-stream');
+    const es = new EventSource(withSession('/api/nvm/revise-stream'));
     evtRef.current = es;
 
     es.onmessage = (ev) => {

@@ -109,20 +109,62 @@ export function destroySession(sessionId: string): void {
   }
 }
 
+// Header-supplied ids come from src/lib/session.ts's crypto.randomUUID()-based
+// generator (32 chars after dash-stripping) — 8-64 gives comfortable headroom
+// without accepting near-empty values that would collide easily.
+const HEADER_SESSION_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
 export function sessionId(req: express.Request): string {
   const raw = req.method === 'GET'
     ? req.query.sessionId
     : req.body?.sessionId;
-  // No sessionId provided — fall back to 'default' (acceptable for single-user use)
-  if (raw === undefined || raw === null || raw === '') return 'default';
-  if (typeof raw !== 'string' || !raw.trim()) return 'default';
-  const cleaned = raw.trim().substring(0, 64);
-  // A sessionId was explicitly supplied but is malformed — reject with 400 rather
-  // than silently falling back to 'default', which could leak another user's session.
-  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleaned)) {
-    throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');
+
+  // Precedence 1: an explicit sessionId (query for GET, body otherwise) always
+  // wins over the header — existing callers/tests (tests/routes/*.test.ts) and
+  // power callers (DebuggerPanel, scripted API use) depend on this remaining
+  // authoritative even once every browser also sends an X-Session-Id header.
+  // Unchanged from prior behavior: a *present but malformed* explicit value is
+  // rejected with 400 rather than silently falling back, since silently
+  // substituting 'default' here could leak another user's session into an
+  // otherwise-explicit request.
+  if (raw !== undefined && raw !== null && raw !== '') {
+    if (typeof raw !== 'string' || !raw.trim()) return 'default';
+    const cleaned = raw.trim().substring(0, 64);
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(cleaned)) {
+      throw new ValidationError('sessionId must match [a-zA-Z0-9_-]{1,64}');
+    }
+    return cleaned;
   }
-  return cleaned;
+
+  // Precedence 2: the client-held X-Session-Id header, installed on every
+  // same-origin /api/* fetch() by src/main.tsx's wrapper (SSE/EventSource
+  // call sites can't set custom headers, so those instead append `?sessionId=`
+  // via src/lib/session.ts's withSession(), which is caught by precedence 1
+  // above). This is what gives each browser tab its own Stage instead of every
+  // visitor sharing the 'default' session.
+  //
+  // Validity guard is a security boundary, not cosmetics: sessionId flows
+  // straight into a filesystem path in PERSIST_SESSIONS mode — see
+  // dbPathFor()/destroySession() below, which do
+  // `path.join(SESSION_DB_DIR, sessionId + '.db')` with no other sanitization.
+  // The header is unauthenticated, attacker-controlled input from any browser
+  // (unlike the explicit query/body value, which at least requires a caller
+  // deliberately constructing the request), so it gets the stricter
+  // treatment: [A-Za-z0-9_-] contains no `/`, `\`, or `.`, so a single path
+  // segment built from it can never traverse out of SESSION_DB_DIR or address
+  // an absolute path — sufficient on every OS this runs on. Anything that
+  // fails the charset (or is missing) falls through to 'default' rather than
+  // throwing: a garbage/stale header (e.g. a corrupted localStorage value)
+  // must never 500 a request that didn't explicitly opt into strict
+  // validation the way a hand-supplied query/body sessionId does.
+  const headerRaw = req.headers['x-session-id'];
+  const header = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
+  if (typeof header === 'string' && HEADER_SESSION_ID_RE.test(header)) {
+    return header;
+  }
+
+  // Precedence 3: no usable id anywhere — fall back to 'default'.
+  return 'default';
 }
 
 // ── TTL cleanup intervals (side effects — run on module load) ─────────────────

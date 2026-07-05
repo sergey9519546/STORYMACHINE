@@ -27,6 +27,7 @@ import {
   Transaction,
   Extension,
 } from '@codemirror/state';
+import { withSession } from '../../lib/session.ts';
 
 // ── Context passed to the completion endpoint ─────────────────────────────────
 export interface CompletionContext {
@@ -55,7 +56,7 @@ function fetchCompletion(
       persona: ctx.persona ?? '',
     });
 
-    const es = new EventSource(`/api/scriptide/complete?${params}`);
+    const es = new EventSource(withSession(`/api/scriptide/complete?${params}`));
     let full = '';
 
     signal.addEventListener('abort', () => {

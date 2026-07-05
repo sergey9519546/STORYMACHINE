@@ -27,6 +27,7 @@ import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
 import { NarrativeAnalyticsPanel } from "./NarrativeAnalyticsPanel";
 import { CausalTwinPanel } from "./CausalTwinPanel";
 import { FixedPointsPanel } from "./FixedPointsPanel";
+import { withSession } from "../lib/session.ts";
 import { SelfPlayPanel } from "./SelfPlayPanel";
 import { ProofInspectorPanel } from "./ProofInspectorPanel";
 import { QualityEnginesPanel } from "./QualityEnginesPanel";
@@ -388,7 +389,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     setLoading(true);
     setStreamLog([]);
     try {
-      const url = `/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`;
+      const url = withSession(`/api/run-room-stream?nodeId=${encodeURIComponent(nodeId)}`);
       const evtSource = new EventSource(url);
       evtSourceRef.current = evtSource;
       await new Promise<void>((resolve, reject) => {

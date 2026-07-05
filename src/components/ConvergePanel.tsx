@@ -14,6 +14,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import type { NarrativeTransitionIR } from '../../server/nvm/ir/NarrativeTransitionIR.ts';
 import type { Critique } from '../../server/nvm/room/room.ts';
+import { withSession } from '../lib/session.ts';
 
 interface ConvergeStep {
   iteration: number;
@@ -282,7 +283,7 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
       candidatesPerIteration: '2',
     });
 
-    const es = new EventSource(`/api/nvm/converge-stream?${params}`);
+    const es = new EventSource(withSession(`/api/nvm/converge-stream?${params}`));
     esRef.current = es;
 
     es.onmessage = (ev) => {
