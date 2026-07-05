@@ -54,6 +54,91 @@ export function computeContentHash(fountain: string): string {
   return crypto.createHash('sha256').update(fountain.trim()).digest('hex');
 }
 
+// ── Doctor result cache (contentHash + storyContext, memoization) ──────────
+// runScriptDoctor is a PURE function of (trimmed fountain, storyContext): it
+// runs no LLM in diagnose-only mode (rewrite.ts's runDiagnoseOnly short-
+// circuits every pass's rewritePass() call before any network/dynamic-import
+// work happens), and none of the 14 passes read any non-deterministic input
+// (no Math.random/Date.now in passes/*.ts — verified by inspection). Same
+// input therefore always produces the same report (minus the analyzedAt
+// timestamp), which makes a same-process cache pure memoization — free
+// correctness, not an approximation.
+//
+// Key includes storyContext, not just contentHash: verified by inspection
+// that two passes read storyContext directly in their DIAGNOSTIC (issue-
+// generating) logic, not merely in the LLM rewrite prompt that diagnose-only
+// mode skips — originality.ts's genre-cliché check reads storyContext.genre,
+// and theme.ts's whole pass is gated on storyContext.theme. So the same
+// fountain text CAN legitimately produce two different reports under two
+// different storyContexts, and keying on contentHash alone would serve a
+// stale/wrong cached report to the second caller. The key folds in all four
+// StoryContext fields (not just theme/genre) so a future pass that starts
+// reading directorStyle/characters in its diagnostics can't silently go
+// stale against this cache.
+const DOCTOR_CACHE_CAPACITY = 64;
+/** Plain Map, no deps: insertion order is the recency order because every
+ *  hit deletes-then-re-sets its key (bumping it to "most recent"), and every
+ *  miss/insert evicts the Map's iteration-order-first (least-recently-used)
+ *  entry once size exceeds capacity. That's a textbook LRU without needing
+ *  an external LRU package. */
+const doctorCache = new Map<string, Omit<ScriptDoctorReport, 'analyzedAt'>>();
+
+/** Manual field-order encoding (not JSON.stringify, and not a plain
+ *  delimiter-joined string) so the key is both stable regardless of how a
+ *  caller constructed their StoryContext object literal (JSON.stringify's
+ *  output order follows the object's own key insertion order, which callers
+ *  don't all guarantee identically) AND collision-free regardless of what
+ *  the free-text fields contain. Each field is length-PREFIXED
+ *  (`${length}:${value}`) rather than joined with a delimiter character:
+ *  theme/genre/directorStyle/characters are author-controlled prose that
+ *  could contain literally any character, including a chosen delimiter —
+ *  e.g. theme:"AB" + genre:"" and theme:"A" + genre:"B" would concatenate to
+ *  the identical string "AB" under plain delimiter-joining. Length-prefixing
+ *  makes every distinct 4-tuple map to a distinct key string, full stop. */
+function storyContextCacheKey(storyContext?: StoryContext): string {
+  if (!storyContext) return '';
+  const fields = [
+    storyContext.theme ?? '',
+    storyContext.genre ?? '',
+    storyContext.directorStyle ?? '',
+    storyContext.characters ?? '',
+  ];
+  return fields.map(f => `${f.length}:${f}`).join('');
+}
+
+function doctorCacheKey(contentHash: string, storyContext?: StoryContext): string {
+  return `${contentHash}${storyContextCacheKey(storyContext)}`;
+}
+
+function doctorCacheGet(key: string): Omit<ScriptDoctorReport, 'analyzedAt'> | undefined {
+  const hit = doctorCache.get(key);
+  if (hit === undefined) return undefined;
+  // Bump recency: delete + re-set moves this key to the end of the Map's
+  // iteration order, which is what the eviction below treats as "newest".
+  doctorCache.delete(key);
+  doctorCache.set(key, hit);
+  return hit;
+}
+
+function doctorCacheSet(key: string, report: Omit<ScriptDoctorReport, 'analyzedAt'>): void {
+  doctorCache.delete(key);
+  doctorCache.set(key, report);
+  if (doctorCache.size > DOCTOR_CACHE_CAPACITY) {
+    // Map iteration order is insertion order, so .keys().next() is always
+    // the least-recently-used entry once every hit/set re-inserts on touch.
+    const oldestKey = doctorCache.keys().next().value;
+    if (oldestKey !== undefined) doctorCache.delete(oldestKey);
+  }
+}
+
+/** Test-only (and ops-safety) escape hatch: drop every cached report. Needed
+ *  so tests asserting cache behavior (hit/miss/eviction) never leak state
+ *  between test cases, and so a future admin/debug endpoint could force a
+ *  clean recompute without restarting the process. */
+export function clearDoctorCache(): void {
+  doctorCache.clear();
+}
+
 // ── Opportunity-based craft penalty (saturation fix) ────────────────────────
 // PRIOR DESIGN (superseded — kept here as the historical record the rest of
 // this comment block refers to): craftPenalty = weightedIssues * (30 /
@@ -568,7 +653,13 @@ function buildTopPriorities(passes: DoctorPassSummary[]): Array<RevisionIssue & 
   return tagged.slice(0, 10).map(({ passOrder: _passOrder, ...rest }) => rest);
 }
 
-function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fountain: string): ScriptDoctorReport {
+// Exported (rather than module-private) solely so
+// tests/core/pipeline-parallel.test.ts can drive it directly from a
+// forced-sequential RevisionResult to build an independent reference report
+// for the parallel-path identity proof — see
+// runScriptDoctorSequentialForTest below. No other caller needs it:
+// runScriptDoctor already wires it into the normal request path.
+export function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fountain: string): ScriptDoctorReport {
   const passes: DoctorPassSummary[] = result.passResults.map(pr => ({
     pass: pr.pass,
     issues: pr.issues,
@@ -678,6 +769,21 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
  * aggregate into a single report.
  */
 export async function runScriptDoctor(fountain: string, storyContext?: StoryContext): Promise<ScriptDoctorReport> {
+  // ── Cache check ────────────────────────────────────────────────────────
+  // contentHash is cheap (one sha256 over the trimmed text) relative to the
+  // 14-pass pipeline, so it's always worth computing up front and checking
+  // the cache before touching the analyzer at all.
+  const contentHash = computeContentHash(fountain);
+  const cacheKey = doctorCacheKey(contentHash, storyContext);
+  const cached = doctorCacheGet(cacheKey);
+  if (cached) {
+    // Shallow copy: callers get their own top-level object (safe to
+    // reassign fields on) that shares nested arrays/objects with the cached
+    // entry; analyzedAt is stamped fresh so a cache hit never reports a
+    // stale "checked at" time.
+    return { ...cached, analyzedAt: Date.now() };
+  }
+
   const analysis = analyzeFountainText(fountain);
 
   // Nothing to diagnose — return a well-formed, worst-case report rather than
@@ -687,6 +793,11 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
   // (nothing was earned — there was nothing to earn it from), and a
   // plainSummary that says plainly that the submission was empty instead of
   // reusing the "problems found" templates on data that doesn't exist.
+  //
+  // Deliberately NOT cached: this branch already skips the entire 14-pass
+  // pipeline (the whole point of the cache), so memoizing it would only
+  // spend one of the 64 LRU slots on a report that costs next to nothing to
+  // rebuild — a strictly worse trade than caching a real pipeline run.
   if (analysis.sceneCount === 0) {
     return {
       health: 0,
@@ -707,7 +818,7 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
       plainSummary:
         'PASS — this submission is empty, so there is nothing to score; overall craft score 0/100. ' +
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
-      contentHash: computeContentHash(fountain),
+      contentHash,
     };
   }
 
@@ -721,6 +832,60 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
 
   const result = await runDiagnoseOnly(() =>
     runRevisionPipeline(compiled, analysis.records, analysis.structure, [], undefined, storyContext),
+  );
+
+  const report = aggregateReport(result, analysis, fountain);
+
+  // Store a shallow copy (not the object about to be returned) so nothing
+  // the caller later does to their own report — e.g. reassigning a
+  // top-level field — can reach back into the cached entry. analyzedAt is
+  // dropped from the stored copy: it's meaningless to memoize (every hit
+  // stamps its own fresh value in the cache-check block above), so the
+  // Omit<..., 'analyzedAt'> cache type keeps that explicit rather than
+  // caching a timestamp nobody will ever read back out unmodified.
+  const { analyzedAt: _analyzedAt, ...cacheable } = report;
+  doctorCacheSet(cacheKey, cacheable);
+
+  return report;
+}
+
+/**
+ * TEST-ONLY escape hatch (tests/core/pipeline-parallel.test.ts): runs the
+ * identical analyze -> diagnose-only pipeline -> aggregate path as
+ * runScriptDoctor above, except it forces runRevisionPipeline's
+ * pre-existing SEQUENTIAL per-pass loop (pipeline.ts's
+ * forceSequentialForTest parameter) instead of the parallel diagnose-only
+ * fast path. This exists purely to give the parallel-path identity proof an
+ * independent reference report computed from the exact same inputs through
+ * the exact same aggregation code — the only thing that differs is whether
+ * the 14 passes ran one-at-a-time or via Promise.all.
+ *
+ * Deliberately bypasses the doctor cache entirely (always a fresh run) and
+ * does not replicate the zero-scene degenerate branch (real corpus samples
+ * always have scenes; callers needing that branch should use
+ * runScriptDoctor directly). Never called by runScriptDoctor or any other
+ * production code path.
+ */
+export async function runScriptDoctorSequentialForTest(
+  fountain: string, storyContext?: StoryContext,
+): Promise<ScriptDoctorReport> {
+  const analysis = analyzeFountainText(fountain);
+  if (analysis.sceneCount === 0) {
+    throw new Error(
+      'runScriptDoctorSequentialForTest does not support zero-scene input — use runScriptDoctor directly.',
+    );
+  }
+
+  const compiled: CompiledScreenplay = {
+    fountain,
+    annotations: analysis.annotations,
+    structureSummary: buildStructureSummaryLine(analysis),
+    wordCount: analysis.wordCount,
+    compiledAt: Date.now(),
+  };
+
+  const result = await runDiagnoseOnly(() =>
+    runRevisionPipeline(compiled, analysis.records, analysis.structure, [], undefined, storyContext, true),
   );
 
   return aggregateReport(result, analysis, fountain);
