@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope, SpellCheck } from "lucide-react";
+import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope, SpellCheck, Sparkles } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
@@ -10,6 +10,7 @@ interface ToolbarProps {
   liveDiagnostics: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
+  isSimulating: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
   onToggleScriptDoctor: () => void;
@@ -19,6 +20,7 @@ interface ToolbarProps {
   onExportFDX: () => void;
   onExportPDF: () => void;
   onExportDOCX: () => void;
+  onSimulateScript?: () => void;
   onOpenStoryMachine?: () => void;
 }
 
@@ -31,6 +33,7 @@ export default function Toolbar({
   liveDiagnostics,
   wordCount,
   isTypewriterSound,
+  isSimulating,
   onToggleHUD,
   onToggleDirectorsLayer,
   onToggleScriptDoctor,
@@ -40,6 +43,7 @@ export default function Toolbar({
   onExportFDX,
   onExportPDF,
   onExportDOCX,
+  onSimulateScript,
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
@@ -164,6 +168,27 @@ export default function Toolbar({
           className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
+        </button>
+        <button
+          onClick={onSimulateScript}
+          disabled={isSimulating || !onSimulateScript}
+          aria-label={isSimulating ? "Simulating script…" : "Simulate this script in Story Machine"}
+          title="Seed an OASIS scenario from this script's scenes and characters, then open Story Machine"
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            isSimulating
+              ? "bg-gray-500 text-gray-200 cursor-wait"
+              : "bg-purple-600 text-white hover:bg-white hover:text-black disabled:opacity-40"
+          }`}
+        >
+          {isSimulating ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Simulating…
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3 h-3" aria-hidden="true" /> Simulate
+            </>
+          )}
         </button>
         <button
           onClick={onOpenStoryMachine}

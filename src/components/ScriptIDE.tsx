@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
+import { buildScenarioFromScript } from "../lib/scenario-from-script";
 import { fountainToFdx } from "../lib/fdx";
 import { fountainToPdf } from "../lib/pdf";
 import { fountainToDocx } from "../lib/docx";
@@ -171,6 +172,12 @@ export default function ScriptIDE({
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
   const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // "Simulate this script" — seeds an OASIS scenario from scriptText + characters
+  // (src/lib/scenario-from-script.ts), then opens Story Machine onto it. Mirrors
+  // StoryMachine.tsx's submitScenario() reset→init sequence exactly.
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulateStatus, setSimulateStatus] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
+  const simulateStatusTimerRef = useRef<NodeJS.Timeout | null>(null);
   // P9: inline copilot persona (custom ghost-text voice/specialty).
   const [copilotPersona, setCopilotPersona] = useState<string>(() => lsGet("copilot_persona") || "default");
   const [personaList, setPersonaList] = useState<Array<{ id: string; name: string; description: string }>>([]);
@@ -297,6 +304,7 @@ export default function ScriptIDE({
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       analysisAbortRef.current?.abort();
       cleanActionAbortRef.current?.abort();
+      if (simulateStatusTimerRef.current) clearTimeout(simulateStatusTimerRef.current);
       if (audioCtxRef.current) {
         audioCtxRef.current.close().catch(() => { /* ignore */ });
         audioCtxRef.current = null;
@@ -787,6 +795,53 @@ export default function ScriptIDE({
     }
   };
 
+  // ── Simulate this script ─────────────────────────────────────────────────────
+  const showSimulateStatus = useCallback((type: "success" | "warning" | "error", message: string) => {
+    setSimulateStatus({ type, message });
+    if (simulateStatusTimerRef.current) clearTimeout(simulateStatusTimerRef.current);
+    simulateStatusTimerRef.current = setTimeout(() => setSimulateStatus(null), 8000);
+  }, []);
+
+  const handleSimulateScript = useCallback(async () => {
+    if (isSimulating) return;
+    setIsSimulating(true);
+    try {
+      const { payload, warnings } = buildScenarioFromScript(scriptText, characters);
+      if (payload.agents.length === 0) {
+        showSimulateStatus("error", warnings[0] ?? "Nothing to simulate — add characters or dialogue first.");
+        return;
+      }
+
+      // Mirrors StoryMachine.tsx's submitScenario(): reset first so a new
+      // scenario never inherits stale agents/ledger from a prior session,
+      // then init with the built payload.
+      const resetRes = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resetRes.ok) throw new Error(`Reset failed: ${resetRes.status}`);
+
+      const initRes = await fetch("/api/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!initRes.ok) throw new Error(`Init failed: ${initRes.status}`);
+
+      const castMsg = `Cast of ${payload.agents.length} seeded into ${payload.nodes.length} location${payload.nodes.length === 1 ? "" : "s"}.`;
+      showSimulateStatus(
+        warnings.length > 0 ? "warning" : "success",
+        warnings.length > 0 ? `${castMsg} ${warnings.join(" ")}` : castMsg,
+      );
+      onOpenStoryMachine?.();
+    } catch (err) {
+      showSimulateStatus("error", (err as Error).message || "Failed to seed simulation. Check the server.");
+    } finally {
+      setIsSimulating(false);
+    }
+  }, [scriptText, characters, isSimulating, onOpenStoryMachine, showSimulateStatus]);
+
   // ── Snapshot handlers ────────────────────────────────────────────────────────
   const takeSnapshot = () => {
     setSnapshotModal({ open: true, name: `Version ${snapshots.length + 1}` });
@@ -1052,6 +1107,7 @@ export default function ScriptIDE({
           liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
+          isSimulating={isSimulating}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
           onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
@@ -1066,8 +1122,34 @@ export default function ScriptIDE({
           onExportFDX={exportFDX}
           onExportPDF={exportPDF}
           onExportDOCX={exportDOCX}
+          onSimulateScript={handleSimulateScript}
           onOpenStoryMachine={onOpenStoryMachine}
         />
+
+        {/* "Simulate this script" result banner — success/warning/error, dismissible,
+            auto-clears after 8s (matches cleanError's timer idiom below). */}
+        {simulateStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`px-4 py-2 border-b-2 border-black text-[11px] font-mono flex items-center justify-between gap-3 ${
+              simulateStatus.type === "error"
+                ? "bg-red-600 text-white"
+                : simulateStatus.type === "warning"
+                ? "bg-[#FFF4CC] text-black"
+                : "bg-green-600 text-white"
+            }`}
+          >
+            <span>{simulateStatus.message}</span>
+            <button
+              onClick={() => setSimulateStatus(null)}
+              aria-label="Dismiss"
+              className="shrink-0 font-bold uppercase text-[10px] border-2 border-current px-2 py-0.5 hover:opacity-80"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Deliverable 2: "New story" — returns to the setup wizard, clearing
             the persisted config (App.tsx's onNewStory). The script draft
