@@ -28,6 +28,51 @@ const LocationItemSchema = z
   })
   .passthrough();
 
+// ── Psychology substrate schemas (Fix B — audit: /api/init silently dropped
+// darkTriad/bigFive/attachmentStyle/defenseMechanisms/goalStack) ─────────────
+// Shapes mirror server/engine/types.ts exactly (DarkTriad, BigFive,
+// AttachmentStyle, DefenseMechanism, GoalStack) so a payload that passes this
+// schema is guaranteed to be assignable straight onto a CharacterSheet with no
+// further coercion needed at the handler.
+
+export const DarkTriadFieldSchema = z.object({
+  machiavellianism: z.number().min(0).max(100),
+  narcissism: z.number().min(0).max(100),
+  psychopathy: z.number().min(0).max(100),
+}).passthrough();
+
+export const BigFiveFieldSchema = z.object({
+  openness: z.number().min(0).max(100),
+  conscientiousness: z.number().min(0).max(100),
+  extraversion: z.number().min(0).max(100),
+  agreeableness: z.number().min(0).max(100),
+  neuroticism: z.number().min(0).max(100),
+}).passthrough();
+
+// Matches server/engine/types.ts's AttachmentStyle union exactly.
+export const AttachmentStyleFieldSchema = z.enum(['secure', 'anxious', 'avoidant', 'anxious_avoidant']);
+
+// Matches server/engine/types.ts's DefenseMechanism union exactly.
+export const DefenseMechanismFieldSchema = z.enum([
+  'rationalization', 'intellectualization', 'projection', 'displacement',
+  'denial', 'dissociation', 'repression',
+]);
+
+export const GoalFieldSchema = z.object({
+  id: z.string().min(1).max(128),
+  description: z.string().min(1).max(500),
+  value: z.number().min(0).max(100),
+  achieved: z.boolean(),
+  depends_on: z.array(z.string().max(128)).max(20).optional(),
+  priority: z.number().optional(),
+}).passthrough();
+
+export const GoalStackFieldSchema = z.object({
+  terminal: GoalFieldSchema,
+  instrumental: z.array(GoalFieldSchema).max(20).default([]),
+  last_planned_at: z.number().default(0),
+}).passthrough();
+
 const AgentItemSchema = z
   .object({
     char_id: z.string().min(1).max(64),
@@ -37,6 +82,16 @@ const AgentItemSchema = z
     knowledge_vector: z.array(z.string()).max(50).default([]),
     suspicion_score: z.number().min(0).max(100).default(0),
     current_location_id: z.string().max(64).default(''),
+    // Fix B: previously accepted by ScenarioBuilder's UI (Dark-Triad sliders,
+    // attachment dropdown) but silently discarded by /api/init's handler —
+    // now validated here (400 on malformed values, e.g. an unknown
+    // attachmentStyle) and threaded through to the registered CharacterSheet
+    // in server/routes/game.ts.
+    darkTriad: DarkTriadFieldSchema.optional(),
+    bigFive: BigFiveFieldSchema.optional(),
+    attachmentStyle: AttachmentStyleFieldSchema.optional(),
+    defenseMechanisms: z.array(DefenseMechanismFieldSchema).max(7).optional(),
+    goalStack: GoalStackFieldSchema.optional(),
   })
   .passthrough();
 
@@ -57,6 +112,20 @@ export const RunRoomBodySchema = z.object({
   sessionId: sessionIdField,
   nodeId: z.string().min(1).max(128),
   maxTurns: z.number().int().min(1).max(50).optional(),
+});
+
+// POST /api/run-scene — Fix D: exposes the previously-dormant
+// Orchestrator.runFullScene (multi-room orchestration). locationIds is capped
+// at 8 (vs. RunRoomBodySchema's single nodeId) because each room fans out to
+// several LLM calls per round, and runFullScene runs every listed room every
+// round — an unbounded list would let one request multiply that fan-out
+// arbitrarily. roundsPerRoom maps onto runFullScene's `turnsPerRoom` argument
+// (how many turns each room gets per full-scene round); capped tighter than
+// RunRoomBodySchema.maxTurns (50) for the same fan-out-budget reason.
+export const RunSceneBodySchema = z.object({
+  sessionId: sessionIdField,
+  locationIds: z.array(z.string().min(1).max(128)).min(1).max(8),
+  roundsPerRoom: z.number().int().min(1).max(12).optional(),
 });
 
 export const ImportBodySchema = z

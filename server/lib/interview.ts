@@ -179,12 +179,21 @@ export function buildInterviewGrounding(
   // still blocked on an unmet prerequisite isn't yet live in the character's
   // mind, so presenting it as something currently motivating their answer
   // would be a false receipt. getReadyGoals only inspects GoalStack.instrumental
-  // (by design — see psychology.ts), so an agent with no goalStack at all falls
-  // back to treating hidden_motive as the implicit single goal driving them —
-  // exactly the same fallback decision.ts's buildPrompt() uses when a
-  // CharacterSheet hasn't been through the engine's goal planner yet.
+  // (by design — see psychology.ts) — but the TERMINAL goal is always live by
+  // definition (it's what the whole stack exists to reach), so it surfaces
+  // too. Without this, a character seeded with only a terminal goal (the
+  // editor's "Simulate this script" flow maps `need` → terminal, no
+  // instrumental steps yet) would show EMPTIER receipts than one with no
+  // goalStack at all — an inversion caught by live smoke after init started
+  // honoring goalStack. Agents with no goalStack fall back to hidden_motive
+  // as the implicit single goal, matching decision.ts's buildPrompt().
   const goals = agent.goalStack
-    ? getReadyGoals(agent.goalStack).map(g => sanitizeForPrompt(g.description, 256))
+    ? [
+        ...(agent.goalStack.terminal && !agent.goalStack.terminal.achieved
+          ? [sanitizeForPrompt(agent.goalStack.terminal.description, 256)]
+          : []),
+        ...getReadyGoals(agent.goalStack).map(g => sanitizeForPrompt(g.description, 256)),
+      ]
     : [sanitizeForPrompt(agent.hidden_motive, 256)];
 
   // ── Relationships in play ───────────────────────────────────────────────

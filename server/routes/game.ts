@@ -7,7 +7,11 @@ import type { CharacterSheet, StageSnapshot } from '../engine/types.ts';
 import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhetFountain } from '../lib/fountain.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES } from '../lib/structure-presets.ts';
 import { logger } from '../lib/logger.ts';
-import { validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema } from '../lib/validation.ts';
+import {
+  validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema,
+  RunSceneBodySchema, DarkTriadFieldSchema, BigFiveFieldSchema, AttachmentStyleFieldSchema,
+  DefenseMechanismFieldSchema, GoalStackFieldSchema,
+} from '../lib/validation.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildInterviewGrounding } from '../lib/interview.ts';
 import { generateContent, modelForTask, getTemperature } from '../engine/ai.ts';
@@ -18,6 +22,41 @@ import {
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import type { OutlineBeat } from '../engine/types.ts';
+
+// ── Fix B: psychology-field extraction (shared by /api/init and
+// /api/simulate-to-fountain) ─────────────────────────────────────────────────
+// ScenarioBuilder's UI (Dark-Triad sliders, attachment dropdown) — and any
+// caller supplying bigFive/defenseMechanisms/goalStack — sends these fields on
+// each agent payload, but until this fix the registerAgent() call below only
+// ever read the 9 whitelisted fields, so a custom scenario silently ran on
+// Stage's neutral defaults (DEFAULT_DARK_TRIAD/DEFAULT_BIG_FIVE/'secure') while
+// still returning 200. Reuses the EXACT same zod schemas validation.ts's
+// AgentItemSchema uses, so a payload that would 400 at /api/init's
+// validate(InitBodySchema) middleware is rejected the same way here — this is
+// defense-in-depth for /api/simulate-to-fountain, which builds an ephemeral
+// session without going through that middleware at all.
+function extractPsychology(raw: Record<string, unknown>): Pick<
+  CharacterSheet, 'darkTriad' | 'bigFive' | 'attachmentStyle' | 'defenseMechanisms' | 'goalStack'
+> {
+  const darkTriadResult = DarkTriadFieldSchema.safeParse(raw.darkTriad);
+  const bigFiveResult = BigFiveFieldSchema.safeParse(raw.bigFive);
+  const attachmentResult = AttachmentStyleFieldSchema.safeParse(raw.attachmentStyle);
+  const goalStackResult = GoalStackFieldSchema.safeParse(raw.goalStack);
+
+  const defenseMechanisms = Array.isArray(raw.defenseMechanisms)
+    ? (raw.defenseMechanisms as unknown[])
+        .filter((d): d is string => DefenseMechanismFieldSchema.safeParse(d).success)
+        .slice(0, 7) as CharacterSheet['defenseMechanisms']
+    : undefined;
+
+  return {
+    darkTriad: darkTriadResult.success ? darkTriadResult.data : undefined,
+    bigFive: bigFiveResult.success ? bigFiveResult.data : undefined,
+    attachmentStyle: attachmentResult.success ? attachmentResult.data : undefined,
+    defenseMechanisms,
+    goalStack: goalStackResult.success ? goalStackResult.data : undefined,
+  };
+}
 
 const router = express.Router();
 export default router;
@@ -65,6 +104,13 @@ router.post('/api/init', gameLimiter, validate(InitBodySchema), asyncHandler(asy
           suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
           current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
           is_alive: a.is_alive !== false,
+          // Fix B: darkTriad/bigFive/attachmentStyle/defenseMechanisms/goalStack —
+          // previously silently discarded here even though InitBodySchema now
+          // validates them; wiring them onto the CharacterSheet is what actually
+          // makes ScenarioBuilder's Dark-Triad sliders/attachment dropdown (and
+          // any caller-supplied bigFive/defenseMechanisms/goalStack) reach the
+          // live simulation instead of running on Stage's neutral defaults.
+          ...extractPsychology(a),
           stakes: Array.isArray(a.stakes)
             ? (a.stakes as unknown[]).filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
               .slice(0, 10)
@@ -110,7 +156,10 @@ router.post('/api/turn', gameLimiter, validate(TurnBodySchema), asyncHandler(asy
   try {
     await prev;
     const action = await session.orchestrator.runTurn(agentId);
-    res.json({ action });
+    // Fix C: surface Tier-1 canon drops (previously only a server log) —
+    // additive, only present when this turn actually dropped a commit.
+    const droppedCommits = session.orchestrator.consumeDroppedCommits();
+    res.json({ action, ...(droppedCommits ? { droppedCommits } : {}) });
   } finally {
     resolveSlot();
   }
@@ -216,7 +265,9 @@ router.post('/api/run-room', gameLimiter, validate(RunRoomBodySchema), asyncHand
   runningRooms.add(lockKey);
   try {
     await orchestrator.runRoomSimulation(nodeId, maxTurns);
-    res.json({ status: 'completed', maxTurns });
+    // Fix C: surface Tier-1 canon drops — additive, only present when nonzero.
+    const droppedCommits = orchestrator.consumeDroppedCommits();
+    res.json({ status: 'completed', maxTurns, ...(droppedCommits ? { droppedCommits } : {}) });
   } finally {
     runningRooms.delete(lockKey);
   }
@@ -281,6 +332,11 @@ router.get('/api/run-room-stream', gameLimiter, async (req, res) => {
     runningRooms.add(lockKey);
     try {
       await orchestrator.runRoomSimulation(nodeId, maxTurns, emit);
+      // Fix C: the final 'simulation_complete' event (emitted from inside
+      // runRoomSimulation) already carries a non-destructive peek of any
+      // dropped commits — drain here purely to reset the counter so it
+      // doesn't leak into this session's NEXT run-room call.
+      orchestrator.consumeDroppedCommits();
     } finally {
       runningRooms.delete(lockKey);
     }
@@ -291,6 +347,56 @@ router.get('/api/run-room-stream', gameLimiter, async (req, res) => {
     ensureEnded();
   }
 });
+
+// ── Multi-room orchestration (Fix D) ────────────────────────────────────────
+// POST /api/run-scene — exposes Orchestrator.runFullScene (Orchestrator.ts),
+// which was fully implemented but had NO route: a director could drive one
+// room at a time via /api/run-room, but could never run a scene that spans
+// several locations at once — with agents relocating between rooms at round
+// boundaries and dramatic tension cascading from the hottest room outward —
+// which is exactly what runFullScene already does. This unlocks that.
+//
+// aiLimiter (not gameLimiter): unlike a single /api/run-room call, this fans
+// out to up to 8 rooms × several rounds, each round running a full
+// runRoomSimulation pass (per-agent turns + a batched epistemic LLM call) —
+// a much larger per-request LLM budget than any other route in this file.
+//
+// Keyless behavior: no special-casing needed here — runFullScene (and the
+// runRoomSimulation/agent.takeTurn calls it makes) already degrade gracefully
+// without an API key (see the engine's existing keyless fallbacks exercised
+// throughout tests/), so an empty/keyless run still resolves and returns 200
+// with the hollow-but-valid { totalTurns, roundsRun, locationIds } shape.
+router.post('/api/run-scene', aiLimiter, validate(RunSceneBodySchema), asyncHandler(async (req, res) => {
+  const sid = sessionId(req);
+  const { locationIds, roundsPerRoom } = req.body as { locationIds: string[]; roundsPerRoom?: number };
+  const { stage, orchestrator } = getOrCreateSession(sid);
+
+  const missing = locationIds.filter(id => !stage.getLocation(id));
+  if (missing.length > 0) {
+    res.status(404).json({ error: `Location(s) not found: ${missing.join(', ')}` });
+    return;
+  }
+
+  // Lock every individual room this scene touches — the SAME per-room lock
+  // /api/run-room uses — so a concurrent /api/run-room (or another
+  // /api/run-scene) call on any shared room is rejected instead of two
+  // simulations racing on the same SQLite-backed Stage.
+  const lockKeys = locationIds.map(id => `${sid}:${id}`);
+  if (lockKeys.some(k => runningRooms.has(k))) {
+    res.status(409).json({ error: 'A simulation is already running for one or more of these rooms. Please wait.' });
+    return;
+  }
+  lockKeys.forEach(k => runningRooms.add(k));
+  try {
+    const result = await orchestrator.runFullScene(locationIds, roundsPerRoom ?? 3);
+    // Fix C: surface Tier-1 canon drops accumulated across every room/round
+    // this scene ran — additive, only present when nonzero.
+    const droppedCommits = orchestrator.consumeDroppedCommits();
+    res.json({ status: 'completed', ...result, ...(droppedCommits ? { droppedCommits } : {}) });
+  } finally {
+    lockKeys.forEach(k => runningRooms.delete(k));
+  }
+}));
 
 // ── Scene grouping endpoint ──────────────────────────────────────────────────
 router.get('/api/scenes', gameLimiter, asyncHandler(async (req, res) => {
@@ -435,6 +541,8 @@ router.post('/api/simulate-to-fountain', gameLimiter, asyncHandler(async (req, r
         suspicion_score: typeof a.suspicion_score === 'number' ? Math.max(0, Math.min(100, a.suspicion_score)) : 0,
         current_location_id: typeof a.current_location_id === 'string' ? a.current_location_id.substring(0, 64) : '',
         is_alive: a.is_alive !== false,
+        // Fix B: same omission as /api/init — see extractPsychology's doc comment.
+        ...extractPsychology(a),
       } as CharacterSheet);
     } catch { /* skip malformed */ }
   });

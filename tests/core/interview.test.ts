@@ -96,8 +96,11 @@ describe('lib/interview — buildInterviewGrounding', () => {
     assert.ok(receipts.defense.gloss.length > 0);
     assert.equal(receipts.attachment.style, 'anxious');
     assert.ok(receipts.speechPattern.length > 0);
-    // g2 depends on g1 (unachieved) so only g1 is "ready"
-    assert.deepEqual(receipts.goals, ['Find the altered entry']);
+    // Terminal goal surfaces first (live by definition — the whole stack
+    // exists to reach it; without it, a terminal-only goalStack yields
+    // emptier receipts than no goalStack at all). Then ready instrumentals:
+    // g2 depends on g1 (unachieved) so only g1 is "ready".
+    assert.deepEqual(receipts.goals, ['Clear his name', 'Find the altered entry']);
   });
 
   it('falls back to the hidden_motive as an implicit goal when no goalStack is set', () => {
