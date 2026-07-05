@@ -41,6 +41,7 @@ import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
 import AnalysisPanel from "./scriptide/AnalysisPanel";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
+import ScriptDoctorPanel from "./scriptide/ScriptDoctorPanel";
 import Toolbar from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
 
@@ -126,6 +127,7 @@ export default function ScriptIDE({
     | "titlePage"
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
+  const [showScriptDoctor, setShowScriptDoctor] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
@@ -975,10 +977,12 @@ export default function ScriptIDE({
           isAnalyzing={engineState.isAnalyzing}
           showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
+          showScriptDoctor={showScriptDoctor}
           wordCount={stats.wordCount}
           isTypewriterSound={isTypewriterSound}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
+          onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
               lsSet("typewriter_sound", prev ? "off" : "on");
@@ -1583,6 +1587,17 @@ export default function ScriptIDE({
                 };
               });
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── SCRIPT DOCTOR OVERLAY ── */}
+      <AnimatePresence>
+        {showScriptDoctor && (
+          <ScriptDoctorPanel
+            fountain={scriptText}
+            title={titlePage.title}
+            onClose={() => setShowScriptDoctor(false)}
           />
         )}
       </AnimatePresence>

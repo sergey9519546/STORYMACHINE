@@ -1,15 +1,17 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2 } from "lucide-react";
+import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
   isAnalyzing: boolean;
   showDirectorHUD: boolean;
   directorsLayer: boolean;
+  showScriptDoctor: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
+  onToggleScriptDoctor: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
   onExportFDX: () => void;
@@ -23,10 +25,12 @@ export default function Toolbar({
   isAnalyzing,
   showDirectorHUD,
   directorsLayer,
+  showScriptDoctor,
   wordCount,
   isTypewriterSound,
   onToggleHUD,
   onToggleDirectorsLayer,
+  onToggleScriptDoctor,
   onToggleTypewriterSound,
   onExportFountain,
   onExportFDX,
@@ -96,6 +100,18 @@ export default function Toolbar({
           }`}
         >
           <Layers className="w-3 h-3" aria-hidden="true" /> Director&apos;s Layer
+        </button>
+        <button
+          onClick={onToggleScriptDoctor}
+          aria-label={showScriptDoctor ? "Hide Script Doctor" : "Show Script Doctor"}
+          aria-pressed={showScriptDoctor}
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            showScriptDoctor
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
         </button>
         <button
           onClick={onExportFountain}
