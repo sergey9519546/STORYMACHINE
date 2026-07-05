@@ -7,13 +7,16 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
+  computeDimensionScore, computeDimensionRawScore, aggregateReport,
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
-import type { DimensionKey, DimensionScore } from '../../server/nvm/analyze/types.ts';
+import type { DimensionKey, DimensionScore, FountainAnalysis } from '../../server/nvm/analyze/types.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
+import type { RevisionResult } from '../../server/nvm/revision/pipeline.ts';
+import type { PassResult, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 
 const PASS_ORDER = [
   'structure', 'causality', 'intention', 'belief', 'conflict', 'character-arc', 'dialogue',
@@ -948,6 +951,212 @@ describe('runScriptDoctor — calibration percentiles', () => {
     for (let i = 0; i < first.dimensions!.length; i++) {
       assert.equal(first.dimensions![i].percentile, second.dimensions![i].percentile);
       assert.equal(first.dimensions![i].percentileDescriptor, second.dimensions![i].percentileDescriptor);
+    }
+  });
+});
+
+// ── Wave 18-β: dimension-collapse fix (short-script dimension scores) ───────
+// FINDING this wave fixes: on a short script (608 words, 9 scenes), all 5
+// DimensionScore.score values rendered identical (84.4 x5) despite issue
+// counts per dimension differing 4-5x (35/40/14/34/8). Root cause: buildDimensions
+// (doctor.ts) fed every dimension through computeHealthScore's FULL formula,
+// including scarcityPenalty (140/sceneCount) — a term that reads only the
+// WHOLE script's sceneCount, identical across all 5 dimension calls, and
+// dominates at low word counts, swamping the tiny per-dimension density
+// differences. Fix: the displayed dimension score (computeDimensionScore) now
+// omits the scarcity term entirely and uses its own, separately-tuned density
+// curve (dimensionDensityPenalty) — see doctor.ts's own Wave 18-β design
+// comment for the full rationale and the measurement that ruled out reusing
+// craftPenalty's curve outright (it collapses dimensions toward the 100
+// ceiling instead of separating them). DimensionBuild.rawScore (calibration
+// percentile ranking) is untouched — see doctor.ts for why.
+
+describe('computeDimensionScore / computeDimensionRawScore — formula spot-check (Wave 18-β)', () => {
+  it('separates 5 skewed dimension issue-mixes at the bug repro word/scene count, ordered by issue density', () => {
+    // Mirrors the bug's own repro shape: 608 words, 9 scenes, per-dimension
+    // weightedIssues 35/40/14/34/8 (minor-only counts of 70/80/28/68/16, since
+    // weightedIssues = 0.5*minorCount). Expected values below are this wave's
+    // own measured output (see doctor.ts's Wave 18-β comment) — computeDimensionScore
+    // itself is the single source of truth for the formula, same convention as
+    // computeHealthScore's own spot-check block above.
+    const wordCount = 608;
+    const sceneCount = 9;
+    const minorCounts = [70, 80, 28, 68, 16]; // -> weightedIssues 35, 40, 14, 34, 8
+    const scores = minorCounts.map(minor => computeDimensionScore({ critical: 0, major: 0, minor }, wordCount, sceneCount));
+
+    assert.deepEqual(scores, [75.3, 69.8, 93.7, 76.3, 97.3]);
+
+    // The historical bug: all 5 rendered IDENTICAL (84.4 x5). Direct regression
+    // guard — this must never collapse back to a single repeated value.
+    assert.equal(new Set(scores).size, 5, `expected 5 distinct scores, got ${JSON.stringify(scores)}`);
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range > 15, `expected a visible spread (>15pts) tracking issue density, got range ${range.toFixed(1)} (${scores.join(', ')})`);
+
+    // Ordering must match issue severity/density: more weighted issues -> lower
+    // score. minorCounts[1]=80 is the heaviest (score[1] must be the lowest);
+    // minorCounts[4]=16 is the lightest (score[4] must be the highest).
+    assert.equal(Math.min(...scores), scores[1], 'the heaviest-issue dimension must score lowest');
+    assert.equal(Math.max(...scores), scores[4], 'the lightest-issue dimension must score highest');
+  });
+
+  it('stays within [0, 100] even for a heavily-flagged dimension at a tiny word count', () => {
+    const score = computeDimensionScore({ critical: 50, major: 0, minor: 0 }, 20, 10);
+    assert.equal(score, 0);
+    const raw = computeDimensionRawScore({ critical: 50, major: 0, minor: 0 }, 20);
+    assert.ok(raw < 0, `expected the unclamped raw score to go negative, got ${raw}`);
+  });
+
+  it('is exactly 100 for a zero-issue dimension regardless of sceneCount — no scarcity floor unlike the overall score', () => {
+    // Contrast with computeHealthScore's OWN zero-issue behavior (this file's
+    // "does NOT return 100 for zero issues at a tiny scene/word count" test
+    // above): the overall score keeps a scarcity surcharge even at zero
+    // issues, but a dimension's displayed score has no such term by design
+    // (Wave 18-β) — a genuinely clean dimension reads as a clean 100.
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 80, 4), 100);
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 2000, 25), 100);
+  });
+
+  it('honesty guard: rounds to the nearest whole point (not a tenth) below 3 scenes', () => {
+    const bySeverity = { critical: 0, major: 0, minor: 70 }; // weightedIssues 35
+    const wordCount = 608;
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 1), 75, 'sceneCount=1 must round to a whole point');
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 2), 75, 'sceneCount=2 must round to a whole point');
+    // sceneCount=3 clears the low-confidence floor (< 3, not <= 3) and keeps
+    // the normal tenths-place precision.
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 3), 75.3, 'sceneCount=3 must keep tenths precision');
+  });
+});
+
+/** Fixture PassResult with all issues attached to a single named pass (each
+ *  dimension's own first mapped pass, per DIMENSION_PASS_MAP above) — enough
+ *  for buildDimensions'/aggregateReport's per-dimension rollup, which only
+ *  cares which DIMENSION a pass belongs to, not which of its 2-4 member
+ *  passes carried the issues. */
+function buildDimensionSkewedResult(
+  weightedByDimension: Array<{ critical?: number; major?: number; minor?: number }>,
+): RevisionResult {
+  const passResults: PassResult[] = PASS_ORDER.map(pass => ({
+    pass: pass as PassResult['pass'],
+    issues: [] as RevisionIssue[],
+    revisedFountain: '',
+    changed: false,
+    summary: '',
+  }));
+
+  DIMENSION_CONTRACT_ORDER.forEach((def, i) => {
+    const mix = weightedByDimension[i];
+    const targetPass = DIMENSION_PASS_MAP[def.key][0];
+    const pr = passResults.find(p => p.pass === targetPass)!;
+    const push = (severity: RevisionIssue['severity'], count: number) => {
+      for (let j = 0; j < count; j++) {
+        pr.issues.push({
+          location: 'Scene 0', rule: `TEST_RULE_${def.key.toUpperCase()}`,
+          description: `synthetic ${def.key} test issue`, severity,
+        });
+      }
+    };
+    push('critical', mix.critical ?? 0);
+    push('major', mix.major ?? 0);
+    push('minor', mix.minor ?? 0);
+  });
+
+  return {
+    passResults,
+    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, completedAt: 0,
+  };
+}
+
+function buildAnalysisFixture(sceneCount: number, wordCount: number): FountainAnalysis {
+  return {
+    records: [], annotations: [], structure: baseStructureState(),
+    characters: [], sceneCount, dialogueLineCount: 0, actionLineCount: 0, wordCount,
+  };
+}
+
+describe('runScriptDoctor report shape — dimension-collapse fix, end to end (Wave 18-β)', () => {
+  it('FIRE: a short (9-scene, 608-word) script with skewed per-dimension issue counts produces non-identical dimension scores, ordered by issue density', () => {
+    // Same repro shape as the formula spot-check above, but exercised through
+    // the actual public aggregation path (aggregateReport) rather than the
+    // bare formula, proving the fix reaches the real report shape a caller
+    // receives — not just the underlying function.
+    const analysis = buildAnalysisFixture(9, 608);
+    const result = buildDimensionSkewedResult([
+      { minor: 70 }, // structure-pacing: weightedIssues 35
+      { minor: 80 }, // character: weightedIssues 40
+      { minor: 28 }, // dialogue-voice: weightedIssues 14
+      { minor: 68 }, // plot-logic: weightedIssues 34
+      { minor: 16 }, // theme-originality: weightedIssues 8
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — dimension collapse fire case');
+
+    const scores = report.dimensions!.map(d => d.score);
+    assert.equal(new Set(scores).size, 5, `expected 5 distinct dimension scores, got ${JSON.stringify(scores)} — this is the exact historical bug (84.4 x5)`);
+
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range > 15, `expected visible spread across dimensions, got range ${range.toFixed(1)} (${JSON.stringify(scores)})`);
+
+    // character (index 1, weightedIssues 40, the heaviest) must score lowest;
+    // theme-originality (index 4, weightedIssues 8, the lightest) must score
+    // highest — ordering matches issue severity/density exactly.
+    const byKey = Object.fromEntries(report.dimensions!.map(d => [d.key, d.score]));
+    assert.equal(byKey['character'], Math.min(...scores), 'the heaviest-issue dimension must score lowest');
+    assert.equal(byKey['theme-originality'], Math.max(...scores), 'the lightest-issue dimension must score highest');
+
+    for (const score of scores) assert.ok(score >= 0 && score <= 100, `dimension score out of range: ${score}`);
+  });
+
+  it('NO-FIRE / control: a short script with a BALANCED issue mix across dimensions produces near-equal scores', () => {
+    // Control for the fire case above: when the underlying issue mix genuinely
+    // IS balanced across dimensions (not skewed), the fix must not manufacture
+    // spread that isn't there — dimensions should land close together, same as
+    // they did (for the wrong reason) before this fix.
+    const analysis = buildAnalysisFixture(9, 608);
+    const result = buildDimensionSkewedResult([
+      { minor: 40 }, { minor: 42 }, { minor: 38 }, { minor: 41 }, { minor: 39 },
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — balanced control case');
+
+    const scores = report.dimensions!.map(d => d.score);
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range < 10, `expected near-equal dimension scores for a balanced issue mix, got range ${range.toFixed(1)} (${JSON.stringify(scores)})`);
+  });
+
+  it('identical bySeverity mixes across all 5 dimensions produce byte-identical scores (determinism sanity)', () => {
+    const analysis = buildAnalysisFixture(10, 320);
+    const result = buildDimensionSkewedResult([
+      { minor: 20 }, { minor: 20 }, { minor: 20 }, { minor: 20 }, { minor: 20 },
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — identical mixes');
+
+    const scores = report.dimensions!.map(d => d.score);
+    assert.ok(scores.every(s => s === scores[0]), `expected all 5 identical scores for identical issue mixes, got ${JSON.stringify(scores)}`);
+  });
+
+  it('honesty guard reaches the real report: dimension scores round to a whole point below 3 scenes', () => {
+    const analysis = buildAnalysisFixture(2, 608);
+    const result = buildDimensionSkewedResult([{ minor: 70 }, {}, {}, {}, {}]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — low-confidence rounding');
+
+    const structureDim = report.dimensions!.find(d => d.key === 'structure-pacing')!;
+    assert.equal(structureDim.score, Math.round(structureDim.score), `expected a whole-point score below 3 scenes, got ${structureDim.score}`);
+  });
+
+  it('length-invariance is NOT expected of the dimension formula the same way as overall health — sanity: dimension scores stay in [0, 100] across a 1x/2x/3x-issue sweep', () => {
+    // Not a strict invariance claim (the overall health length-invariance test
+    // in calibration.test.ts is the binding one, and it is untouched by this
+    // wave — see doctor.ts's craftPenalty comment). This is a basic sanity
+    // bound: whatever the dimension curve does as issue volume scales up, it
+    // must never leave the documented [0, 100] contract.
+    const analysis = buildAnalysisFixture(9, 608);
+    for (const multiplier of [1, 2, 3]) {
+      const result = buildDimensionSkewedResult([
+        { minor: 70 * multiplier }, { minor: 80 * multiplier }, { minor: 28 * multiplier },
+        { minor: 68 * multiplier }, { minor: 16 * multiplier },
+      ]);
+      const report = aggregateReport(result, analysis, `fixture fountain — issue sweep x${multiplier}`);
+      for (const dim of report.dimensions!) {
+        assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} out of range at x${multiplier}: ${dim.score}`);
+      }
     }
   });
 });

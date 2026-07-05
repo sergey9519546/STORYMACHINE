@@ -228,6 +228,41 @@ export function clearDoctorCache(): void {
 // NOT fully correct (an individual very-short-but-genuinely-clean script
 // still can't reach the top of the range — that's scarcityPenalty working
 // as designed, not a bug).
+/** The word-density half of craftPenalty, factored out on its own (Wave
+ *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
+ *  computeDimensionScore's comment for why the per-dimension scores need
+ *  exactly that. Byte-identical arithmetic to what craftPenalty always
+ *  computed for this half; only the factoring is new.
+ *
+ *  The three tuned constants are declared LOCALLY (inside this function
+ *  body) rather than at module scope, for the same TemporalDeadZone reason
+ *  documented on craftPenalty below — this function is on the same
+ *  doctor.ts <-> calibration/reference.ts import cycle (reference.ts's
+ *  scoreSample reaches it transitively through computeRawCraftScore), so a
+ *  module-level `const` here would carry the identical hazard. */
+function densityPenalty(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  const WORD_COUNT_EXPONENT = 0.7;
+  const DENSITY_POWER = 3.75;
+  const DENSITY_SCALE = 2.5;
+
+  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
+  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const density = weightedIssues / opportunityWords;
+  return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
+}
+
+/** The scene-scarcity half of craftPenalty, factored out on its own (Wave
+ *  18-β) for the same reason as densityPenalty above — see that function's
+ *  comment. SCARCITY_SCALE stays function-local for the identical TDZ
+ *  reason. */
+function scarcityPenalty(sceneCount: number): number {
+  const SCARCITY_SCALE = 140;
+  return SCARCITY_SCALE / Math.max(sceneCount, 1);
+}
+
 /** Shared penalty expression behind both computeRawCraftScore and
  *  computeHealthScore — factored out so the two can never drift apart. See
  *  the design comment above for the full rationale; in short:
@@ -236,39 +271,25 @@ export function clearDoctorCache(): void {
  *  where weightedIssues = 4·critical + 1.5·major + 0.5·minor (unchanged from
  *  the prior formula — only the normalization changed).
  *
- *  The four tuned constants are declared LOCALLY (inside this function body)
- *  rather than at module scope — deliberately, not for style. doctor.ts and
- *  calibration/reference.ts import each other (reference.ts's header
- *  explains why: it reuses this exact formula to build its distribution,
- *  without ever calling back into aggregateReport/runScriptDoctor). Whichever
- *  of the two modules a process happens to load FIRST becomes the entry
- *  point of that cycle; if it were doctor.ts, reference.ts's top-level
- *  `await buildDistribution()` would call into this function while doctor.ts
- *  was still mid-evaluation — before any module-scope `const` declared here
- *  had run its initializer. That's a genuine TemporalDeadZone ReferenceError
- *  (verified while building this fix), silently swallowed by reference.ts's
- *  own top-level try/catch into an empty distribution — every report would
- *  then quietly lose healthPercentile for the rest of the process, with
- *  nothing crashing to reveal why. Function PARAMETERS and function-local
- *  `const`s have no such hazard: they're initialized fresh on every call,
- *  independent of module evaluation order, so the cycle above can never
- *  observe them uninitialized. */
+ *  Now a thin sum of densityPenalty + scarcityPenalty above (Wave 18-β
+ *  factoring) — the OVERALL health formula this function backs is completely
+ *  unchanged by that refactor: same two terms, same constants, same sum, so
+ *  every existing computeHealthScore/computeRawCraftScore caller (including
+ *  calibration/reference.ts's scoreSample, which this file must not touch —
+ *  see Wave 18-β's own report) sees byte-identical output before and after.
+ *  Only computeDimensionScore below is new, and it deliberately calls
+ *  densityPenalty alone, never this function.
+ *
+ *  Constants stay pushed down into densityPenalty/scarcityPenalty rather
+ *  than re-declared here — same TDZ hazard as those two functions'
+ *  comments explain; this function never declares a module-level const of
+ *  its own either. */
 function craftPenalty(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
   wordCount: number,
 ): number {
-  const WORD_COUNT_EXPONENT = 0.7;
-  const DENSITY_POWER = 3.75;
-  const DENSITY_SCALE = 2.5;
-  const SCARCITY_SCALE = 140;
-
-  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
-  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
-  const density = weightedIssues / opportunityWords;
-  const densityPenalty = DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
-  const scarcityPenalty = SCARCITY_SCALE / Math.max(sceneCount, 1);
-  return densityPenalty + scarcityPenalty;
+  return densityPenalty(bySeverity, wordCount) + scarcityPenalty(sceneCount);
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
@@ -305,6 +326,156 @@ export function computeHealthScore(
 ): number {
   const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount, wordCount)));
   return Math.round(clamped * 10) / 10;
+}
+
+// ── Wave 18-β: per-dimension score, scarcity-free (dimension-collapse fix) ──
+// FINDING this wave fixes: on a short script (measured case: 608 words, 9
+// scenes), all 5 DimensionScore.score values rendered identical (84.4 x5)
+// despite issue counts per dimension differing by 4-5x (35/40/14/34/8). Root
+// cause, isolated by direct measurement: buildDimensions (below) fed every
+// dimension's own bySeverity mix through the SAME computeHealthScore used for
+// the overall score — i.e. through the FULL craftPenalty, densityPenalty +
+// scarcityPenalty. scarcityPenalty (140/sceneCount) does not vary by
+// dimension at all (it only reads sceneCount, which is the whole script's,
+// identical across all 5 calls), and at low word counts it dominates: for a
+// 9-scene/~600-word script, scarcityPenalty ≈ 140/9 ≈ 15.6, while
+// densityPenalty for a REALISTIC per-dimension weightedIssues at that word
+// count is well under 1 point. Health = 100 - penalty then rounds every
+// dimension to the same displayed number: the identical ~15.6-point scarcity
+// term swamps a sub-1-point density signal, five times over. This is exactly
+// the scarcity term's own design intent working correctly for the OVERALL
+// score (see craftPenalty's design comment above: "a tiny script can no
+// longer read as clean purely because it was too short to accumulate
+// issues") — it was simply never meant to be reapplied identically across 5
+// sibling dimensions, where its only visible effect is to erase the one
+// signal a dimension score exists to show: RELATIVE issue density between a
+// script's own craft families.
+//
+// Fix chosen, MEASURED not guessed (see this wave's own scratchpad
+// measurement scripts, not checked into the repo — one ran the real 20-
+// sample reference corpus through the real pipeline to get actual
+// per-dimension weightedIssues distributions, one tried candidate constants
+// against that data plus synthetic skewed short scripts): apply
+// scarcityPenalty to OVERALL health only — a dimension's DISPLAYED score
+// uses a density term alone. But reusing craftPenalty's EXACT densityPenalty
+// curve for that (candidate (a) taken literally) was tried first and
+// measured to fail: densityPenalty's constants (DENSITY_POWER=3.75,
+// DENSITY_SCALE=2.5) were tuned against the OVERALL script's total
+// weightedIssues (summed across all 14 passes, typically >= wordCount^0.7,
+// i.e. density >= 1). A single dimension's weightedIssues is a SHARE of that
+// total (2-3 passes' worth, not 14) — typically well under wordCount^0.7,
+// i.e. density < 1 — and raising a sub-1 density to the 3.75 power crushes
+// it disproportionately (measured: realistic per-dimension weightedIssues in
+// the 5-40 range at 250-600 word counts produced densityPenalty well under
+// 1 point for EVERY dimension), collapsing all 5 dimensions toward the 100
+// ceiling instead of toward one shared mid-value — the identical bug in the
+// other direction, not a fix.
+//
+// So this wave ships a SEPARATE, independently-tuned dimension density curve
+// (dimensionDensityPenalty below: DENSITY_POWER_DIM=1.5, DENSITY_SCALE_DIM=
+// 100, same WORD_COUNT_EXPONENT=0.7 opportunity unit) rather than reusing
+// craftPenalty's curve outright. Verified against the real 20-sample
+// corpus: every one of the 5 dimensions shows non-degenerate spread (no
+// dimension pins to a single clamped value across the corpus) at this
+// curve, and the bug's own repro shape (9 scenes, ~600 words, per-dimension
+// weighted issues roughly 35/40/14/34/8) separates to roughly 75/70/94/76/97
+// — a ~27-point spread that orders exactly by issue density, instead of one
+// repeated number.
+//
+// Known, accepted residual: per-dimension band-average ordering (strong vs.
+// troubled) is not strictly monotonic for every one of the 5 dimensions in
+// the CURRENT reference corpus (e.g. the 'structure-pacing' family happens
+// to carry slightly MORE weighted issues, on average, in the 'troubled' band
+// than in 'weak'/'competent' — a property of which craft family each band's
+// samples were designed to be weak in, not a formula artifact). This is
+// PRE-EXISTING: it was already true of the OLD per-dimension formula too
+// (scarcityPenalty was a constant additive term for same-sceneCount corpus
+// samples, so it never could have changed relative per-dimension ordering
+// either), and no test in this file's own test suite (nor calibration.test.ts)
+// asserts per-dimension band monotonicity — only OVERALL health/healthPercentile
+// band ordering is asserted, and that is completely untouched by this wave
+// (see below). Not in this wave's scope to fix; noted for the record rather
+// than silently glossed over.
+//
+// What this deliberately does NOT touch: computeHealthScore/
+// computeRawCraftScore/craftPenalty (the OVERALL formula) are byte-identical
+// before and after this wave — see craftPenalty's own comment. Nor does it
+// touch DimensionBuild.rawScore (buildDimensions below): that field feeds
+// ONLY the calibration percentile ranking against calibration/reference.ts's
+// distribution, and reference.ts's own scoreSample computes its per-dimension
+// reference statistic via computeRawCraftScore too (scarcity included, same
+// as before) — reference.ts is outside this wave's file-ownership scope, so
+// rawScore keeps calling computeRawCraftScore unchanged, ranking on the exact
+// same statistic basis the reference distribution was built from. Only the
+// DISPLAYED dimension `score` (types.ts's DimensionScore.score, the number a
+// writer actually reads) changes formula.
+//
+// Honesty guard: below DIMENSION_LOW_CONFIDENCE_SCENES scenes, a dimension's
+// own issue family has barely had room to differentiate at all (most of a
+// dimension's passes need several scenes' worth of material before their
+// rules can meaningfully fire) — rounding to a whole point rather than a
+// tenth avoids implying a precision the signal doesn't support. types.ts is
+// read-only for this wave (per its own file-ownership constraint) and has no
+// existing low-confidence marker field to populate instead; a
+// `DimensionScore.lowConfidence?: boolean` field would be the natural next
+// step if the report contract is ever reopened — noted here rather than
+// added.
+const DIMENSION_LOW_CONFIDENCE_SCENES = 3;
+
+/** Dimension-scoped density penalty — deliberately NOT craftPenalty's
+ *  densityPenalty (see the design comment above for why reusing that curve
+ *  measured out to a ceiling-collapse instead of a fix). Same word-based
+ *  opportunity unit (WORD_COUNT_EXPONENT=0.7, unchanged from the overall
+ *  formula — the sub-linear issues-per-word falloff that motivated it there
+ *  applies equally to a dimension's own issue family), but its own power/
+ *  scale, tuned against the real corpus's per-dimension weightedIssues range
+ *  (see this wave's own report for the measurement). Constants stay
+ *  function-local for the same TDZ reason as densityPenalty/scarcityPenalty
+ *  above — this function sits on the identical doctor.ts <-> reference.ts
+ *  import cycle transitively (reachable from computeDimensionRawScore,
+ *  called by buildDimensions, called from aggregateReport). */
+function dimensionDensityPenalty(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  const WORD_COUNT_EXPONENT = 0.7;
+  const DENSITY_POWER_DIM = 1.5;
+  const DENSITY_SCALE_DIM = 100;
+
+  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
+  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const density = weightedIssues / opportunityWords;
+  return DENSITY_SCALE_DIM * Math.pow(density, DENSITY_POWER_DIM);
+}
+
+/** Unclamped dimension craft statistic: 100 − dimensionDensityPenalty(...),
+ *  no scarcity term. Exported for the same spot-check reason as
+ *  computeRawCraftScore — independently checkable against a known issue mix
+ *  without running the pipeline. Not used for calibration ranking (that's
+ *  DimensionBuild.rawScore, computeRawCraftScore, unchanged — see the design
+ *  comment above); this is purely the basis for the DISPLAYED per-dimension
+ *  score below. */
+export function computeDimensionRawScore(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  return 100 - dimensionDensityPenalty(bySeverity, wordCount);
+}
+
+/** DISPLAYED per-dimension score: computeDimensionRawScore, clamped to
+ *  [0, 100], honesty-guard-rounded (see DIMENSION_LOW_CONFIDENCE_SCENES
+ *  above). sceneCount is used ONLY for that rounding-precision decision here
+ *  — never fed into a scarcity term, which is the whole point of this wave's
+ *  fix; see the design comment above computeDimensionRawScore. */
+export function computeDimensionScore(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+  sceneCount: number,
+): number {
+  const clamped = Math.max(0, Math.min(100, computeDimensionRawScore(bySeverity, wordCount)));
+  return sceneCount < DIMENSION_LOW_CONFIDENCE_SCENES
+    ? Math.round(clamped)
+    : Math.round(clamped * 10) / 10;
 }
 
 /** health >= 90 excellent, >= 75 strong, >= 55 solid, >= 35 uneven, else troubled. */
@@ -433,10 +604,18 @@ function buildDimensionSummary(
 interface DimensionBuild {
   score: DimensionScore;
   mix: DimensionIssueMix | null;
-  /** computeRawCraftScore for this dimension's own issue mix — unclamped,
-   *  used only for calibration ranking (aggregateReport below), never
-   *  displayed. See computeRawCraftScore's comment for why ranking needs the
-   *  unclamped statistic. */
+  /** computeRawCraftScore (the FULL formula, scarcity term included) for
+   *  this dimension's own issue mix — unclamped, used ONLY for calibration
+   *  ranking against calibration/reference.ts's distribution (aggregateReport
+   *  below). Deliberately NOT computeDimensionRawScore (the scarcity-free
+   *  statistic the displayed `score` below is now built from, Wave 18-β):
+   *  reference.ts's own scoreSample builds its per-dimension reference
+   *  numbers via computeRawCraftScore too (unchanged — reference.ts is
+   *  outside this wave's file-ownership scope), so ranking must stay on that
+   *  same statistic basis or a report's dimension percentile would compare
+   *  apples (scarcity-free) to the reference set's oranges (scarcity-
+   *  included). See computeRawCraftScore's comment for why ranking needs the
+   *  unclamped statistic in the first place. */
   rawScore: number;
 }
 
@@ -449,10 +628,17 @@ interface DimensionBuild {
  *  wordCount is the WHOLE script's word count, shared across all 5
  *  dimensions — there's no per-dimension word count to measure (a dimension
  *  is a regrouping of issues by PASS, not a distinct slice of the prose), so
- *  each dimension's own opportunity-based penalty (craftPenalty in
- *  computeHealthScore/computeRawCraftScore) is scaled against the same
+ *  each dimension's own density penalty is scaled against the same
  *  script-wide word count as the overall health score, exactly as sceneCount
- *  already was before this fix. */
+ *  already was before this fix.
+ *
+ *  The DISPLAYED `score` (Wave 18-β) is computeDimensionScore — density only,
+ *  no scarcity term — so 5 dimensions built from the same sceneCount no
+ *  longer collapse to one identical number at low scene/word counts; see
+ *  computeDimensionScore's own design comment above for the full finding and
+ *  rationale. `rawScore` stays on the OLD (scarcity-included)
+ *  computeRawCraftScore statistic — see DimensionBuild's own comment for why
+ *  that field specifically must not change. */
 function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCount: number): DimensionBuild[] {
   return DIMENSION_DEFS.map(def => {
     const passSet = new Set<PassName>(def.passes);
@@ -461,7 +647,7 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCo
       (acc, i) => { acc[i.severity]++; return acc; },
       { critical: 0, major: 0, minor: 0 },
     );
-    const score = computeHealthScore(bySeverity, sceneCount, wordCount);
+    const score = computeDimensionScore(bySeverity, wordCount, sceneCount);
     const rawScore = computeRawCraftScore(bySeverity, sceneCount, wordCount);
     const mix = analyzeDimensionIssues(issues);
     return {
