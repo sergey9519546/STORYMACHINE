@@ -1080,6 +1080,86 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1177 — characterArcPass (distinct-mode pivot): arc highlight back-loaded, arc relational-emotion decoupled, arc relational-revelation decoupled', async () => {
+    const makeRec1177 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0,
+      revelation: null, dramaticTurn: 'nothing',
+      relationshipShifts: [], seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], dialogueHighlights: [], visualBeats: [],
+      purpose: 'development',
+      ...overrides,
+    });
+    const runArc1177 = async (records: any[]) => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      return characterArcPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records, structure: {} as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Half-loaded geometry n=10 → mid=5; highlight scenes at 1 (front) and 5,6,7,8 (back) → 4/5 = 80%, front=1.
+    it('ARC_HIGHLIGHT_BACK_LOADED fires when >70% of highlight scenes fall in the second half', async () => {
+      const recs1177a = Array.from({ length: 10 }, (_, i) => makeRec1177(i));
+      [1, 5, 6, 7, 8].forEach(i => { recs1177a[i] = makeRec1177(i, { dialogueHighlights: ['a memorable line'] }); });
+      const res = await runArc1177(recs1177a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_HIGHLIGHT_BACK_LOADED'), 'ARC_HIGHLIGHT_BACK_LOADED should fire');
+    });
+
+    it('ARC_HIGHLIGHT_BACK_LOADED does not fire when highlight scenes are balanced across halves', async () => {
+      const recs1177an = Array.from({ length: 10 }, (_, i) => makeRec1177(i));
+      [1, 2, 6, 7].forEach(i => { recs1177an[i] = makeRec1177(i, { dialogueHighlights: ['a memorable line'] }); });
+      const res = await runArc1177(recs1177an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_HIGHLIGHT_BACK_LOADED'), 'ARC_HIGHLIGHT_BACK_LOADED should not fire');
+    });
+
+    // Decoupling geometry: ≥2 A scenes, ≥2 B scenes, zero shared scenes → fire; one overlapping scene → no-fire.
+    it('ARC_RELATIONAL_EMOTION_DECOUPLED fires when relationship shifts never coincide with an emotional beat', async () => {
+      const recs1177b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 1) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 5 || i === 6) return makeRec1177(i, { emotionalShift: 'positive' });
+        return makeRec1177(i);
+      });
+      const res = await runArc1177(recs1177b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_EMOTION_DECOUPLED'), 'ARC_RELATIONAL_EMOTION_DECOUPLED should fire');
+    });
+
+    it('ARC_RELATIONAL_EMOTION_DECOUPLED does not fire when one scene carries both a relationship shift and an emotional beat', async () => {
+      const recs1177bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }], emotionalShift: 'positive' });
+        if (i === 1) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 6) return makeRec1177(i, { emotionalShift: 'positive' });
+        return makeRec1177(i);
+      });
+      const res = await runArc1177(recs1177bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_EMOTION_DECOUPLED'), 'ARC_RELATIONAL_EMOTION_DECOUPLED should not fire');
+    });
+
+    it('ARC_RELATIONAL_REVELATION_DECOUPLED fires when relationship shifts never coincide with a revelation', async () => {
+      const recs1177c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 1) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 5 || i === 6) return makeRec1177(i, { revelation: 'a hidden truth surfaces' });
+        return makeRec1177(i);
+      });
+      const res = await runArc1177(recs1177c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_REVELATION_DECOUPLED'), 'ARC_RELATIONAL_REVELATION_DECOUPLED should fire');
+    });
+
+    it('ARC_RELATIONAL_REVELATION_DECOUPLED does not fire when one scene carries both a relationship shift and a revelation', async () => {
+      const recs1177cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }], revelation: 'a hidden truth surfaces' });
+        if (i === 1) return makeRec1177(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        if (i === 6) return makeRec1177(i, { revelation: 'a hidden truth surfaces' });
+        return makeRec1177(i);
+      });
+      const res = await runArc1177(recs1177cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'ARC_RELATIONAL_REVELATION_DECOUPLED'), 'ARC_RELATIONAL_REVELATION_DECOUPLED should not fire');
+    });
+  });
+
   describe('Wave 1163 — characterArcPass: arc positive-staging aftermath void, arc positive-dialogue-highlight aftermath void, arc negative-suspense aftermath void', async () => {
     const makeRec1163 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

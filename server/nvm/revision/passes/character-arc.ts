@@ -598,10 +598,23 @@
 // POSITIVE_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID give the positive-emotion trigger its fourth and
 // fifth channels (visualBeats, dialogueHighlights); ARC_NEGATIVE_SUSPENSE_AFTERMATH_VOID gives
 // the negative-emotion trigger its third channel (suspenseDelta).
+// Wave 1177 additions (continues the deliberate pivot away from sequence/aftermath begun in
+// dialogue.ts Wave 1176): this pass had used checkAftermathVoid 46 times vs only 4 for
+// co-occurrence/decoupling and zero for checkHalfLoaded, despite this file already having five
+// hand-rolled FRONT_LOADED/BACK_LOADED checks (curiosity, emotional, payoff, relational,
+// suspense) — proof the distribution/timing mode is valued here, just never routed through the
+// shared helper. ARC_HIGHLIGHT_BACK_LOADED closes a real gap: dialogueHighlights has five other
+// analytical modes applied to it (zone-cluster, zone-imbalance, peak-uncaused, drought-run,
+// co-occurrence with visualBeats) but never a half-loaded distribution check, and it's the
+// first use of checkHalfLoaded in this file. ARC_RELATIONAL_EMOTION_DECOUPLED and ARC_
+// RELATIONAL_REVELATION_DECOUPLED mine co-occurrence/decoupling: this pass's central signal,
+// relationshipShifts, had only ever been decoupling-checked against dialogueHighlights (Wave
+// 603), curiosity (Wave 449), and suspense (Wave 463) — its co-occurrence with the felt-emotion
+// and revelation channels was untested.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 export async function characterArcPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, annotations, approvedSpans } = input;
@@ -6746,6 +6759,84 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every negative-emotion scene (${r1163c.triggerCount} qualifying) is followed by two scenes with no rise in suspense, even though ${r1163c.aftermathCount} such rises occur elsewhere in the script. A setback that never tightens tension in its immediate wake reads as a contained, resolved loss — the story never lets the audience feel that the defeat's consequences are still actively unfolding.`,
         suggestedFix: `After at least one negative-emotion scene, let the following scene or two sharpen the danger — a new threat the setback exposes, a complication it creates — so the loss keeps generating tension instead of settling into a closed chapter.`,
+      });
+    }
+  }
+
+  // ARC_HIGHLIGHT_BACK_LOADED — Distribution/timing × dialogueHighlights. Built on
+  // checkHalfLoaded from the shared checks library — the first use of this helper in this file.
+  // n≥10, ≥4 highlight scenes, front half ≥1, >70% in the second half. Fires when memorable
+  // dialogue is scarce early and only accumulates as the story nears its climax, leaving the
+  // opening's characterization comparatively unvoiced. Distinct from ARC_RELATIONAL_BACK_LOADED
+  // / ARC_EMOTIONAL_BACK_LOADED / ARC_CURIOSITY_BACK_LOADED (same mode, different channels) and
+  // from every existing dialogueHighlights check in this file (ARC_DIALOGUE_HIGHLIGHT_ZONE_
+  // IMBALANCE, ARC_HIGHLIGHT_PEAK_UNCAUSED, ARC_HIGHLIGHT_DROUGHT_RUN, ARC_HIGHLIGHT_ZONE_
+  // CLUSTER, ARC_DIALOGUE_HIGHLIGHT_STAGING_DECOUPLED) — none of which measure a front/back
+  // distribution skew.
+  {
+    const r1177a = checkHalfLoaded({
+      records, minRecords: 10, minCount: 4, ratioThreshold: 0.7, direction: 'back',
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+      minOtherHalfCount: 1,
+    });
+    if (r1177a.fires) {
+      issues.push({
+        location: `Dialogue-highlight distribution — ${r1177a.matchingHalfCount}/${r1177a.count} highlight scenes in the second half`,
+        rule: 'ARC_HIGHLIGHT_BACK_LOADED',
+        severity: 'minor',
+        description: `${r1177a.matchingHalfCount} of the story's ${r1177a.count} scenes carrying a standout line of dialogue (${Math.round(r1177a.matchingHalfCount / r1177a.count * 100)}%) fall in the second half — the opening establishes the character largely without memorable speech, and the voice only sharpens as the story nears its climax. Early scenes carry the burden of introducing who this person is with comparatively little of what makes them worth listening to.`,
+        suggestedFix: `Give the character at least one standout line in the first half — a piece of dialogue that reveals who they are before the plot forces the issue. Characterization through voice should build from the outset, not arrive only once the story's pressure is already mounting.`,
+      });
+    }
+  }
+
+  // ARC_RELATIONAL_EMOTION_DECOUPLED — Co-occurrence/decoupling × relationshipShifts ×
+  // emotionalShift (non-neutral). Built on checkCoOccurrenceDecoupled from the shared checks
+  // library. n≥8, ≥2 shift scenes, ≥2 emotionally-charged scenes, and ZERO scenes carrying both.
+  // Fires when a relationship never moves in the same scene where a character visibly feels
+  // something. Distinct from ARC_RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED (Wave 603, same
+  // trigger paired with dialogueHighlights) — this pass's central relational signal has never
+  // been decoupling-checked against the emotional channel itself, despite the two being the most
+  // obviously related pair in the whole file.
+  {
+    const r1177b = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.relationshipShifts ?? []).length > 0,
+      isB: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1177b.fires) {
+      issues.push({
+        location: `${r1177b.aCount} relationship-shift scenes and ${r1177b.bCount} emotional scenes never coincide`,
+        rule: 'ARC_RELATIONAL_EMOTION_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r1177b.aCount} scenes where a relationship shifts and the ${r1177b.bCount} scenes where a character's emotional register shifts never once occur in the same scene — the arc's relational movement and its felt emotional movement run on entirely separate tracks. A bond forming or breaking without the protagonist visibly feeling anything about it reads as plot mechanics; the relationship changes on paper but the character's arc, structurally, is never shown to register it.`,
+        suggestedFix: `Let at least one relationship shift land in a scene where the protagonist's emotional state also visibly moves — the two should be the same event seen from two angles, not two separate bookkeeping updates. A bond that changes should cost or reward something a character actually feels.`,
+      });
+    }
+  }
+
+  // ARC_RELATIONAL_REVELATION_DECOUPLED — Co-occurrence/decoupling × relationshipShifts ×
+  // revelation. Built on checkCoOccurrenceDecoupled from the shared checks library. n≥8, ≥2
+  // shift scenes, ≥2 revelation scenes, and ZERO scenes carrying both. Fires when a relationship
+  // never moves in the same scene where something is revealed. Distinct from ARC_RELATIONAL_
+  // EMOTION_DECOUPLED (this wave, same trigger paired with emotionalShift), ARC_SUSPENSE_
+  // RELATIONAL_DECOUPLED (Wave 463, suspense channel — not this pairing), ARC_CURIOSITY_
+  // RELATIONAL_DECOUPLED (Wave 449), and RELATIONSHIP_SHIFT_DIALOGUE_HIGHLIGHT_DECOUPLED (Wave
+  // 603) — a fresh pairing on the revelation channel, never previously checked against this
+  // pass's central relational signal.
+  {
+    const r1177c = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 2, minBCount: 2,
+      isA: r => (r.relationshipShifts ?? []).length > 0,
+      isB: r => r.revelation != null,
+    });
+    if (r1177c.fires) {
+      issues.push({
+        location: `${r1177c.aCount} relationship-shift scenes and ${r1177c.bCount} revelation scenes never coincide`,
+        rule: 'ARC_RELATIONAL_REVELATION_DECOUPLED',
+        severity: 'minor',
+        description: `The ${r1177c.aCount} scenes where a relationship shifts and the ${r1177c.bCount} scenes where something is revealed never once occur in the same scene — the arc's relational movement and its discoveries never touch. A truth surfacing without ever moving how two characters stand together treats revelation as pure information rather than something with interpersonal consequence; the arc learns things without those things ever costing or repairing a bond.`,
+        suggestedFix: `Let at least one revelation land inside a scene where a relationship also shifts — the truth someone learns should be capable of changing who they trust or how close they feel to someone. A discovery that never touches a bond is plot information; one that does becomes personal stakes.`,
       });
     }
   }
