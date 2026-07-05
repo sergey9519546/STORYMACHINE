@@ -281,6 +281,218 @@ describe('analyzeFountainText — seed/payoff clue pairing', () => {
   });
 });
 
+// Run 17-C — content-word recall channel for clue lifecycle. The exact-token
+// path above (quoted phrases / CAPS tokens) measured 0/20 payoff fires across
+// the calibration corpus: real scripts almost never repeat a clue's exact
+// wording. These cases exercise the additive content-word channel
+// (computeContentWordClueClusters) that recovers those payoffs via shared
+// clue-anchor-noun content words rather than verbatim phrasing.
+describe('analyzeFountainText — clue lifecycle content-word matching (fire)', () => {
+  it('pairs a clue seeded in different words than its payoff ("a brass key..." / "turned the brass key")', () => {
+    const fountain = [
+      'INT. ATTIC - DAY',
+      '',
+      'Someone left a brass key on a red ribbon inside an old trunk.',
+      '',
+      'INT. KITCHEN - DAY',
+      '',
+      'Nothing much happens here today.',
+      '',
+      'INT. GARDEN - DAY',
+      '',
+      'Still nothing of note happens outside.',
+      '',
+      'INT. ATTIC - NIGHT',
+      '',
+      'She turned the brass key at last.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.sceneCount, 4);
+    assert.ok(
+      analysis.records[0].seededClueIds.some(id => id.startsWith('key')),
+      'the brass key should be seeded at scene 0',
+    );
+    assert.ok(
+      analysis.records[3].payoffSetupIds.some(id => id.startsWith('key')),
+      'the brass key should be paid off at scene 3, despite no verbatim phrase reuse',
+    );
+  });
+
+  it('collapses plural/possessive variants of the same anchor noun ("keys" seed / "key\'s" payoff)', () => {
+    const fountain = [
+      'INT. HALLWAY - DAY',
+      '',
+      'Someone hides three rusty keys behind the vent.',
+      '',
+      'INT. LOBBY - DAY',
+      '',
+      'Nothing happens in this scene either.',
+      '',
+      'INT. STUDY - DAY',
+      '',
+      'Nothing of consequence occurs here.',
+      '',
+      'INT. HALLWAY - NIGHT',
+      '',
+      "The key's teeth still match the old lock.",
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(
+      analysis.records[0].seededClueIds.some(id => id.startsWith('key')),
+      'the plural "keys" mention should seed a key clue',
+    );
+    assert.ok(
+      analysis.records[3].payoffSetupIds.some(id => id.startsWith('key')),
+      'the possessive "key\'s" mention should pay off the same stemmed clue',
+    );
+  });
+
+  it('matches on a single shared rare anchor word alone, with no other shared descriptor', () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'The lawyer studies a battered ledger before the meeting.',
+      '',
+      'INT. STREET - DAY',
+      '',
+      'Nothing happens on this ordinary block.',
+      '',
+      'INT. PARK - DAY',
+      '',
+      'Nothing happens under these ordinary trees.',
+      '',
+      'INT. ARCHIVE - NIGHT',
+      '',
+      'Investigators finally locate the missing ledger.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(
+      analysis.records[0].seededClueIds.some(id => id.startsWith('ledger')),
+      'the ledger should be seeded at scene 0',
+    );
+    assert.ok(
+      analysis.records[3].payoffSetupIds.some(id => id.startsWith('ledger')),
+      'a rare anchor word alone (no other shared descriptor between the two mentions) should still pay off',
+    );
+  });
+});
+
+describe('analyzeFountainText — clue lifecycle content-word matching (no-fire)', () => {
+  it('does not pair two unrelated mentions of a common scene-furniture noun ("door")', () => {
+    const fountain = [
+      'INT. HOUSE ONE - DAY',
+      '',
+      'A neighbor slams the door after an argument.',
+      '',
+      'INT. STREET - DAY',
+      '',
+      'Nothing happens on this quiet afternoon.',
+      '',
+      'INT. YARD - DAY',
+      '',
+      'Nothing happens beneath the quiet sky.',
+      '',
+      'INT. HOUSE TWO - DAY',
+      '',
+      'A delivery driver knocks and waits by the door.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(
+      !analysis.records.some(r => r.payoffSetupIds.some(id => id.startsWith('door'))),
+      'two unrelated "door" mentions must not manufacture a false clue payoff',
+    );
+  });
+
+  it('does not cross-match unrelated mentions of a non-rare anchor with no shared descriptor ("watch")', () => {
+    const fountain = [
+      'INT. SHOP - DAY',
+      '',
+      'Dana sells an antique watch to a stranger.',
+      '',
+      'INT. STREET - DAY',
+      '',
+      'Nothing happens along this ordinary block.',
+      '',
+      'INT. OFFICE - DAY',
+      '',
+      'Priya checks her digital watch before the meeting.',
+      '',
+      'INT. CAFE - DAY',
+      '',
+      'Nothing happens over this quiet coffee.',
+      '',
+      'INT. STATION - DAY',
+      '',
+      'Malik forgets his silver watch on the counter.',
+      '',
+      'INT. DOCK - DAY',
+      '',
+      'Sana loses a broken watch near the water.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.ok(
+      !analysis.records.some(r => r.payoffSetupIds.some(id => id.startsWith('watch'))),
+      'four differently-described "watch" mentions (anchor common enough in-script to require a shared descriptor) must not pair up on the anchor alone',
+    );
+  });
+
+  it('keeps two different clues sharing the same anchor noun from cross-matching each other', () => {
+    const fountain = [
+      'INT. GARAGE - DAY',
+      '',
+      'Dad grips the rusty attic key tightly.',
+      '',
+      'INT. STREET - DAY',
+      '',
+      'He spins the spare toolbox key on his finger.',
+      '',
+      'INT. PARK - DAY',
+      '',
+      'Nothing happens beneath these quiet trees.',
+      '',
+      'INT. HALLWAY - DAY',
+      '',
+      'Nothing of consequence occurs in this hallway.',
+      '',
+      'INT. GARAGE - NIGHT',
+      '',
+      'Dad finally finds the rusty attic key again.',
+      '',
+      'INT. STUDY - DAY',
+      '',
+      'Nothing of consequence occurs in this study.',
+      '',
+      'INT. DRIVEWAY - NIGHT',
+      '',
+      'He finally returns the spare toolbox key to its hook.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.sceneCount, 7);
+
+    // The attic key: seeded at scene 0, paid off at scene 4.
+    const atticSeedId = analysis.records[0].seededClueIds.find(id => id.startsWith('key'));
+    assert.ok(atticSeedId, 'the attic key should be seeded at scene 0');
+    assert.ok(analysis.records[4].payoffSetupIds.includes(atticSeedId!), 'the attic key should be paid off at scene 4');
+
+    // The spare key: seeded at scene 1, paid off at scene 6 — a DIFFERENT clue
+    // that happens to share the same "key" anchor.
+    const spareSeedId = analysis.records[1].seededClueIds.find(id => id.startsWith('key'));
+    assert.ok(spareSeedId, 'the spare key should be seeded at scene 1');
+    assert.ok(analysis.records[6].payoffSetupIds.includes(spareSeedId!), 'the spare key should be paid off at scene 6');
+
+    // Neither clue's payoff scene should ever cross-credit the other clue's id.
+    assert.notEqual(atticSeedId, spareSeedId);
+    assert.ok(!analysis.records[4].payoffSetupIds.includes(spareSeedId!), 'scene 4 should not pay off the spare key');
+    assert.ok(!analysis.records[6].payoffSetupIds.includes(atticSeedId!), 'scene 6 should not pay off the attic key');
+  });
+});
+
 describe('analyzeFountainText — character ordering', () => {
   it('orders speaking characters by dialogue-line count, not first appearance', () => {
     const fountain = [

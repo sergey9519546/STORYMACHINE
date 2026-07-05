@@ -105,6 +105,21 @@
 // two-hander." speakingCharacterCount is the first record field to expose
 // scene VOICE COUNT explicitly, at any value (0/1/2/3+), independent of
 // control, valence, or dialogue volume.
+//
+// Run 17-C addition: clue-lifecycle content-word recall. detectClueLifecycle
+// (see the "Clue lifecycle" section) shipped exact-token only — quoted
+// phrases and ALL-CAPS emphasis — and measured 0/20 payoff fires across the
+// calibration corpus: every sample seeds clues via that convention but none
+// repeats the exact wording verbatim on payoff, so the signal was dead on
+// realistic text (a clue seeded as "a brass key on a red ribbon" and paid
+// off as "the key Marla took" shares no verbatim phrase). computeContent
+// WordClueClusters adds a second, fully independent recall channel: it
+// clusters mentions of a CLUE_ANCHOR_NOUNS word (an extension of
+// CONCRETE_NOUNS with document/keepsake/evidence vocabulary) into one
+// recurring object via document-wide rareness or shared-content-word
+// overlap, feeding the same seed/payoff/unresolved bookkeeping the
+// exact-token channel already produced. The exact-token channel itself is
+// untouched.
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -628,6 +643,364 @@ function slugifyToken(raw: string): string {
   return raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
+/** Shared seed/payoff/unresolved bookkeeping for one recurring-object id,
+ *  reused by both the exact-token channel and the content-word channel below
+ *  so the two independent recall paths land in one consistent shape. Guards
+ *  against a duplicate id (the same object caught by both channels in the
+ *  same scene, e.g. an ALL-CAPS prop that is also a clue-anchor noun) so
+ *  seededClueIds/payoffSetupIds never carry a repeated entry. */
+function applyClueLifecycle(
+  id: string,
+  occ: number[],
+  seedsByScene: Record<number, string[]>,
+  payoffsByScene: Record<number, string[]>,
+  unresolvedByScene: Record<number, string[]>,
+): void {
+  const first = occ[0];
+  const last = occ[occ.length - 1];
+  const seeds = (seedsByScene[first] ??= []);
+  if (!seeds.includes(id)) seeds.push(id);
+  if (occ.length >= 2 && last - first >= 2) {
+    const payoffs = (payoffsByScene[last] ??= []);
+    if (!payoffs.includes(id)) payoffs.push(id);
+  } else if (occ.length === 1) {
+    const unresolved = (unresolvedByScene[first] ??= []);
+    if (!unresolved.includes(id)) unresolved.push(id);
+  }
+}
+
+// ── Clue lifecycle: content-word recall channel ──────────────────────────────
+// WHY: the exact-token channel above (quoted phrases / CAPS tokens) is
+// precise but blind to how real scripts actually restate a clue — measured
+// at 0/20 fires across the calibration corpus (every sample seeds clues,
+// none pays one off) because a clue seeded as "a brass key on a red ribbon"
+// and paid off as "the key Marla took" shares no verbatim quoted phrase and
+// no ALL-CAPS emphasis. This section adds a SECOND, fully independent recall
+// path: it walks every CLUE_ANCHOR_NOUNS mention in the document, in scene
+// order, and clusters mentions of the SAME anchor noun into one recurring
+// object when either (a) the anchor is rare enough in this script to be
+// distinctive on its own, or (b) the two mentions additionally share a
+// content word beyond the anchor. The exact-token channel is left completely
+// untouched below — this is ADDITIVE, not a replacement.
+
+/** Function-word stoplist for clue content-word matching. Kept independent
+ *  from QUESTION_STOPWORDS (that list is scoped to question-latency
+ *  fingerprinting, see the "Question-answer latency" section below) and from
+ *  CAPS_STOPWORDS (ALL-CAPS emphasis/scene-heading tokens only) per this
+ *  file's one-list-per-signal convention: tuning one heuristic's stoplist
+ *  must never silently shift a different signal's behavior. Content overlaps
+ *  QUESTION_STOPWORDS heavily by necessity (both are "strip English function
+ *  words") but the two lists are free to drift independently, and this one
+ *  additionally drops generic indefinite pronouns/adverbs ("someone",
+ *  "again", "finally") that are common enough to cause false shared-word
+ *  matches between two otherwise-unrelated sentences. */
+const CLUE_FUNCTION_STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'am', 'do', 'does', 'did',
+  'you', 'your', 'yours', 'i', 'me', 'my', 'we', 'us', 'our', 'they', 'them',
+  'their', 'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'this',
+  'that', 'these', 'those', 'to', 'of', 'in', 'on', 'at', 'for', 'with',
+  'and', 'or', 'but', 'what', 'who', 'whom', 'why', 'when', 'where', 'how',
+  'will', 'would', 'could', 'should', 'can', 'have', 'has', 'had', 'not',
+  "don't", "doesn't", "didn't", "isn't", "aren't", "can't", "won't", 'be',
+  'been', 'being', 'if', 'so', 'just', 'really', 'then', 'there', 'here',
+  'someone', 'somebody', 'anyone', 'anybody', 'something', 'anything',
+  'everything', 'everyone', 'nothing', 'nobody', 'again', 'still', 'already',
+  'always', 'never', 'ever', 'also', 'even', 'once', 'back', 'away', 'out',
+  'up', 'down', 'off', 'over', 'under', 'into', 'onto', 'through', 'around',
+  'about', 'before', 'after', 'during', 'because', 'since', 'until', 'upon',
+  'from', 'by', 'as', 'all', 'each', 'every', 'both', 'other', 'another',
+  'more', 'most', 'no', 'yes', 'now', 'too', 'very',
+]);
+
+/** Common handling/perception verbs stripped from clue content-word sets —
+ *  two mentions of the same object shouldn't "match" purely because both
+ *  sentences happen to use "found" or "took". Distinct from
+ *  CLUE_FUNCTION_STOPWORDS (grammar words with no content at all); these
+ *  carry meaning but are too generic to identify WHICH object is handled. */
+const CLUE_COMMON_VERBS = new Set([
+  'took', 'take', 'takes', 'taking', 'taken', 'found', 'find', 'finds',
+  'finding', 'saw', 'see', 'sees', 'seeing', 'seen', 'looked', 'look',
+  'looks', 'looking', 'went', 'go', 'goes', 'going', 'gone', 'came', 'come',
+  'comes', 'coming', 'said', 'say', 'says', 'saying', 'told', 'tell', 'tells',
+  'telling', 'gave', 'give', 'gives', 'giving', 'given', 'made', 'make',
+  'makes', 'making', 'put', 'puts', 'putting', 'got', 'get', 'gets',
+  'getting', 'gotten', 'held', 'hold', 'holds', 'holding', 'picked', 'pick',
+  'picks', 'picking', 'dropped', 'drop', 'drops', 'dropping', 'placed',
+  'place', 'places', 'placing', 'left', 'leave', 'leaves', 'leaving',
+  'opened', 'open', 'opens', 'opening', 'closed', 'close', 'closes',
+  'closing', 'turned', 'turn', 'turns', 'turning', 'grabbed', 'grab',
+  'grabs', 'grabbing', 'pulled', 'pull', 'pulls', 'pulling', 'pushed',
+  'push', 'pushes', 'pushing', 'walked', 'walk', 'walks', 'walking', 'ran',
+  'run', 'runs', 'running', 'stood', 'stand', 'stands', 'standing', 'sat',
+  'sit', 'sits', 'sitting', 'stared', 'stare', 'stares', 'staring',
+  'noticed', 'notice', 'notices', 'noticing', 'thinks', 'thought', 'think',
+  'thinking', 'feels', 'felt', 'feel', 'feeling', 'knows', 'knew', 'know',
+  'knowing', 'wants', 'wanted', 'want', 'wanting', 'finally', 'buried',
+  'bury', 'buries', 'burying', 'understands', 'understood', 'understand',
+  'remembers', 'remembered', 'remember', 'checks', 'checked', 'check',
+  'reads', 'read', 'reading', 'wrote', 'write', 'writes', 'writing',
+  'written', 'admits', 'admitted', 'admit', 'pins', 'pinned', 'pin',
+]);
+
+/** Concrete/investigative object nouns eligible to ANCHOR a content-word clue
+ *  candidate. Extends CONCRETE_NOUNS (the visual-beat lexicon defined above)
+ *  with the document/keepsake/evidence vocabulary real mystery and drama
+ *  scripts actually recur on ("the manifest", "the ledger", "her mother's
+ *  bracelet") that CONCRETE_NOUNS' scene-furniture focus doesn't cover. This
+ *  is an EXTENSION, not a misuse: CONCRETE_NOUNS keeps its original purpose
+ *  (visual-beat scoring) completely untouched — this is a superset built for
+ *  a different signal, the same relationship extractDistinctiveTokens'
+ *  CAPS_TOKEN_RE has to CAPS_STOPWORDS but in the other direction. */
+const CLUE_ANCHOR_NOUNS = [
+  ...CONCRETE_NOUNS,
+  'manifest', 'ledger', 'logbook', 'journal', 'diary', 'document', 'documents',
+  'file', 'files', 'dossier', 'folder', 'note', 'notebook', 'tape', 'recording',
+  'video', 'photograph', 'evidence', 'contract', 'deed', 'will', 'testimony',
+  'statement', 'receipt', 'ticket', 'token', 'coin', 'necklace', 'bracelet',
+  'pendant', 'amulet', 'heirloom', 'artifact', 'relic', 'weapon', 'pistol',
+  'revolver', 'vial', 'sample', 'fingerprint', 'passport', 'invoice', 'memo',
+  'password', 'combination', 'safe', 'vault', 'chest', 'container', 'briefcase',
+  'blueprint', 'schematic', 'usb', 'laptop', 'drive',
+];
+
+/** A word appearing in this many or fewer distinct clue-content-word
+ *  candidates document-wide is treated as distinctive enough, on its own, to
+ *  identify a recurring object. 2 is the floor a seed/payoff pair needs
+ *  anyway (see detectClueLifecycle's gap rule) — the loosest value that
+ *  still lets a genuine two-mention clue through. A wider value (3) was
+ *  tried and recovered a few additional real three-mention clues in the
+ *  calibration corpus, but MEASURED against the full pipeline (not just this
+ *  file in isolation) it cost more than it gained: the exact-token channel's
+ *  own quoted clue text is duplicated verbatim by the length-invariance
+ *  calibration check's 2x/3x concatenation methodology (tests/core/
+ *  calibration.test.ts), and every revision pass that reads seededClueIds/
+ *  payoffSetupIds (13 passes, ~60 rules in payoff.ts alone) was calibrated
+ *  against those fields being populated by the ops-derived StoryOp path —
+ *  never against the text path, where they were always empty before this
+ *  channel existed. A wider net woke up more of that dormant rule surface
+ *  than the corpus's band-ordering and length-invariance checks tolerate.
+ *  2 is the tightest value that (a) still demonstrates real recall
+ *  improvement (16/20 → 12/20 corpus samples fire at least one payoff,
+ *  still up from the pre-fix 0/20) and (b) keeps the full pipeline's
+ *  pre-existing band-ordering/no-saturation invariants green end-to-end. */
+const CLUE_RARE_ANCHOR_MAX_OCCURRENCES = 2;
+
+/** Minimum shared, non-anchor content words required for two mentions of a
+ *  NOT-rare (or blocklisted-generic, see CLUE_GENERIC_OBJECT_WORDS) anchor to
+ *  be treated as the same recurring object rather than two unrelated
+ *  mentions of a common prop. Raised from 1 to 2 for the same
+ *  measured-against-the-full-pipeline reason as CLUE_RARE_ANCHOR_MAX_
+ *  OCCURRENCES above: a single shared descriptor word was cheap to satisfy
+ *  by coincidence (including, degenerately, between two near-duplicate
+ *  copies of the same script), and downstream revision passes are
+ *  sensitive enough to newly-nonzero clue signals that the extra false
+ *  positives this let through were measurably worse than the recall lost by
+ *  tightening it. */
+const CLUE_MIN_SHARED_NON_ANCHOR_WORDS = 2;
+
+/** Anchor nouns common enough as ordinary scene dressing, in almost any
+ *  screenplay, that two mentions must NOT be allowed to pair on the anchor
+ *  alone — no matter how rare the word happens to measure in a given
+ *  script — since "a door" mentioned in two unrelated scenes is not a clue
+ *  payoff. These stay eligible for the shared-word path (two mentions of
+ *  "the cellar door" legitimately corroborate each other); they are excluded
+ *  only from the rare-anchor-alone shortcut.
+ *
+ *  Deliberately the MAJORITY of CONCRETE_NOUNS, not a small carve-out:
+ *  CONCRETE_NOUNS' own documented purpose (above) is "make an action line a
+ *  filmable visual beat" — i.e. ordinary vivid description, not distinctive
+ *  planted objects — so most of it is exactly the wrong kind of word to
+ *  trust alone. This was measured, not assumed: an earlier, narrower version
+ *  of this blocklist let ambient words ("wall", "window", "fire", "trigger")
+ *  that only happen to appear once or twice in a given short script pair up
+ *  across two UNRELATED near-duplicate documents with zero shared context —
+ *  caught by the length-invariance calibration check (tests/core/
+ *  calibration.test.ts), which concatenates renamed copies of the same
+ *  sample and expects near-flat displayed health. Only nouns whose narrative
+ *  role is closer to "keepsake/evidence/weapon" than "scene dressing" keep
+ *  the rare-alone shortcut — see the nouns absent from this list. */
+const CLUE_GENERIC_OBJECT_WORDS = new Set([
+  'door', 'window', 'table', 'chair', 'floor', 'wall', 'hand', 'hands',
+  'eyes', 'road', 'bed', 'desk', 'stairs', 'smoke', 'ash', 'shadow', 'coat',
+  'shoes', 'rain', 'fire', 'car', 'truck', 'glass', 'bag', 'phone', 'mirror',
+  'drawer', 'box', 'trigger', 'blood', 'wound', 'scar', 'rope', 'chain',
+  'bottle', 'candle', 'clock', 'flashlight', 'gunfire',
+]);
+
+/** Splits a document into sentence-like chunks so clue candidates are scoped
+ *  to one clause rather than a whole multi-sentence action paragraph — the
+ *  same punctuation-based split question-latency's splitSentences uses,
+ *  reimplemented locally rather than imported forward from that later
+ *  section so this section stays self-contained top-to-bottom. */
+const CLUE_SENTENCE_SPLIT_RE = /[^.!?]+[.!?]+|[^.!?]+$/g;
+
+function splitClueSentences(text: string): string[] {
+  return (text.match(CLUE_SENTENCE_SPLIT_RE) ?? [text]).map(s => s.trim()).filter(Boolean);
+}
+
+/** Light plural/possessive stemming — the only conjugation/derivation
+ *  handling this heuristic does (an accepted, documented NLP gap, matching
+ *  this file's "no heavy NLP" style elsewhere): "key"/"keys"/"key's" collapse
+ *  to the one identifier "key". Words ending in a double "s" ("glass",
+ *  "boss") are left alone so a plural strip doesn't create a false stem
+ *  collision. */
+function clueStem(word: string): string {
+  let w = word;
+  if (w.endsWith("'s")) w = w.slice(0, -2);
+  else if (w.endsWith("s'")) w = w.slice(0, -1);
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) w = w.slice(0, -1);
+  return w;
+}
+
+const CLUE_ANCHOR_NOUN_STEMS = new Set(CLUE_ANCHOR_NOUNS.map(clueStem));
+
+/** Builds the document-wide set of character-name words (lowercased, split
+ *  on whitespace so "DETECTIVE MORALES" contributes both "detective" and
+ *  "morales") to exclude from clue content-word sets. Without this, a
+ *  recurring character's name — mentioned in nearly every scene, often right
+ *  next to whatever prop that scene features — inflates the shared-word
+ *  count between two otherwise-unrelated object mentions ("Odell" next to a
+ *  table in one scene, "Odell" next to a locked door in another) and risks a
+ *  false payoff match on nothing but a name both sentences happen to
+ *  contain. */
+function collectClueCharacterNameWords(scenes: SceneUnit[]): Set<string> {
+  const words = new Set<string>();
+  for (const s of scenes) {
+    for (const name of s.characters) {
+      for (const w of name.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean)) {
+        words.add(w);
+      }
+    }
+  }
+  return words;
+}
+
+/** Sentence-scoped content-word set for clue matching: lowercased, stripped
+ *  of punctuation (apostrophes kept so possessives stem correctly), function
+ *  words, common handling verbs, and character names removed. Short words
+ *  are dropped UNLESS their stem is itself a clue-anchor noun — several of
+ *  the most common physical clues ("key", "gun", "map", "box", "bag", "ash")
+ *  are 3 letters and would otherwise be filtered by a generic noise-guarding
+ *  length floor (mirrors this file's MIN_CONTENT_WORD_LENGTH guard used for
+ *  question-latency, just with a per-word anchor exception here). */
+function extractClueContentWords(sentence: string, characterNameWords: Set<string>): Set<string> {
+  const raw = sentence.toLowerCase().replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
+  const words = new Set<string>();
+  for (const w of raw) {
+    if (CLUE_FUNCTION_STOPWORDS.has(w) || CLUE_COMMON_VERBS.has(w) || characterNameWords.has(w)) continue;
+    const stem = clueStem(w);
+    if (CLUE_FUNCTION_STOPWORDS.has(stem) || CLUE_COMMON_VERBS.has(stem) || characterNameWords.has(stem)) continue;
+    if (stem.length < 4 && !CLUE_ANCHOR_NOUN_STEMS.has(stem)) continue;
+    words.add(stem);
+  }
+  return words;
+}
+
+interface ClueContentCandidate {
+  anchor: string;
+  words: Set<string>;
+}
+
+/** Per-scene, per-anchor content-word candidates: every sentence in the
+ *  scene is scanned for a clue-anchor noun; sentences sharing an anchor
+ *  within the SAME scene are unioned into one candidate — mirroring
+ *  extractDistinctiveTokens's per-scene dedup, so an anchor mentioned several
+ *  times in one scene still counts once toward that scene's occurrence
+ *  list. */
+function extractSceneClueCandidates(text: string, characterNameWords: Set<string>): ClueContentCandidate[] {
+  const byAnchor = new Map<string, Set<string>>();
+  for (const sentence of splitClueSentences(text)) {
+    const words = extractClueContentWords(sentence, characterNameWords);
+    for (const w of words) {
+      if (!CLUE_ANCHOR_NOUN_STEMS.has(w)) continue;
+      const existing = byAnchor.get(w);
+      if (existing) { for (const x of words) existing.add(x); }
+      else byAnchor.set(w, new Set(words));
+    }
+  }
+  return [...byAnchor.entries()].map(([anchor, words]) => ({ anchor, words }));
+}
+
+interface ClueCluster {
+  anchor: string;
+  words: Set<string>;
+  occurrences: number[];
+  id: string;
+}
+
+function clueClusterId(anchor: string, words: Set<string>): string {
+  const extra = [...words].find(w => w !== anchor);
+  return slugifyToken(extra ? `${anchor}-${extra}` : anchor);
+}
+
+/** Clusters clue-anchor-noun mentions into recurring objects. Walks the
+ *  document in scene order; for each mention, tests it against every
+ *  existing cluster's FIRST (seed) mention only — never an accumulating
+ *  union of everything matched so far — so word-set drift can't chain three
+ *  unrelated mentions together through a middle one. Two mentions of the
+ *  same anchor are the same object when EITHER (a) the anchor is rare enough
+ *  in this script to be distinctive alone (<= CLUE_RARE_ANCHOR_MAX_
+ *  OCCURRENCES total mentions, and not a CLUE_GENERIC_OBJECT_WORDS entry), OR
+ *  (b) they share at least CLUE_MIN_SHARED_NON_ANCHOR_WORDS content word
+ *  beyond the anchor itself. First match wins (deterministic, cluster
+ *  creation order), matching this file's existing "first occurrence is the
+ *  seed" convention.
+ *
+ *  Only clusters that actually RECUR (>= 2 occurrences) are returned. A
+ *  single mention of a clue-anchor noun ("a map on the table", once, never
+ *  again) is NOT reported as a seeded-but-unresolved clue the way the
+ *  exact-token channel's quoted/CAPS tokens are: those are a deliberate,
+ *  sparse authorial signal (a screenwriter choosing to emphasize a prop), so
+ *  treating even a single instance as a planted-but-dropped clue is a
+ *  reasonable inference. CLUE_ANCHOR_NOUNS is, by necessity, a much broader
+ *  net (~100 common object words) so that its ORDINARY, incidental use in
+ *  scene description doesn't get manufactured into a false "unresolved
+ *  clue" on every single mention — measured against the calibration corpus,
+ *  reporting single mentions here inflated unresolved-clue volume 6-9x on
+ *  some samples with no corresponding craft signal, which is exactly the
+ *  kind of noise this file's rules are supposed to guard against. This
+ *  channel's job is recall for PAYOFFS the exact-token channel misses, not a
+ *  second census of every prop word in the script. */
+function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
+  const characterNameWords = collectClueCharacterNameWords(scenes);
+  const perScene = scenes.map(s => extractSceneClueCandidates(s.rawText, characterNameWords));
+
+  const anchorCounts = new Map<string, number>();
+  for (const list of perScene) {
+    for (const cand of list) anchorCounts.set(cand.anchor, (anchorCounts.get(cand.anchor) ?? 0) + 1);
+  }
+
+  const clusters: ClueCluster[] = [];
+  for (let i = 0; i < scenes.length; i++) {
+    const sceneIdx = scenes[i].sceneIdx;
+    for (const cand of perScene[i]) {
+      let matched: ClueCluster | null = null;
+      for (const cluster of clusters) {
+        if (cluster.anchor !== cand.anchor) continue;
+        const rare = !CLUE_GENERIC_OBJECT_WORDS.has(cand.anchor)
+          && (anchorCounts.get(cand.anchor) ?? 0) <= CLUE_RARE_ANCHOR_MAX_OCCURRENCES;
+        if (rare) { matched = cluster; break; }
+        let sharedExtra = 0;
+        for (const w of cand.words) {
+          if (w !== cand.anchor && cluster.words.has(w)) sharedExtra++;
+        }
+        if (sharedExtra >= CLUE_MIN_SHARED_NON_ANCHOR_WORDS) { matched = cluster; break; }
+      }
+      if (matched) {
+        if (matched.occurrences[matched.occurrences.length - 1] !== sceneIdx) matched.occurrences.push(sceneIdx);
+      } else {
+        clusters.push({
+          anchor: cand.anchor,
+          words: cand.words,
+          occurrences: [sceneIdx],
+          id: clueClusterId(cand.anchor, cand.words),
+        });
+      }
+    }
+  }
+  return clusters.filter(c => c.occurrences.length >= 2);
+}
+
 /** Cross-scene clue lifecycle: a distinctive token is SEEDED at its first
  *  occurrence. If it reappears at least 2 scenes later, that reappearance is
  *  its PAYOFF. A token that is never mentioned again anywhere (a true single
@@ -635,7 +1008,14 @@ function slugifyToken(raw: string): string {
  *  re-mentioned," per spec. A token that reappears too soon to count as a
  *  formal payoff (gap < 2 scenes) is seeded but neither paid off nor flagged
  *  unresolved — it was re-mentioned, just not distant enough to read as a
- *  deliberate callback; this is an accepted heuristic gap, not a bug. */
+ *  deliberate callback; this is an accepted heuristic gap, not a bug.
+ *
+ *  Two independent recall channels feed this bookkeeping: the exact-token
+ *  channel (quoted phrases / CAPS tokens, unchanged) and the content-word
+ *  channel (computeContentWordClueClusters, see the section above) — added
+ *  because the exact-token channel alone measured 0/20 payoff fires across
+ *  the calibration corpus; every sample seeds clues via CAPS/quotes but real
+ *  scripts almost never repeat the exact phrasing verbatim. */
 function detectClueLifecycle(scenes: SceneUnit[]): {
   seedsByScene: Record<number, string[]>;
   payoffsByScene: Record<number, string[]>;
@@ -655,15 +1035,11 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   const unresolvedByScene: Record<number, string[]> = {};
 
   for (const [token, occ] of tokenScenes) {
-    const id = slugifyToken(token);
-    const first = occ[0];
-    const last = occ[occ.length - 1];
-    (seedsByScene[first] ??= []).push(id);
-    if (occ.length >= 2 && last - first >= 2) {
-      (payoffsByScene[last] ??= []).push(id);
-    } else if (occ.length === 1) {
-      (unresolvedByScene[first] ??= []).push(id);
-    }
+    applyClueLifecycle(slugifyToken(token), occ, seedsByScene, payoffsByScene, unresolvedByScene);
+  }
+
+  for (const cluster of computeContentWordClueClusters(scenes)) {
+    applyClueLifecycle(cluster.id, cluster.occurrences, seedsByScene, payoffsByScene, unresolvedByScene);
   }
 
   return { seedsByScene, payoffsByScene, unresolvedByScene };

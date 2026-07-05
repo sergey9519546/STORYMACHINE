@@ -389,23 +389,54 @@ describe('no-saturation & length-invariance (opportunity-based craftPenalty fix)
     const zeroDay = REFERENCE_CORPUS.find(s => s.label === 'Zero Day');
     assert.ok(zeroDay, "pinned sample 'Zero Day' must exist in the corpus");
 
-    // Rename the two speaking characters per extra copy so each copy's own
-    // planted clue ("Payload triggers at market open") and its payoff still
-    // resolve as a distinct, self-contained clue/payoff pair rather than
-    // three copies of literally the same character voice — see corpus.ts's
-    // header for why the reference corpus itself is controlled this way.
-    function renamedCopy(fountain: string, nadia: string, manager: string, tag: string): string {
-      return fountain
+    // Rename the two speaking characters AND the recurring prop vocabulary
+    // per extra copy so each copy's own planted clue ("Payload triggers at
+    // market open") and its payoff still resolve as a distinct,
+    // self-contained clue/payoff pair rather than three copies of literally
+    // the same objects — see corpus.ts's header for why the reference corpus
+    // itself is controlled this way. The prop renames exist because BOTH
+    // clue channels in fountain-analyzer.ts (exact-token quoted phrases and
+    // the content-word cluster channel) legitimately treat a verbatim-
+    // repeated prop sentence in a later scene as a recurrence — which is
+    // correct detector behavior on real scripts, but on this fixture's
+    // concatenation methodology it would manufacture cross-copy seed/payoff
+    // pairs that a genuinely longer script of matched craft would not have.
+    // Each copy keeps its own internal recurrences (logs/feeds/traces recur
+    // within their copy exactly like the original), so per-copy craft signal
+    // is preserved; only cross-copy lexical identity is removed.
+    function renamedCopy(
+      fountain: string,
+      nadia: string,
+      manager: string,
+      tag: string,
+      props: Record<string, string>,
+    ): string {
+      let out = fountain
         .replace(/\bNADIA\b/g, nadia.toUpperCase())
         .replace(/\bNadia\b/g, nadia)
         .replace(/\bMANAGER\b/g, manager.toUpperCase())
         .replace(/\bManager\b/g, manager)
         .replace(/- (NIGHT|DAY|CONTINUOUS|MORNING)$/gm, m => `${m} (${tag})`);
+      for (const [from, to] of Object.entries(props)) {
+        out = out
+          .replace(new RegExp(`\\b${from}\\b`, 'g'), to)
+          .replace(
+            new RegExp(`\\b${from[0].toUpperCase()}${from.slice(1)}\\b`, 'g'),
+            `${to[0].toUpperCase()}${to.slice(1)}`,
+          );
+      }
+      return out;
     }
 
     const copy1 = zeroDay!.fountain;
-    const copy2 = renamedCopy(zeroDay!.fountain, 'Priya', 'Rios', 'II');
-    const copy3 = renamedCopy(zeroDay!.fountain, 'Elena', 'Cho', 'III');
+    const copy2 = renamedCopy(zeroDay!.fountain, 'Priya', 'Rios', 'II', {
+      payload: 'package', logs: 'feeds', wall: 'bank', noise: 'chatter',
+      script: 'macro', market: 'exchange', dashboard: 'console',
+    });
+    const copy3 = renamedCopy(zeroDay!.fountain, 'Elena', 'Cho', 'III', {
+      payload: 'charge', logs: 'traces', wall: 'grid', noise: 'static',
+      script: 'routine', market: 'auction', dashboard: 'monitor',
+    });
 
     const [report1x, report2x, report3x] = await Promise.all([
       runScriptDoctor(copy1),
