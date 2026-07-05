@@ -528,6 +528,12 @@
 // fifth channel (dialogueHighlights); BELIEF_TURN_CURIOSITY_AFTERMATH_VOID and BELIEF_TURN_
 // EMOTIONAL_AFTERMATH_VOID give dramaticTurn its third and fourth channels (curiosityDelta,
 // emotionalShift).
+// Wave 1160 additions: after Wave 1146, clockRaised was at five of six channels and
+// dramaticTurn at four. BELIEF_CLOCK_STAGING_AFTERMATH_VOID gives clockRaised its sixth and
+// final channel (visualBeats), completing full six-channel saturation for this trigger.
+// BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and BELIEF_TURN_STAGING_AFTERMATH_VOID give
+// dramaticTurn its fifth and sixth channels (dialogueHighlights, visualBeats), completing full
+// six-channel saturation for both of this wave's tracked triggers.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6501,6 +6507,86 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1146c.triggerCount} dramatic-turn scenes is followed by two scenes with no emotional shift, even though ${r1146c.aftermathCount} such shifts occur elsewhere in the script. A pivot that never registers on any character's felt emotional state leaves the belief layer's turns reading as plot mechanics rather than moments that change how someone feels.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot lands as something felt, not just executed as a structural beat.`,
+      });
+    }
+  }
+
+  // BELIEF_CLOCK_STAGING_AFTERMATH_VOID — Sequence/aftermath × clockRaised trigger → visualBeats
+  // absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2 qualifying
+  // clock-raise scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene lookahead. Fires
+  // when every clock-raise's two-scene aftermath has no heavily-staged scene, while such staging
+  // occurs elsewhere. Distinct from BELIEF_CLOCK_CURIOSITY_AFTERMATH_VOID, BELIEF_CLOCK_
+  // SUSPENSE_AFTERMATH_VOID (Wave 1118), BELIEF_CLOCK_EMOTIONAL_AFTERMATH_VOID, BELIEF_CLOCK_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1132), and BELIEF_CLOCK_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (Wave 1146, same trigger paired with curiosityDelta/suspenseDelta/emotionalShift/
+  // relationshipShifts/dialogueHighlights) — this is the sixth and final consequence channel
+  // for this trigger, completing full six-channel saturation.
+  {
+    const r1160a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.clockRaised === true,
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1160a.fires) {
+      issues.push({
+        location: `${r1160a.triggerCount} clock-raise scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'BELIEF_CLOCK_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1160a.triggerCount} scenes that raise the ticking clock is followed by two scenes with no heavily-staged visual beat, even though ${r1160a.aftermathCount} such scenes exist elsewhere in the script. A deadline that tightens without earning a visually charged follow-through leaves the belief layer's clock registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one clock-raise, stage at least two concrete visual beats, so the mounting pressure registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn
+  // (non-'nothing') trigger → dialogueHighlights absence. Built on checkAftermathVoid from the
+  // shared checks library. n≥8, ≥2 qualifying turn scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every dramatic turn's two-scene
+  // aftermath contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct
+  // from BELIEF_TURN_RELATIONAL_AFTERMATH_VOID (Wave 1118), BELIEF_TURN_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1132), BELIEF_TURN_CURIOSITY_AFTERMATH_VOID, and BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID
+  // (Wave 1146, same trigger paired with relationshipShifts/suspenseDelta/curiosityDelta/
+  // emotionalShift) — this is the fifth consequence channel for this trigger.
+  {
+    const r1160b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1160b.fires) {
+      issues.push({
+        location: `${r1160b.triggerCount} dramatic-turn scene(s) — no highlighted dialogue within 2 scenes of any`,
+        rule: 'BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1160b.triggerCount} dramatic-turn scenes is followed by two scenes with no highlighted dialogue, even though ${r1160b.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a memorable line right after it happens leaves the belief layer's turns unvoiced — no character's speech processes what just changed.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a line that names what the pivot means for what they now believe, so the turn registers in speech, not just in plot mechanics.`,
+      });
+    }
+  }
+
+  // BELIEF_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn (non-'nothing')
+  // trigger → visualBeats absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every dramatic turn's two-scene aftermath has no heavily-staged scene,
+  // while such staging occurs elsewhere. Distinct from BELIEF_TURN_RELATIONAL_AFTERMATH_VOID
+  // (Wave 1118), BELIEF_TURN_SUSPENSE_AFTERMATH_VOID (Wave 1132), BELIEF_TURN_CURIOSITY_
+  // AFTERMATH_VOID, BELIEF_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1146), and BELIEF_TURN_DIALOGUE_
+  // HIGHLIGHT_AFTERMATH_VOID (this wave, same trigger paired with relationshipShifts/
+  // suspenseDelta/curiosityDelta/emotionalShift/dialogueHighlights) — this is the sixth and
+  // final consequence channel for this trigger, completing full six-channel saturation.
+  {
+    const r1160c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1160c.fires) {
+      issues.push({
+        location: `${r1160c.triggerCount} dramatic-turn scene(s) — no heavily-staged scene within 2 scenes of any`,
+        rule: 'BELIEF_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1160c.triggerCount} dramatic-turn scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1160c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the belief layer's turns registering as narrated information rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences for what the character believes register in image, not just in plot bookkeeping.`,
       });
     }
   }
