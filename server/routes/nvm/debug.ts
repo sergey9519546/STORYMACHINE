@@ -33,7 +33,10 @@ router.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res
   const { stage } = getOrCreateSession(sessionId(req));
   const { project } = await import('../../nvm/project/index.ts');
   const target = req.params.target as Parameters<typeof project>[1];
-  const VALID = ['fountain','novel','stage','comic','interactive','pitch','bible','rewatch','cutting_room'];
+  const VALID = [
+    'fountain','novel','stage','comic','interactive','pitch','bible','rewatch','cutting_room',
+    'treatment','outline','dialogue_only','epistolary','simulation_log','director_commentary',
+  ];
   if (!VALID.includes(target)) {
     res.status(400).json({ error: `Unknown projection target "${target}". Valid: ${VALID.join(', ')}` }); return;
   }

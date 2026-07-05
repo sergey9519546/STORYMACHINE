@@ -22,7 +22,13 @@ export type ProjectionTarget =
   | 'bible'
   | 'rewatch'
   | 'cutting_room'
-  | 'sidecar';
+  | 'sidecar'
+  | 'treatment'
+  | 'outline'
+  | 'dialogue_only'
+  | 'epistolary'
+  | 'simulation_log'
+  | 'director_commentary';
 
 export interface Canon {
   commits: StoryCommit[];
@@ -50,6 +56,12 @@ export function project(canon: Canon, target: ProjectionTarget): Artifact {
     case 'rewatch':      return projectRewatch(canon);
     case 'cutting_room': return projectCuttingRoom(canon);
     case 'sidecar':      return projectSidecar(canon);
+    case 'treatment':          return projectTreatment(canon);
+    case 'outline':            return projectOutline(canon);
+    case 'dialogue_only':      return projectDialogueOnly(canon);
+    case 'epistolary':         return projectEpistolary(canon);
+    case 'simulation_log':     return projectSimulationLog(canon);
+    case 'director_commentary': return projectDirectorCommentary(canon);
   }
 }
 
@@ -515,4 +527,482 @@ function projectSidecar(canon: Canon): Artifact {
       momentum: sidecar.momentum,
     },
   };
+}
+
+// ── Six new targets (Output Syntax matrix) ────────────────────────────────────
+// Wave: Output Syntax expansion. Every target below is a real professional
+// document format, not a debug dump, and every one reuses the per-op craft
+// vocabulary already established by renderFountainOp/emotionBeat/carrierPhrase/
+// cleanId/themeArgumentLines/readerStateBeat above rather than duplicating it —
+// each target simply recombines those primitives at a different "altitude"
+// (treatment prose, beat-sheet line, pure dialogue, first-person document,
+// neutral ledger line, meta-commentary paragraph).
+
+/** Which charIds an op "touches" — the shared signal used both to find a
+ *  scene's/canon's dominant/protagonist character (epistolary POV, treatment
+ *  logline) and nothing else. Ops with no character (ADD_FACT, SEED_CLUE, …)
+ *  contribute no ids, which is correct: they don't belong to anyone's POV. */
+function opCharIds(op: StoryOp): string[] {
+  switch (op.op) {
+    case 'UPDATE_BELIEF':      return [op.charId];
+    case 'APPRAISE_EMOTION':   return [op.charId];
+    case 'SHIFT_RELATIONSHIP': return [op.pair[0], op.pair[1]];
+    default:                   return [];
+  }
+}
+
+/** The character whose charId is touched by the most ops in a set — ties break
+ *  toward whichever id was seen first. Returns null when no op in the set
+ *  touches any character (e.g. a scene made only of facts/clues/clocks). */
+function dominantCharacterOf(ops: StoryOp[]): string | null {
+  const counts = new Map<string, number>();
+  const order: string[] = [];
+  for (const op of ops) {
+    for (const id of opCharIds(op)) {
+      if (!counts.has(id)) { counts.set(id, 0); order.push(id); }
+      counts.set(id, counts.get(id)! + 1);
+    }
+  }
+  if (order.length === 0) return null;
+  let best = order[0];
+  for (const id of order) {
+    if (counts.get(id)! > counts.get(best)!) best = id;
+  }
+  return best;
+}
+
+/** Same tally, across every non-reverted commit in the canon — the "who is
+ *  this story actually about" signal the treatment's logline is built from. */
+function protagonistOf(canon: Canon): string | null {
+  const allOps = canon.commits.filter(c => !c.reverted).flatMap(c => c.ops);
+  return dominantCharacterOf(allOps);
+}
+
+/** Logline: protagonist + want (their first stated belief) + opposition (the
+ *  first character a negative-valence relationship shift pits them against).
+ *  Never returns an empty string — falls back to a still-true generic line
+ *  when the canon carries no character ops at all (empty commits, or a canon
+ *  made only of facts/clues). */
+function deriveLogline(canon: Canon): string {
+  const protagonist = protagonistOf(canon);
+  if (!protagonist) {
+    return 'A story unfolds, its central figure yet to declare themselves.';
+  }
+  const name = capitalize(protagonist);
+  let want: string | null = null;
+  let opposition: string | null = null;
+  const NEGATIVE_DIMENSIONS = new Set(['resentment', 'fear', 'contempt', 'guilt']);
+  for (const commit of canon.commits.filter(c => !c.reverted)) {
+    for (const op of commit.ops) {
+      if (want === null && op.op === 'UPDATE_BELIEF' && op.charId === protagonist) {
+        want = op.belief.proposition;
+      }
+      if (opposition === null && op.op === 'SHIFT_RELATIONSHIP' && op.pair.includes(protagonist)) {
+        const other = op.pair[0] === protagonist ? op.pair[1] : op.pair[0];
+        if (op.delta.amount < 0 || NEGATIVE_DIMENSIONS.has(op.delta.dimension)) {
+          opposition = capitalize(other);
+        }
+      }
+    }
+  }
+  const wantClause = want
+    ? `driven by the conviction that ${want.charAt(0).toLowerCase()}${want.slice(1)}`
+    : 'driven by a conviction they cannot quite shake';
+  const oppositionClause = opposition
+    ? `against the mounting resistance of ${opposition}`
+    : 'against a world that will not yield easily';
+  return `${name}, ${wantClause}, must contend ${oppositionClause}.`;
+}
+
+/** Closing "where the story stands" paragraph: theme argument state, open
+ *  (un-paid-off) clues, and clocks still actively running. Every clause has a
+ *  non-empty fallback so an empty/early canon still reads as a complete
+ *  (if uneventful) closing paragraph rather than a blank line. */
+function deriveClosingState(canon: Canon): string {
+  const theme = canon.state.authorIntent.theme;
+  const openClues = canon.state.clues.filter(c => !canon.state.payoffs.some(p => p.setupId === c.clueId));
+  const activeClocks = Object.entries(canon.state.clocks).filter(([, amount]) => amount > 0);
+  const parts: string[] = [];
+  parts.push(theme
+    ? `The story still argues its case: "${theme}."`
+    : 'The story has yet to declare its argument outright.');
+  parts.push(openClues.length > 0
+    ? `${openClues.length} clue${openClues.length === 1 ? '' : 's'} remain${openClues.length === 1 ? 's' : ''} unresolved — ${openClues.map(c => cleanId(c.clueId)).join(', ')}.`
+    : 'No clue is left dangling.');
+  parts.push(activeClocks.length > 0
+    ? `Time is still running out on ${activeClocks.map(([id]) => cleanId(id)).join(', ')}.`
+    : 'No clock presses on what remains.');
+  return parts.join(' ');
+}
+
+/** One treatment-altitude sentence per op: what happens, and (for the ops
+ *  that carry narrative weight — clues, payoffs, clocks, theme, relationship,
+ *  belief) an explicit clause on why it matters. Exhaustive over all 14
+ *  StoryOp kinds, same discipline as renderFountainOp. Returns null only for
+ *  an UPDATE_READER_STATE delta with no signal (mirrors readerStateBeat). */
+function treatmentOpSentence(op: StoryOp): string | null {
+  switch (op.op) {
+    case 'ADD_FACT':
+      if (op.fact.predicate === 'moves_to') {
+        return `${capitalize(op.fact.subject)} arrives at ${op.fact.object}, resetting the ground the story stands on.`;
+      }
+      return `It becomes true that ${op.fact.subject} ${op.fact.predicate.replace(/[-_]/g, ' ')} ${op.fact.object} — a fact the rest of the story now has to live with.`;
+    case 'EXPIRE_FACT':
+      return `What was once true about "${cleanId(op.factId)}" quietly stops holding — the ground shifts under everyone who believed it.`;
+    case 'UPDATE_BELIEF':
+      return `${capitalize(op.charId)} comes to believe ${op.belief.proposition}${op.belief.source === 'told' ? ', though it was only ever told to them' : ''} — a conviction that will shape what they do next.`;
+    case 'APPRAISE_EMOTION':
+      return `${emotionBeat(op.charId, op.emotion.dominant)} It matters because feeling shapes what comes next.`;
+    case 'SHIFT_RELATIONSHIP':
+      return `Between ${capitalize(op.pair[0])} and ${capitalize(op.pair[1])}, something shifts — ${op.delta.reason} — and neither will treat the other quite the same again.`;
+    case 'ADVANCE_OBJECT_ARC':
+      return `The ${cleanId(op.objectId)} is ${op.toState} now, and its changed state will matter later.`;
+    case 'TRIGGER_RULE':
+      return `The ${cleanId(op.mechanismId)} fires, doing exactly what it was built to do — the story's machinery made visible.`;
+    case 'SEED_CLUE':
+      return `${carrierPhrase(op.carrier)} is planted here — "${cleanId(op.clueId)}" — small enough to miss, but it will matter.`;
+    case 'PAYOFF_SETUP':
+      return `What was seeded as "${cleanId(op.setupId)}" pays off here, and the pieces the story has been quietly assembling click into place.`;
+    case 'RAISE_CLOCK':
+      return `The deadline on the ${cleanId(op.clockId)} tightens; time is running out, and everyone in the scene knows it.`;
+    case 'ADVANCE_THEME_ARGUMENT':
+      return `The story's argument about ${cleanId(op.claimId)} moves — this scene ${op.move}s the case, and the theme is no longer where it started.`;
+    case 'UPDATE_READER_STATE': {
+      const beat = readerStateBeat(op.delta);
+      return beat ? `${beat} The audience's sense of what's coming shifts with it.` : null;
+    }
+    case 'RECORD_VISUAL_FACT':
+      return `${capitalize(op.fact)}, plainly visible, and impossible to unsee.`;
+    case 'RECORD_SONIC_FACT':
+      return `A sound cuts through the scene — ${op.fact} — and no one can pretend not to have heard it.`;
+  }
+}
+
+/** One prose paragraph per scene, dramatizing every op it carries. An
+ *  ops-free scene still reads as a complete (if uneventful) paragraph rather
+ *  than an empty line. */
+function treatmentParagraph(commit: StoryCommit): string {
+  const sentences = commit.ops.map(treatmentOpSentence).filter((s): s is string => s !== null);
+  return sentences.length > 0
+    ? sentences.join(' ')
+    : 'The scene passes quietly, its consequences held for later.';
+}
+
+function projectTreatment(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const lines: string[] = [
+    `TITLE: ${canon.title ?? 'Untitled'}`,
+    'FORMAT: Treatment',
+    '',
+    'LOGLINE',
+    deriveLogline(canon),
+    '',
+  ];
+  for (const commit of commits) {
+    lines.push(`Scene ${commit.sceneIdx + 1}.`);
+    lines.push(treatmentParagraph(commit));
+    lines.push('');
+  }
+  lines.push('WHERE THE STORY STANDS');
+  lines.push(deriveClosingState(canon));
+  return { target: 'treatment', content: lines.join('\n'), metadata: { scenes: commits.length } };
+}
+
+type BeatCategory = 'reversal' | 'revelation' | 'relationship' | 'clue' | 'escalation' | 'beat';
+
+/** Generic one-line beat summary for the 8 op kinds that don't map to one of
+ *  the 5 named beat categories below (they still need SOME summary text when
+ *  they're the only op a scene carries). */
+function genericBeatSummary(op: StoryOp): string {
+  switch (op.op) {
+    case 'ADD_FACT':
+      return `A fact lands: ${op.fact.subject} ${op.fact.predicate.replace(/[-_]/g, ' ')} ${op.fact.object}.`;
+    case 'APPRAISE_EMOTION':
+      return `${capitalize(op.charId)}'s ${op.emotion.dominant} takes hold.`;
+    case 'ADVANCE_OBJECT_ARC':
+      return `The ${cleanId(op.objectId)} becomes ${op.toState}.`;
+    case 'TRIGGER_RULE':
+      return `The ${cleanId(op.mechanismId)} fires.`;
+    case 'RECORD_VISUAL_FACT':
+      return `${capitalize(op.fact)}.`;
+    case 'RECORD_SONIC_FACT':
+      return `A sound: ${op.fact}.`;
+    case 'ADVANCE_THEME_ARGUMENT':
+      return `The story ${op.move}s its case about "${cleanId(op.claimId)}."`;
+    case 'UPDATE_READER_STATE':
+      return readerStateBeat(op.delta) ?? '(A quiet beat.)';
+    default:
+      return '(A beat.)';
+  }
+}
+
+/** The dominant op (by the priority the wave spec fixes: reversal > revelation
+ *  > relationship shift > clue > escalation) determines the one-line beat
+ *  summary for the scene; a scene with none of those 5 falls back to
+ *  summarizing whatever its first op is (or "(No events this scene.)" for an
+ *  ops-free scene). */
+function beatCategoryAndSummary(commit: StoryCommit): { category: BeatCategory; summary: string } {
+  const ops = commit.ops;
+
+  const reversalOp = ops.find(o =>
+    o.op === 'EXPIRE_FACT' ||
+    (o.op === 'ADVANCE_THEME_ARGUMENT' && (o.move === 'attack' || o.move === 'undercut')));
+  if (reversalOp) {
+    if (reversalOp.op === 'EXPIRE_FACT') {
+      return { category: 'reversal', summary: `What was true about "${cleanId(reversalOp.factId)}" no longer holds.` };
+    }
+    const themeOp = reversalOp as Extract<StoryOp, { op: 'ADVANCE_THEME_ARGUMENT' }>;
+    return { category: 'reversal', summary: `The case for "${cleanId(themeOp.claimId)}" turns — the argument is ${themeOp.move}ed.` };
+  }
+
+  const revelationOp = ops.find(o => o.op === 'PAYOFF_SETUP' || o.op === 'UPDATE_BELIEF');
+  if (revelationOp) {
+    if (revelationOp.op === 'PAYOFF_SETUP') {
+      return { category: 'revelation', summary: `"${cleanId(revelationOp.setupId)}" pays off — the pieces click into place.` };
+    }
+    const beliefOp = revelationOp as Extract<StoryOp, { op: 'UPDATE_BELIEF' }>;
+    return { category: 'revelation', summary: `${capitalize(beliefOp.charId)} realizes: ${beliefOp.belief.proposition}` };
+  }
+
+  const relOp = ops.find((o): o is Extract<StoryOp, { op: 'SHIFT_RELATIONSHIP' }> => o.op === 'SHIFT_RELATIONSHIP');
+  if (relOp) {
+    return { category: 'relationship', summary: `${capitalize(relOp.pair[0])} and ${capitalize(relOp.pair[1])} — ${relOp.delta.reason}.` };
+  }
+
+  const clueOp = ops.find((o): o is Extract<StoryOp, { op: 'SEED_CLUE' }> => o.op === 'SEED_CLUE');
+  if (clueOp) {
+    return { category: 'clue', summary: `A clue is planted: "${cleanId(clueOp.clueId)}."` };
+  }
+
+  const clockOp = ops.find((o): o is Extract<StoryOp, { op: 'RAISE_CLOCK' }> => o.op === 'RAISE_CLOCK');
+  if (clockOp) {
+    return { category: 'escalation', summary: `The pressure rises on the ${cleanId(clockOp.clockId)} — running out of time.` };
+  }
+
+  const first = ops[0];
+  if (!first) return { category: 'beat', summary: '(No events this scene.)' };
+  return { category: 'beat', summary: genericBeatSummary(first) };
+}
+
+/** [SETUP]/[PAYOFF]/[CLOCK]/[TURN] annotations from whichever of those op
+ *  kinds the scene carries — independent of, and possibly in addition to, the
+ *  dominant-op summary above (a scene can be dominantly a "relationship"
+ *  beat and still carry a clue seed, which still deserves its [SETUP] tag). */
+function beatAnnotations(ops: StoryOp[]): string {
+  const tags: string[] = [];
+  if (ops.some(o => o.op === 'SEED_CLUE')) tags.push('[SETUP]');
+  if (ops.some(o => o.op === 'PAYOFF_SETUP')) tags.push('[PAYOFF]');
+  if (ops.some(o => o.op === 'RAISE_CLOCK')) tags.push('[CLOCK]');
+  if (ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT')) tags.push('[TURN]');
+  return tags.join(' ');
+}
+
+function projectOutline(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const n = commits.length;
+  const lines: string[] = [`OUTLINE: ${canon.title ?? 'Untitled'}`, ''];
+  if (n === 0) {
+    lines.push('(No scenes committed yet.)');
+    return { target: 'outline', content: lines.join('\n'), metadata: { scenes: 0 } };
+  }
+  // Act-break convention mirrors compile.ts's injectActBreaks (25%/50%/75% of
+  // scene count) — the same headroom guard (n < 4 → no markers, too short to
+  // meaningfully break into acts).
+  const act2Start = n >= 4 ? Math.floor(n * 0.25) : -1;
+  const midpoint  = n >= 4 ? Math.floor(n * 0.5)  : -1;
+  const act3Start = n >= 4 ? Math.floor(n * 0.75) : -1;
+  commits.forEach((commit, i) => {
+    if (i === act2Start) lines.push('--- END OF ACT ONE ---');
+    if (i === midpoint)  lines.push('--- MIDPOINT ---');
+    if (i === act3Start) lines.push('--- END OF ACT TWO ---');
+    const { summary } = beatCategoryAndSummary(commit);
+    const tags = beatAnnotations(commit.ops);
+    lines.push(`${i + 1}. ${summary}${tags ? ' ' + tags : ''}`);
+  });
+  return { target: 'outline', content: lines.join('\n'), metadata: { scenes: n } };
+}
+
+function projectDialogueOnly(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const lines: string[] = [`${canon.title ?? 'Untitled'} — TABLE READ DRAFT`, ''];
+  for (const commit of commits) {
+    lines.push(`SCENE ${commit.sceneIdx + 1}`);
+    lines.push('');
+    let hasDialogue = false;
+    for (const op of commit.ops) {
+      if (op.op === 'UPDATE_BELIEF') {
+        lines.push(`\t\t\t${op.charId.toUpperCase()}`);
+        lines.push(op.belief.proposition);
+        lines.push('');
+        hasDialogue = true;
+      } else if (op.op === 'ADVANCE_THEME_ARGUMENT') {
+        lines.push(...themeArgumentLines(op.claimId, op.move));
+        lines.push('');
+        hasDialogue = true;
+      }
+      // Every other op kind (action/visual/sonic/facts/clues/clocks/…) is
+      // deliberately dropped — this target exists solely to let actors read
+      // the spoken lines for voice testing.
+    }
+    if (!hasDialogue) lines.push('(No dialogue this scene.)', '');
+  }
+  return { target: 'dialogue_only', content: lines.join('\n'), metadata: { scenes: commits.length } };
+}
+
+/** SHIFT_RELATIONSHIP rendered as how the letter-writer addresses the other
+ *  party — only fires when the dominant (POV) character is actually one side
+ *  of the shift; a relationship shift between two OTHER characters isn't
+ *  something this entry's writer would plausibly narrate in the first person. */
+function relationshipAddressLine(pov: string, op: Extract<StoryOp, { op: 'SHIFT_RELATIONSHIP' }>): string | null {
+  if (op.pair[0] !== pov && op.pair[1] !== pov) return null;
+  const other = op.pair[0] === pov ? op.pair[1] : op.pair[0];
+  return `To you, ${capitalize(other)}: something between us has shifted — ${op.delta.reason}. I am not sure either of us can pretend otherwise.`;
+}
+
+/** One scene as one document — letter/journal-entry-flavored, always in the
+ *  first person of the scene's dominant (POV) character, date-stamped by
+ *  sceneIdx. A scene with no POV character (only facts/clues/clocks, no
+ *  UPDATE_BELIEF/APPRAISE_EMOTION/SHIFT_RELATIONSHIP) still produces a
+ *  complete entry, narrated by an unnamed observer. */
+function epistolaryEntry(commit: StoryCommit): string[] {
+  const pov = dominantCharacterOf(commit.ops);
+  const writer = pov ? capitalize(pov) : 'The Recorder';
+  const body: string[] = [];
+  for (const op of commit.ops) {
+    if (op.op === 'UPDATE_BELIEF' && (pov === null || op.charId === pov)) {
+      body.push(`I have come to believe ${op.belief.proposition}${op.belief.source === 'told' ? ', though I only have someone else’s word for it' : ''}.`);
+    } else if (op.op === 'ADD_FACT') {
+      body.push(op.fact.predicate === 'moves_to'
+        ? `I arrived at ${op.fact.object} today.`
+        : `I learned that ${op.fact.subject} ${op.fact.predicate.replace(/[-_]/g, ' ')} ${op.fact.object}.`);
+    } else if (op.op === 'SHIFT_RELATIONSHIP' && pov !== null) {
+      const addr = relationshipAddressLine(pov, op);
+      if (addr) body.push(addr);
+    } else if (op.op === 'APPRAISE_EMOTION' && (pov === null || op.charId === pov)) {
+      body.push(`I felt ${op.emotion.dominant} today, more than I let on.`);
+    } else if (op.op === 'SEED_CLUE') {
+      body.push(`I noticed something I can't quite explain: ${cleanId(op.clueId)}.`);
+    } else if (op.op === 'PAYOFF_SETUP') {
+      body.push(`At last I understand "${cleanId(op.setupId)}" — it all makes sense now.`);
+    } else if (op.op === 'RAISE_CLOCK') {
+      body.push(`I am running out of time on ${cleanId(op.clockId)}.`);
+    } else if (op.op === 'EXPIRE_FACT') {
+      body.push(`What I once took as true about "${cleanId(op.factId)}" no longer holds.`);
+    }
+  }
+  if (body.length === 0) body.push('Nothing worth recording happened today.');
+  return [
+    `ENTRY — DAY ${commit.sceneIdx + 1}`,
+    'Dear journal,',
+    '',
+    ...body,
+    '',
+    `— ${writer}`,
+    '',
+  ];
+}
+
+function projectEpistolary(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const lines: string[] = [`${canon.title ?? 'Untitled'} — Collected Documents`, ''];
+  for (const commit of commits) lines.push(...epistolaryEntry(commit));
+  return { target: 'epistolary', content: lines.join('\n'), metadata: { entries: commits.length } };
+}
+
+/** One neutral, turn-indexed line per op — the Fabula view: exactly what
+ *  happened, zero presentation spin. Turn-indexed by sceneIdx (not
+ *  wall-clock), per spec. Exhaustive over all 14 StoryOp kinds. */
+function simulationLogLine(turn: number, op: StoryOp): string {
+  switch (op.op) {
+    case 'ADD_FACT':
+      return `TURN ${turn} · FACT: ${op.fact.subject} ${op.fact.predicate} ${op.fact.object}`;
+    case 'EXPIRE_FACT':
+      return `TURN ${turn} · FACT EXPIRED: ${op.factId}`;
+    case 'UPDATE_BELIEF':
+      return `TURN ${turn} · BELIEF: ${op.charId} -> "${op.belief.proposition}" (source: ${op.belief.source})`;
+    case 'APPRAISE_EMOTION':
+      return `TURN ${turn} · EMOTION: ${op.charId} = ${op.emotion.dominant} (intensity ${op.emotion.intensity})`;
+    case 'SHIFT_RELATIONSHIP':
+      return `TURN ${turn} · RELATIONSHIP: ${op.pair[0]}-${op.pair[1]} ${op.delta.dimension} ${op.delta.amount >= 0 ? '+' : ''}${op.delta.amount}`;
+    case 'ADVANCE_OBJECT_ARC':
+      return `TURN ${turn} · OBJECT: ${op.objectId} -> ${op.toState}`;
+    case 'TRIGGER_RULE':
+      return `TURN ${turn} · RULE FIRED: ${op.mechanismId}/${op.ruleId}`;
+    case 'SEED_CLUE':
+      return `TURN ${turn} · CLUE SEEDED: ${op.clueId} (${op.carrier})`;
+    case 'PAYOFF_SETUP':
+      return `TURN ${turn} · PAYOFF: ${op.setupId} -> ${op.payoffEventId}`;
+    case 'RAISE_CLOCK':
+      return `TURN ${turn} · CLOCK: ${op.clockId} +${op.amount}`;
+    case 'ADVANCE_THEME_ARGUMENT':
+      return `TURN ${turn} · THEME ARGUMENT: ${op.claimId} ${op.move}`;
+    case 'UPDATE_READER_STATE': {
+      const parts: string[] = [];
+      if (op.delta.suspense)   parts.push(`suspense ${op.delta.suspense >= 0 ? '+' : ''}${op.delta.suspense}`);
+      if (op.delta.curiosity)  parts.push(`curiosity ${op.delta.curiosity >= 0 ? '+' : ''}${op.delta.curiosity}`);
+      if (op.delta.investment) parts.push(`investment ${op.delta.investment >= 0 ? '+' : ''}${op.delta.investment}`);
+      if (op.delta.knownFact)  parts.push(`known: ${op.delta.knownFact}`);
+      return `TURN ${turn} · READER STATE: ${parts.length > 0 ? parts.join(', ') : 'no change'}`;
+    }
+    case 'RECORD_VISUAL_FACT':
+      return `TURN ${turn} · VISUAL: ${op.fact}`;
+    case 'RECORD_SONIC_FACT':
+      return `TURN ${turn} · SONIC: ${op.fact}`;
+  }
+}
+
+function projectSimulationLog(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const lines: string[] = [`SIMULATION LOG: ${canon.title ?? 'Untitled'}`, ''];
+  let entries = 0;
+  for (const commit of commits) {
+    for (const op of commit.ops) {
+      lines.push(simulationLogLine(commit.sceneIdx, op));
+      entries++;
+    }
+  }
+  if (entries === 0) lines.push('(No ops recorded.)');
+  return { target: 'simulation_log', content: lines.join('\n'), metadata: { entries } };
+}
+
+/** Per-scene director's-voice paragraph: what was planted, what paid off,
+ *  where audience tension moved, what the theme argument did, and — the
+ *  dramatic-irony beat — what the audience already knows that a character
+ *  believing a `told` (i.e. lied-to) proposition does not. Reuses the same
+ *  told-source signal projectRewatch already keys its irony notes off of. */
+function projectDirectorCommentary(canon: Canon): Artifact {
+  const commits = canon.commits.filter(c => !c.reverted);
+  const lines: string[] = [`${canon.title ?? 'Untitled'} — Director's Commentary`, ''];
+  for (const commit of commits) {
+    const planted: string[] = [];
+    const paidOff: string[] = [];
+    const tensionMoves: string[] = [];
+    const themeMoves: string[] = [];
+    const irony: string[] = [];
+    for (const op of commit.ops) {
+      if (op.op === 'SEED_CLUE') planted.push(cleanId(op.clueId));
+      if (op.op === 'PAYOFF_SETUP') paidOff.push(cleanId(op.setupId));
+      if (op.op === 'UPDATE_READER_STATE') {
+        const beat = readerStateBeat(op.delta);
+        if (beat) tensionMoves.push(beat);
+      }
+      if (op.op === 'ADVANCE_THEME_ARGUMENT') themeMoves.push(`${op.move}s the claim that ${cleanId(op.claimId)}`);
+      if (op.op === 'UPDATE_BELIEF' && op.belief.source === 'told') {
+        irony.push(`${capitalize(op.charId)} believes "${op.belief.proposition}" without knowing it was only ever told to them`);
+      }
+    }
+    const paragraph: string[] = [
+      `Here's what's really happening under the surface of scene ${commit.sceneIdx + 1}.`,
+    ];
+    if (planted.length > 0) paragraph.push(`We're planting ${planted.join(', ')} here — the audience won't clock it yet, but it'll matter.`);
+    if (paidOff.length > 0) paragraph.push(`This is where ${paidOff.join(', ')} pays off — everything we planted earlier clicks into place.`);
+    if (tensionMoves.length > 0) paragraph.push(`Notice how the tension moves here: ${tensionMoves.join(' ')}`);
+    if (themeMoves.length > 0) paragraph.push(`The theme is doing real work in this scene — the story ${themeMoves.join('; ')}.`);
+    if (irony.length > 0) paragraph.push(`And here's the dramatic irony: ${irony.join('; ')} — the audience already knows better.`);
+    if (planted.length === 0 && paidOff.length === 0 && tensionMoves.length === 0 && themeMoves.length === 0 && irony.length === 0) {
+      paragraph.push('A quieter beat — no machinery visibly turning here, but it earns its place in the sequence.');
+    }
+    lines.push(`SCENE ${commit.sceneIdx + 1}.`, paragraph.join(' '), '');
+  }
+  return { target: 'director_commentary', content: lines.join('\n'), metadata: { scenes: commits.length } };
 }
