@@ -14,8 +14,10 @@ trail.
 
 ## 1. Current state (snapshot)
 
-Branch `claude/storymachine-claude-md-audit-nird9w`, PR #173 open to `main`
-(all CI green). Shipped this session:
+**PR #173 MERGED to `main`** (merge f122bff — the eight-run Script Doctor
+platform). Working branch `claude/storymachine-claude-md-audit-nird9w` was
+reset from the merged main and now carries Run 9's commits; any future PR is
+a NEW PR. Shipped through the merge:
 
 - **Script Doctor**: 14-pass diagnose-only coverage pipeline. Verdicts
   RECOMMEND/CONSIDER/PASS across 5 dimensions, percentiles vs. a 20-sample
@@ -55,9 +57,7 @@ Branch `claude/storymachine-claude-md-audit-nird9w`, PR #173 open to `main`
 - **CI** enforces no-`console.*`-in-`server/**` and a keyless test posture
   (no fake `GEMINI_API_KEY` masking real degradation paths).
 
-Suite: **~7,674+ tests, 0 failures** (7,674 confirmed at Wave 1182's own run
-via commit message; later commits in this log added tests without
-regressions per the wave discipline in `CLAUDE.md`).
+Suite: **7,749 tests, 0 failures** (as of Run 9 close).
 
 ---
 
@@ -88,7 +88,9 @@ regressions per the wave discipline in `CLAUDE.md`).
 Two workstreams have uncommitted or partially-landed changes on disk right
 now. Integrate and verify both before starting any new run below.
 
-**(a) OASIS bridge completion agent**
+**(a) OASIS bridge completion — SHIPPED** (commit "Complete the
+simulation-to-canon bridge; honor configured psychology"; verified via
+interview receipts + keyless run-scene smoke). Details for reference:
 - Wire `SHIFT_RELATIONSHIP` / `APPRAISE_EMOTION` ops from ToM (theory-of-mind)
   and appraisal deltas in `server/nvm/bridge/action-to-ops.ts` and its
   Orchestrator call sites (`server/engine/Orchestrator.ts`).
@@ -115,7 +117,10 @@ until then the server strips them harmlessly.
 
 ---
 
-## 4. Run 8 — Blindspot patches (small, do before new features)
+## 4. Run 8 — Blindspot patches — ✅ COMPLETE
+(formula-version history + sample script; heavyBodyLimiter; log-hygiene
+tripwire; PR body refreshed before merge. Checklist below retained for the
+record.)
 
 Already done: `types.ts` formula comment, README keyless truth, CI keyless
 test posture (see Run 1 commit log — these landed as "Blindspot batch 1").
@@ -140,7 +145,11 @@ Remaining:
 
 ---
 
-## 5. Run 9 — Architecture truth & structure
+## 5. Run 9 — Architecture truth & structure — ✅ COMPLETE
+(ARCHITECTURE.md rewritten grep-verified; record-parity harness landed with
+30 tests + 5 product findings — follow-ups below; nvm.ts split into 8
+modules behavior-identical; frontend code-split, StoryMachine chunk −81%,
+500KB warning gone. Checklist retained for the record. NEXT RUN: Run 10.)
 
 `ARCHITECTURE.md` is stale and actively misleading in places (see below) —
 fix it before it misleads another session further.
