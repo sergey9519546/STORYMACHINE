@@ -15,20 +15,38 @@
 // explicit, tiered PARITY MATRIX between the two record sets.
 //
 // ── THE CENTRAL DISCOVERY THAT SHAPES THIS FILE ─────────────────────────────
-// compile.ts's projectFountain (server/nvm/project/index.ts) is a LOSSY
-// renderer: of the 14 StoryOp kinds, only THREE ever produce Fountain text —
-// UPDATE_BELIEF (as a character-cue + "(believing) <proposition>" dialogue
-// block), SHIFT_RELATIONSHIP (as an action-line sentence built from `reason`),
-// and RECORD_VISUAL_FACT (as an ALL-CAPS action line). RAISE_CLOCK, SEED_CLUE,
+// (UPDATED — Run 17-B, "compiler richness".) Until Run 17-B, compile.ts's
+// projectFountain (server/nvm/project/index.ts) was a LOSSY renderer: of the
+// 14 StoryOp kinds, only THREE ever produced Fountain text — UPDATE_BELIEF (as
+// a character-cue + "(believing) <proposition>" dialogue block),
+// SHIFT_RELATIONSHIP (as an action-line sentence built from `reason`), and
+// RECORD_VISUAL_FACT (as an ALL-CAPS action line). RAISE_CLOCK, SEED_CLUE,
 // PAYOFF_SETUP, UPDATE_READER_STATE, APPRAISE_EMOTION, ADD_FACT and the rest
-// render NOTHING. So for the text-derived path to ever see a signal the
-// ops-derived path recorded, the *prose in a rendered op* (a belief
-// proposition or a relationship reason) must carry it lexically — a deadline
-// word for a clock raise, a danger word for a suspense delta, a quoted phrase
-// for a clue token, and so on. Co-designing that prose is not a test-fixture
-// trick; it is the literal mechanism by which a real author's compiled draft
-// would carry the same signals through both paths. Every golden-story op
-// below is annotated with which lexicon term it's supplying and why.
+// rendered NOTHING, so the *only* way the text-derived path could ever see a
+// signal the ops-derived path recorded was for the co-authored belief/reason
+// prose to carry it lexically. Run 17-B closed that gap: projectFountain now
+// renders all 14 op kinds as craft-plausible Fountain prose (see
+// server/nvm/project/index.ts's renderFountainOp and
+// tests/core/projection-richness.test.ts's per-op fire/no-fire tests), and
+// several of those renderings deliberately reuse fountain-analyzer.ts's own
+// lexicon terms (deadline vocabulary for RAISE_CLOCK, a quoted token for
+// SEED_CLUE/PAYOFF_SETUP, valence words for APPRAISE_EMOTION, danger/relief/
+// mystery words for UPDATE_READER_STATE) — see the "compiler-richness
+// capability" probe below, which demonstrates these PRESENCE-tier signals now
+// survive WITHOUT any co-authored belief text at all. The golden stories
+// below still co-author matching lexicon into their belief/reason prose
+// (that discipline was never wrong — a real author's dialogue independently
+// reinforces the same signals a rendered op now also carries), so every
+// number pinned below was RE-MEASURED after Run 17-B's rendering changes,
+// not merely assumed unchanged: the suspenseDelta/curiosityDelta/
+// emotionalShift sign-agreement rates below are IDENTICAL to their pre-Run-
+// 17-B values (19/19, 16/19, 19/19) — richer rendering was designed to
+// reinforce the existing lexicon-agreement signal, not duplicate or
+// contradict it, and that design goal was verified by measurement, not
+// assumed (an earlier draft of the richer renderer picked mood-line
+// vocabulary that accidentally collided with RELIEF_WORDS and briefly
+// regressed suspenseDelta agreement to 13/19 during authoring — fixed before
+// landing; see server/nvm/project/index.ts's readerStateBeat comment).
 //
 // Every number pinned below was MEASURED first (see the comment above each
 // threshold) then set with headroom, per the standing instruction to measure
@@ -331,7 +349,7 @@ type ParityTier =
 const PARITY_MATRIX: Record<keyof ScreenplaySceneRecord, ParityTier> = {
   commitId: 'NOT_COMPARED_IDENTIFIER',        // 'commit-N' vs 'fountain-scene-N' — different id schemes by design
   sceneIdx: 'STRUCTURAL_EXACT',
-  slug: 'STRUCTURAL_DIVERGENT',               // see "structural exact" describe block below for evidence + root cause
+  slug: 'STRUCTURAL_DIVERGENT',               // for THESE golden stories (no commit carries an ADD_FACT 'moves_to' fact); Run 17-B's sceneSlug (project/index.ts) now renders the SAME location-aware template memory.ts's deriveSlug uses, so a commit that DOES carry a relocation fact gets a byte-identical (STRUCTURAL_EXACT) slug on both paths — see the "location-aware slug" describe block below, which is the positive case. Neither golden story exercises a relocation fact, so the tier pinned here (documenting the placeholder-fallback case) is unchanged.
   purpose: 'NOT_COMPARED_FREEFORM',           // ops purpose keys off ops directly; text purpose keys off content/position heuristics — independently derived, no contract
   dramaticTurn: 'NOT_COMPARED_FREEFORM',      // ops-path dramaticTurn is pulled from ADD_FACT/belief text that compile.ts never renders verbatim
   revelation: 'PRESENCE',
@@ -387,22 +405,24 @@ describe('record parity — structural (scene count exact; slug divergence docum
       assert.deepEqual(pair.textRecords.map(r => r.sceneIdx), expected);
     });
 
-    // FINDING: slug is classified STRUCTURAL_DIVERGENT, not STRUCTURAL_EXACT,
-    // because the two producers derive it from entirely different sources.
-    // memory.ts's deriveSlug looks for an ADD_FACT with predicate 'moves_to'
-    // in the SAME commit and falls back to `INT. UNKNOWN — SCENE ${idx+1}`.
-    // compile.ts's projectFountain never consults that field at all — it
-    // hardcodes `INT. SCENE ${commit.sceneIdx} - CONTINUOUS` for every commit
-    // regardless of ops content. So analyzeFountainText's slug (pulled
-    // verbatim from the rendered heading) can NEVER match memory.ts's slug:
-    // different template, different em-dash-vs-hyphen punctuation, and even
-    // different scene numbering (idx+1 vs idx). This isn't a case/whitespace
-    // difference to normalize away — it's a genuine product gap (the
-    // location-aware slug a live story computes is silently discarded by the
-    // compiler) that a follow-up should fix by having projectFountain render
-    // `records[i].slug` instead of a generic placeholder. Asserted here so
-    // the gap is CONTRACTED, not rediscovered by a confused future reader.
-    it(`${label}: slug text genuinely diverges (compiler discards the location-aware slug) — documented, not normalized`, () => {
+    // FINDING (UPDATED — Run 17-B): slug remains classified STRUCTURAL_DIVERGENT
+    // for THESE golden stories specifically because neither authors an
+    // ADD_FACT 'moves_to' fact — but the underlying gap this test originally
+    // contracted (projectFountain silently discarding location info) is now
+    // PARTIALLY closed. project/index.ts's sceneSlug renders the exact same
+    // template memory.ts's deriveSlug uses (`INT. ${LOCATION} — SCENE
+    // ${idx+1}`) whenever a commit DOES carry a relocation fact — see the
+    // "location-aware slug" describe block immediately below for the positive
+    // case, which is now STRUCTURAL_EXACT. The placeholder fallback asserted
+    // here (`INT. SCENE ${idx} - CONTINUOUS` vs memory.ts's
+    // `INT. UNKNOWN — SCENE ${idx+1}`) is deliberately UNCHANGED rather than
+    // also unified: tests/core/core-01.test.ts's "fountain output contains
+    // title and scene headers" check asserts `artifact.content.includes('INT.
+    // SCENE')` verbatim against a canon with no relocation fact, which is
+    // outside this wave's file ownership — so the no-location fallback is
+    // intentionally left exactly as it was rather than invented into a
+    // divergence with a test this wave doesn't own.
+    it(`${label}: slug text genuinely diverges when no commit carries location info (documented, not normalized)`, () => {
       for (let i = 0; i < sceneCount; i++) {
         assert.notEqual(
           pair.opsRecords[i].slug, pair.textRecords[i].slug,
@@ -411,6 +431,25 @@ describe('record parity — structural (scene count exact; slug divergence docum
       }
     });
   }
+});
+
+// ── TIER: STRUCTURAL EXACT — location-aware slug (Run 17-B) ────────────────
+// The positive case the finding above points to: a commit that DOES carry an
+// ADD_FACT 'moves_to' fact now renders a slug that matches memory.ts's
+// deriveSlug BYTE-FOR-BYTE, because project/index.ts's sceneSlug (Run 17-B)
+// mirrors deriveSlug's exact template rather than inventing its own.
+describe('record parity — location-aware slug is STRUCTURAL_EXACT when a commit carries location info', () => {
+  const LOCATION_PROBE = runBothPaths(
+    [[
+      { op: 'ADD_FACT', fact: { factId: 'f-reloc', subject: 'nora', predicate: 'moves_to', object: 'the docks', addedAtTurn: 0, validFrom: 0, validTo: null } },
+    ]],
+    'LOCATION PROBE',
+  );
+
+  it('ops-derived and text-derived slugs are byte-identical for a commit with an ADD_FACT moves_to fact', () => {
+    assert.equal(LOCATION_PROBE.opsRecords[0].slug, LOCATION_PROBE.textRecords[0].slug);
+    assert.equal(LOCATION_PROBE.opsRecords[0].slug, 'INT. THE DOCKS — SCENE 1');
+  });
 });
 
 // ── TIER: PRESENCE ───────────────────────────────────────────────────────────
@@ -534,6 +573,48 @@ describe('record parity — presence (clues, clock, revelation, relationship shi
   it('KNOWN LIMITATION: a relationship shift with no co-speaking dialogue is present on the ops path but absent on the text path', () => {
     assert.equal(PROBE.opsRecords[1].relationshipShifts?.length, 1, 'ops path records the shift from the SHIFT_RELATIONSHIP op alone');
     assert.equal(PROBE.textRecords[1].relationshipShifts?.length, 0, 'documented gap: text path requires two co-speaking characters, which this scene has none of — see comment above');
+  });
+});
+
+// ── TIER: PRESENCE — compiler-richness capability (Run 17-B) ───────────────
+// Before Run 17-B, the ONLY reason seededClueIds/payoffSetupIds/clockRaised
+// ever matched on the text path was that every golden-story scene ABOVE also
+// carries a co-authored UPDATE_BELIEF whose prose happens to repeat the
+// clue's quoted phrase or a deadline word (see the file-header comment). That
+// discipline demonstrates a real author's dialogue CAN carry these signals,
+// but it never proved the *compiler* carries them — a story whose SEED_CLUE/
+// PAYOFF_SETUP/RAISE_CLOCK/UPDATE_READER_STATE ops have no such accompanying
+// belief text would previously have compiled to Fountain with NO trace of
+// them at all. This probe is deliberately belief-text-free (its filler
+// UPDATE_BELIEF scenes are lexically inert — no clue phrase, no deadline
+// word, no valence) so every PRESENCE-tier signal recovered below is
+// attributable to the op's OWN rendering (server/nvm/project/index.ts's
+// renderFountainOp), not to co-authored prose.
+const RICHNESS_PROBE = runBothPaths(
+  [
+    [{ op: 'SEED_CLUE', clueId: 'clue-locket', carrier: 'object' }],
+    [{ op: 'UPDATE_BELIEF', charId: 'filler', belief: belief('Nothing of note happens in this scene.') }],
+    [{ op: 'UPDATE_BELIEF', charId: 'filler', belief: belief('Still nothing of note happens here.') }],
+    [{ op: 'PAYOFF_SETUP', setupId: 'clue-locket', payoffEventId: 'evt-locket' }],
+    [{ op: 'RAISE_CLOCK', clockId: 'clock-fuse', amount: 1 }],
+    [{ op: 'UPDATE_READER_STATE', delta: { suspense: 2, curiosity: 0 } }],
+  ],
+  'RICHNESS PROBE',
+);
+
+describe('record parity — compiler-richness capability: PRESENCE fields now survive WITHOUT co-authored belief lexicon', () => {
+  it('SEED_CLUE alone (no accompanying belief text) is recoverable as a seeded clue on the text path', () => {
+    assert.ok(flatten(RICHNESS_PROBE.textRecords, 'seededClueIds').includes('locket'));
+  });
+  it('PAYOFF_SETUP alone, 3 scenes later (no accompanying belief text), is recoverable as a paid-off clue on the text path', () => {
+    assert.ok(flatten(RICHNESS_PROBE.textRecords, 'payoffSetupIds').includes('locket'));
+  });
+  it('RAISE_CLOCK alone (no accompanying deadline belief) sets clockRaised on the text path', () => {
+    assert.equal(RICHNESS_PROBE.textRecords[4].clockRaised, true);
+  });
+  it('UPDATE_READER_STATE alone (no accompanying belief text) yields a matching-sign suspenseDelta on the text path', () => {
+    assert.equal(sign(RICHNESS_PROBE.opsRecords[5].suspenseDelta), 1);
+    assert.equal(sign(RICHNESS_PROBE.textRecords[5].suspenseDelta), 1);
   });
 });
 
