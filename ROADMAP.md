@@ -497,6 +497,21 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## STANDING DIRECTIVE — Exhaustive coverage (user, 2026-07-05)
+
+Every configurable/enumerable axis in the product must be pushed to
+exhaustive coverage: all genres, all sin-check detectors, all tension
+measures, all defense-cascade states, all narrative metrics, all story
+structures, all emotional arcs, all character-arc modes, all director
+styles — and beyond those, EVERY axis found by audit (scene-purpose
+enums, emotion taxonomies, relationship stances, clue carrier types,
+payoff types, root-cause templates, lexicons, projection targets,
+export formats). Procedure after each build wave: inventory what was
+built, enumerate each axis's current vs possible option space, and
+dispatch expansion agents for every gap. Padding is still forbidden —
+exhaustive means every REAL option, each with genuine craft content.
+Next exhaustiveness sweep: after B-wave 1 + Runs 17-C/18-β/γ land.
+
 ## 13b. Blueprint integration (OASIS architecture docs, 2026-07-05)
 
 User supplied a 53-page architecture blueprint + research memo. Two mapping
