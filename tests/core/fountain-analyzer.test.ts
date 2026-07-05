@@ -303,3 +303,116 @@ describe('analyzeFountainText — character ordering', () => {
     assert.deepEqual(analysis.characters, ['BOB', 'ALICE']);
   });
 });
+
+// Wave 1182 (Program v2, Type 1 signal channel) — question-answer latency.
+describe('analyzeFountainText — question-answer latency (questionsRaised)', () => {
+  it('counts a substantive dialogue question toward questionsRaised', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Why did she vanish from the warehouse that night?',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].questionsRaised, 1);
+  });
+
+  it('does not count a short phatic interrogative toward questionsRaised, even one that clears the word-count floor', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Are you okay now?',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].questionsRaised, 0);
+  });
+});
+
+describe('analyzeFountainText — question-answer latency (cross-scene resolution)', () => {
+  it('resolves a question raised in an earlier scene once a later scene shares its distinctive content words', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Why did she vanish from the warehouse that night?',
+      '',
+      'INT. HALLWAY - DAY',
+      '',
+      'Nothing much happens here today.',
+      '',
+      'INT. WAREHOUSE - NIGHT',
+      '',
+      'The warehouse holds the answer everyone has been searching for.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.sceneCount, 3);
+    assert.equal(analysis.records[0].questionsRaised, 1);
+    assert.equal(analysis.records[2].questionsResolved, 1);
+    assert.equal(analysis.records[0].questionsUnresolved, 0);
+  });
+
+  it('leaves a question unresolved at its origin scene when no later line ever shares its distinctive content words', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Why did she vanish from the warehouse that night?',
+      '',
+      'INT. HALLWAY - DAY',
+      '',
+      'Nothing much happens here today.',
+      '',
+      'INT. KITCHEN - DAY',
+      '',
+      'John makes breakfast quietly this morning.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].questionsRaised, 1);
+    assert.equal(analysis.records[0].questionsUnresolved, 1);
+    assert.ok(analysis.records.every(r => (r.questionsResolved ?? 0) === 0), 'no scene should register a resolution');
+  });
+});
+
+describe('analyzeFountainText — question-answer latency (same-scene resolution)', () => {
+  it('counts a same-scene question/answer pair toward questionsResolvedSameScene', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Why did she vanish from the warehouse that night?',
+      '',
+      'WITNESS',
+      'She went to the warehouse alone after the argument.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].questionsResolved, 1);
+    assert.equal(analysis.records[0].questionsResolvedSameScene, 1);
+  });
+
+  it('does not count a cross-scene resolution toward questionsResolvedSameScene', () => {
+    const fountain = [
+      'INT. STUDY - DAY',
+      '',
+      'DETECTIVE',
+      'Why did she vanish from the warehouse that night?',
+      '',
+      'INT. HALLWAY - DAY',
+      '',
+      'Nothing much happens here today.',
+      '',
+      'INT. WAREHOUSE - NIGHT',
+      '',
+      'The warehouse holds the answer everyone has been searching for.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[2].questionsResolved, 1);
+    assert.equal(analysis.records[2].questionsResolvedSameScene, 0);
+  });
+});

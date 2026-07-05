@@ -1365,6 +1365,82 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1182 — payoffPass: unanswered question flood, instant gratification pattern, dead question zone', async () => {
+    const runPY1182 = async (records: ScreenplaySceneRecord[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // UNANSWERED_QUESTION_FLOOD: n=6, needs >=6 raised story-wide with a resolution rate <=15%.
+    it('UNANSWERED_QUESTION_FLOOD fires when the story raises >=6 questions and resolves almost none of them', async () => {
+      const recs1182a = Array.from({ length: 6 }, (_, i) => {
+        if (i === 0 || i === 1) return makeSharedRecord(i, { questionsRaised: 3, questionsResolved: 0 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'UNANSWERED_QUESTION_FLOOD'), 'UNANSWERED_QUESTION_FLOOD should fire');
+    });
+
+    it('UNANSWERED_QUESTION_FLOOD does not fire once the resolution rate clears the 15% floor', async () => {
+      const recs1182an = Array.from({ length: 6 }, (_, i) => {
+        if (i === 0 || i === 1) return makeSharedRecord(i, { questionsRaised: 3, questionsResolved: i === 1 ? 1 : 0 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'UNANSWERED_QUESTION_FLOOD'), 'UNANSWERED_QUESTION_FLOOD should not fire');
+    });
+
+    // INSTANT_GRATIFICATION_PATTERN: n=6, needs >=4 resolved story-wide with >=80% same-scene.
+    it('INSTANT_GRATIFICATION_PATTERN fires when almost every resolved question is answered in its own scene', async () => {
+      const recs1182b = Array.from({ length: 6 }, (_, i) => {
+        if (i === 0 || i === 1) {
+          return makeSharedRecord(i, { questionsRaised: 2, questionsResolved: 2, questionsResolvedSameScene: 2 });
+        }
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INSTANT_GRATIFICATION_PATTERN'), 'INSTANT_GRATIFICATION_PATTERN should fire');
+    });
+
+    it('INSTANT_GRATIFICATION_PATTERN does not fire once the same-scene share drops below 80%', async () => {
+      const recs1182bn = Array.from({ length: 6 }, (_, i) => {
+        if (i === 0) return makeSharedRecord(i, { questionsRaised: 2, questionsResolved: 2, questionsResolvedSameScene: 1 });
+        if (i === 1) return makeSharedRecord(i, { questionsRaised: 2, questionsResolved: 2, questionsResolvedSameScene: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INSTANT_GRATIFICATION_PATTERN'), 'INSTANT_GRATIFICATION_PATTERN should not fire');
+    });
+
+    // DEAD_QUESTION_ZONE: n=8 (4 zones of 2 scenes each). Zone 0 (scenes 0-1) raises 2, resolves
+    // 0 (rate 0). Zone 3 (scenes 6-7) raises 2, resolves 2 (rate 1.0, >=50% healthy floor).
+    it('DEAD_QUESTION_ZONE fires when one zone raises questions it never resolves while another zone resolves most of its own', async () => {
+      const recs1182c = Array.from({ length: 8 }, (_, i) => {
+        if (i === 0) return makeSharedRecord(i, { questionsRaised: 2, questionsUnresolved: 2 });
+        if (i === 6) return makeSharedRecord(i, { questionsRaised: 2, questionsUnresolved: 0 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'DEAD_QUESTION_ZONE'), 'DEAD_QUESTION_ZONE should fire');
+    });
+
+    it('DEAD_QUESTION_ZONE does not fire once the struggling zone resolves at least one of its own questions', async () => {
+      const recs1182cn = Array.from({ length: 8 }, (_, i) => {
+        if (i === 0) return makeSharedRecord(i, { questionsRaised: 2, questionsUnresolved: 1 });
+        if (i === 6) return makeSharedRecord(i, { questionsRaised: 2, questionsUnresolved: 0 });
+        return makeSharedRecord(i);
+      });
+      const res = await runPY1182(recs1182cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'DEAD_QUESTION_ZONE'), 'DEAD_QUESTION_ZONE should not fire');
+    });
+  });
+
   describe('Wave 1168 — payoffPass: payoff suspense-relational aftermath void, payoff emotion-suspense aftermath void, payoff clock-delta-relational aftermath void', async () => {
     const runPY1168 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');

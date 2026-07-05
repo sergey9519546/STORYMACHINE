@@ -20,6 +20,16 @@
 // This degrades gracefully rather than breaking: a fountain-only story still
 // gets a sensible act position, it just can't see explicit clock-raise ops
 // that only ever existed as StoryOps, not as text.
+//
+// Wave 1182 additions (Program v2, Type 1 — signal channel): question-answer
+// latency. detectQuestionLatency() lexically fingerprints substantive dialogue
+// questions and matches each forward against every later line (any scene)
+// that shares enough of its distinctive vocabulary, tallying four per-scene
+// counts — questionsRaised, questionsResolved, questionsResolvedSameScene,
+// questionsUnresolved — mirroring detectClueLifecycle's seed/payoff shape but
+// for interrogative dialogue rather than recurring props/quoted phrases. See
+// the "Question-answer latency" section below for the extraction and
+// memory.ts for the record fields (optional, ops-derived-path may omit them).
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -194,6 +204,11 @@ interface SceneUnit {
    *  (revelation, dramatic turn) where "first/highest-scoring line" must
    *  respect actual reading order, not action-then-dialogue grouping. */
   orderedLines: string[];
+  /** Parallel to orderedLines: true where that entry came from a dialogue
+   *  block, false for action — lets detectQuestionLatency restrict "raises a
+   *  question" to dialogue while still testing every line (action included)
+   *  as a candidate answer, without re-deriving order from the raw blocks. */
+  orderedIsDialogue: boolean[];
   /** orderedLines joined — the text surface cross-scene clue detection scans. */
   rawText: string;
 }
@@ -218,6 +233,7 @@ function extractSceneContent(blocks: FountainBlock[]): Omit<SceneUnit, 'sceneIdx
   const dialogueLines: DialogueLine[] = [];
   const characters: string[] = [];
   const orderedLines: string[] = [];
+  const orderedIsDialogue: boolean[] = [];
   const seenChar = new Set<string>();
   let currentSpeaker = '';
 
@@ -228,6 +244,7 @@ function extractSceneContent(blocks: FountainBlock[]): Omit<SceneUnit, 'sceneIdx
     if (b.type === 'action') {
       actionLines.push(text);
       orderedLines.push(text);
+      orderedIsDialogue.push(false);
     } else if (b.type === 'character' || b.type === 'dual_dialogue') {
       const name = normalizeCharacterName(text);
       currentSpeaker = name;
@@ -238,12 +255,13 @@ function extractSceneContent(blocks: FountainBlock[]): Omit<SceneUnit, 'sceneIdx
     } else if (b.type === 'dialogue') {
       dialogueLines.push({ speaker: currentSpeaker, text });
       orderedLines.push(text);
+      orderedIsDialogue.push(true);
     }
     // parenthetical/transition/shot/section/synopsis/note/lyrics/centered/
     // boneyard carry no signal for these heuristics and are intentionally skipped.
   }
 
-  return { actionLines, dialogueLines, characters, orderedLines, rawText: orderedLines.join('\n') };
+  return { actionLines, dialogueLines, characters, orderedLines, orderedIsDialogue, rawText: orderedLines.join('\n') };
 }
 
 /** Split parsed blocks into per-scene groups on scene_heading boundaries.
@@ -534,6 +552,183 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   return { seedsByScene, payoffsByScene, unresolvedByScene };
 }
 
+// ── Question-answer latency (cross-scene) — Wave 1182 ────────────────────────
+// WHY this is a genuinely new channel, not a restatement of curiosityDelta:
+// curiosityDelta is an INTENSITY score (question-mark density + mystery
+// lexicon hits) with no notion of an individual question as a trackable
+// entity — it cannot say whether a specific question got answered, how long
+// that took, or whether it never did. The functions below lexically
+// fingerprint each substantive dialogue question and match it forward against
+// every later line (any scene, action or dialogue) that shares enough of its
+// distinctive vocabulary, mirroring detectClueLifecycle's seed/payoff shape
+// but for interrogative dialogue rather than recurring props/quoted phrases.
+
+/** Guard lexicon: short/rhetorical interrogatives that read as verbal tics or
+ *  phatic check-ins ("What?", "You okay?") rather than a substantive question
+ *  the story owes an answer to. Matched against the WHOLE question sentence
+ *  (lowercased, punctuation stripped) — not just word count — so a tic with
+ *  enough words to otherwise clear the bar (e.g. "Are you okay now?") still
+ *  gets filtered. Distinct purpose from CAPS_STOPWORDS (that one excludes
+ *  emphasis tokens from clue-token extraction; this excludes conversational
+ *  tics from question-raising). */
+const PHATIC_QUESTION_GUARD = new Set([
+  'what', 'why', 'how', 'really', 'seriously', 'huh', 'what now', 'and', 'so',
+  'right', 'you ok', 'you okay', 'are you ok', 'are you okay',
+  'are you okay now', 'you sure', 'are you sure', 'you coming', 'got it',
+  'you understand', 'you see', 'you know', 'ok', 'okay', 'you hear me',
+  'why not', 'why now', 'what about it',
+]);
+
+/** Function-word stoplist for content-word fingerprinting, so two lines don't
+ *  "match" purely on shared grammar ("what", "did", "you"). Kept separate
+ *  from CAPS_STOPWORDS (that list is about ALL-CAPS clue tokens, a different
+ *  extraction with different false-positive risks). */
+const QUESTION_STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'am', 'do', 'does', 'did',
+  'you', 'your', 'yours', 'i', 'me', 'my', 'we', 'us', 'our', 'they', 'them',
+  'their', 'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'this',
+  'that', 'these', 'those', 'to', 'of', 'in', 'on', 'at', 'for', 'with',
+  'and', 'or', 'but', 'what', 'who', 'whom', 'why', 'when', 'where', 'how',
+  'will', 'would', 'could', 'should', 'can', 'have', 'has', 'had', 'not',
+  "don't", "doesn't", "didn't", "isn't", "aren't", "can't", "won't", 'be',
+  'been', 'being', 'if', 'so', 'just', 'really', 'then', 'there', 'here',
+]);
+
+/** A question sentence needs at least this many words (after stripping the
+ *  trailing "?") to count as substantive — below this, one-or-two-word
+ *  interrogatives are near-certainly conversational tics even when not
+ *  literally in PHATIC_QUESTION_GUARD. */
+const MIN_SUBSTANTIVE_QUESTION_WORDS = 4;
+/** Content words shorter than this are almost always function words that
+ *  slipped past QUESTION_STOPWORDS (or short nouns too generic to prove a
+ *  real topical match) — excluded from the fingerprint. */
+const MIN_CONTENT_WORD_LENGTH = 4;
+
+/** Split a line into sentence-like chunks so a single dialogue line that
+ *  contains a question alongside other sentences ("Wait. Why is it open?")
+ *  still gets each clause evaluated on its own punctuation. */
+const SENTENCE_SPLIT_RE = /[^.!?]+[.!?]+|[^.!?]+$/g;
+
+function splitSentences(text: string): string[] {
+  return (text.match(SENTENCE_SPLIT_RE) ?? [text]).map(s => s.trim()).filter(Boolean);
+}
+
+function isSubstantiveQuestion(sentence: string): boolean {
+  if (!sentence.endsWith('?')) return false;
+  const bare = sentence.slice(0, -1).trim().toLowerCase().replace(/[^a-z0-9' ]/g, '');
+  if (PHATIC_QUESTION_GUARD.has(bare)) return false;
+  const words = bare.split(/\s+/).filter(Boolean);
+  return words.length >= MIN_SUBSTANTIVE_QUESTION_WORDS;
+}
+
+/** Distinctive-word fingerprint for a line: lowercased, punctuation stripped,
+ *  function words and short tokens removed. Used both for a question's own
+ *  topic signature and for testing whether a later line "lexically addresses"
+ *  it (per spec) via any shared word — intentionally permissive (a single
+ *  shared distinctive word is enough), matching this file's lightweight
+ *  lexicon-overlap style elsewhere (e.g. detectClueLifecycle's token reuse).
+ *  This is an accepted heuristic gap, not exact NLU: no stemming, so
+ *  "vanish"/"vanished" are treated as distinct words. */
+function extractContentWords(text: string): Set<string> {
+  const words = text.toLowerCase().replace(/[^a-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
+  return new Set(words.filter(w => w.length >= MIN_CONTENT_WORD_LENGTH && !QUESTION_STOPWORDS.has(w)));
+}
+
+function shareContentWord(a: Set<string>, b: Set<string>): boolean {
+  for (const w of a) if (b.has(w)) return true;
+  return false;
+}
+
+interface OpenQuestion {
+  originScene: number;
+  words: Set<string>;
+}
+
+interface QuestionLatencySignal {
+  raisedByScene: number[];
+  resolvedByScene: number[];
+  resolvedSameSceneByScene: number[];
+  unresolvedByScene: number[];
+}
+
+/** QUESTION-ANSWER LATENCY: walks the whole document once, line by line and
+ *  scene by scene, in order. Every substantive dialogue question (per
+ *  isSubstantiveQuestion) opens a fingerprinted thread. Every later line
+ *  (action or dialogue, any scene) is first tested as an answer to the
+ *  oldest still-open thread before it can raise a new question of its own —
+ *  so a question sentence can never resolve itself, and the longest-waiting
+ *  thread always gets credit first (deterministic, order-independent of
+ *  Set/Map iteration). A thread resolved by a later line in the SAME scene it
+ *  was raised in is tallied separately (resolvedSameSceneByScene) from one
+ *  resolved in a later scene, so callers can tell "answered eventually" apart
+ *  from "answered instantly." Anything never matched by the document's end is
+ *  tallied as unresolved against the scene that raised it — mirroring
+ *  detectClueLifecycle's "seeds never re-mentioned" convention. */
+function detectQuestionLatency(scenes: SceneUnit[]): QuestionLatencySignal {
+  const n = scenes.length;
+  const raisedByScene = new Array<number>(n).fill(0);
+  const resolvedByScene = new Array<number>(n).fill(0);
+  const resolvedSameSceneByScene = new Array<number>(n).fill(0);
+  const unresolvedByScene = new Array<number>(n).fill(0);
+
+  // Cross-scene carryover: questions raised in an earlier scene that have not
+  // yet found an answer anywhere.
+  const open: OpenQuestion[] = [];
+
+  for (const scene of scenes) {
+    // Questions raised in THIS scene, still unmatched so far, in raise order —
+    // kept apart from `open` purely so a same-scene answer can be told apart
+    // from a carried-over one; both pools use the same OpenQuestion shape.
+    const openThisScene: OpenQuestion[] = [];
+
+    for (let i = 0; i < scene.orderedLines.length; i++) {
+      const line = scene.orderedLines[i];
+      const lineWords = extractContentWords(line);
+
+      // Test this line as an answer BEFORE it can register any new question
+      // of its own, so a question sentence never resolves itself. Cross-scene
+      // carryovers are checked first — the longest-waiting thread in the
+      // whole document gets credit before anything raised in this same scene.
+      let matched = false;
+      for (let k = 0; k < open.length; k++) {
+        if (shareContentWord(open[k].words, lineWords)) {
+          open.splice(k, 1);
+          resolvedByScene[scene.sceneIdx]++;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        for (let k = 0; k < openThisScene.length; k++) {
+          if (shareContentWord(openThisScene[k].words, lineWords)) {
+            openThisScene.splice(k, 1);
+            resolvedByScene[scene.sceneIdx]++;
+            resolvedSameSceneByScene[scene.sceneIdx]++;
+            break;
+          }
+        }
+      }
+
+      if (scene.orderedIsDialogue[i]) {
+        for (const sentence of splitSentences(line)) {
+          if (!isSubstantiveQuestion(sentence)) continue;
+          raisedByScene[scene.sceneIdx]++;
+          openThisScene.push({ originScene: scene.sceneIdx, words: extractContentWords(sentence) });
+        }
+      }
+    }
+
+    // Anything still open when the scene ends carries forward to later scenes.
+    open.push(...openThisScene);
+  }
+
+  // Anything never matched anywhere in the document is permanently
+  // unresolved, tallied against the scene that raised it.
+  for (const q of open) unresolvedByScene[q.originScene]++;
+
+  return { raisedByScene, resolvedByScene, resolvedSameSceneByScene, unresolvedByScene };
+}
+
 // ── Empty-input shortcut ──────────────────────────────────────────────────────
 
 function emptyAnalysis(): FountainAnalysis {
@@ -583,6 +778,9 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
   const { seedsByScene, payoffsByScene, unresolvedByScene } = detectClueLifecycle(sceneUnits);
 
+  // ── Phase 2b: cross-scene question-answer latency (Wave 1182) ────────────
+  const questionLatency = detectQuestionLatency(sceneUnits);
+
   // ── Phase 3: purpose (needs cross-scene position + peak-intensity context) ─
   const maxSuspense = suspenseDeltas.length > 0 ? Math.max(...suspenseDeltas) : 0;
   const purposes = sceneUnits.map((s, idx) => detectPurpose({
@@ -616,6 +814,10 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
     suspenseDelta: suspenseDeltas[idx],
     curiosityDelta: curiosityDeltas[idx],
     relationshipShifts: relationshipShiftsList[idx],
+    questionsRaised: questionLatency.raisedByScene[idx],
+    questionsResolved: questionLatency.resolvedByScene[idx],
+    questionsResolvedSameScene: questionLatency.resolvedSameSceneByScene[idx],
+    questionsUnresolved: questionLatency.unresolvedByScene[idx],
     createdAt: idx,
   }));
 
