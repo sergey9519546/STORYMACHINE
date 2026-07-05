@@ -411,10 +411,16 @@ NEXT RUN: Run 17 — function-first (see §13).)
 
 ---
 
-## 13. Run 17 — Function-first (REPLANNED — answers "is the app at its
-finest in function?" honestly: not yet)
-
-Four function gaps take priority over all polish. Anchors verified:
+## 13. Run 17 — Function-first — ✅ COMPLETE (B/C/D; A cancelled)
+(B: all 14 op kinds render, parity re-measured. C: clue lifecycle
+11/20 corpus fires via content-word channel, calibration fixture
+reconciled. D: squiggle→Fix-with-AI bridge with receipts + honest
+keyless degradation. A (E2E browser) cancelled by user directive — no
+browser/deploy checking; its last output reported all 5 journeys
+passing before the kill. Run 18 α/β/γ also COMPLETE: dialogue blind
+spots fixed, dimension collapse fixed, discrimination harness in CI —
+2 hard pairs, 4 named-blind-spot todos ranked told-exposition >
+subtext = passivity.)
 
 - [ ] **(L)** E2E browser verification of the core journeys (upload→doctor→
   fix-verify; what-if; interview; coverage export) via preinstalled
@@ -521,7 +527,17 @@ ghost-commit branching; 6 Vonnegut tension curves w/ interpolation; 10
 projection targets; 8-genre router w/ rule-threshold modifiers). Genuinely
 missing or thin, ranked by product value:
 
-- [ ] **B-wave 1 (dispatched):** (a) Genre engine expansion — 8 → 20+
+- [x] **B-wave 1 — ✅ COMPLETE** (a=28 genres+16 tones+genreRules+
+  /api/story-tone; b=6 sin detectors, Wave 1191; c=metrics module +
+  /api/nvm/metrics; d=6 projection targets; e=22 structures/10 curves/
+  12 arc modes/28 styles; f=defense cascade+trinity. Follow-ups filed:
+  genre completion to 40+ incl. cosmic_horror/slasher/k_drama/
+  spy/gangster/political+psychological thriller etc. + 8 more tones
+  [B1-a declined mid-flight scope change on injection caution — fresh
+  brief needed]; genrePromiseBlock wiring into prompt assembly;
+  story_tone proper session persistence; deterministic.ts cascade
+  consumption; FALSE_CLUE needs an analyzer truth-value signal.)
+  Original dispatch scope: (a) Genre engine expansion — 8 → 20+
   genres, TONE as a separate composable axis (bleak/cozy/paranoid/...),
   per-genre required-behaviors/forbidden-shortcuts/info-position defaults,
   noir rule-modifiers (currently none); (b) Sin-check detector pack —
