@@ -622,6 +622,184 @@ describe('Wave 1183 — calibration-drift guard (strengths must never leak into 
   });
 });
 
+// ── Wave 1187 (Program v2, Type 2 — excellence detectors, opening cycle 2) ──
+// Three more buildStrengths guards, added additively over the same
+// StrengthsInput.records seam Wave 1183 introduced (see doctor.ts's Wave 1187
+// header comment for placement/distinctness/rejection rationale): scene-
+// purpose variety (>=6 distinct ScenePurpose values, no single one >50%),
+// suspense shaping (a genuine closing-quarter suspense peak that tops every
+// earlier quarter's average, off a real opening baseline), and dramatic-turn
+// density (>=2 named dramaticTurn scenes in BOTH the front and back half).
+
+/** Substrings unique to each Wave 1187 strength template — same
+ *  phrasing-independent detection convention as WAVE_1183_MARKERS above. */
+const WAVE_1187_MARKERS = [
+  "doesn't lean on one narrative gear", // buildScenePurposeVarietyStrength
+  'genuine peak late in the draft',     // buildSuspenseShapingStrength
+  'keeps generating real turns',        // buildDramaticTurnDensityStrength
+] as const;
+
+describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures)', () => {
+  it('scene-purpose variety FIRE: 8 distinct purposes with no dominant one names the count and the top purpose', () => {
+    const records = buildSceneRecords(8, {
+      0: { purpose: 'establish_world' },
+      1: { purpose: 'introduce_conflict' },
+      2: { purpose: 'complicate' },
+      3: { purpose: 'raise_stakes' },
+      4: { purpose: 'revelation' },
+      5: { purpose: 'turning_point' },
+      6: { purpose: 'climax' },
+      7: { purpose: 'resolution' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes("doesn't lean on one narrative gear") && s.includes('8 distinct scene functions') &&
+        s.includes('establish world')),
+      `expected the scene-purpose-variety strength naming 8 distinct functions and the top purpose, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('scene-purpose variety NO-FIRE: 6 distinct purposes but one dominating over half the scenes never fires', () => {
+    // Mirrors the corpus's 'competent'/'weak' pattern: real variety on paper
+    // (6 distinct purposes present), but a single purpose (complicate) still
+    // runs the show at 7/12 = 58% of scenes — not a genuinely varied draft.
+    const records = buildSceneRecords(12, {
+      0: { purpose: 'establish_world' },
+      1: { purpose: 'raise_stakes' },
+      2: { purpose: 'revelation' },
+      3: { purpose: 'climax' },
+      4: { purpose: 'resolution' },
+      // idx 5-11 (7 scenes) keep the buildSceneRecord default purpose 'complicate'.
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes("doesn't lean on one narrative gear")),
+      `scene-purpose-variety must not fire when one purpose dominates over half the scenes, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('suspense shaping FIRE: a closing-quarter peak that tops every earlier quarter average names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      0: { suspenseDelta: 1 },
+      1: { suspenseDelta: 1 },
+      // idx 2-5 (quarters two and three) stay at the default suspenseDelta 0.
+      6: { suspenseDelta: 2 },
+      7: { suspenseDelta: 0 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('genuine peak late in the draft') && s.includes('Scene 6') && s.includes('Scene 0')),
+      `expected the suspense-shaping strength naming Scene 6 (the peak) and Scene 0 (the baseline), got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('suspense shaping NO-FIRE: a closing-quarter peak that only TIES the opening baseline never fires', () => {
+    // Mirrors the corpus's designed flaw: the ending isn't actually stronger
+    // than the opening, just even with it — not a genuine build.
+    const records = buildSceneRecords(8, {
+      0: { suspenseDelta: 1 },
+      1: { suspenseDelta: 1 },
+      6: { suspenseDelta: 1 },
+      7: { suspenseDelta: 0 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('genuine peak late in the draft')),
+      `suspense-shaping must not fire when the closing peak merely ties (not tops) an earlier quarter's average, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('dramatic-turn density FIRE: 2 turns in the front half and 2 in the back half names all four scenes', () => {
+    const records = buildSceneRecords(8, {
+      1: { dramaticTurn: 'She finally confronts him.' },
+      2: { dramaticTurn: 'The alibi falls apart.' },
+      5: { dramaticTurn: 'The truth comes out.' },
+      6: { dramaticTurn: 'He chooses to stay.' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('keeps generating real turns') && s.includes('Scenes 1, 2') && s.includes('Scenes 5, 6')),
+      `expected the dramatic-turn-density strength naming Scenes 1, 2 and Scenes 5, 6, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('dramatic-turn density NO-FIRE: 2 turns in the front half but only 1 in the back half never fires', () => {
+    // Mirrors the corpus's 'competent' near-miss (Thanksgiving, Maybe): real
+    // turns up front, but the back half only manages a single, thinner turn.
+    const records = buildSceneRecords(8, {
+      1: { dramaticTurn: 'She finally confronts him.' },
+      2: { dramaticTurn: 'The alibi falls apart.' },
+      6: { dramaticTurn: 'He chooses to stay.' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('keeps generating real turns')),
+      `dramatic-turn-density must not fire when only one half clears the 2-turn floor, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+});
+
+describe('runScriptDoctor — Wave 1187 excellence detectors against the real reference corpus', () => {
+  it('at least one new detector fires somewhere across the 5 strong-band samples', async () => {
+    const strongReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'strong').map(s => runScriptDoctor(s.fountain)),
+    );
+    const anyFired = strongReports.some(r => (r.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m))));
+    assert.ok(
+      anyFired,
+      `expected at least one Wave 1187 strength somewhere in the strong band, got: ` +
+        `${JSON.stringify(strongReports.map(r => r.strengths))}`,
+    );
+  });
+
+  it('never-padded proof: no Wave 1187 detector fires on any competent-band sample', async () => {
+    const competentReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'competent').map(async s => ({
+        label: s.label, report: await runScriptDoctor(s.fountain),
+      })),
+    );
+    for (const { label, report } of competentReports) {
+      const fired = WAVE_1187_MARKERS.filter(m => (report.strengths ?? []).some(s => s.includes(m)));
+      assert.deepEqual(
+        fired, [],
+        `Wave 1187 detector(s) [${fired.join(', ')}] false-fired on competent-band sample "${label}" — ` +
+          `the competent band is deliberately competent-but-unremarkable, never broken; a fire here means the ` +
+          `guard is padded.`,
+      );
+    }
+  });
+});
+
+describe('Wave 1187 — calibration-drift guard (strengths must never leak into scoring)', () => {
+  it('health stays a pure function of bySeverity/sceneCount/wordCount across the whole corpus, extending the Wave 1183 mechanism check to at least one Wave 1187 strength', async () => {
+    let sawAWave1187Strength = false;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      if ((report.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m)))) sawAWave1187Strength = true;
+
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths (a separate, downstream field) must never be able to move it, Wave 1187's included`,
+      );
+    }
+    assert.ok(
+      sawAWave1187Strength,
+      'expected at least one corpus sample to carry a Wave 1187 strength — otherwise this guard would be vacuous',
+    );
+  });
+});
+
 describe('runScriptDoctor — plainSummary', () => {
   it('is non-empty, names the verdict, and never leaks a raw ALL_CAPS rule token', async () => {
     const report = await runScriptDoctor(buildMultiSceneFountain());

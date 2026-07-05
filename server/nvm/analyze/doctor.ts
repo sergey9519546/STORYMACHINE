@@ -512,7 +512,10 @@ export interface StrengthsInput {
    *  produces byte-identical output (an empty/absent records array can never
    *  satisfy any of the three new guards' minimum-population conditions).
    *  Matches the file's existing optional-field precedent (memory.ts's
-   *  relationshipShifts/questionsRaised: "treat absence as []/0"). */
+   *  relationshipShifts/questionsRaised: "treat absence as []/0"). Wave 1187
+   *  reuses this same array for three more channels already present on
+   *  every record — purpose, suspenseDelta, dramaticTurn — no schema change
+   *  needed. */
   records?: ScreenplaySceneRecord[];
 }
 
@@ -703,6 +706,232 @@ function buildEmotionalRangeStrength(
   );
 }
 
+// ── Wave 1187 additions (Program v2, Type 2 — excellence) ──────────────────
+// Three more never-padded buildStrengths guards, each over a signal channel
+// this file has never read before (`purpose`, zone-quartile `suspenseDelta`,
+// and distributional `dramaticTurn`) — distinct from the four originals
+// above and from all three Wave 1183 guards (clockRaised, relationshipShifts,
+// emotionalShift). Same authoring discipline as Wave 1183: every guard below
+// was measured against calibration/corpus.ts's 20 controlled-richness samples
+// through the real analyzer (analyzeFountainText) before being accepted, and
+// three candidate axes from the wave's own candidate list were evaluated and
+// REJECTED for lack of corpus support:
+//
+// REJECTED — question discipline (raises AND resolves with nonzero
+// cross-scene latency), re-measured with the discriminating guard the
+// charter asked for (a minimum raised-count + resolution-rate window +
+// latency floor) after Wave 1183 rejected a weaker version: across all 20
+// corpus samples only two ever carry a nonzero cross-scene resolution
+// (questionsResolved - questionsResolvedSameScene > 0) at all — Sunlight
+// Clause ('strong') and The Grift ('troubled') — and they are tied on every
+// axis a guard could threshold (both raise exactly 1 question, resolve
+// exactly 1, resolutionRate 1.0). Worse, The Grift's raise-to-resolve gap
+// (Scene 5 to Scene 9, a 4-scene latency) is LONGER than Sunlight Clause's
+// (Scene 7 to Scene 9, a 2-scene latency) — so a latency FLOOR does not
+// merely fail to discriminate, it actively inverts (a stricter floor keeps
+// the troubled sample and drops the strong one). No raised-count/
+// resolution-rate/latency threshold separates strong from troubled at this
+// corpus's population (n=2 nonzero samples total). REJECTED again,
+// definitively — confirmed unsupportable, not merely under-guarded.
+//
+// REJECTED — power contest presence (a scene where powerFlipped is true):
+// measured directly, powerFlipped is false on all 20 corpus samples, strong
+// band included — exactly Wave 1186's own finding when it shipped the
+// signal. Fixture-only axes are explicitly disallowed by the charter
+// (never-padded requires corpus-real fire in the strong band); there is
+// nothing here to build a rule on.
+//
+// REJECTED — curiosity seeding (positive curiosityDelta in the opening zone
+// sustained by later positive scenes): measured directly, ZERO of the 20
+// corpus samples carry a positive-curiosity opening-quarter scene followed
+// by a later positive-curiosity scene. Every sample has at most one nonzero-
+// curiosity scene in the whole document EXCEPT Zero Day ('competent'), which
+// has three (Scenes 2, 3, 6) — Zero Day would be the ONLY sample to
+// false-fire under any loosened version of this axis (e.g. "any positive
+// scene in the first half, any later one"). The axis never fires where it
+// should (strong) and would fire exactly where it must not (competent)
+// under the only relaxation available — REJECTED.
+//
+// The three SHIPPED below were each measured to fire on at least one
+// 'strong' sample and zero of the other 19 non-strong samples across EVERY
+// band (not merely 'competent') — stronger evidence than the never-padded
+// bar requires.
+
+/** Minimum distinct ScenePurpose values (of the 9 possible) for genuine
+ *  narrative-function variety, and the ceiling share any single purpose may
+ *  hold without the "variety" claim just describing one dominant purpose
+ *  with a couple of garnish scenes. Distinct from every pre-existing guard
+ *  and from all three Wave 1183 guards — a fourth, independent channel
+ *  (`purpose`) buildStrengths has never read before — and from
+ *  buildSuspenseShapingStrength/buildDramaticTurnDensityStrength below (a
+ *  DISTRIBUTION-of-VALUES mode, how many distinct categories appear and how
+ *  evenly, rather than either of those two's zone/half TIMING mode). Verified
+ *  against calibration/corpus.ts: exactly 3 of 5 'strong' samples (Nine
+ *  Minutes: 7 distinct purposes, 20% dominance; Second Wind: 6 distinct, 50%
+ *  dominance; Sunlight Clause: 6 distinct, 40% dominance) clear both
+ *  thresholds; 0 of the other 15 samples across 'competent', 'weak', and
+ *  'troubled' reach 6 distinct purposes at all (the closest non-strong
+ *  showing is Thanksgiving, Maybe's 5) — every non-strong sample draws its
+ *  scene purposes from a narrower registry, precisely the corpus's designed
+ *  competent-but-unremarkable flaw of leaning on 2-3 functions
+ *  (`complicate`/`character_moment` dominate the weak and troubled bands). */
+const SCENE_PURPOSE_VARIETY_MIN_DISTINCT = 6;
+/** See SCENE_PURPOSE_VARIETY_MIN_DISTINCT above for the corpus evidence this
+ *  ceiling was measured against. */
+const SCENE_PURPOSE_VARIETY_MAX_DOMINANCE = 0.5;
+
+/** Guard: the draft moves through a genuinely varied set of scene purposes
+ *  rather than repeating the same 2-3 narrative functions — SCENE_PURPOSE_
+ *  VARIETY_MIN_DISTINCT-or-more distinct ScenePurpose values represented,
+ *  with no single one exceeding SCENE_PURPOSE_VARIETY_MAX_DOMINANCE share of
+ *  all scenes (so "one dominant purpose plus a sprinkling of one-off
+ *  purposes" cannot masquerade as variety). See the constant comment above
+ *  for corpus evidence and distinctness rationale. */
+function buildScenePurposeVarietyStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+  if (records.length === 0) return null;
+
+  // First-encountered-wins tie-break for both the distinct-value ordering
+  // (readable, scene-order-stable output) and the dominant-purpose pick —
+  // same determinism convention as buildRelationshipDynamismStrength's pair
+  // selection above.
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  for (const r of records) {
+    if (!counts.has(r.purpose)) order.push(r.purpose);
+    counts.set(r.purpose, (counts.get(r.purpose) ?? 0) + 1);
+  }
+  const distinct = counts.size;
+  if (distinct < SCENE_PURPOSE_VARIETY_MIN_DISTINCT) return null;
+
+  let topPurpose = order[0];
+  let topCount = counts.get(topPurpose)!;
+  for (const p of order) {
+    const c = counts.get(p)!;
+    if (c > topCount) { topPurpose = p; topCount = c; }
+  }
+  const dominance = topCount / records.length;
+  if (dominance > SCENE_PURPOSE_VARIETY_MAX_DOMINANCE) return null;
+
+  const humanized = order.map(p => p.replace(/_/g, ' '));
+  return (
+    `This draft doesn't lean on one narrative gear — it moves through ${distinct} distinct scene functions ` +
+    `(${humanized.join(', ')}) without any single one taking over (the most common, "${topPurpose.replace(/_/g, ' ')}", ` +
+    `is only ${Math.round(dominance * 100)}% of scenes).`
+  );
+}
+
+/** Minimum scenes for the suspense-shaping guard specifically — stricter
+ *  than EXCELLENCE_MIN_SCENES because this guard partitions the document
+ *  into FOUR quarters (not two halves like the guards above and below), and a
+ *  quarter under real population can't carry a meaningful average; one scene
+ *  below the corpus's own smallest sample size (9) so no corpus sample is
+ *  excluded from measurement by construction. */
+const SUSPENSE_SHAPING_MIN_SCENES = 8;
+const SUSPENSE_SHAPING_ZONES = 4;
+
+/** Guard: suspense doesn't merely trend upward on average (that's the
+ *  pre-existing `structure.escalating` guard above, a two-HALF average
+ *  trend) — it builds all the way to a genuine PEAK scene in the closing
+ *  quarter that outright tops every earlier quarter's own average, off a
+ *  real (nonzero) opening-quarter baseline. Distinct from `structure.
+ *  escalating` on both analytical mode (peak vs. average) and position
+ *  granularity (quarters vs. halves): a script can escalate on a first-half/
+ *  second-half average while its actual closing peak is unremarkable, or
+ *  vice versa — this reads the sharper, more specific claim directly, per
+ *  WAVE_QUALITY_GUARANTEE.md's own "no stronger sibling skipped" clause.
+ *  Distinct from every Wave 1183 guard (a different channel — suspenseDelta
+ *  zone-peak, not clockRaised/relationshipShifts/emotionalShift) and from
+ *  buildScenePurposeVarietyStrength above (a distribution-of-VALUES check,
+ *  not a positional peak-vs-average one). Verified against
+ *  calibration/corpus.ts: exactly 1 of 5 'strong' samples (Second Wind)
+ *  clears it — suspense opens at a real baseline (Scene 0, suspense delta 1;
+ *  quarter-one average 0.67), goes flat through quarters two and three
+ *  (average 0 each), then peaks at Scene 8 (suspense delta 1), topping every
+ *  earlier quarter's average. 0 of the other 19 samples (every other band,
+ *  not merely 'competent') clear it — each either never establishes a
+ *  nonzero opening baseline at all, or its closing quarter never exceeds an
+ *  earlier quarter's average. */
+function buildSuspenseShapingStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < SUSPENSE_SHAPING_MIN_SCENES) return null;
+
+  const zones: ScreenplaySceneRecord[][] = Array.from({ length: SUSPENSE_SHAPING_ZONES }, () => []);
+  records.forEach((r, i) => {
+    const zone = Math.min(SUSPENSE_SHAPING_ZONES - 1, Math.floor((i / sceneCount) * SUSPENSE_SHAPING_ZONES));
+    zones[zone].push(r);
+  });
+  // Every quarter must have real population — an empty quarter's "average"
+  // is a meaningless 0 that could trivially satisfy either side of the
+  // comparison below.
+  if (zones.some(z => z.length === 0)) return null;
+
+  const zoneAvg = zones.map(z => z.reduce((s, r) => s + r.suspenseDelta, 0) / z.length);
+  const earlyBaseline = zoneAvg[0];
+  if (earlyBaseline === 0) return null;
+
+  const finalZone = zones[SUSPENSE_SHAPING_ZONES - 1];
+  const peakRecord = finalZone.reduce((best, r) => (r.suspenseDelta > best.suspenseDelta ? r : best), finalZone[0]);
+  if (peakRecord.suspenseDelta <= 0) return null;
+
+  const earlierAvgs = zoneAvg.slice(0, SUSPENSE_SHAPING_ZONES - 1);
+  if (!earlierAvgs.every(avg => peakRecord.suspenseDelta > avg)) return null;
+
+  const baselineRecord = zones[0].find(r => r.suspenseDelta !== 0) ?? zones[0][0];
+  return (
+    `Suspense doesn't stay flat and hope for the best — it builds to a genuine peak late in the draft ` +
+    `(Scene ${peakRecord.sceneIdx}, suspense delta ${peakRecord.suspenseDelta}) that tops every earlier quarter's average tension, ` +
+    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx}.`
+  );
+}
+
+/** Minimum dramatic turns required in EACH half for the density claim below
+ *  — one scene's worth of "the draft names a turn" per half would already be
+ *  covered in spirit by buildStakesContinuityStrength's own >=1-per-half
+ *  pattern (a different channel), so this guard requires DENSITY (>=2 per
+ *  half) to earn a distinct, stronger claim on this noisier, free-text
+ *  channel. */
+const DRAMATIC_TURN_DENSITY_MIN_PER_HALF = 2;
+
+/** Guard: a named dramatic turn (dramaticTurn non-empty) lands at least
+ *  DRAMATIC_TURN_DENSITY_MIN_PER_HALF times in BOTH the front and back half
+ *  of the document — the story keeps generating real narrative turns
+ *  throughout, not just once near the top and once at the very end. Distinct
+ *  from buildStakesContinuityStrength (Wave 1183: clockRaised, a boolean
+ *  presence channel) despite the shared both-halves POSITION — this reads
+ *  `dramaticTurn`, a free-text per-scene channel buildStrengths has never
+ *  consumed, and requires DENSITY (>=2, not merely >=1) per half. Distinct
+ *  from buildScenePurposeVarietyStrength and buildSuspenseShapingStrength
+ *  above (a third, independent channel, and a plain half-split position
+ *  rather than either of those two's value-distribution or quarter-zone
+ *  mode). Verified against calibration/corpus.ts: exactly 1 of 5 'strong'
+ *  samples (Low Tide) clears >=2 turns in both halves (front: Scenes 2, 3;
+ *  back: Scenes 8, 9). 0 of the other 19 samples (every band) reach 2 turns
+ *  in even one half, let alone both — Thanksgiving, Maybe ('competent')
+ *  comes closest with 2 turns in its front half but only 1 in its back half,
+ *  which correctly does not clear this guard. */
+function buildDramaticTurnDensityStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const midN = Math.floor(sceneCount / 2);
+  const firstHalfTurns = records.slice(0, midN).filter(r => r.dramaticTurn.length > 0);
+  const secondHalfTurns = records.slice(midN).filter(r => r.dramaticTurn.length > 0);
+  if (firstHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
+  if (secondHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
+
+  const frontScenes = firstHalfTurns.map(r => r.sceneIdx).join(', ');
+  const backScenes = secondHalfTurns.map(r => r.sceneIdx).join(', ');
+  return (
+    `This draft keeps generating real turns, not just one per act — dramatic turning points land repeatedly in ` +
+    `both the front half (Scenes ${frontScenes}) and the back half (Scenes ${backScenes}) of the document.`
+  );
+}
+
 /**
  * Earned, never-padded "what's working" bullets. Exported as a pure function
  * over already-computed report data (rather than folded inline into
@@ -760,6 +989,21 @@ export function buildStrengths(input: StrengthsInput): string[] {
 
   const emotionalRange = buildEmotionalRangeStrength(records, sceneCount);
   if (emotionalRange) strengths.push(emotionalRange);
+
+  // Wave 1187 additions (Program v2, Type 2 — excellence): three more
+  // never-padded guards over signal channels buildStrengths didn't
+  // previously read (purpose, zone-quartile suspenseDelta, distributional
+  // dramaticTurn). See each helper's own comment above for its guard
+  // conditions, corpus evidence, and distinctness rationale versus the four
+  // original guards and Wave 1183's three.
+  const scenePurposeVariety = buildScenePurposeVarietyStrength(records, sceneCount);
+  if (scenePurposeVariety) strengths.push(scenePurposeVariety);
+
+  const suspenseShaping = buildSuspenseShapingStrength(records, sceneCount);
+  if (suspenseShaping) strengths.push(suspenseShaping);
+
+  const dramaticTurnDensity = buildDramaticTurnDensityStrength(records, sceneCount);
+  if (dramaticTurnDensity) strengths.push(dramaticTurnDensity);
 
   return strengths;
 }
