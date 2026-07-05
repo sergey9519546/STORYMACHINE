@@ -173,6 +173,36 @@ export interface LiveDiagnosis {
   analyzedAt: number;
 }
 
+/** Response of POST /api/scriptide/fix — the fix-and-verify receipt.
+ *  Generation is the LLM's (opt-in, aiLimiter, span-scoped); VERIFICATION is
+ *  the deterministic doctor's: the delta below is computed by re-running the
+ *  full diagnose-only pipeline on the exact candidate text, so the receipt is
+ *  proof, not promise. Both contentHashes are included so anyone can re-run
+ *  the doctor on either text and get byte-identical numbers. Keyless: 200
+ *  with usedLLM false and no candidate — never a 500. */
+export interface FixVerifyResult {
+  usedLLM: boolean;
+  /** One honest sentence when no candidate could be produced (keyless, model
+   *  failure, or the rewrite failed validation guards). */
+  note?: string;
+  /** The full document with the span replaced — what "Accept" applies. */
+  candidateFountain?: string;
+  /** Just the replacement span text (for the diff view). */
+  spanReplacement?: string;
+  /** 1-based inclusive lines of the span that was rewritten. */
+  span?: { startLine: number; endLine: number };
+  before?: { health: number; verdict?: CoverageVerdict; contentHash: string };
+  after?: { health: number; verdict?: CoverageVerdict; contentHash: string };
+  /** Issues present in the baseline report and absent from the candidate's —
+   *  matched by (rule, location) identity. The whole document is compared,
+   *  not just the span: a fix can ripple, and hiding ripples would make the
+   *  receipt a lie. */
+  cleared?: Array<RevisionIssue & { pass: PassName }>;
+  /** Issues absent from the baseline and present in the candidate's report —
+   *  regressions the fix introduced, shown with the same prominence as wins. */
+  introduced?: Array<RevisionIssue & { pass: PassName }>;
+}
+
 export interface ScriptDoctorReport {
   /** 0–100 deterministic health score. 100-ceiling, opportunity-normalized:
    *  weighted issues (4·critical + 1.5·major + 0.5·minor) are read as a
