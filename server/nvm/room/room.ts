@@ -1,10 +1,23 @@
-// Adversarial Writers' Room (G2) — 6 NarrativeModule critics argue about
+// Adversarial Writers' Room (G2) — 12 NarrativeModule critics argue about
 // every candidate IR. Showrunner drives coherence, Skeptic pokes holes,
 // Continuity is the proof kernel, Character-Advocate protects psychology,
 // Studio-Note enforces commercial viability, Dramaturge ensures structure.
+// Pacing-Editor watches rhythm, Dialogue-Specialist watches voice,
+// Theme-Auditor watches whether the thematic argument moves or restates,
+// Genre-Gatekeeper enforces the configured genre's structural contract,
+// Audience-Proxy distinguishes confusion from mystery, and
+// Production-Realist watches shootability and physical-production load.
 //
 // Critics bid "attention" on scenes (urgency×expectedPayoff). A scene no
 // critic bids on is boring. A contested scene is the spine.
+//
+// Severity tiers: most critiques are soft craft notes, scored purely by
+// `severity`. A critique may additionally set `hard: true` — a genre-contract
+// or continuity veto that must never be averaged away or buried among softer
+// notes. WritersRoomResult surfaces those separately as `hardObjections` /
+// `hasHardObjection` so a caller can gate on them directly instead of reading
+// the full critiques[] looking for outliers.
+//
 // Output: Critique[] + argument transcript the writer can read.
 
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
@@ -18,6 +31,14 @@ export interface Critique {
   objection: string;
   suggestedOperator: MutationOperator | null;
   attentionBid: number;      // 0–100: how much this critic wants to own this scene
+  /**
+   * Optional severity tier. true = a hard veto (continuity contradiction,
+   * genre forbidden-shortcut violation) that must be surfaced distinctly and
+   * never silently folded into an averaged/consensus view. Omitted or false
+   * = an ordinary soft craft note. Additive field — existing critics that
+   * never set it are unaffected and read as soft.
+   */
+  hard?: boolean;
 }
 
 export interface WritersRoomResult {
@@ -26,15 +47,25 @@ export interface WritersRoomResult {
   transcript: string;    // human-readable argument log
   dominantCritic: string; // critic with highest total attentionBid
   suggestedOperator: MutationOperator | null; // majority-vote operator suggestion
+  /** Every critique with `hard: true`, highest severity first — the vetoes. */
+  hardObjections: Critique[];
+  /** true iff hardObjections is non-empty — cheap gate for callers. */
+  hasHardObjection: boolean;
 }
 
-// Load all 6 critics
+// Load all 12 critics
 import { showrunnerCritic } from './critics/showrunner.ts';
 import { skepticCritic } from './critics/skeptic.ts';
 import { continuityCritic } from './critics/continuity.ts';
 import { characterAdvocateCritic } from './critics/character-advocate.ts';
 import { studioNoteCritic } from './critics/studio-note.ts';
 import { dramaturgeCritic } from './critics/dramaturge.ts';
+import { pacingEditorCritic } from './critics/pacing-editor.ts';
+import { dialogueSpecialistCritic } from './critics/dialogue-specialist.ts';
+import { themeAuditorCritic } from './critics/theme-auditor.ts';
+import { genreGatekeeperCritic } from './critics/genre-gatekeeper.ts';
+import { audienceProxyCritic } from './critics/audience-proxy.ts';
+import { productionRealistCritic } from './critics/production-realist.ts';
 import { logger } from '../../lib/logger.ts';
 
 export type CriticFn = (
@@ -43,12 +74,18 @@ export type CriticFn = (
 ) => Critique[];
 
 const CRITICS: Array<{ id: string; fn: CriticFn }> = [
-  { id: 'showrunner',         fn: showrunnerCritic },
-  { id: 'skeptic',            fn: skepticCritic },
-  { id: 'continuity',         fn: continuityCritic },
-  { id: 'character_advocate', fn: characterAdvocateCritic },
-  { id: 'studio_note',        fn: studioNoteCritic },
-  { id: 'dramaturge',         fn: dramaturgeCritic },
+  { id: 'showrunner',           fn: showrunnerCritic },
+  { id: 'skeptic',              fn: skepticCritic },
+  { id: 'continuity',           fn: continuityCritic },
+  { id: 'character_advocate',   fn: characterAdvocateCritic },
+  { id: 'studio_note',          fn: studioNoteCritic },
+  { id: 'dramaturge',           fn: dramaturgeCritic },
+  { id: 'pacing_editor',        fn: pacingEditorCritic },
+  { id: 'dialogue_specialist',  fn: dialogueSpecialistCritic },
+  { id: 'theme_auditor',        fn: themeAuditorCritic },
+  { id: 'genre_gatekeeper',     fn: genreGatekeeperCritic },
+  { id: 'audience_proxy',       fn: audienceProxyCritic },
+  { id: 'production_realist',   fn: productionRealistCritic },
 ];
 
 export function runWritersRoom(
@@ -111,6 +148,16 @@ export function runWritersRoom(
   const suggestedOperator = [...opVotes.entries()]
     .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
+  // Hard objections (severity tier): vetoes must be surfaced distinctly, not
+  // buried inside the consensus/dominant/suggestedOperator aggregates above —
+  // those aggregates still run over the full critiques[] unchanged, but a
+  // caller that only checks hasHardObjection never has to reconstruct this
+  // filter itself or risk missing a veto among dozens of soft notes.
+  const hardObjections = allCritiques
+    .filter(c => c.hard === true)
+    .sort((a, b) => b.severity - a.severity);
+  const hasHardObjection = hardObjections.length > 0;
+
   // Argument transcript
   const lines: string[] = [
     `=== Writers' Room — scene ${ir.sceneIdx} (${ir.sceneFunction}) ===`,
@@ -121,10 +168,22 @@ export function runWritersRoom(
   for (const c of allCritiques.sort((a, b) => b.severity - a.severity)) {
     const opRef = c.targetOpIdx !== null ? ` [op${c.targetOpIdx}]` : '';
     const opSug = c.suggestedOperator ? ` → suggest: ${c.suggestedOperator}` : '';
-    lines.push(`[${c.criticId.toUpperCase()}${opRef}] sev=${c.severity} bid=${c.attentionBid} | ${c.objection}${opSug}`);
+    const hardTag = c.hard ? ' ⚠ VETO' : '';
+    lines.push(`[${c.criticId.toUpperCase()}${opRef}]${hardTag} sev=${c.severity} bid=${c.attentionBid} | ${c.objection}${opSug}`);
   }
   if (allCritiques.length === 0) lines.push('(no objections — scene passes unanimously)');
-  lines.push('', `consensus=${consensus}  dominant=${dominantCritic}  operator=${suggestedOperator ?? 'none'}`);
+  lines.push(
+    '',
+    `consensus=${consensus}  dominant=${dominantCritic}  operator=${suggestedOperator ?? 'none'}  hardObjections=${hardObjections.length}`,
+  );
 
-  return { critiques: allCritiques, consensus, transcript: lines.join('\n'), dominantCritic, suggestedOperator };
+  return {
+    critiques: allCritiques,
+    consensus,
+    transcript: lines.join('\n'),
+    dominantCritic,
+    suggestedOperator,
+    hardObjections,
+    hasHardObjection,
+  };
 }
