@@ -14,9 +14,13 @@ import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
-import { validate, DoctorBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, SlateBodySchema } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { renderCoverageHtml } from '../lib/coverage-html.ts';
+import { buildBreakdownRows, breakdownRowsToCsv, analyzeSceneCharacters } from '../lib/breakdown.ts';
+import { renderPitchKitHtml } from '../lib/pitchkit-html.ts';
+import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '../lib/slate.ts';
+import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 
 const router = express.Router();
 export default router;
@@ -493,5 +497,154 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
   } catch (err) {
     logger.error('export_coverage_error', { message: (err as Error).message });
     res.status(500).json({ error: 'Coverage export failed' });
+  }
+}));
+
+// ── Run 14 (ROADMAP §10, producer tier) — shared fountain/fdx resolution ─────
+// Same exactly-one-of-fountain/fdx contract as DoctorBodySchema, and the same
+// fdx->Fountain resolution the coverage route above hand-rolls inline. Both
+// new producer-tier routes below (breakdown, pitchkit) need the identical
+// resolution, so it's factored out here rather than tripled — the coverage
+// route above is left as-is (untouched, still tested, still inline) to avoid
+// any risk of perturbing its existing behavior for this run.
+function resolveFountainOrRespond(
+  req: express.Request, res: express.Response,
+): string | undefined {
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string };
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return undefined;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return undefined;
+    }
+    return converted.fountain;
+  }
+
+  return fountainBody as string;
+}
+
+// ── Slate Triage export ───────────────────────────────────────────────────────
+// POST /api/export/slate — deterministic, keyless multi-script ranking for a
+// development desk triaging a slate of submissions. Runs the doctor on every
+// submitted script (doctor.ts's own LRU cache — see its file header — makes
+// re-submitting the same script across slates free) and returns a ranked
+// summary, or (format:'html', via query OR body — a producer opening this
+// straight from a browser can't always set a JSON body field, so both are
+// accepted) a standalone comparative HTML table for printing/sharing.
+//
+// Limiter choice: gameLimiter, NOT heavyBodyLimiter. heavyBodyLimiter exists
+// for routes that accept a large RAW (non-JSON) body that bypasses
+// server/app.ts's global `express.json({limit:'1mb'})` cap entirely (see its
+// own doc comment in session-store.ts — e.g. POST /api/scriptide/doctor/pdf's
+// express.raw({limit:'15mb'})). This route carries no such exemption: it's
+// plain JSON, so the SAME 1mb global cap already bounds every request before
+// SlateBodySchema's own combined-900_000-char refinement even runs — a slate
+// request can never cost more analysis than a single existing
+// POST /api/scriptide/doctor call at that schema's own ceiling, just spread
+// across up to 20 smaller scripts instead of one large one. gameLimiter's
+// existing 120/min ceiling is the right budget for that, same as every other
+// bounded-JSON-body analysis route in this file.
+router.post('/api/export/slate', gameLimiter, validate(SlateBodySchema), asyncHandler(async (req, res) => {
+  const { scripts } = req.body as { scripts: Array<{ title: string; fountain: string }> };
+  const wantsHtml = req.query.format === 'html' || (req.body as { format?: string }).format === 'html';
+
+  try {
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+
+    const entries: SlateEntry[] = [];
+    for (const script of scripts) {
+      const title = sanitizeForPrompt(script.title, 200) || 'Untitled';
+      const report = await runScriptDoctor(script.fountain);
+      const contentHash = report.contentHash ?? createHash('sha256').update(script.fountain.trim()).digest('hex');
+      entries.push(buildSlateEntry(title, report, contentHash));
+    }
+
+    const slate = rankSlate(entries);
+    const rankedAt = Date.now();
+
+    if (wantsHtml) {
+      const html = renderSlateHtml(slate, rankedAt);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="slate-triage.html"');
+      res.send(html);
+      return;
+    }
+
+    res.json({ slate, rankedAt });
+  } catch (err) {
+    logger.error('export_slate_error', { message: (err as Error).message });
+    res.status(500).json({ error: 'Slate triage failed' });
+  }
+}));
+
+// ── Breakdown export (CSV) ───────────────────────────────────────────────────
+// POST /api/export/breakdown — one row per scene (scene number, slug, parsed
+// location/INT-EXT/time-of-day, speaking characters, word count, has-clock,
+// has-clue-seeded) as a downloadable CSV a 1st AD or line producer can open
+// directly in a spreadsheet. Deterministic and keyless: server/lib/
+// breakdown.ts is a pure function of the Fountain text (re-derives
+// clockRaised/seededClueIds from analyzeFountainText itself rather than
+// trusting any client-supplied report).
+router.post('/api/export/breakdown', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  const fountain = resolveFountainOrRespond(req, res);
+  if (fountain === undefined) return;
+
+  const rawTitle = typeof req.body?.title === 'string' ? req.body.title : 'Untitled';
+  const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
+
+  try {
+    const rows = buildBreakdownRows(fountain);
+    const csv = breakdownRowsToCsv(rows);
+
+    const filename = `${encodeURIComponent(title)}-breakdown.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    logger.error('export_breakdown_error', { message: (err as Error).message });
+    res.status(500).json({ error: 'Breakdown export failed' });
+  }
+}));
+
+// ── Pitch Kit export (standalone HTML) ───────────────────────────────────────
+// POST /api/export/pitchkit — title block, inline-SVG tension curve, inline-
+// SVG character map, and a scene/word/verdict summary strip, all in one
+// standalone print-quality HTML document. Deterministic and keyless: re-runs
+// the doctor (server/nvm/analyze/doctor.ts) and the analyzer
+// (server/nvm/analyze/fountain-analyzer.ts) here for the same authenticity
+// reason POST /api/export/coverage does — the exported numbers are always
+// the numbers the tool actually computed for this exact script.
+router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
+  const fountain = resolveFountainOrRespond(req, res);
+  if (fountain === undefined) return;
+
+  const rawTitle = typeof req.body?.title === 'string' ? req.body.title : 'Untitled';
+  const title = sanitizeForPrompt(rawTitle, 256) || 'Untitled';
+
+  try {
+    // Dynamic import: same rationale as the coverage route above — doctor.ts
+    // pulls in the full analyzer + all 14 revision passes, so routes that
+    // never call the doctor shouldn't pay for it at startup.
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+    const report = await runScriptDoctor(fountain);
+    const { records } = analyzeFountainText(fountain);
+    const sceneCharacters = analyzeSceneCharacters(fountain);
+
+    const html = renderPitchKitHtml({ title, report, records, sceneCharacters });
+
+    const filename = `${encodeURIComponent(title)}-pitchkit.html`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(html);
+  } catch (err) {
+    logger.error('export_pitchkit_error', { message: (err as Error).message });
+    res.status(500).json({ error: 'Pitch kit export failed' });
   }
 }));

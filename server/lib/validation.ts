@@ -458,6 +458,35 @@ export const FixBodySchema = z.object({
   issues: z.array(FixIssueItemSchema).min(1).max(10),
 });
 
+// POST /api/export/slate — Run 14 producer-tier slate triage (append-only;
+// this run does not touch any schema above). Each script's `fountain` shares
+// DoctorBodySchema's own 900_000-char single-document ceiling, but that alone
+// is not the binding constraint here: server/app.ts's global
+// `express.json({limit:'1mb'})` body-size cap runs BEFORE this schema ever
+// sees the request, so a 20-script slate at 900_000 chars apiece (~18MB)
+// would be rejected by the body parser's generic 413 long before reaching
+// this schema's clean, specific 400. The `.refine` below caps the SUM of
+// every script's fountain length at 900_000 — the same ceiling
+// DoctorBodySchema uses for a single document — which keeps even a maximal
+// 20-script slate comfortably under the 1mb JSON cap after per-title/key/
+// comma JSON-structure overhead, so THIS validator's message is the one that
+// actually fires for an oversized slate instead of a less-specific 413.
+const SlateScriptItemSchema = z.object({
+  title: z.string().min(1).max(200),
+  fountain: z.string().min(1).max(900_000),
+}).passthrough();
+
+export const SlateBodySchema = z.object({
+  scripts: z.array(SlateScriptItemSchema).min(2).max(20),
+  format: z.enum(['json', 'html']).optional(),
+}).refine(
+  (body) => body.scripts.reduce((sum, s) => sum + s.fountain.length, 0) <= 900_000,
+  {
+    message: 'combined fountain length across all scripts must not exceed 900,000 characters — split into a smaller slate',
+    path: ['scripts'],
+  },
+);
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
