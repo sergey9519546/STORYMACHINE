@@ -1597,6 +1597,14 @@ export default function ScriptIDE({
           <ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
+            onLoadFountain={(text) => {
+              // Same path as confirmRestore (snapshot restore): set the
+              // editor's script text and re-trigger analysis, so a loaded
+              // .fdx→Fountain conversion behaves identically to any other
+              // full-script replacement for undo/collab purposes.
+              setScriptText(text);
+              triggerAnalysis(text);
+            }}
             onClose={() => setShowScriptDoctor(false)}
           />
         )}
