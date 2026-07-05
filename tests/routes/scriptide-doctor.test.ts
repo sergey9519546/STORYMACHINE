@@ -1,6 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, type TestServer } from './helpers.ts';
+import { fountainToFdx } from '../../src/lib/fdx.ts';
 
 // Multi-scene Fountain fixture: 4 sluglines (INT./EXT.), 3 speaking characters,
 // dialogue in every scene, and a few lexicon hits (deadline term "midnight",
@@ -53,6 +54,12 @@ Just drive. We'll figure out the rest later.
 JAX
 I'm sorry. I should have told you everything.
 `;
+
+// Real Final Draft XML for the fdx submission path — generated from the same
+// fixture via the existing Fountain→FDX exporter (src/lib/fdx.ts), so this
+// exercises the doctor route's fdx branch with a script rich enough to
+// produce a non-degenerate report, without hand-rolling FDX XML by hand.
+const MULTI_SCENE_FDX = fountainToFdx(MULTI_SCENE_FOUNTAIN, 'The Long Wait');
 
 describe('routes/scriptide/doctor — HTTP behavior', async () => {
   let server: TestServer;
@@ -146,5 +153,44 @@ describe('routes/scriptide/doctor — HTTP behavior', async () => {
     delete body1.analyzedAt;
     delete body2.analyzedAt;
     assert.deepEqual(body1, body2);
+  });
+
+  // ── Final Draft (.fdx) submission path ────────────────────────────────────
+  it('POST a valid Final Draft (.fdx) body returns 200 with a well-formed report and source.format "fdx"', async () => {
+    const res = await post({ fdx: MULTI_SCENE_FDX });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+
+    // Same 14-pass contract as the fountain submission path — the doctor
+    // never knows or cares which format the script arrived in.
+    assert.equal(body.passes.length, 14);
+    assert.equal(body.sceneCount, 4);
+
+    assert.equal(body.source.format, 'fdx');
+    assert.equal(typeof body.source.convertedFountain, 'string');
+    assert.ok(body.source.convertedFountain.length > 0);
+    // The converted Fountain text carries at least one recognizable slugline.
+    assert.match(body.source.convertedFountain, /INT\.\s+WAREHOUSE|EXT\.\s+WAREHOUSE|EXT\.\s+HIGHWAY/);
+  });
+
+  it('POST a body with both fountain and fdx returns 400', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, fdx: MULTI_SCENE_FDX });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /exactly one of fountain or fdx/);
+  });
+
+  it('POST a body with neither fountain nor fdx returns 400', async () => {
+    const res = await post({ title: 'Untitled' });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.match(body.error, /exactly one of fountain or fdx/);
+  });
+
+  it('POST a malformed fdx (no <Paragraph> elements) returns 400', async () => {
+    const res = await post({ fdx: '<FinalDraft><Content></Content></FinalDraft>' });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.ok(typeof body.error === 'string' && body.error.length > 0);
   });
 });

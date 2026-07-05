@@ -13,7 +13,9 @@ import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
 import { validate, DoctorBodySchema } from '../lib/validation.ts';
+import { fdxToFountain } from '../lib/fdx-import.ts';
 import type { DirectorStyle, StoryGenre, StoryStructure } from '../engine/types.ts';
+import type { DoctorSource } from '../nvm/analyze/types.ts';
 
 // ── Schema for analyzeScriptBlock ─────────────────────────────────────────────
 const AnalyzeScriptSchema = {
@@ -220,7 +222,20 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
 
 // ── Script Doctor (bridge half 3) ────────────────────────────────────────────
 // POST /api/scriptide/doctor — run the deterministic 14-pass revision-engine
-// checkup over raw Fountain text and return the aggregated ScriptDoctorReport.
+// checkup and return the aggregated ScriptDoctorReport. Two-format contract,
+// enforced by DoctorBodySchema (exactly one of the two fields is present):
+//   - { fountain }   — raw Fountain text, run through the doctor as-is.
+//   - { fdx }        — a Final Draft (.fdx) export. Converted to Fountain via
+//                       fdxToFountain() (server/lib/fdx-import.ts) first; a
+//                       conversion failure (not valid FDX) or an empty
+//                       converted script both short-circuit with a 400 before
+//                       the doctor ever runs. fdxToFountain is a small, pure,
+//                       dependency-free module, so — unlike doctor.ts below —
+//                       it's imported statically rather than dynamically.
+// Either way the response is the ScriptDoctorReport plus `source`, set here
+// (never by runScriptDoctor itself — see DoctorSource's doc comment) so the
+// client knows which format was submitted and, for fdx, can load the
+// converted Fountain text and see any non-fatal conversion warnings.
 // gameLimiter, NOT aiLimiter: every other analysis route in this file calls an
 // LLM and sits behind aiLimiter, but the doctor never does — runScriptDoctor()
 // runs the revision pipeline inside runDiagnoseOnly() (server/nvm/revision/
@@ -229,16 +244,43 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
 // guard. It's pure CPU work over the request body, so it belongs on the
 // higher-throughput gameLimiter like the other stateless/non-AI routes above.
 // Stateless by design: no sessionId, no getOrCreateSession/Stage — the doctor
-// only needs the Fountain text itself, so nothing here touches `sessions`.
+// only needs the script text itself, so nothing here touches `sessions`.
 router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
-  const { fountain } = req.body as { fountain: string; title?: string };
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+
+  let fountain: string;
+  let source: DoctorSource;
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return;
+    }
+    fountain = converted.fountain;
+    source = {
+      format: 'fdx',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+  } else {
+    fountain = fountainBody as string;
+    source = { format: 'fountain' };
+  }
+
   // Dynamic import: doctor.ts pulls in the full analyzer + all 14 revision
   // passes, matching this file's convention of lazily loading heavy modules
   // (see the engine/ai.ts and engine/character-memory.ts imports below) so
   // routes that never call the doctor don't pay for it at startup.
   const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
   const report = await runScriptDoctor(fountain);
-  res.json(report);
+  res.json({ ...report, source });
 }));
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────

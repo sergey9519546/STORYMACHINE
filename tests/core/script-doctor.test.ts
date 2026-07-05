@@ -4,9 +4,13 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runScriptDoctor, computeHealthScore, gradeForHealth } from '../../server/nvm/analyze/doctor.ts';
+import {
+  runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
+} from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
+import type { DimensionKey, DimensionScore } from '../../server/nvm/analyze/types.ts';
+import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 
 const PASS_ORDER = [
   'structure', 'causality', 'intention', 'belief', 'conflict', 'character-arc', 'dialogue',
@@ -211,5 +215,217 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
     const health = computeHealthScore({ critical: 10, major: 10, minor: 10 }, 5);
     assert.equal(health, 0);
     assert.equal(gradeForHealth(health), 'troubled');
+  });
+});
+
+// ── Coverage layer ────────────────────────────────────────────────────────────
+// verdict / dimensions / strengths / plainSummary — the industry-coverage
+// surface added on top of the raw health/passes rollup above.
+
+const DIMENSION_CONTRACT_ORDER: Array<{ key: DimensionKey; label: string }> = [
+  { key: 'structure-pacing', label: 'Structure & Pacing' },
+  { key: 'character', label: 'Character' },
+  { key: 'dialogue-voice', label: 'Dialogue & Voice' },
+  { key: 'plot-logic', label: 'Plot Logic & Payoff' },
+  { key: 'theme-originality', label: 'Theme & Originality' },
+];
+
+/** All 14 passes, exactly once each, across the 5 fixed dimensions. */
+const DIMENSION_PASS_MAP: Record<DimensionKey, string[]> = {
+  'structure-pacing': ['structure', 'pacing', 'rhythm'],
+  character: ['character-arc', 'intention', 'relationship-arc'],
+  'dialogue-voice': ['dialogue', 'voice'],
+  'plot-logic': ['causality', 'belief', 'payoff', 'conflict'],
+  'theme-originality': ['theme', 'originality'],
+};
+
+function baseStructureState(overrides: Partial<StructureState> = {}): StructureState {
+  return {
+    actPosition: 'act2a',
+    completionPercent: 40,
+    avgSuspensePerScene: 1,
+    escalating: false,
+    reversalCount: 0,
+    reversalDensity: 0,
+    approachingClimax: false,
+    openClues: 0,
+    revelationCount: 0,
+    midpointPressure: 0,
+    tightestScene: null,
+    ...overrides,
+  };
+}
+
+/** DimensionScore fixtures for buildStrengths, one per contract dimension,
+ *  with caller-supplied issueCounts (index-aligned to DIMENSION_CONTRACT_ORDER). */
+function buildDimensionFixtures(issueCounts: number[]): DimensionScore[] {
+  return DIMENSION_CONTRACT_ORDER.map((d, i) => ({
+    key: d.key,
+    label: d.label,
+    passes: DIMENSION_PASS_MAP[d.key] as DimensionScore['passes'],
+    score: issueCounts[i] === 0 ? 100 : 50,
+    issueCount: issueCounts[i],
+    summary: 'fixture summary — not under test here',
+  }));
+}
+
+describe('runScriptDoctor — dimensions', () => {
+  it('reports exactly 5 dimensions, in contract order, covering all 14 passes exactly once', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    assert.ok(report.dimensions, 'dimensions must be populated on a non-degenerate report');
+    const dimensions = report.dimensions!;
+
+    assert.equal(dimensions.length, 5);
+    assert.deepEqual(dimensions.map(d => d.key), DIMENSION_CONTRACT_ORDER.map(d => d.key));
+    assert.deepEqual(dimensions.map(d => d.label), DIMENSION_CONTRACT_ORDER.map(d => d.label));
+
+    const allMappedPasses = dimensions.flatMap(d => d.passes);
+    assert.deepEqual(
+      [...allMappedPasses].sort(),
+      [...PASS_ORDER].sort(),
+      'every one of the 14 passes must appear in exactly one dimension, with no gaps or overlaps',
+    );
+    assert.equal(new Set(allMappedPasses).size, 14, 'no pass may be double-mapped into two dimensions');
+
+    for (const dim of dimensions) {
+      assert.deepEqual(dim.passes, DIMENSION_PASS_MAP[dim.key], `unexpected pass list for dimension ${dim.key}`);
+
+      // Per-dimension issueCount must reconcile with the sum of the matching
+      // passes' issue counts in the report's own per-pass rollup.
+      const expectedIssueCount = report.passes
+        .filter(p => dim.passes.includes(p.pass))
+        .reduce((s, p) => s + p.issues.length, 0);
+      assert.equal(dim.issueCount, expectedIssueCount, `issueCount mismatch for dimension ${dim.key}`);
+
+      assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} score out of range: ${dim.score}`);
+      assert.ok(dim.summary.length > 0, `dimension ${dim.key} must have a non-empty summary`);
+
+      // No pass's ALL_CAPS rule constant may leak verbatim into the
+      // writer-facing summary sentence.
+      const dimRules = report.passes
+        .filter(p => dim.passes.includes(p.pass))
+        .flatMap(p => p.issues.map(i => i.rule));
+      for (const rule of dimRules) {
+        assert.ok(!dim.summary.includes(rule), `dimension summary leaked raw rule token "${rule}"`);
+      }
+    }
+  });
+});
+
+describe('verdictFor — boundary mapping', () => {
+  it('RECOMMENDs only at health >= 85 AND sceneCount >= 8 (both boundaries inclusive)', () => {
+    assert.equal(verdictFor(85, 8), 'RECOMMEND');
+    assert.equal(verdictFor(100, 30), 'RECOMMEND');
+  });
+
+  it('falls back to CONSIDER just below either RECOMMEND boundary', () => {
+    assert.equal(verdictFor(84.9, 8), 'CONSIDER', 'health just under 85 must not RECOMMEND');
+    assert.equal(verdictFor(85, 7), 'CONSIDER', 'sceneCount just under 8 must not RECOMMEND');
+  });
+
+  it('caps a short-but-healthy script at CONSIDER — high health alone is not enough', () => {
+    // The exact scenario called out in the contract comment: a 3-scene
+    // fragment scoring 95 is too short a sample to fully judge, so it's
+    // capped at CONSIDER rather than RECOMMEND.
+    assert.equal(verdictFor(95, 3), 'CONSIDER');
+  });
+
+  it('PASSes below health 60 regardless of sceneCount', () => {
+    assert.equal(verdictFor(59.9, 100), 'PASS');
+    assert.equal(verdictFor(0, 0), 'PASS');
+  });
+
+  it('CONSIDERs the health===60 boundary (not PASS) and mid-health scripts generally', () => {
+    assert.equal(verdictFor(60, 1), 'CONSIDER');
+    assert.equal(verdictFor(70, 20), 'CONSIDER');
+  });
+});
+
+describe('buildStrengths — earned, never-padded bullets', () => {
+  it('fire case: each guard fires exactly once when its evidence is genuinely present', () => {
+    const strengths = buildStrengths({
+      structure: baseStructureState({ escalating: true, openClues: 0 }),
+      anyClueSeeded: true,
+      sceneCount: 10,
+      bySeverity: { critical: 0, major: 3, minor: 5 },
+      // Only the first dimension is clean — isolates the "zero-issue
+      // dimension" guard to firing exactly once, not once-per-dimension.
+      dimensions: buildDimensionFixtures([0, 2, 3, 4, 5]),
+    });
+
+    assert.deepEqual(strengths, [
+      'Nothing to fix in Structure & Pacing — clean across all 10 scene(s).',
+      'Tension genuinely builds as the story goes — the back half reads more intensely than the front half, not less.',
+      'Every clue planted in this draft gets paid off — nothing is left dangling by the end.',
+      'No fatal flaws surfaced across 10 scenes — nothing here would sink the draft outright.',
+    ]);
+  });
+
+  it('no-fire case: nothing is padded in when no guard has genuine evidence', () => {
+    const strengths = buildStrengths({
+      structure: baseStructureState({ escalating: false, openClues: 3 }),
+      anyClueSeeded: true,
+      sceneCount: 3, // below the >= 5 no-fatal-flaws floor
+      bySeverity: { critical: 0, major: 1, minor: 0 },
+      dimensions: buildDimensionFixtures([1, 1, 1, 1, 1]), // no dimension is clean
+    });
+
+    assert.deepEqual(strengths, []);
+  });
+
+  it('the setup/payoff strength requires an actual seeded clue, not just openClues === 0', () => {
+    // A script that never planted anything trivially has openClues === 0 —
+    // that must NOT read as "every setup pays off" (there were no setups).
+    const strengths = buildStrengths({
+      structure: baseStructureState({ escalating: false, openClues: 0 }),
+      anyClueSeeded: false,
+      sceneCount: 10,
+      bySeverity: { critical: 1, major: 0, minor: 0 },
+      dimensions: buildDimensionFixtures([1, 1, 1, 1, 1]),
+    });
+
+    assert.ok(
+      !strengths.some(s => s.includes('gets paid off')),
+      'must not claim payoff completeness when nothing was ever seeded',
+    );
+  });
+});
+
+describe('runScriptDoctor — plainSummary', () => {
+  it('is non-empty, names the verdict, and never leaks a raw ALL_CAPS rule token', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    assert.ok(report.plainSummary && report.plainSummary.length > 0);
+    assert.ok(report.verdict, 'verdict must be populated alongside plainSummary');
+    assert.ok(
+      report.plainSummary!.includes(report.verdict!),
+      'plainSummary must state the verdict word itself',
+    );
+
+    const allRules = report.passes.flatMap(p => p.issues.map(i => i.rule));
+    for (const rule of allRules) {
+      assert.ok(!report.plainSummary!.includes(rule), `plainSummary leaked raw rule token "${rule}"`);
+    }
+  });
+});
+
+describe('runScriptDoctor — degenerate zero-scene coverage layer', () => {
+  it('returns PASS, empty strengths, and all-zero (but present) dimensions for whitespace-only input', async () => {
+    const report = await runScriptDoctor('   \n\n  \t  ');
+
+    assert.equal(report.verdict, 'PASS');
+    assert.deepEqual(report.strengths, []);
+
+    assert.ok(report.dimensions, 'dimensions must still be present on the degenerate report');
+    const dimensions = report.dimensions!;
+    assert.equal(dimensions.length, 5);
+    assert.deepEqual(dimensions.map(d => d.key), DIMENSION_CONTRACT_ORDER.map(d => d.key));
+    for (const dim of dimensions) {
+      assert.equal(dim.score, 0);
+      assert.equal(dim.issueCount, 0);
+      assert.ok(dim.summary.length > 0);
+    }
+
+    assert.ok(report.plainSummary && report.plainSummary.length > 0);
+    assert.ok(report.plainSummary!.includes('PASS'));
   });
 });

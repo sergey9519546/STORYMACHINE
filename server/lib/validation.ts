@@ -241,17 +241,25 @@ export const ReviseBodySchema = z.object({
   title: z.string().max(256).optional(),
 });
 
-// POST /api/scriptide/doctor — stateless (no sessionId): raw Fountain text in,
-// ScriptDoctorReport out. 900_000 chars is deliberately below the express
-// `express.json({ limit: '1mb' })` body cap (server/app.ts) so this schema's
-// max-length check is the one that actually fires and returns a clean 400 —
-// in the worst case (1 byte/char) 1mb ≈ 1_048_576 chars, so a fountain string
-// right at that ceiling would otherwise be rejected by the body parser with a
-// less specific 413 instead of this schema's message.
+// POST /api/scriptide/doctor — stateless (no sessionId): raw Fountain text OR
+// a Final Draft (.fdx) export in, ScriptDoctorReport out. Callers submit
+// EXACTLY ONE of `fountain` / `fdx` — never both, never neither — enforced by
+// the refinement below so server/routes/scriptide.ts never has to re-derive
+// which format arrived; it can just check which key is defined. 900_000 chars
+// is deliberately below the express `express.json({ limit: '1mb' })` body cap
+// (server/app.ts) so this schema's max-length check is the one that actually
+// fires and returns a clean 400 — in the worst case (1 byte/char) 1mb ≈
+// 1_048_576 chars, so a fountain/fdx string right at that ceiling would
+// otherwise be rejected by the body parser with a less specific 413 instead
+// of this schema's message.
 export const DoctorBodySchema = z.object({
-  fountain: z.string().min(1).max(900_000),
+  fountain: z.string().min(1).max(900_000).optional(),
+  fdx: z.string().min(1).max(900_000).optional(),
   title: z.string().max(300).optional(),
-});
+}).refine(
+  (body) => (body.fountain !== undefined) !== (body.fdx !== undefined),
+  'provide exactly one of fountain or fdx',
+);
 
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)

@@ -86,6 +86,10 @@ export interface DimensionScore {
 export interface DoctorSource {
   format: 'fountain' | 'fdx';
   convertedFountain?: string;
+  /** Non-critical fdx→Fountain conversion notes (e.g. an unrecognized Final
+   *  Draft paragraph type that was imported as Action). Present only when
+   *  fdxToFountain produced at least one. */
+  warnings?: string[];
 }
 
 export interface ScriptDoctorReport {
