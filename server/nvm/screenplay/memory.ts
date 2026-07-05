@@ -95,6 +95,23 @@ export interface ScreenplaySceneRecord {
   powerHolder?: string | null;
   powerBalance?: number;
   powerFlipped?: boolean;
+  /** Speaking-character count within the scene (Wave 1190 — Program v2 Type 1
+   *  signal channel #3, closing cycle 2). Count of distinct characters with at
+   *  least one dialogue line in this scene: 0 = no dialogue at all, 1 = a
+   *  monologue/solo beat (one character holds the floor, nobody answers),
+   *  2+ = a genuine multi-voice exchange (see fountain-analyzer.ts's
+   *  detectSpeakingCharacterCount, the only builder that currently populates
+   *  this). Distinct from powerHolder/powerBalance/powerFlipped (Wave 1186):
+   *  those are null/0 for three different, unrelated reasons (fewer than two
+   *  speakers, an ambiguous near-zero balance, or too few dyad lines to
+   *  judge) and cannot by themselves distinguish a true solo scene from a
+   *  close two-hander — speakingCharacterCount reports the raw voice count at
+   *  any value, independent of control or dialogue volume. Optional only so
+   *  legacy/test fixtures and the ops-derived path (StoryOps carry no raw
+   *  dialogue text or speaker attribution to count against) still typecheck;
+   *  consumers should treat absence as 0, matching the questionsRaised/
+   *  powerHolder precedent above. */
+  speakingCharacterCount?: number;
   /** createdAt timestamp */
   createdAt: number;
 }

@@ -358,6 +358,13 @@ const PARITY_MATRIX: Record<keyof ScreenplaySceneRecord, ParityTier> = {
   powerHolder: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   powerBalance: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   powerFlipped: 'KNOWN_ASYMMETRY_TEXT_ONLY',
+  // Wave 1190 (Program v2, Type 1 signal channel #3): speaking-character count
+  // per scene. text-path-only, same tier as the powerHolder/questionsRaised
+  // families above — the ops-derived path carries no raw dialogue text or
+  // speaker attribution to count distinct speakers against (UPDATE_BELIEF's
+  // charId is the belief-holder, not necessarily who spoke), so annotateCommit
+  // never populates this (see memory.ts's Wave 1190 field comment).
+  speakingCharacterCount: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   createdAt: 'NOT_COMPARED_IDENTIFIER',       // ops path = real epoch ms; text path = scene index integer — never comparable
 };
 
@@ -652,12 +659,13 @@ describe('record parity — drift tripwire', () => {
     }
   });
 
-  it('PARITY_MATRIX classifies all 25 known ScreenplaySceneRecord fields (sanity count)', () => {
+  it('PARITY_MATRIX classifies all 26 known ScreenplaySceneRecord fields (sanity count)', () => {
     // Not a substitute for the compile-time Record<keyof ScreenplaySceneRecord, ParityTier>
     // check above (that's what actually fails `npm run lint` on a new field) —
     // this just guards against someone hand-editing PARITY_MATRIX's runtime
     // shape independently of the type. 22 through Wave 1182, +3 for Wave
-    // 1186's powerHolder/powerBalance/powerFlipped.
-    assert.equal(Object.keys(PARITY_MATRIX).length, 25);
+    // 1186's powerHolder/powerBalance/powerFlipped, +1 for Wave 1190's
+    // speakingCharacterCount.
+    assert.equal(Object.keys(PARITY_MATRIX).length, 26);
   });
 });

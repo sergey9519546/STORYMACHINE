@@ -65,6 +65,46 @@
 // are scene-wide intensity scores with no notion of "between which two
 // people"; dramaticTurn/revelation are single-line spot checks, not a
 // running per-line tally. See the "Power-balance shifts" section below.
+//
+// Wave 1190 additions (Program v2, Type 1 — signal channel #3, closes cycle 2):
+// speaking-character count per scene, i.e. whether a scene lets one character
+// hold the floor alone (a monologue/solo beat) or is a genuine multi-voice
+// exchange. PREREQUISITE (filed at the Cycle 1 gate, ROADMAP.md): before
+// committing thresholds, the three charter-suggested candidates — scene
+// entry/exit dynamics (first/last line type), emotional-whiplash rate
+// (adjacent-scene valence sign flips), and dialogue-action interleave rhythm
+// (runs of consecutive dialogue vs action per scene) — were measured against
+// all 20 calibration-corpus samples, not assumed. Result: all three are
+// corpus-DEGENERATE, not merely sparse. Entry/exit: 196/196 scenes open with
+// action and 194/196 close on a statement (0% dialogue-open in the entire
+// corpus — the raw material for this axis simply does not vary here).
+// Emotional whiplash: zero direct adjacent sign flips in all 20 samples (only
+// one sample has even a single indirect flip once neutral scenes are
+// compressed out) — emotionalShift is neutral in 178/196 scenes (91%), far
+// too sparse for a threshold to ever cross. Dialogue-action interleave: every
+// single scene in the corpus resolves to exactly 2 content-block runs (one
+// action paragraph, then one dialogue block) — 0% variance, a structural
+// artifact of the corpus's fixed per-scene skeleton. Per the prerequisite's
+// sanctioned path (i), a DIFFERENT signal was chosen by evidence rather than
+// enriching the corpus: distinct-speaking-character count per scene, measured
+// off the SAME dialogue data the three rejected candidates already touch.
+// This axis is genuinely dense and, unlike the three rejected candidates,
+// separates the calibration bands cleanly: solo/monologue-shaped scenes
+// (exactly one speaking character) cluster entirely in each strong/competent
+// sample's opening third or spread across all three thirds, while every
+// weak/troubled sample collapses into one uninterrupted multi-voice-exchange
+// run of 4-7 consecutive scenes with no solo beat anywhere past the opening
+// (measured, not assumed — see rhythm.ts's Wave 1190 header for the exact
+// per-sample numbers this produced). detectSpeakingCharacterCount() counts
+// distinct dialogue speakers per scene (0 = no dialogue, 1 = monologue, 2+ =
+// exchange) — distinct from powerHolder/powerBalance (Wave 1186), which is
+// null/0 whenever there are fewer than two speakers OR the dyad's control
+// falls inside the deadband OR too few dyad lines exist to judge: powerHolder
+// null is overloaded across three different reasons and cannot by itself
+// distinguish "this is a true solo scene" from "this is a close, ambiguous
+// two-hander." speakingCharacterCount is the first record field to expose
+// scene VOICE COUNT explicitly, at any value (0/1/2/3+), independent of
+// control, valence, or dialogue volume.
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -939,6 +979,29 @@ function detectPowerBalance(scene: SceneUnit): PowerBalanceSignal {
   return { powerHolder: full.holder, powerBalance: full.balance, powerFlipped };
 }
 
+// ── Speaking-character count (per-scene) — Wave 1190 ─────────────────────────
+// See the file-header "Wave 1190 additions" comment for the prerequisite
+// measurement, the rejected candidates, and the distinctness rationale
+// against powerHolder/powerBalance. Deliberately per-scene/independent, like
+// detectPowerBalance, since "how many voices does THIS scene have" needs no
+// state from other scenes.
+
+/** SPEAKING-CHARACTER COUNT: counts distinct dialogue speakers in the scene —
+ *  0 when the scene has no dialogue at all, 1 when exactly one character
+ *  speaks (a monologue/solo beat — nobody answers), 2+ for a genuine
+ *  multi-voice exchange. Computed directly from scene.dialogueLines (the
+ *  lines that actually carry a speaker), not scene.characters (which records
+ *  a name the moment a character cue appears, even if no dialogue text ever
+ *  follows it) — so a character cue with no spoken line never inflates the
+ *  count. */
+function detectSpeakingCharacterCount(scene: SceneUnit): number {
+  const speakers = new Set<string>();
+  for (const d of scene.dialogueLines) {
+    if (d.speaker) speakers.add(d.speaker);
+  }
+  return speakers.size;
+}
+
 // ── Empty-input shortcut ──────────────────────────────────────────────────────
 
 function emptyAnalysis(): FountainAnalysis {
@@ -985,6 +1048,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const dialogueHighlightsList = sceneUnits.map(s => detectDialogueHighlights(s.dialogueLines));
   const relationshipShiftsList = sceneUnits.map(s => detectRelationshipShifts(s.characters, s.dialogueLines));
   const powerBalances = sceneUnits.map(s => detectPowerBalance(s));
+  const speakingCharacterCounts = sceneUnits.map(s => detectSpeakingCharacterCount(s));
 
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
   const { seedsByScene, payoffsByScene, unresolvedByScene } = detectClueLifecycle(sceneUnits);
@@ -1032,6 +1096,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
     powerHolder: powerBalances[idx].powerHolder,
     powerBalance: powerBalances[idx].powerBalance,
     powerFlipped: powerBalances[idx].powerFlipped,
+    speakingCharacterCount: speakingCharacterCounts[idx],
     createdAt: idx,
   }));
 

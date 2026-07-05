@@ -507,3 +507,74 @@ describe('analyzeFountainText — power-balance shifts (powerHolder / powerBalan
     assert.equal(analysis.records[0].powerFlipped, false);
   });
 });
+
+// Wave 1190 (Program v2, Type 1 signal channel #3, closes cycle 2) —
+// speaking-character count per scene (monologue/solo beat vs multi-voice
+// exchange). See fountain-analyzer.ts's Wave 1190 header comment for the
+// corpus-density prerequisite measurement that led here.
+describe('analyzeFountainText — speaking-character count (monologue vs exchange)', () => {
+  it('a scene where only one character speaks reports speakingCharacterCount 1', () => {
+    const fountain = [
+      'INT. STUDY - NIGHT',
+      '',
+      'Whit stares at the cold fireplace.',
+      '',
+      'WHIT',
+      'Nobody is coming back for this house.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].speakingCharacterCount, 1);
+  });
+
+  it('a scene where two characters each speak at least one line reports speakingCharacterCount 2', () => {
+    const fountain = [
+      'INT. STUDY - NIGHT',
+      '',
+      'Whit and Reyes face each other across the desk.',
+      '',
+      'WHIT',
+      'You knew about the ledger the whole time.',
+      '',
+      'REYES',
+      'I found out the same day you did.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].speakingCharacterCount, 2);
+  });
+
+  it('a scene with no dialogue at all reports speakingCharacterCount 0', () => {
+    const fountain = [
+      'EXT. DOCKS - DAWN',
+      '',
+      'Fog rolls over the empty pier. Nothing moves.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].speakingCharacterCount, 0);
+  });
+
+  it('a three-character scene reports speakingCharacterCount 3, and a repeated speaker is not double-counted', () => {
+    const fountain = [
+      'INT. BULLPEN - DAY',
+      '',
+      'The detectives crowd around the board.',
+      '',
+      'RAY',
+      'Two sets of figures for one cargo load.',
+      '',
+      'VIC',
+      'That much I already knew.',
+      '',
+      'RAY',
+      'But did you know who signed off on it?',
+      '',
+      'CHIEF',
+      'Enough. Both of you, with me.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].speakingCharacterCount, 3);
+  });
+});

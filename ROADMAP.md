@@ -264,7 +264,18 @@ strongest trust claim.
 
 ---
 
-## 8. Run 12 — Waves 1183–1186 (one full v2 rotation)
+## 8. Run 12 — ✅ COMPLETE (both cycles, gates green)
+Cycle 1 (1183-1186) + cycle 2 (1187-1190) shipped: 24 rules/detectors,
+2 new signal channels (power balance, speaking-character count), 6 genre
+variants (7 of 8 genres covered; noir needs a valence-variance signal),
+6 root-cause templates. CYCLE-2 GATE: 8 LIVE / 4 FIXTURE-ONLY / 0 DEAD;
+band separation improved (weak/troubled dropped — new LIVE rules fire
+only there: 61.62/53.07/37.28/34.43). The density prerequisite WORKED
+(cycle-2 Type-1: 2/3 LIVE vs cycle-1: 0/3) — measure-before-threshold is
+now STANDING PRACTICE for all future Type-1 waves. Per wave economics:
+wave grinding pauses here; resume cycles post-deep-read-enrichment or as
+scheduled. NEXT RUN: Run 13 (keyless deterministic simulation, design
+doc first). — Waves 1183–1186 (one full v2 rotation)
 
 **Why**: prove out all four Program v2 wave types end to end before trusting
 the rotation to run unattended for hundreds of future waves.
