@@ -283,6 +283,92 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   res.json({ ...report, source });
 }));
 
+// POST /api/scriptide/doctor/pdf — Script Doctor entry point for a screenplay
+// submitted as a PDF (the single most common real-world screenplay format —
+// Final Draft/WriterDuet/Arc Studio/etc. all export to it). Converts to
+// Fountain via pdfToFountain() (server/lib/pdf-import.ts) and then runs the
+// exact same doctor pipeline as the /doctor route above, so this is the
+// three-format sibling to that route's { fountain } / { fdx } contract:
+//   - PDF has no JSON-serializable text of its own (it's a binary format), so
+//     it can't share DoctorBodySchema/{ fountain, fdx } — it gets its own
+//     route with its own body-parsing middleware instead of a third field on
+//     the JSON schema.
+// Middleware chain:
+//   gameLimiter        — same tier as /doctor: pdfToFountain + runScriptDoctor
+//                         are both pure CPU work with no LLM call (see the
+//                         /doctor route's comment above for why that route
+//                         sits on gameLimiter, not aiLimiter — identical
+//                         reasoning applies here).
+//   express.raw(...)    — the request body is opaque PDF bytes, not JSON.
+//                         server/app.ts's global express.json({limit:'1mb'})
+//                         is content-type-gated to application/json and
+//                         leaves any other content type's body untouched, so
+//                         a route-local express.raw() scoped to
+//                         application/pdf (plus application/octet-stream,
+//                         since some HTTP clients/proxies mislabel binary
+//                         uploads generically) doesn't conflict with it.
+//                         limit:'15mb', well above the JSON routes' 1mb cap:
+//                         real screenplay PDFs — dozens of pages, often with
+//                         embedded font subsets — routinely land in the low
+//                         single-digit megabytes, so 1mb would reject
+//                         ordinary scripts, not just abuse.
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage.
+router.post(
+  '/api/scriptide/doctor/pdf',
+  gameLimiter,
+  express.raw({ type: ['application/pdf', 'application/octet-stream'], limit: '15mb' }),
+  asyncHandler(async (req, res) => {
+    const body = req.body as unknown;
+
+    // Empty body (no bytes at all, or Content-Type didn't match the raw
+    // parser above so req.body was never populated as a Buffer) — reject
+    // before ever touching pdfToFountain.
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      res.status(400).json({ error: 'Request body is empty — expected raw PDF bytes.' });
+      return;
+    }
+
+    // Fast, exact magic-byte guard ahead of the real parse: pdfToFountain()
+    // itself re-checks more leniently (a bounded scan for "%PDF-" that can
+    // appear a little later in the stream, matching how real PDF readers
+    // locate it) — this route-level check only needs to catch the common
+    // case (wrong content, not a PDF at all) cheaply, without spending a full
+    // pdfjs parse on obviously-non-PDF input.
+    if (body.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      res.status(400).json({ error: 'This does not look like a PDF file (missing %PDF header).' });
+      return;
+    }
+
+    // Dynamic import: pdf-import.ts's own pdfjs-dist dependency is a large
+    // parser this route is the only caller of — matching this file's
+    // lazy-load convention for heavy modules (see fdx-import's static-import
+    // note on the /doctor route above, and doctor.ts's dynamic import below,
+    // for the same reasoning applied to the other two shapes of "heavy but
+    // situational" dependency).
+    const { pdfToFountain } = await import('../lib/pdf-import.ts');
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = await pdfToFountain(new Uint8Array(body));
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The PDF converted to an empty script — nothing to analyze.' });
+      return;
+    }
+
+    const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+    const report = await runScriptDoctor(converted.fountain);
+    const source: DoctorSource = {
+      format: 'pdf',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+    res.json({ ...report, source });
+  }),
+);
+
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
 router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
