@@ -12,7 +12,7 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users } from "lucide-react";
 import ScenarioBuilder from "./storymachine/ScenarioBuilder";
 import SettingsPanel from "./SettingsPanel";
 import WhatIfPanel from "./WhatIfPanel";
@@ -39,6 +39,8 @@ import { MomentumPanel } from "./MomentumPanel";
 import { VoiceDNAPanel } from "./VoiceDNAPanel";
 import { LivePlayPanel } from "./LivePlayPanel";
 import { RevisionPanel } from "./RevisionPanel";
+import InterviewPanel from "./InterviewPanel";
+import { RoomPanel } from "./RoomPanel";
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -134,6 +136,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showVoiceDNA, setShowVoiceDNA]         = useState(false);
   const [showLivePlay, setShowLivePlay]         = useState(false);
   const [showRevision, setShowRevision]         = useState(false);
+  const [showInterview, setShowInterview]       = useState(false);
+  const [showRoom, setShowRoom]                 = useState(false);
 
   // Keyless-honesty banner (finding E): null until the readiness check
   // resolves, so the banner never flashes an incorrect "no key" warning on
@@ -756,6 +760,22 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           >
             <span style={{ fontSize: 14 }}>✒</span>
             <span className="hidden sm:inline">Revise</span>
+          </button>
+          <button
+            onClick={() => setShowInterview(true)}
+            title="Character Interview — talk to a character, grounded in their real psychology"
+            className="bg-fuchsia-950 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">Interview</span>
+          </button>
+          <button
+            onClick={() => setShowRoom(true)}
+            title="Writers' Room — convene six critics to debate the current story state"
+            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+          >
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Room</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -1464,6 +1484,16 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showRevision && (
         <RevisionPanel onClose={() => setShowRevision(false)} />
+      )}
+
+      {showInterview && (
+        <InterviewPanel onClose={() => setShowInterview(false)} agents={agents} />
+      )}
+
+      {showRoom && (
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
+          <RoomPanel onClose={() => setShowRoom(false)} />
+        </div>
       )}
     </div>
   );
