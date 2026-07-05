@@ -84,7 +84,7 @@ export interface DimensionScore {
  *  by runScriptDoctor. When the input was converted (e.g. from Final Draft
  *  .fdx), convertedFountain carries the result so the client can load it. */
 export interface DoctorSource {
-  format: 'fountain' | 'fdx';
+  format: 'fountain' | 'fdx' | 'pdf';
   convertedFountain?: string;
   /** Non-critical fdx→Fountain conversion notes (e.g. an unrecognized Final
    *  Draft paragraph type that was imported as Action). Present only when
@@ -128,4 +128,9 @@ export interface ScriptDoctorReport {
   plainSummary?: string;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
+  /** sha256 hex of the trimmed analyzed Fountain text. The determinism
+   *  receipt: two reports with equal contentHash came from the identical
+   *  script, so their verdicts are comparable draft-over-draft, and an
+   *  exported report can be re-verified byte-for-byte. */
+  contentHash?: string;
 }
