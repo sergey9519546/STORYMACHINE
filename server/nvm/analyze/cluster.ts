@@ -32,6 +32,12 @@
 //      unrelated observations.
 // Singletons (any cluster of exactly 1) are never returned — clustering is
 // about convergent symptoms, not a re-listing of the flat issue array.
+//
+// A fourth mechanism sits above these three (Wave 1185, see the "Wave 1185
+// additions" block below for the full rationale): a small set of NAMED
+// templates — recognized rule-pair convergences that are always the same
+// underlying wound, not a coincidence — run first and claim their matching
+// issues so the three generic mechanisms above only ever see what's left.
 
 import crypto from 'node:crypto';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
@@ -136,6 +142,183 @@ function findingId(memberRules: string[], startLine?: number, endLine?: number, 
   const sortedRules = [...memberRules].sort();
   const key = `${JSON.stringify(sortedRules)}|${startLine ?? ''}|${endLine ?? ''}|${extra}`;
   return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
+
+// ── Wave 1185 additions (Program v2, Type 4 — root-cause templates) ────────
+//
+// Everything above this point turns co-firing issues into a GENERIC finding
+// ("Recurring Structure & Pacing trouble in Scene 5") — accurate, but it
+// names the symptom cluster, not the wound. A template is a recognized,
+// NAMED co-occurrence pattern: a fixed pair (or larger set) of rules that,
+// when they land in the same spatially-connected group (the exact same
+// mechanism overlapClusters already uses — same scene, or a lines-anchored
+// issue whose range falls inside a scene-anchored one's span), are always
+// the same underlying craft problem wearing two rule-name hats, not a
+// coincidence. The three below were chosen from measured evidence, not
+// intuition (Wave 1184's method: runScriptDoctor over all 20 calibration
+// corpus samples, tallied for rule-pair co-occurrence and, more strongly,
+// spatial overlap — see the wave commit for the full top-pairs table):
+//
+//   WEAK_MIDPOINT + MIDPOINT_EMOTIONAL_FLATLINE     — co-fire in 20/20
+//     samples; land in the identical scene span 20/20 times they co-fire
+//     (both anchor to the same floor(n/2) midpoint scene by construction).
+//   DRAMATIC_TURN_AFTERMATH_VOID + INCITING_AFTERMATH_STALL — co-fire in
+//     12/20 samples; land in the identical scene span all 12/12 times (the
+//     story's first catalyst is very often also its first dramatic turn).
+//   ZERO_ENTROPY_SCENE + DIALOGUE_ASSERTION_RUN     — co-fire in 20/20
+//     samples; the assertion run's line range falls inside a zero-entropy
+//     scene's span in 14/20 samples (real overlap, not mere co-presence).
+//
+// ── Design choice: claim-before-generic-clustering, not enrich-after ──────
+// Two designs were available: (a) let overlapClusters/characterClusters run
+// as today and afterward re-title any resulting cluster whose memberRules
+// happen to match a template, or (b) run template recognition FIRST and
+// remove (claim) the issues it matches from the pool before the generic
+// clusterers ever see them. (b) is what's implemented, because (a) has a
+// real double-report risk this module's own architecture forbids: the
+// generic scene/lines clustering (Cluster 1 above) is span-overlap-based
+// with NO awareness of rule identity, so it would independently form the
+// exact same connected group a template also matches — re-titling it after
+// the fact is a patch that has to special-case every future template's shape
+// against every existing clusterer's output, whereas claiming issues up
+// front means every clusterer downstream (overlap, character, document
+// family) simply never sees a claimed issue again, by construction, forever
+// — no coordination required as templates or clusterers are added later. The
+// cost is that a template's own matching logic must be self-contained (it
+// can't lean on overlapClusters' output), which is why matchOverlapTemplate
+// below re-implements the identical span-overlap union-find, scoped to the
+// template's own rule set.
+
+interface RootCauseTemplate {
+  /** Slug embedded in the finding's id (stable across runs — see
+   *  synthesizeTemplateFinding) so a template's findings are identifiable
+   *  and never collide with a generic cluster's hash-only id. */
+  id: string;
+  /** Every one of these rules must appear (as a distinct rule, at least
+   *  once) within the same spatially-connected group for the template to
+   *  fire — two issues of the SAME rule overlapping is not this template,
+   *  it's an ordinary generic cluster (or, if the whole group is exactly one
+   *  rule repeated, no finding at all — clusterIssues never merges same-rule
+   *  duplicates into a named wound). */
+  requiredRules: string[];
+  /** Plain-language name of the underlying problem — the wound, not the
+   *  symptom list. No rule-name jargon, no ALL_CAPS token. */
+  title: string;
+  /** One or two sentences: what the two symptoms together prove, and the
+   *  single concrete change that clears both at once (the fix-and-verify
+   *  surface consumes this text as its fix target). */
+  explanation: (members: LocatedIssue[], where: string) => string;
+}
+
+const ROOT_CAUSE_TEMPLATES: RootCauseTemplate[] = [
+  {
+    id: 'midpoint-stall',
+    requiredRules: ['WEAK_MIDPOINT', 'MIDPOINT_EMOTIONAL_FLATLINE'],
+    title: 'The middle has no engine',
+    explanation: (members, where) =>
+      `Two independent checks agree that ${where} is the story's dead center: midpoint suspense `
+      + `pressure is flat, and the midpoint scene itself carries no emotional or tension shift. `
+      + `That's not two problems, it's one missing pivot — give this single scene a reversal, a `
+      + `revelation, or a point-of-no-return decision, and both symptoms clear together.`,
+  },
+  {
+    id: 'aftermath-void',
+    requiredRules: ['DRAMATIC_TURN_AFTERMATH_VOID', 'INCITING_AFTERMATH_STALL'],
+    title: "Consequences don't land",
+    explanation: (members, where) =>
+      `${where} delivers the story's pivotal turn, but the two scenes that follow register `
+      + `nothing — no suspense rise, no emotional shift, no relationship movement — on two separate `
+      + `readings of the same wake. The turn itself doesn't need rewriting; the very next scene does: `
+      + `make someone react to what just happened before the story is allowed to move on.`,
+  },
+  {
+    id: 'inert-scene-flat-talk',
+    requiredRules: ['ZERO_ENTROPY_SCENE', 'DIALOGUE_ASSERTION_RUN'],
+    title: 'Everyone sounds the same about nothing',
+    explanation: (members, where) =>
+      `${where} has no plot or character momentum, and it also carries a run of purely declarative `
+      + `dialogue in that same stretch — nobody asks a question, nobody pushes back, nothing is at `
+      + `stake in how it's said or what it moves. Give one character in this scene a want that `
+      + `collides with another's; the friction fixes the momentum and the dialogue in the same stroke.`,
+  },
+];
+
+/** Run one template's recognizer over every located issue: filter to the
+ *  template's own rule set (scene/lines-anchored issues only — a template
+ *  has nothing to say about a character- or document-anchored issue, since
+ *  the whole claim is spatial convergence), union-find them by the identical
+ *  inclusive span-overlap rule overlapClusters uses, then keep only the
+ *  resulting groups that contain EVERY required rule at least once.
+ *  Singletons and partial matches (only one of the required rules present in
+ *  a connected group) are correctly not a template match — they fall through
+ *  to the ordinary clusterers untouched. */
+function matchOverlapTemplate(
+  template: RootCauseTemplate,
+  located: LocatedIssue[],
+): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
+  const candidates = located.filter(li =>
+    template.requiredRules.includes(li.issue.rule)
+    && (li.anchor === 'scene' || li.anchor === 'lines')
+    && li.startLine !== undefined && li.endLine !== undefined,
+  );
+  if (candidates.length < 2) return { consumed: [], findings: [] };
+
+  const uf = makeUnionFind(candidates.length);
+  for (let a = 0; a < candidates.length; a++) {
+    const A = candidates[a];
+    for (let b = a + 1; b < candidates.length; b++) {
+      const B = candidates[b];
+      if (A.startLine! <= B.endLine! && B.startLine! <= A.endLine!) uf.union(a, b);
+    }
+  }
+
+  const groups = new Map<number, LocatedIssue[]>();
+  candidates.forEach((li, i) => {
+    const root = uf.find(i);
+    const group = groups.get(root) ?? [];
+    group.push(li);
+    groups.set(root, group);
+  });
+
+  const consumed: LocatedIssue[] = [];
+  const findings: RootCauseFinding[] = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const rulesPresent = new Set(group.map(m => m.issue.rule));
+    const allRequiredPresent = template.requiredRules.every(r => rulesPresent.has(r));
+    if (!allRequiredPresent) continue;
+    findings.push(synthesizeTemplateFinding(template, group));
+    consumed.push(...group);
+  }
+  return { consumed, findings };
+}
+
+function synthesizeTemplateFinding(template: RootCauseTemplate, members: LocatedIssue[]): RootCauseFinding {
+  const memberRules = uniqueRules(members);
+  const startLine = Math.min(...members.map(m => m.startLine!));
+  const endLine = Math.max(...members.map(m => m.endLine!));
+  const sceneIdxs = sceneIdxsOf(members);
+  const where = sceneIdxs.length === 1
+    ? `Scene ${sceneIdxs[0]}`
+    : sceneIdxs.length > 1
+      ? `Scenes ${sceneIdxs[0]}–${sceneIdxs[sceneIdxs.length - 1]}`
+      : `lines ${startLine}-${endLine}`;
+
+  return {
+    // Template id is folded into both the hash discriminator (extra) AND the
+    // visible prefix, so a template's findings are stable across runs and
+    // identifiable at a glance (never just an opaque hash) — the "recorded
+    // in the finding id for stability" requirement.
+    id: `${template.id}-${findingId(memberRules, startLine, endLine, template.id)}`,
+    title: template.title,
+    explanation: template.explanation(members, where),
+    severity: worstSeverity(members),
+    memberRules,
+    memberCount: members.length,
+    sceneIdxs,
+    startLine,
+    endLine,
+  };
 }
 
 // ── Union-find over line-overlap ─────────────────────────────────────────────
@@ -303,9 +486,21 @@ function synthesizeDocumentFamilyFinding(family: string, members: LocatedIssue[]
 export function clusterIssues(located: LocatedIssue[]): RootCauseFinding[] {
   const findings: RootCauseFinding[] = [];
 
-  for (const group of overlapClusters(located)) findings.push(synthesizeSceneOrLinesFinding(group));
-  for (const group of characterClusters(located)) findings.push(synthesizeCharacterFinding(group));
-  for (const { family, members } of documentFamilyClusters(located)) {
+  // Named templates run first and claim their member issues (see the Wave
+  // 1185 design-choice comment above matchOverlapTemplate) so the generic
+  // clusterers below never re-report the same spatial convergence under the
+  // generic "Recurring X trouble" wording.
+  const consumed = new Set<LocatedIssue>();
+  for (const template of ROOT_CAUSE_TEMPLATES) {
+    const { consumed: templateConsumed, findings: templateFindings } = matchOverlapTemplate(template, located);
+    for (const li of templateConsumed) consumed.add(li);
+    findings.push(...templateFindings);
+  }
+  const remaining = consumed.size === 0 ? located : located.filter(li => !consumed.has(li));
+
+  for (const group of overlapClusters(remaining)) findings.push(synthesizeSceneOrLinesFinding(group));
+  for (const group of characterClusters(remaining)) findings.push(synthesizeCharacterFinding(group));
+  for (const { family, members } of documentFamilyClusters(remaining)) {
     findings.push(synthesizeDocumentFamilyFinding(family, members));
   }
 
