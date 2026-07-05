@@ -537,6 +537,12 @@
 // suspenseDelta its second channel (emotionalShift); PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID
 // gives emotionalShift its second channel (curiosityDelta); PAYOFF_CLOCK_DELTA_EMOTIONAL_
 // AFTERMATH_VOID gives clockDelta≠0 its second channel (emotionalShift).
+// Wave 1168 additions: after Wave 1154, suspenseDelta stood at two channels (curiosityDelta,
+// emotionalShift), emotionalShift at two (relationshipShifts, curiosityDelta), and clockDelta≠0
+// at two (curiosityDelta, emotionalShift). PAYOFF_SUSPENSE_RELATIONAL_AFTERMATH_VOID gives
+// suspenseDelta its third channel (relationshipShifts); PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID
+// gives emotionalShift its third channel (suspenseDelta); PAYOFF_CLOCK_DELTA_RELATIONAL_
+// AFTERMATH_VOID gives clockDelta≠0 its third channel (relationshipShifts).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6478,6 +6484,81 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1154c.triggerCount} scenes that move the ticking clock is followed by two scenes with no emotional shift, even though ${r1154c.aftermathCount} such shifts occur elsewhere. A deadline that shifts without ever registering on a character's felt state leaves the payoff machinery's clock reading as a number changing rather than pressure anyone visibly feels.`,
         suggestedFix: `In the two scenes following at least one clock-delta shift, let a character's emotional register respond to the changing pressure, so the deadline carries felt weight, not just arithmetic.`,
+      });
+    }
+  }
+
+  // PAYOFF_SUSPENSE_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → relationshipShifts absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 scenes anywhere with a recorded
+  // relationship shift, 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath
+  // carries no relationship movement, while such movement occurs elsewhere. Distinct from
+  // PAYOFF_SUSPENSE_CURIOSITY_AFTERMATH_VOID (Wave 1140) and PAYOFF_SUSPENSE_EMOTIONAL_AFTERMATH_
+  // VOID (Wave 1154, same trigger paired with curiosityDelta/emotionalShift) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1168a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1168a.fires) {
+      issues.push({
+        location: `${r1168a.triggerCount} suspense-spike scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PAYOFF_SUSPENSE_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1168a.triggerCount} suspense-spike scenes is followed by two scenes with no recorded relationship shift, even though ${r1168a.aftermathCount} such shifts occur elsewhere. A spike in danger that never moves how a pair of characters stand with each other right after it lands leaves the payoff machinery's tension isolated from the interpersonal stakes it should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let it shift a relationship — an alliance strained or forced by the danger — so the tension carries interpersonal weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 suspense-rising scenes anywhere,
+  // 2-scene lookahead. Fires when every emotionally-charged scene's two-scene aftermath carries
+  // no rise in suspense, while such rises occur elsewhere. Distinct from PAYOFF_EMOTION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1140) and PAYOFF_EMOTION_CURIOSITY_AFTERMATH_VOID (Wave 1154,
+  // same trigger paired with relationshipShifts/curiosityDelta) — this is the third consequence
+  // channel for this trigger.
+  {
+    const r1168b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1168b.fires) {
+      issues.push({
+        location: `${r1168b.triggerCount} emotionally-charged scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'PAYOFF_EMOTION_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1168b.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in suspense, even though ${r1168b.aftermathCount} such rises occur elsewhere. A strong feeling that never sharpens danger or uncertainty right after it lands leaves the payoff machinery's emotional beats registering as internal state rather than something that compounds tension.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let the feeling raise the stakes, so the payoff machinery's emotional beats keep building tension, not just registering how a character feels.`,
+      });
+    }
+  }
+
+  // PAYOFF_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID — Sequence/aftermath × clockDelta≠0 trigger →
+  // relationshipShifts absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying clock-delta scenes (pos<n-2), ≥2 scenes anywhere with a recorded relationship
+  // shift, 2-scene lookahead. Fires when every clock-delta's two-scene aftermath carries no
+  // relationship movement, while such movement occurs elsewhere. Distinct from PAYOFF_CLOCK_
+  // DELTA_CURIOSITY_AFTERMATH_VOID (Wave 1140) and PAYOFF_CLOCK_DELTA_EMOTIONAL_AFTERMATH_VOID
+  // (Wave 1154, same trigger paired with curiosityDelta/emotionalShift) — this is the third
+  // consequence channel for this trigger.
+  {
+    const r1168c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.clockDelta ?? 0) !== 0,
+      isAftermath: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1168c.fires) {
+      issues.push({
+        location: `${r1168c.triggerCount} clock-delta scene(s) — no relationship shift within 2 scenes of any`,
+        rule: 'PAYOFF_CLOCK_DELTA_RELATIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1168c.triggerCount} scenes that move the ticking clock is followed by two scenes with no recorded relationship shift, even though ${r1168c.aftermathCount} such shifts occur elsewhere. A deadline that shifts without ever moving how characters stand with each other leaves the payoff machinery's clock isolated from the interpersonal stakes the changing pressure should eventually complicate.`,
+        suggestedFix: `In the two scenes following at least one clock-delta shift, let it move a relationship — the changing pressure forcing an alliance or a rupture — so the deadline carries interpersonal weight, not just a shifting number.`,
       });
     }
   }
