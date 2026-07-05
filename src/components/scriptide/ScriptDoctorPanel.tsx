@@ -28,6 +28,7 @@ import type {
   SceneDiagnostics,
   CoverageVerdict,
   DimensionKey,
+  RootCauseFinding,
 } from "../../../server/nvm/analyze/types.ts";
 import type {
   RevisionIssue,
@@ -144,6 +145,49 @@ function formatPassName(pass: PassName): string {
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+/** Turn a raw rule identifier (e.g. "CHARACTER_INTRO_CLICHE", the ALL_CAPS
+ *  snake_case convention every revision pass uses for RevisionIssue.rule)
+ *  into a plain-language phrase ("character intro cliche") for the root-cause
+ *  card's "contributing notes" list — that list is meant to name the writer's
+ *  problem, not leak an internal rule constant verbatim. */
+function humanizeRule(rule: string): string {
+  return rule.replace(/_/g, " ").toLowerCase();
+}
+
+/** Severity → chip classes for the root-cause card's severity badge — reuses
+ *  the exact SEVERITY_META palette (green/amber/red is reserved for
+ *  score/severity bands elsewhere in this file) so a root cause reads with
+ *  the same urgency vocabulary as everything else in the report. */
+const ROOT_CAUSE_SEVERITY_BORDER: Record<RevisionIssue["severity"], string> = {
+  critical: "border-red-600",
+  major: "border-amber-500",
+  minor: "border-zinc-400 dark:border-zinc-500",
+};
+
+/** Neutral/accent styling for percentile badges — deliberately NOT the
+ *  green/amber/red severity palette used everywhere else in this file, since
+ *  a percentile is descriptive context ("how this compares"), not a grade. */
+const PERCENTILE_BADGE_CLASS =
+  "inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/40";
+
+/** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) for a percentile badge —
+ *  handles the 11–13 teens exception (11th/12th/13th, not 11st/12nd/13rd). */
+function ordinal(n: number): string {
+  const rounded = Math.round(n);
+  const mod100 = rounded % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${rounded}th`;
+  switch (rounded % 10) {
+    case 1:
+      return `${rounded}st`;
+    case 2:
+      return `${rounded}nd`;
+    case 3:
+      return `${rounded}rd`;
+    default:
+      return `${rounded}th`;
+  }
 }
 
 /** Heatmap cell color by issue density — critical presence always wins regardless
@@ -443,6 +487,79 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
         <p className="text-[10px] font-mono text-green-700 dark:text-green-400 mt-2 pl-2 border-l-2 border-green-500">
           Fix: {issue.suggestedFix}
         </p>
+      )}
+    </div>
+  );
+}
+
+/** One root-cause finding: severity chip, title, explanation, a compact
+ *  "N issues • scenes X, Y" meta line, and a collapsible list of the member
+ *  rules that were clustered into this diagnosis. Manages its own collapse
+ *  state (each card opens independently) — mirrors the per-pass collapsible
+ *  pattern below (aria-expanded + chevron) rather than introducing a new
+ *  interaction idiom. */
+function RootCauseCard({ finding }: { finding: RootCauseFinding }) {
+  const [open, setOpen] = useState(false);
+  const meta = SEVERITY_META[finding.severity];
+  const Icon = meta.icon;
+  const sceneLabel =
+    finding.sceneIdxs.length > 0
+      ? `scene${finding.sceneIdxs.length === 1 ? "" : "s"} ${finding.sceneIdxs
+          .map((idx) => idx + 1)
+          .join(", ")}`
+      : null;
+  const notesId = `root-cause-notes-${finding.id}`;
+
+  return (
+    <div
+      className={`bg-gray-50 dark:bg-zinc-800 border-2 border-l-[6px] ${ROOT_CAUSE_SEVERITY_BORDER[finding.severity]} border-black/10 dark:border-white/10 p-3 space-y-2`}
+    >
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${meta.badge}`}
+        >
+          <Icon className="w-3 h-3" aria-hidden="true" /> {meta.label}
+        </span>
+        <span className="text-xs font-bold uppercase tracking-wide text-black dark:text-white">
+          {finding.title}
+        </span>
+      </div>
+      <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
+        {finding.explanation}
+      </p>
+      <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+        {finding.memberCount} issue{finding.memberCount === 1 ? "" : "s"}
+        {sceneLabel ? ` • ${sceneLabel}` : ""}
+      </p>
+      {finding.memberRules.length > 0 && (
+        <div>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls={notesId}
+            className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-white hover:underline"
+          >
+            {open ? (
+              <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+            )}
+            Show the {finding.memberRules.length} contributing note
+            {finding.memberRules.length === 1 ? "" : "s"}
+          </button>
+          {open && (
+            <ul id={notesId} className="mt-1.5 space-y-1 pl-4">
+              {finding.memberRules.map((rule, i) => (
+                <li
+                  key={`${rule}-${i}`}
+                  className="text-[10px] font-mono text-gray-600 dark:text-gray-300 list-disc"
+                >
+                  {humanizeRule(rule)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
@@ -990,6 +1107,11 @@ export default function ScriptDoctorPanel({
                       {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
                       {report.totalIssues === 1 ? "" : "s"}
                     </div>
+                    {typeof report.healthPercentile === "number" && (
+                      <div className="text-[10px] font-mono opacity-80 mt-0.5">
+                        Stronger than {Math.round(report.healthPercentile)}% of the reference set
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-white/30">
@@ -1029,6 +1151,11 @@ export default function ScriptDoctorPanel({
                       {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
                       {report.totalIssues === 1 ? "" : "s"}
                     </div>
+                    {typeof report.healthPercentile === "number" && (
+                      <div className="text-[10px] font-mono opacity-70 mt-0.5">
+                        Stronger than {Math.round(report.healthPercentile)}% of the reference set
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-4">
@@ -1056,6 +1183,29 @@ export default function ScriptDoctorPanel({
               <p className="text-xs leading-relaxed text-black dark:text-gray-100 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
                 {report.plainSummary}
               </p>
+            )}
+
+            {/* Root causes — co-firing issues clustered into named diagnoses.
+                Placed high in the reading order (right after the verdict/
+                plainSummary, before the dimension bars) since "what's actually
+                wrong" is the headline, not an appendix. Renders only when the
+                server populated at least one finding — older reports (or a
+                script with nothing to cluster) fall through with no gap. */}
+            {report.rootCauses && report.rootCauses.length > 0 && (
+              <div>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+                  Root Causes
+                </h3>
+                <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
+                  Several notes often share one underlying problem. Fixing these first
+                  clears the most issues at once.
+                </p>
+                <div className="space-y-2">
+                  {report.rootCauses.map((finding) => (
+                    <RootCauseCard key={finding.id} finding={finding} />
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Draft-over-draft: only rendered once a PREVIOUS entry exists at
@@ -1089,7 +1239,17 @@ export default function ScriptDoctorPanel({
                           <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">
                             {dim.label}
                           </span>
-                          <span className={`text-xs font-bold ${band.text}`}>{pct}</span>
+                          <span className="flex items-center gap-1.5">
+                            {typeof dim.percentile === "number" && (
+                              <span
+                                className={PERCENTILE_BADGE_CLASS}
+                                title={dim.percentileDescriptor ?? `${ordinal(dim.percentile)} percentile`}
+                              >
+                                {ordinal(dim.percentile)} pct
+                              </span>
+                            )}
+                            <span className={`text-xs font-bold ${band.text}`}>{pct}</span>
+                          </span>
                         </div>
                         <div
                           className="h-2.5 w-full bg-gray-200 dark:bg-zinc-700 border border-black/10 dark:border-white/10 overflow-hidden mt-1"
