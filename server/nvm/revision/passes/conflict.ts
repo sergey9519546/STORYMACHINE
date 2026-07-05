@@ -564,6 +564,17 @@
 // checkHalfLoaded helper — the first use of that helper in this file. CONFLICT_STAGING_BACK_
 // LOADED, CONFLICT_SUSPENSE_FRONT_LOADED, and CONFLICT_EMOTION_BACK_LOADED give visualBeats,
 // suspenseDelta, and emotionalShift their first distribution/timing checks in this pass.
+// Wave 1186 additions (Program v2, Type 1 — signal channel, closes cycle 1): fountain-analyzer.ts's
+// new power-balance signal (powerHolder/powerBalance/powerFlipped — who holds conversational
+// control in a scene, distinct from relationshipShifts' valence axis and from Wave 1182's
+// question-resolution-timing axis) gets its first 3 consumers, placed here because conflict is
+// precisely "who contests whom." CONFLICT_POWER_STATIC_FLATLINE (average/aggregate mode) catches
+// a story whose control never once changes hands; CONFLICT_CLIMAX_UNCONTESTED (zone mode) catches
+// a final act that coasts, uncontested, even when earlier acts prove the story can stage a flip;
+// CONFLICT_INTERROGATION_MONOPOLY (co-occurrence mode, joining Wave 1182's questionsRaised with
+// this wave's powerHolder) catches one character always running the room even under direct
+// interrogation pressure. See the block comment immediately above these three rules for the full
+// distinctness rationale and guard conditions.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6941,6 +6952,124 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         description: `${r1178c.matchingHalfCount} of the story's ${r1178c.count} emotionally-charged scenes (${Math.round(r1178c.matchingHalfCount / r1178c.count * 100)}%) fall in the second half, leaving only ${r1178c.otherHalfCount} in the first. The conflict's felt cost is back-loaded — the opening confrontations register as plot mechanics, and only as the climax nears does the danger start to visibly weigh on anyone.`,
         suggestedFix: `Let at least one early conflict scene land emotionally — a flash of fear, anger, or grief at the first sign of danger, not only once the stakes are already at their peak. A conflict that costs something felt from its first appearance reads as consequential throughout, not just at the end.`,
       });
+    }
+  }
+
+  // ── Wave 1186 additions (Program v2, Type 1 signal channel, closes cycle 1) ─
+  // fountain-analyzer.ts's new power-balance signal (powerHolder/powerBalance/
+  // powerFlipped — see that file's Wave 1186 header comment) gets its first 3
+  // consumers, all here because conflict is precisely "who is contesting whom,"
+  // and power is WHO CONTROLS a scene's exchange — a genuinely different axis
+  // from every existing channel this pass reads. Distinct from relationship-
+  // arc.ts's valence rules: those measure whether two characters like/trust
+  // each other (an affinity axis), while power measures who is DICTATING the
+  // exchange regardless of affinity — a warm relationship can still have a
+  // sharp power imbalance (a loving but controlling parent), and a hostile one
+  // can be evenly matched (two rivals trading blows). Distinct from Wave
+  // 1182's question-answer latency: that channel tracks whether a question
+  // gets ANSWERED and how long that takes (a resolution-timing axis); power
+  // tracks who is asking versus being made to answer IN THE FIRST PLACE, a
+  // control axis that exists whether or not the question is ever resolved.
+  // CONFLICT_POWER_STATIC_FLATLINE (average/aggregate mode) catches a story
+  // where the same character holds every scene's control, dyad after dyad,
+  // regardless of who they're paired with — the conflict never once shifts
+  // hands. CONFLICT_CLIMAX_UNCONTESTED (zone presence/absence mode) catches a
+  // subtler failure the aggregate can't see: a story that DOES flip control
+  // earlier can still let its final act coast, uncontested, right when the
+  // stakes should be highest. CONFLICT_INTERROGATION_MONOPOLY (co-occurrence
+  // mode, joining Wave 1182's questionsRaised with this wave's powerHolder) is
+  // the tightest test of the three — restricted to scenes where a character
+  // is actually being interrogated, does the same person always run the room
+  // even under direct questioning pressure. All three are hand-rolled: the
+  // shared checks library's templates test scene-level boolean predicates
+  // against a fixed trigger/aftermath or front/back shape, not "does one
+  // string value stay identical across every qualifying scene" or "does a
+  // co-occurrence hold across two independently-computed optional fields" —
+  // shapes it doesn't currently express.
+
+  // CONFLICT_POWER_STATIC_FLATLINE — average/aggregate mode over the new
+  // powerHolder channel. n>=8, >=4 scenes with a determined (non-null) dyad
+  // holder. Fires when every single one of those scenes names the exact same
+  // character as the controlling voice — not merely "present in every scene"
+  // (a lead character naturally appears often) but "never once out-controlled,
+  // regardless of scene partner." A story whose power never changes hands has
+  // no real contest anywhere: every confrontation is a foregone conclusion
+  // before it starts.
+  {
+    const dyadScenes1186a = records.filter(r => r.powerHolder != null);
+    const MIN_DYAD_SCENES_1186A = 4;
+    if (records.length >= 8 && dyadScenes1186a.length >= MIN_DYAD_SCENES_1186A) {
+      const firstHolder1186a = dyadScenes1186a[0].powerHolder as string;
+      const allSameHolder1186a = dyadScenes1186a.every(r => r.powerHolder === firstHolder1186a);
+      if (allSameHolder1186a) {
+        issues.push({
+          location: `${dyadScenes1186a.length} scene(s) with a determined power holder`,
+          rule: 'CONFLICT_POWER_STATIC_FLATLINE',
+          severity: 'major',
+          description: `${firstHolder1186a} holds conversational control in all ${dyadScenes1186a.length} scenes where a power dynamic can be measured, regardless of which other character they're paired with. The balance of control never once shifts hands — every confrontation this story stages is a foregone conclusion before a single line is spoken, because the same person always dictates the terms of the exchange.`,
+          suggestedFix: `Give at least one scene to a character who can genuinely out-maneuver ${firstHolder1186a} — through a sharper question, an interruption that lands, or a turn-length reversal where they hold the floor. A story where control never changes hands reads as inert even when the dialogue itself is tense.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_CLIMAX_UNCONTESTED — zone presence/absence mode over powerFlipped,
+  // the structural-localization counterpart to the aggregate check above (a
+  // story can pass it — control DOES shift hands somewhere — while its final
+  // act specifically never contests control, masked by earlier acts' genuine
+  // reversals). n>=8, final zone (Act 3, 75–100%) needs >=2 scenes with a
+  // determined power holder (so "no flip" means something, not merely "no
+  // dyad data there"); earlier zones (Act 1 through Act 2b) combined need
+  // >=1 scene where control actually flipped mid-scene. Fires when the final
+  // zone's flip count is exactly zero while the earlier zones prove the story
+  // is capable of staging a flip at all.
+  {
+    const n1186b = records.length;
+    if (n1186b >= 8) {
+      const zoneOf1186b = (idx: number) => Math.min(3, Math.floor((idx / n1186b) * 4));
+      const finalZoneDyad1186b = records.filter((r, i) => zoneOf1186b(i) === 3 && r.powerHolder != null);
+      const earlierFlips1186b = records.filter((r, i) => zoneOf1186b(i) < 3 && r.powerFlipped === true);
+      const finalZoneFlips1186b = finalZoneDyad1186b.filter(r => r.powerFlipped === true);
+      const MIN_FINAL_DYAD_1186B = 2;
+      if (finalZoneDyad1186b.length >= MIN_FINAL_DYAD_1186B && earlierFlips1186b.length >= 1 && finalZoneFlips1186b.length === 0) {
+        issues.push({
+          location: `${FOUR_ZONE_NAMES[3]} — ${finalZoneDyad1186b.length} power-scored scene(s), zero control flips`,
+          rule: 'CONFLICT_CLIMAX_UNCONTESTED',
+          severity: 'major',
+          description: `${FOUR_ZONE_NAMES[3]} has ${finalZoneDyad1186b.length} scene(s) where a power dynamic can be measured, and control never once changes hands in any of them — even though it demonstrably can: ${earlierFlips1186b.length} earlier scene(s) show control flipping mid-scene. The ending coasts on whatever balance of power the story already settled into, right when the climax should be putting that balance under the most pressure.`,
+          suggestedFix: `Let control genuinely change hands at least once in the final act — give the character who has been losing the room one scene where a sharp question, an interruption, or a held silence turns the exchange back their way. A climax that still contests who's in charge reads as higher-stakes than one that has already been decided.`,
+        });
+      }
+    }
+  }
+
+  // CONFLICT_INTERROGATION_MONOPOLY — co-occurrence mode joining Wave 1182's
+  // questionsRaised with this wave's powerHolder. n>=8, restricted to scenes
+  // that are BOTH interrogation-heavy (questionsRaised >= 1) AND have a
+  // determined dyad holder — >=3 such scenes required. Fires when every one
+  // of those scenes names the same character as the controlling voice, even
+  // though each of them is a scene where someone is actively being questioned.
+  // A story where the same person always runs the interrogation, never once
+  // finding themselves on the receiving end of one, has a flat dynamic: the
+  // dramatic tool of "who is forced to answer" is never turned on the
+  // dominant character.
+  {
+    const interrogationDyadScenes1186c = records.filter(
+      r => (r.questionsRaised ?? 0) >= 1 && r.powerHolder != null,
+    );
+    const MIN_INTERROGATION_SCENES_1186C = 3;
+    if (records.length >= 8 && interrogationDyadScenes1186c.length >= MIN_INTERROGATION_SCENES_1186C) {
+      const firstHolder1186c = interrogationDyadScenes1186c[0].powerHolder as string;
+      const allSameHolder1186c = interrogationDyadScenes1186c.every(r => r.powerHolder === firstHolder1186c);
+      if (allSameHolder1186c) {
+        issues.push({
+          location: `${interrogationDyadScenes1186c.length} question-raising scene(s) with a determined power holder`,
+          rule: 'CONFLICT_INTERROGATION_MONOPOLY',
+          severity: 'minor',
+          description: `${firstHolder1186c} controls the exchange in all ${interrogationDyadScenes1186c.length} scenes where a substantive question is raised AND a power dynamic can be measured — the same character is always the one asking, never the one made to answer. Interrogation is one of this story's best tools for testing a character under pressure, and it's never once turned on the person who dominates every other exchange.`,
+          suggestedFix: `Stage at least one scene where ${firstHolder1186c} is the one being pressed with substantive questions and visibly loses control of the exchange — a reversal of who's interrogating whom is one of the clearest ways to dramatize a shift in power.`,
+        });
+      }
     }
   }
 

@@ -175,6 +175,21 @@ fix it before it misleads another session further.
 - [ ] **(S)** Frontend chunk splitting: the `ScriptIDE` chunk is >530KB;
   lazy-load its heavy panels.
 
+### CYCLE 1 HEALTH GATE VERDICT (waves 1183-1186 — first gate run)
+Zero DEAD rules of 12 (hard floor met); band separation untouched
+(61.62/53.07/38.68/36.03, strictly monotonic). Pattern surfaced: leaf-level
+Type-1 signal waves (1182, 1186) are corpus-INVISIBLE — the 20 samples are
+short controlled fixtures without dense dyad dialogue — while Type 2/4 waves
+(aggregating corpus-proven signals) land LIVE immediately; Type 3 is
+structurally exempt (corpus runs genre-absent, permanently). Guards were NOT
+loosened to manufacture fire (precision over vanity, per guarantee doc).
+- [ ] **(S)** PREREQUISITE before cycle 2's Type-1 wave (1190): either
+  measure the target signal's corpus density BEFORE committing thresholds,
+  or enrich the corpus with 1-2 denser two-hander samples (richness-matched
+  across all bands per the controlled-design constraint!).
+- Cycle 2 = 1187 (Type 2) → 1188 (Type 3) → 1189 (Type 4) → 1190 (Type 1),
+  gate re-runs at 1190.
+
 ### Wave 1183 finding (analyzer weakness, schedule as a Type 1 wave)
 - [ ] **(M)** detectClueLifecycle's payoff detection requires the seeded
   phrase to recur VERBATIM (quoted) — it fires on zero of 20 corpus samples

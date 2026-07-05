@@ -416,3 +416,94 @@ describe('analyzeFountainText — question-answer latency (same-scene resolution
     assert.equal(analysis.records[2].questionsResolvedSameScene, 0);
   });
 });
+
+// Wave 1186 (Program v2, Type 1 signal channel, closes cycle 1) — power-balance
+// shifts within scenes.
+describe('analyzeFountainText — power-balance shifts (powerHolder / powerBalance)', () => {
+  it('a scene of one-sided commands and accusations gives the commanding character powerHolder', () => {
+    const fountain = [
+      'INT. INTERROGATION ROOM - NIGHT',
+      '',
+      'DETECTIVE',
+      'Sit down. Tell me where you were last night. Answer me now.',
+      '',
+      'SUSPECT',
+      'I was home.',
+      '',
+      'DETECTIVE',
+      "Don't lie to me. Give me the truth right now.",
+      '',
+      'SUSPECT',
+      'Fine.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, 'DETECTIVE');
+    assert.ok((analysis.records[0].powerBalance ?? 0) > 0.15, `expected a clearly positive balance, got ${analysis.records[0].powerBalance}`);
+    assert.equal(analysis.records[0].powerFlipped, false);
+  });
+
+  it('a scene of even, uncommanding, equal-length dialogue gives no holder and a near-zero balance', () => {
+    const fountain = [
+      'INT. KITCHEN - DAY',
+      '',
+      'ALICE',
+      'The weather today is nice and calm outside.',
+      '',
+      'BOB',
+      'Yes it certainly is quite pleasant this afternoon.',
+      '',
+      'ALICE',
+      'We should go for a walk sometime later.',
+      '',
+      'BOB',
+      'That sounds like a really lovely idea indeed.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, null);
+    assert.ok(Math.abs(analysis.records[0].powerBalance ?? 0) <= 0.15, `expected a near-zero balance, got ${analysis.records[0].powerBalance}`);
+    assert.equal(analysis.records[0].powerFlipped, false);
+  });
+
+  it('a scene where control demonstrably changes hands mid-scene sets powerFlipped', () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'BOSS',
+      'Sit down. Get out your reports and tell me what happened.',
+      '',
+      'EMPLOYEE',
+      'Yes sir.',
+      '',
+      'BOSS',
+      'Explain yourself right now.',
+      '',
+      'EMPLOYEE',
+      'Actually, you never read the memo I sent, did you? You never listen to anyone in this office.',
+      '',
+      'BOSS',
+      'What memo?',
+      '',
+      'EMPLOYEE',
+      'How could you forget something so important? You ruined the whole project because you never checked your email.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerFlipped, true);
+    assert.equal(analysis.records[0].powerHolder, 'EMPLOYEE');
+  });
+
+  it('a scene with fewer than two speaking characters reports no holder, zero balance, no flip', () => {
+    const fountain = [
+      'INT. EMPTY ROOM - DAY',
+      '',
+      'A single figure stands alone in the dark, saying nothing.',
+    ].join('\n');
+
+    const analysis = analyzeFountainText(fountain);
+    assert.equal(analysis.records[0].powerHolder, null);
+    assert.equal(analysis.records[0].powerBalance, 0);
+    assert.equal(analysis.records[0].powerFlipped, false);
+  });
+});

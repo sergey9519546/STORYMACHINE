@@ -30,6 +30,41 @@
 // for interrogative dialogue rather than recurring props/quoted phrases. See
 // the "Question-answer latency" section below for the extraction and
 // memory.ts for the record fields (optional, ops-derived-path may omit them).
+//
+// Wave 1186 additions (Program v2, Type 1 — signal channel, closes cycle 1):
+// power-balance shifts within scenes. Of the charter's remaining Type 1
+// candidates (dramatic-irony gap, power-balance shifts, motif recurrence
+// shape), power-balance is the one deterministic lexicon/structure extraction
+// can actually support: a dramatic-irony gap requires modeling what the
+// AUDIENCE knows versus what each CHARACTER knows — a semantic tracking
+// problem this file has no representation for (revelation is a single
+// boolean per scene, not a per-character knowledge state) and is squarely a
+// deep-read/semantic-channel problem per ROADMAP.md's Run 10 framing, not a
+// lexicon one. Motif recurrence shape needs clustering of recurring IMAGERY
+// across non-identical phrasing (a metaphor restated three different ways),
+// which is a similarity judgment this file's exact-token clue-lifecycle
+// mechanism cannot make without drifting into false positives on any shared
+// common word. Power-balance, by contrast, reduces to five deterministic
+// per-line proxies over dialogue alone — imperative sentences, questions
+// asked (reusing isSubstantiveQuestion/splitSentences from Wave 1182's
+// question-latency machinery), em-dash interruption markers, turn-length
+// word-count dominance, and second-person accusatory phrasing — none of
+// which need anything beyond the SceneUnit shape this file already builds.
+// detectPowerBalance() scores the scene's two most-speaking characters
+// against each other and emits three new optional per-scene fields:
+// powerHolder (which of the two dyad members controls the scene, or null
+// when neither clearly does), powerBalance (-1..1, signed toward whichever
+// of the two speaks FIRST in the scene — deliberately decoupled from line
+// count, since a character who says less can still hold the room), and
+// powerFlipped (true when the first half and second half of the dyad's
+// exchange resolve to two different holders). Distinct from every existing
+// channel: relationshipShifts measures VALENCE (do these two like or trust
+// each other), not CONTROL (who is dictating the terms of the exchange) — a
+// scene can have a warm, loving power imbalance or a hostile, contested one,
+// and the two axes are independent by design; suspenseDelta/curiosityDelta
+// are scene-wide intensity scores with no notion of "between which two
+// people"; dramaticTurn/revelation are single-line spot checks, not a
+// running per-line tally. See the "Power-balance shifts" section below.
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -145,6 +180,18 @@ const RELATIONSHIP_SHIFT_THRESHOLD = 2;
  *  than neutral — a small deadband so a single stray word doesn't flip it. */
 const EMOTIONAL_SHIFT_THRESHOLD = 1;
 
+/** Second-person accusatory phrases for the power-balance signal (Wave
+ *  1186) — a line leveling direct blame is a control move ("you did this")
+ *  distinct from generic negative valence ("hate", "anger" — NEGATIVE_
+ *  VALENCE_WORDS), which can appear with no addressee at all (a character
+ *  fuming alone). Accusation specifically targets the OTHER speaker, which is
+ *  what makes it a power-balance proxy rather than an emotional-tone one. */
+const ACCUSATORY_TERMS = [
+  'you always', 'you never', 'your fault', 'you did this', 'you lied', 'you knew',
+  'you ruined', 'you broke', 'you betrayed', 'you promised', 'how could you',
+  'you left me', 'you abandoned', 'you used me',
+];
+
 // ── Precompiled lexicon regexes ──────────────────────────────────────────────
 // Built once at module load (not per-call) so per-scene analysis is a handful
 // of single-pass regex scans rather than one RegExp construction per lexicon
@@ -166,6 +213,36 @@ const MYSTERY_RE = buildLexiconRegex(MYSTERY_WORDS);
 const TURN_VERB_RE = buildLexiconRegex(TURN_VERB_WORDS);
 const DEADLINE_RE = buildLexiconRegex(DEADLINE_TERMS);
 const CONCRETE_NOUN_RE = buildLexiconRegex(CONCRETE_NOUNS);
+const ACCUSATORY_RE = buildLexiconRegex(ACCUSATORY_TERMS);
+
+/** Imperative-lead phrases for the power-balance signal (Wave 1186) — tested
+ *  against the START of a line only (a command "opens" the line), unlike
+ *  every buildLexiconRegex-based lexicon above which matches anywhere in the
+ *  text. Sorted longest-first so a specific multi-word command ("sit down")
+ *  is recognized before a shorter prefix that would also technically match
+ *  ("sit") would matter — kept as a plain startsWith list rather than a
+ *  regex since anchoring `\b` alternation to the string start needs the same
+ *  longest-first ordering a regex alternation would need anyway, and this
+ *  reads more plainly. Distinct from TURN_VERB_WORDS: that lexicon marks
+ *  irreversible narrative state-change verbs anywhere in a line (dies,
+ *  betrays, confesses) — a fact about the STORY; this marks a conversational
+ *  command aimed at the other speaker — a fact about who is dictating the
+ *  exchange, regardless of whether anything narratively irreversible occurs. */
+const IMPERATIVE_LEAD_TERMS = [
+  'sit down', 'get out', 'get up', 'get over here', 'get down', 'give me', 'tell me',
+  'come here', 'come on', 'come with me', 'shut up', 'back off', 'let go', 'let me',
+  'hands up', 'answer me', 'drop it', 'put it down', 'open the', 'close the', 'follow me',
+  'watch it', "don't", 'move', 'run', 'explain', 'quiet', 'enough', 'stop', 'go', 'wait',
+  'listen', 'look',
+].sort((a, b) => b.length - a.length);
+
+/** True when `text` OPENS with an imperative-lead phrase (a command directed
+ *  at the other speaker), after stripping a leading quote/dash/em-dash so
+ *  Fountain's occasional leading punctuation doesn't hide a real command. */
+function isImperativeLine(text: string): boolean {
+  const bare = text.trim().toLowerCase().replace(/^["'\-—]+/, '');
+  return IMPERATIVE_LEAD_TERMS.some(term => bare.startsWith(term));
+}
 
 /** Count all lexicon hits in `text`. Safe to call repeatedly: String.match
  *  with a global RegExp always rescans from the start regardless of the
@@ -729,6 +806,139 @@ function detectQuestionLatency(scenes: SceneUnit[]): QuestionLatencySignal {
   return { raisedByScene, resolvedByScene, resolvedSameSceneByScene, unresolvedByScene };
 }
 
+// ── Power-balance shifts (per-scene) — Wave 1186 ─────────────────────────────
+// See the file-header "Wave 1186 additions" comment for the full tractability
+// argument and distinctness rationale. This section is deliberately
+// per-scene/independent (unlike question-latency's cross-scene carryover)
+// since "who controls THIS scene's exchange" doesn't need any state from
+// other scenes to compute.
+
+/** Weights for the five deterministic control proxies below, tuned so no
+ *  single signal can dominate the balance on its own (an interruption is
+ *  worth more than a single question, since cutting someone off is a more
+ *  overt control move than merely asking something) while still letting
+ *  several weaker signals of the same kind outweigh a single strong one. */
+const POWER_W_IMPERATIVE = 1;
+const POWER_W_QUESTION = 0.8;
+const POWER_W_ACCUSATORY = 1;
+const POWER_W_INTERRUPT = 1.2;
+/** How much weight the turn-length (word-count) dominance term gets in the
+ *  final blend, relative to the four event-based proxies combined — kept a
+ *  minority share so a single long monologue can't alone declare a "holder"
+ *  without any of the other four control moves ever appearing. */
+const POWER_DOMINANCE_BLEND = 0.3;
+/** Deadband around 0 below which powerHolder reports null (no clear control)
+ *  rather than forcing a coin-flip winner — same deadband role as
+ *  EMOTIONAL_SHIFT_THRESHOLD above, scaled to this signal's -1..1 range. */
+const POWER_HOLDER_DEADBAND = 0.15;
+/** Minimum dyad-restricted dialogue lines for a scene to report ANY
+ *  powerHolder/powerBalance signal at all — below this, two lines of small
+ *  talk aren't enough evidence to call a control winner. */
+const MIN_DYAD_DIALOGUE_LINES = 2;
+/** Minimum dyad-restricted dialogue lines before powerFlipped is even
+ *  evaluated — a flip claim needs at least 2 lines on each side of the
+ *  scene's midpoint to mean anything. */
+const MIN_DYAD_LINES_FOR_FLIP_SPLIT = 4;
+
+/** Score one contiguous run of dyad-restricted dialogue lines for
+ *  conversational control between `primary` and `secondary`, returning the
+ *  signed balance (positive toward `primary`) and, past POWER_HOLDER_
+ *  DEADBAND, which of the two holds it (or null). Shared by the full-scene
+ *  computation and by the first-half/second-half flip comparison below so
+ *  both read identical scoring logic — a flip is measured with the exact
+ *  same yardstick as the full-scene holder, never a looser approximation. */
+function scoreDyadLines(
+  lines: DialogueLine[], primary: string, secondary: string,
+): { holder: string | null; balance: number } {
+  let scorePrimary = 0;
+  let scoreSecondary = 0;
+  let wordsPrimary = 0;
+  let wordsSecondary = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const { speaker, text } = lines[i];
+    let lineScore = 0;
+    if (isImperativeLine(text)) lineScore += POWER_W_IMPERATIVE;
+    for (const sentence of splitSentences(text)) {
+      if (isSubstantiveQuestion(sentence)) lineScore += POWER_W_QUESTION;
+    }
+    lineScore += countHits(text, ACCUSATORY_RE) * POWER_W_ACCUSATORY;
+    // Interruption: the PREVIOUS dyad line (a different speaker) ends in an
+    // em-dash — read as that speaker being cut off — and this line is the
+    // one that cuts in. Credited to the interrupter, not the interrupted.
+    if (i > 0) {
+      const prev = lines[i - 1];
+      if (prev.speaker !== speaker && prev.text.trim().endsWith('—')) {
+        lineScore += POWER_W_INTERRUPT;
+      }
+    }
+    const words = text.split(/\s+/).filter(Boolean).length;
+    if (speaker === primary) { scorePrimary += lineScore; wordsPrimary += words; }
+    else { scoreSecondary += lineScore; wordsSecondary += words; }
+  }
+
+  const totalWords = wordsPrimary + wordsSecondary;
+  const dominanceRaw = totalWords > 0 ? (wordsPrimary - wordsSecondary) / totalWords : 0;
+  const totalEventScore = scorePrimary + scoreSecondary;
+  const eventBalance = totalEventScore > 0 ? (scorePrimary - scoreSecondary) / totalEventScore : 0;
+  const raw = eventBalance * (1 - POWER_DOMINANCE_BLEND) + dominanceRaw * POWER_DOMINANCE_BLEND;
+  const balance = clamp(Math.round(raw * 100) / 100, -1, 1);
+  const holder = balance > POWER_HOLDER_DEADBAND ? primary : balance < -POWER_HOLDER_DEADBAND ? secondary : null;
+  return { holder, balance };
+}
+
+interface PowerBalanceSignal {
+  powerHolder: string | null;
+  powerBalance: number;
+  powerFlipped: boolean;
+}
+
+/** POWER BALANCE: identifies the scene's two most-speaking characters (by
+ *  dialogue-line count; fewer than two speaking characters means there is no
+ *  dyad to score), scores their dialogue-only exchange for conversational
+ *  control via scoreDyadLines, and additionally splits the exchange in half
+ *  to detect a mid-scene flip. `primary`/`secondary` are assigned by
+ *  FIRST-APPEARANCE order (scene.characters), not by who speaks more, so the
+ *  sign of powerBalance has a stable meaning independent of line count — a
+ *  character who says less can still be the one running the scene. */
+function detectPowerBalance(scene: SceneUnit): PowerBalanceSignal {
+  const NONE: PowerBalanceSignal = { powerHolder: null, powerBalance: 0, powerFlipped: false };
+  if (scene.characters.length < 2) return NONE;
+
+  const lineCounts = new Map<string, number>();
+  for (const d of scene.dialogueLines) {
+    if (!d.speaker) continue;
+    lineCounts.set(d.speaker, (lineCounts.get(d.speaker) ?? 0) + 1);
+  }
+  const speakingChars = scene.characters.filter(c => (lineCounts.get(c) ?? 0) > 0);
+  if (speakingChars.length < 2) return NONE;
+
+  const topTwo = new Set(
+    [...speakingChars]
+      .sort((a, b) => (lineCounts.get(b) ?? 0) - (lineCounts.get(a) ?? 0))
+      .slice(0, 2),
+  );
+  // Re-order the top two by first-appearance (scene.characters is already in
+  // that order) rather than by the line-count sort above, per this function's
+  // documented sign convention.
+  const [primary, secondary] = scene.characters.filter(c => topTwo.has(c));
+
+  const dyadLines = scene.dialogueLines.filter(d => d.speaker === primary || d.speaker === secondary);
+  if (dyadLines.length < MIN_DYAD_DIALOGUE_LINES) return NONE;
+
+  const full = scoreDyadLines(dyadLines, primary, secondary);
+
+  let powerFlipped = false;
+  if (dyadLines.length >= MIN_DYAD_LINES_FOR_FLIP_SPLIT) {
+    const mid = Math.ceil(dyadLines.length / 2);
+    const firstHalf = scoreDyadLines(dyadLines.slice(0, mid), primary, secondary);
+    const secondHalf = scoreDyadLines(dyadLines.slice(mid), primary, secondary);
+    powerFlipped = firstHalf.holder !== null && secondHalf.holder !== null && firstHalf.holder !== secondHalf.holder;
+  }
+
+  return { powerHolder: full.holder, powerBalance: full.balance, powerFlipped };
+}
+
 // ── Empty-input shortcut ──────────────────────────────────────────────────────
 
 function emptyAnalysis(): FountainAnalysis {
@@ -774,6 +984,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const visualBeatsList = sceneUnits.map(s => detectVisualBeats(s.actionLines));
   const dialogueHighlightsList = sceneUnits.map(s => detectDialogueHighlights(s.dialogueLines));
   const relationshipShiftsList = sceneUnits.map(s => detectRelationshipShifts(s.characters, s.dialogueLines));
+  const powerBalances = sceneUnits.map(s => detectPowerBalance(s));
 
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
   const { seedsByScene, payoffsByScene, unresolvedByScene } = detectClueLifecycle(sceneUnits);
@@ -818,6 +1029,9 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
     questionsResolved: questionLatency.resolvedByScene[idx],
     questionsResolvedSameScene: questionLatency.resolvedSameSceneByScene[idx],
     questionsUnresolved: questionLatency.unresolvedByScene[idx],
+    powerHolder: powerBalances[idx].powerHolder,
+    powerBalance: powerBalances[idx].powerBalance,
+    powerFlipped: powerBalances[idx].powerFlipped,
     createdAt: idx,
   }));
 

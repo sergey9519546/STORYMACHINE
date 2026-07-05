@@ -567,6 +567,118 @@ import { evaluateRewrite, REWRITE_MIN_LENGTH_RATIO } from '../../server/nvm/revi
 
 import { relationshipArcPass } from '../../server/nvm/revision/passes/relationship-arc.ts';
 
+// Wave 1186 (Program v2, Type 1 signal channel, closes cycle 1) —
+// conflictPass's first 3 consumers of fountain-analyzer.ts's new power-balance
+// signal (powerHolder/powerBalance/powerFlipped). See conflict.ts's Wave 1186
+// header comment for the full distinctness rationale.
+describe('Wave 1186 — conflictPass (Program v2, Type 1 — signal channel): power-balance flatline, climax-uncontested, interrogation monopoly', async () => {
+  const makeRec1186 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    powerHolder: null, powerBalance: 0, powerFlipped: false, questionsRaised: 0,
+    ...override,
+  });
+  const blankFountain1186 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const noAnnotations1186 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+  const makeInput1186 = (records: any[]) => ({
+    fountain: blankFountain1186(records.length), original: blankFountain1186(records.length),
+    records: records as any, structure: {} as any,
+    annotations: noAnnotations1186(records.length), approvedSpans: [],
+  });
+
+  // ── CONFLICT_POWER_STATIC_FLATLINE ────────────────────────────────────────
+
+  it('conflictPass fires CONFLICT_POWER_STATIC_FLATLINE when the same character holds every determined dyad scene', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) =>
+      makeRec1186(i, [0, 2, 4, 6].includes(i) ? { powerHolder: 'ALICE', powerBalance: 0.5 } : {}),
+    );
+    const result = await conflictPass(makeInput1186(records));
+    const flatline = result.issues.filter((i: any) => i.rule === 'CONFLICT_POWER_STATIC_FLATLINE');
+    assert.ok(flatline.length >= 1, `Expected CONFLICT_POWER_STATIC_FLATLINE, got: ${result.issues.map((i: any) => i.rule).join(', ')}`);
+    assert.equal(flatline[0].severity, 'major');
+  });
+
+  it('conflictPass does NOT fire CONFLICT_POWER_STATIC_FLATLINE when control is held by more than one character', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => {
+      if ([0, 2, 4].includes(i)) return makeRec1186(i, { powerHolder: 'ALICE', powerBalance: 0.5 });
+      if (i === 6) return makeRec1186(i, { powerHolder: 'BOB', powerBalance: -0.5 });
+      return makeRec1186(i);
+    });
+    const result = await conflictPass(makeInput1186(records));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'CONFLICT_POWER_STATIC_FLATLINE'),
+      'Should NOT fire when the determined-holder scenes are split between two characters',
+    );
+  });
+
+  // ── CONFLICT_CLIMAX_UNCONTESTED ───────────────────────────────────────────
+
+  it('conflictPass fires CONFLICT_CLIMAX_UNCONTESTED when the final zone never flips while an earlier zone does', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    // n=8 → zones [0,1] [2,3] [4,5] [6,7]. Earlier flip at idx 1; final zone
+    // (idx 6,7) both have a determined holder but neither flips.
+    const records = Array.from({ length: 8 }, (_, i) => {
+      if (i === 1) return makeRec1186(i, { powerHolder: 'ALICE', powerFlipped: true });
+      if (i === 6) return makeRec1186(i, { powerHolder: 'ALICE', powerFlipped: false });
+      if (i === 7) return makeRec1186(i, { powerHolder: 'BOB', powerFlipped: false });
+      return makeRec1186(i);
+    });
+    const result = await conflictPass(makeInput1186(records));
+    const uncontested = result.issues.filter((i: any) => i.rule === 'CONFLICT_CLIMAX_UNCONTESTED');
+    assert.ok(uncontested.length >= 1, `Expected CONFLICT_CLIMAX_UNCONTESTED, got: ${result.issues.map((i: any) => i.rule).join(', ')}`);
+    assert.equal(uncontested[0].severity, 'major');
+  });
+
+  it('conflictPass does NOT fire CONFLICT_CLIMAX_UNCONTESTED when the final zone also flips at least once', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => {
+      if (i === 1) return makeRec1186(i, { powerHolder: 'ALICE', powerFlipped: true });
+      if (i === 6) return makeRec1186(i, { powerHolder: 'ALICE', powerFlipped: false });
+      if (i === 7) return makeRec1186(i, { powerHolder: 'BOB', powerFlipped: true });
+      return makeRec1186(i);
+    });
+    const result = await conflictPass(makeInput1186(records));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'CONFLICT_CLIMAX_UNCONTESTED'),
+      'Should NOT fire when the final zone contests control at least once',
+    );
+  });
+
+  // ── CONFLICT_INTERROGATION_MONOPOLY ───────────────────────────────────────
+
+  it('conflictPass fires CONFLICT_INTERROGATION_MONOPOLY when the same character controls every question-raising scene', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) =>
+      [0, 2, 4].includes(i)
+        ? makeRec1186(i, { questionsRaised: 1, powerHolder: 'ALICE', powerBalance: 0.4 })
+        : makeRec1186(i),
+    );
+    const result = await conflictPass(makeInput1186(records));
+    const monopoly = result.issues.filter((i: any) => i.rule === 'CONFLICT_INTERROGATION_MONOPOLY');
+    assert.ok(monopoly.length >= 1, `Expected CONFLICT_INTERROGATION_MONOPOLY, got: ${result.issues.map((i: any) => i.rule).join(', ')}`);
+    assert.equal(monopoly[0].severity, 'minor');
+  });
+
+  it('conflictPass does NOT fire CONFLICT_INTERROGATION_MONOPOLY when question-raising scenes split control between characters', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => {
+      if (i === 0 || i === 2) return makeRec1186(i, { questionsRaised: 1, powerHolder: 'ALICE', powerBalance: 0.4 });
+      if (i === 4) return makeRec1186(i, { questionsRaised: 1, powerHolder: 'BOB', powerBalance: -0.4 });
+      return makeRec1186(i);
+    });
+    const result = await conflictPass(makeInput1186(records));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'CONFLICT_INTERROGATION_MONOPOLY'),
+      'Should NOT fire when the question-raising scenes are controlled by more than one character',
+    );
+  });
+});
 
   // ── conflict CLOCK_WITHOUT_CONFRONTATION uses magnitude ───────────────────
 

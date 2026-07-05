@@ -73,6 +73,28 @@ export interface ScreenplaySceneRecord {
   questionsResolved?: number;
   questionsResolvedSameScene?: number;
   questionsUnresolved?: number;
+  /** Power-balance shifts within scenes (Wave 1186 — Program v2 Type 1 signal
+   *  channel, closing cycle 1). Which of the scene's two most-speaking
+   *  characters holds conversational control, derived purely from dialogue
+   *  (imperatives, questions asked, em-dash interruptions, turn-length
+   *  dominance, second-person accusatory phrasing — see fountain-analyzer.ts's
+   *  detectPowerBalance, the only builder that currently populates these).
+   *  powerHolder is the controlling character's name, or null when fewer than
+   *  two characters speak, too little dialogue exists to judge, or the
+   *  balance falls inside the deadband around zero (no clear holder).
+   *  powerBalance is signed -1..1 toward whichever of the two dyad members
+   *  speaks FIRST in the scene (not toward whoever talks most) — deliberately
+   *  independent of the memory.ts precedent's usual "positive means good"
+   *  framing, since power is a fact about control, not valence. powerFlipped
+   *  is true only when the first half and second half of the dyad's exchange
+   *  resolve to two different, non-null holders. Optional only so legacy/test
+   *  fixtures and the ops-derived path (StoryOps carry no raw dialogue text to
+   *  score for imperatives/interruptions/accusatory phrasing) still typecheck;
+   *  consumers should treat absence as null/0/false, matching the
+   *  questionsRaised precedent immediately above. */
+  powerHolder?: string | null;
+  powerBalance?: number;
+  powerFlipped?: boolean;
   /** createdAt timestamp */
   createdAt: number;
 }

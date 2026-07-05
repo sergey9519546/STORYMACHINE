@@ -350,6 +350,14 @@ const PARITY_MATRIX: Record<keyof ScreenplaySceneRecord, ParityTier> = {
   questionsResolved: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   questionsResolvedSameScene: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   questionsUnresolved: 'KNOWN_ASYMMETRY_TEXT_ONLY',
+  // Wave 1186 (Program v2, Type 1 signal channel): power-balance shifts.
+  // text-path-only, same tier as the questionsRaised family above — the
+  // ops-derived path has no raw dialogue text to score for imperatives,
+  // interruptions, or accusatory phrasing, so annotateCommit never populates
+  // these (see memory.ts's Wave 1186 field comment).
+  powerHolder: 'KNOWN_ASYMMETRY_TEXT_ONLY',
+  powerBalance: 'KNOWN_ASYMMETRY_TEXT_ONLY',
+  powerFlipped: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   createdAt: 'NOT_COMPARED_IDENTIFIER',       // ops path = real epoch ms; text path = scene index integer — never comparable
 };
 
@@ -644,11 +652,12 @@ describe('record parity — drift tripwire', () => {
     }
   });
 
-  it('PARITY_MATRIX classifies all 22 known ScreenplaySceneRecord fields (sanity count)', () => {
+  it('PARITY_MATRIX classifies all 25 known ScreenplaySceneRecord fields (sanity count)', () => {
     // Not a substitute for the compile-time Record<keyof ScreenplaySceneRecord, ParityTier>
     // check above (that's what actually fails `npm run lint` on a new field) —
     // this just guards against someone hand-editing PARITY_MATRIX's runtime
-    // shape independently of the type.
-    assert.equal(Object.keys(PARITY_MATRIX).length, 22);
+    // shape independently of the type. 22 through Wave 1182, +3 for Wave
+    // 1186's powerHolder/powerBalance/powerFlipped.
+    assert.equal(Object.keys(PARITY_MATRIX).length, 25);
   });
 });
