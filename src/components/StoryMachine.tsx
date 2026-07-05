@@ -135,6 +135,21 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showLivePlay, setShowLivePlay]         = useState(false);
   const [showRevision, setShowRevision]         = useState(false);
 
+  // Keyless-honesty banner (finding E): null until the readiness check
+  // resolves, so the banner never flashes an incorrect "no key" warning on
+  // first paint. Dismissal is remembered per-app, independently of ScriptIDE's
+  // own banner (different localStorage key — the two apps are shown/hidden
+  // independently and each has its own idiom for "don't nag again").
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  const [llmBannerDismissed, setLlmBannerDismissed] = useState(() => {
+    try { return localStorage.getItem("sm_llmready_banner_dismissed_storymachine") === "1"; }
+    catch { return false; }
+  });
+  const dismissLlmBanner = useCallback(() => {
+    setLlmBannerDismissed(true);
+    try { localStorage.setItem("sm_llmready_banner_dismissed_storymachine", "1"); } catch { /* best-effort */ }
+  }, []);
+
   const fetchActivePressures = useCallback(async () => {
     try {
       const res = await fetch("/api/dramatic-pressure-all");
@@ -157,6 +172,20 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     fetchSpineData();
     fetchActivePressures();
   }, [fetchActivePressures]);
+
+  // Finding E: fetch AI readiness once on mount. Non-fatal on failure — the
+  // banner just never renders if we can't determine readiness rather than
+  // guessing wrong and nagging a user who's already configured a key.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => { /* non-critical — banner stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // C5: unified fetch-failure notifier — shows a toast only when the component
   // is still mounted (suppresses spurious errors fired during unmount).
@@ -328,11 +357,19 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const handleTurn = async (agentId: string) => {
     setLoading(true);
     try {
-      await fetch("/api/turn", {
+      const res = await fetch("/api/turn", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agentId }),
       });
+      // Finding A: this previously never checked res.ok, so a failed turn
+      // (most commonly: no AI key configured) surfaced as silent nothing —
+      // the UI just sat there with no feedback at all.
+      if (!res.ok) {
+        throw new Error(
+          "Turn failed — if you haven't configured an AI key, generation is unavailable. Analysis features still work."
+        );
+      }
       await refreshAll();
     } catch (e) {
       showError((e as Error).message ?? 'Turn failed.');
@@ -472,6 +509,21 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
         >
           <span>{errorMsg}</span>
           <button onClick={() => setErrorMsg(null)} className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+        </div>
+      )}
+      {/* Finding E: keyless-honesty banner — non-nagging (dismissible,
+          remembered per-app) and only rendered once readiness is known. */}
+      {llmReady === false && !llmBannerDismissed && (
+        <div className="mb-6 border-4 border-black bg-[#FFF4CC] text-black px-4 py-3 font-mono text-xs flex items-center justify-between gap-4">
+          <span>
+            Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
+          </span>
+          <button
+            onClick={dismissLlmBanner}
+            className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-1 hover:bg-black hover:text-white transition-colors"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">

@@ -27,7 +27,18 @@ router.get('/metrics', (_req, res) => {
 
 // ── AI provider config routes ─────────────────────────────────────────────
 router.get('/api/ai-config', (_req, res) => {
-  res.json(getPublicConfig());
+  const pub = getPublicConfig();
+  // Journey-audit finding A: SettingsPanel's keySet only mirrors the
+  // multi-provider AI_API_KEY path (server/lib/ai-config.ts's private _keys,
+  // wired through applyConfig/wireProviders). But the *default* code path —
+  // server/engine/ai.ts's getAI() — reads process.env.GEMINI_API_KEY
+  // directly and never touches ai-config.ts at all. A deployment that only
+  // sets GEMINI_API_KEY (the documented default) is fully "ready" yet would
+  // show keySet:false and mislead a first-time user into thinking no key is
+  // configured. llmReady ORs both independent sources so the client gets one
+  // honest readiness signal without ever learning either key's value.
+  const llmReady = Boolean(process.env.GEMINI_API_KEY) || pub.keySet;
+  res.json({ ...pub, llmReady });
 });
 
 router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandler(async (req, res) => {

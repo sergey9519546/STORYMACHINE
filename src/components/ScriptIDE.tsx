@@ -60,6 +60,8 @@ interface ScriptIDEProps {
     need: string;
   }>;
   onImportConsumed?: () => void;
+  /** Sends the user back to the setup wizard, clearing the persisted config (App.tsx). */
+  onNewStory?: () => void;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -112,6 +114,7 @@ export default function ScriptIDE({
   importedScript,
   importedCharacters,
   onImportConsumed,
+  onNewStory,
 }: ScriptIDEProps) {
   // ── Core state ──────────────────────────────────────────────────────────────
   const [engineState, setEngineState] = useState<EngineState | null>(null);
@@ -172,6 +175,19 @@ export default function ScriptIDE({
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
   const [showCollabBar, setShowCollabBar] = useState(false);
+  // Keyless-honesty banner (finding E): whether generation-dependent features
+  // (copilot, simulation turns, rewriting) have an AI key behind them.
+  // null = not yet fetched; the banner only ever renders once we know for
+  // sure, so first paint never flashes a false "no key" warning.
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  const [llmBannerDismissed, setLlmBannerDismissed] = useState(
+    () => lsGet("llmready_banner_dismissed_scriptide") === "1"
+  );
+  // "Open a script file" → .fdx handoff (finding D): StartScreen can't convert
+  // .fdx client-side, so it hands off the filename via sessionStorage and
+  // lets the user land in the editor anyway, with this notice explaining why
+  // their file isn't sitting in the draft and pointing at Script Doctor.
+  const [fdxImportNotice, setFdxImportNotice] = useState<string | null>(null);
 
   // ── Refs ────────────────────────────────────────────────────────────────────
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -550,8 +566,46 @@ export default function ScriptIDE({
     return () => { cancelled = true; };
   }, []);
 
+  // Finding E: fetch AI readiness once on mount so first-time users learn up
+  // front what works keyless (analysis, exports) vs what needs a key
+  // (generation). Non-fatal on failure — the banner simply never shows if we
+  // can't determine readiness, rather than guessing wrong.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => { /* non-critical — banner stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // StartScreen's "Open a script file" hands off a pending .fdx filename via
+  // sessionStorage when it couldn't convert the file client-side. Surface it
+  // once, then clear the flag so it never reappears on a later reload.
+  useEffect(() => {
+    try {
+      const pendingFdx = sessionStorage.getItem("sm_fdx_import_pending");
+      if (pendingFdx) {
+        setFdxImportNotice(
+          `"${pendingFdx}" is a Final Draft (.fdx) file — this app converts .fdx server-side. Open Script Doctor (below) and use its "Upload script" button to bring it in as Fountain.`
+        );
+        sessionStorage.removeItem("sm_fdx_import_pending");
+      }
+    } catch { /* sessionStorage unavailable — notice just never appears */ }
+  }, []);
+
   // Persist persona selection so it survives reloads.
   useEffect(() => { lsSet("copilot_persona", copilotPersona); }, [copilotPersona]);
+
+  // Dismissing the keyless-readiness banner is remembered per-app (finding E
+  // asks for "dismissible, non-nagging" — StoryMachine.tsx tracks its own key
+  // separately since the two apps are shown/dismissed independently).
+  const dismissLlmBanner = () => {
+    setLlmBannerDismissed(true);
+    lsSet("llmready_banner_dismissed_scriptide", "1");
+  };
 
   const handleScriptChange = (text: string) => {
     setScriptText(text);
@@ -972,6 +1026,12 @@ export default function ScriptIDE({
             <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
           </div>
         )}
+        {fdxImportNotice && (
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
+            <span>{fdxImportNotice}</span>
+            <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
         <Toolbar
           isSaving={isSaving}
           isAnalyzing={engineState.isAnalyzing}
@@ -995,6 +1055,42 @@ export default function ScriptIDE({
           onExportDOCX={exportDOCX}
           onOpenStoryMachine={onOpenStoryMachine}
         />
+
+        {/* Deliverable 2: "New story" — returns to the setup wizard, clearing
+            the persisted config (App.tsx's onNewStory). The script draft
+            itself is untouched; only which screen App shows on next load. */}
+        {onNewStory && (
+          <div className="px-4 py-1 border-b-2 border-black bg-gray-100 flex items-center">
+            <button
+              onClick={() => {
+                if (window.confirm("Start a new story? This returns you to the setup wizard — your current draft stays saved.")) {
+                  onNewStory();
+                }
+              }}
+              title="Return to the setup wizard (your script draft is not deleted)"
+              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black transition-colors"
+            >
+              ← New Story
+            </button>
+          </div>
+        )}
+
+        {/* Finding E: keyless-honesty banner — shown once we know the server
+            has no AI key configured, dismissible and remembered per-app. */}
+        {llmReady === false && !llmBannerDismissed && (
+          <div className="px-4 py-2 border-b-2 border-black bg-[#FFF4CC] text-black text-[11px] font-mono flex items-center justify-between gap-3">
+            <span>
+              Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
+            </span>
+            <button
+              onClick={dismissLlmBanner}
+              aria-label="Dismiss"
+              className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* P9: inline copilot persona picker — selects the ghost-text voice. */}
         <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2">
