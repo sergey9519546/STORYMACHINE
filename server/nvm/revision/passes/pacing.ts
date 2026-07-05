@@ -522,6 +522,16 @@
 // AFTERMATH_VOID give each trigger its fifth channel (visualBeats); PACING_SUSPENSE_RECURRENCE_
 // AFTERMATH_VOID adds the self-referential sixth channel for suspenseDelta (another suspense
 // rise elsewhere), completing full six-channel saturation for this trigger.
+// Wave 1167 additions: after Wave 1153, emotionalShift stood at five of six channels
+// (curiosityDelta, suspenseDelta, relationshipShifts, dialogueHighlights, visualBeats).
+// PACING_EMOTION_RECURRENCE_AFTERMATH_VOID adds the self-referential sixth channel (another
+// non-neutral emotional shift elsewhere), completing full six-channel saturation for this
+// trigger — following the same self-pairing convention as PACING_SUSPENSE_RECURRENCE_AFTERMATH_
+// VOID (Wave 1153). With suspenseDelta and emotionalShift both exhausted, this wave introduces
+// curiosityDelta>0 as a genuinely fresh checkAftermathVoid trigger — it has only ever appeared
+// as an aftermath channel in this file, never as the isTrigger side of a check. PACING_
+// CURIOSITY_SUSPENSE_AFTERMATH_VOID pairs curiosityDelta with suspenseDelta; PACING_CURIOSITY_
+// EMOTIONAL_AFTERMATH_VOID pairs it with emotionalShift.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
@@ -6623,6 +6633,85 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1153c.triggerCount} suspense-spike scenes is followed by two scenes with no further rise in suspense, even though ${r1153c.aftermathCount} such rises occur elsewhere in the script. A tension spike that never compounds into a further escalation in its immediate aftermath reads as an isolated jolt rather than pacing that builds — danger flares and settles instead of accumulating toward something larger.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let the tension climb again rather than settle, so the pacing compounds danger into an escalating pattern instead of a series of disconnected jolts.`,
+      });
+    }
+  }
+
+  // PACING_EMOTION_RECURRENCE_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → emotionalShift (self) absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 further emotionally-
+  // charged scenes anywhere, 2-scene lookahead. Fires when every emotionally-charged scene's
+  // two-scene aftermath registers no further emotional shift, while such shifts occur elsewhere.
+  // This is the self-referential sixth channel for this trigger — distinct from PACING_EMOTION_
+  // RELATIONAL_AFTERMATH_VOID (Wave 1111), PACING_EMOTION_CURIOSITY_AFTERMATH_VOID (Wave 1125),
+  // PACING_EMOTION_SUSPENSE_AFTERMATH_VOID, PACING_EMOTION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID
+  // (Wave 1139), and PACING_EMOTION_STAGING_AFTERMATH_VOID (Wave 1153, same trigger paired with
+  // relationshipShifts/curiosityDelta/suspenseDelta/dialogueHighlights/visualBeats) — completing
+  // full six-channel saturation for this trigger. A feeling that never propagates into a further
+  // emotional beat nearby reads as an isolated spike rather than an emotional current the pacing
+  // sustains.
+  {
+    const r1167a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1167a.fires) {
+      issues.push({
+        location: `${r1167a.triggerCount} emotionally-charged scene(s) — no further emotional shift within 2 scenes of any`,
+        rule: 'PACING_EMOTION_RECURRENCE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1167a.triggerCount} emotionally-charged scenes is followed by two scenes with no further emotional shift, even though ${r1167a.aftermathCount} such shifts occur elsewhere. A feeling that never propagates into a further emotional beat in its immediate wake reads as an isolated spike rather than an emotional current the pacing sustains — the story's feeling flares and settles instead of carrying forward.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let the feeling carry into a further emotional beat, so the pacing sustains an emotional current instead of a series of disconnected spikes.`,
+      });
+    }
+  }
+
+  // PACING_CURIOSITY_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × curiosityDelta (>0) trigger
+  // → suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying curiosity-spike scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every curiosity-spike's two-scene aftermath carries no rise in
+  // suspense, while such rises occur elsewhere. Distinct from every existing curiosityDelta
+  // reference in this file: prior rules use it only as an aftermath channel for other triggers,
+  // never as the isTrigger side of a check — this is the first check to use curiosityDelta as a
+  // trigger in this pass.
+  {
+    const r1167b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.curiosityDelta ?? 0) > 0,
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1167b.fires) {
+      issues.push({
+        location: `${r1167b.triggerCount} curiosity-spike scene(s) — no suspense rise within 2 scenes of any`,
+        rule: 'PACING_CURIOSITY_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1167b.triggerCount} curiosity-spike scenes is followed by two scenes with no rise in suspense, even though ${r1167b.aftermathCount} such rises occur elsewhere. A fresh question that never sharpens into danger or urgency right after it opens leaves the pacing's curiosity registering as idle wondering rather than a hook that tightens the tension of what comes next.`,
+        suggestedFix: `In the two scenes following at least one curiosity spike, let the new question raise the stakes, so the pacing's curiosity feeds tension rather than dissipating as loose intrigue.`,
+      });
+    }
+  }
+
+  // PACING_CURIOSITY_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × curiosityDelta (>0) trigger
+  // → emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying curiosity-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere,
+  // 2-scene lookahead. Fires when every curiosity-spike's two-scene aftermath registers no
+  // emotional shift, while such shifts occur elsewhere. Distinct from PACING_CURIOSITY_SUSPENSE_
+  // AFTERMATH_VOID (this wave, same trigger paired with suspenseDelta) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1167c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.curiosityDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1167c.fires) {
+      issues.push({
+        location: `${r1167c.triggerCount} curiosity-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'PACING_CURIOSITY_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1167c.triggerCount} curiosity-spike scenes is followed by two scenes with no emotional shift, even though ${r1167c.aftermathCount} such shifts occur elsewhere. A fresh question that never registers on any character's felt state right after it opens leaves the pacing's curiosity reading as a purely intellectual hook rather than something the audience feels invested in through a character.`,
+        suggestedFix: `In the two scenes following at least one curiosity spike, let the new question land on a character's emotional register, so the pacing's intrigue carries felt weight, not just a puzzle to solve.`,
       });
     }
   }
