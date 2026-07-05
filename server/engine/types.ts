@@ -182,7 +182,23 @@ export type StoryStructure =
   | 'john_yorke'
   | 'freytag'
   | 'sequence'
-  | 'kishotenketsu';
+  | 'kishotenketsu'
+  | 'three_act'
+  | 'syd_field'
+  | 'rashomon'
+  | 'non_linear'
+  | 'circular'
+  | 'hyperlink'
+  | 'fichtean_curve'
+  | 'in_media_res'
+  | 'snowflake'
+  | 'mystery_box'
+  | 'closed_circle'
+  | 'procedural_case'
+  | 'heist_structure'
+  | 'trial_structure'
+  | 'survival_structure'
+  | 'hero_journey';
 
 // TO ADD A NEW EMOTIONAL ARC: extend this union, then add an entry in
 //   server/lib/structure-presets.ts ARC_TENSION_CURVES.
@@ -192,7 +208,11 @@ export type EmotionalArc =
   | 'man_in_a_hole'
   | 'icarus'
   | 'cinderella'
-  | 'oedipus';
+  | 'oedipus'
+  | 'flat_tension_baseline'
+  | 'sine_wave'
+  | 'double_man_in_a_hole'
+  | 'tragedy_spiral';
 
 // TO ADD A NEW DIRECTOR STYLE: extend this union, then add an entry in
 //   server/lib/structure-presets.ts STYLE_MODIFIERS.
@@ -202,7 +222,29 @@ export type DirectorStyle =
   | 'nolan'
   | 'villeneuve'
   | 'aster'
-  | 'lynch';
+  | 'lynch'
+  | 'kubrick'
+  | 'tarantino'
+  | 'scorsese'
+  | 'coen_brothers'
+  | 'wes_anderson'
+  | 'spielberg'
+  | 'kurosawa'
+  | 'leone'
+  | 'malick'
+  | 'michael_mann'
+  | 'edgar_wright'
+  | 'refn'
+  | 'eggers'
+  | 'bong_joon_ho'
+  | 'del_toro'
+  | 'gerwig'
+  | 'chazelle'
+  | 'pta'
+  | 'claire_denis'
+  | 'almodovar'
+  | 'park_chan_wook'
+  | 'miyazaki';
 
 // TO ADD A NEW GENRE: extend this union, then add an entry in
 //   server/lib/genre-router.ts GENRE_MODIFIERS.
