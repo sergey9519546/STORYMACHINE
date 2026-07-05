@@ -554,6 +554,12 @@
 // AFTERMATH_VOID and ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID give each trigger its fourth
 // channel (relationshipShifts); ORIGINALITY_REVELATION_STAGING_AFTERMATH_VOID gives revelation
 // its fifth channel (visualBeats).
+// Wave 1166 additions: after Wave 1152, revelation stood at five of six channels (missing only
+// dialogueHighlights) and dramaticTurn at four (missing visualBeats and dialogueHighlights).
+// ORIGINALITY_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives revelation its sixth and final
+// channel; ORIGINALITY_TURN_STAGING_AFTERMATH_VOID and ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_
+// AFTERMATH_VOID give dramaticTurn its fifth and sixth channels (visualBeats, dialogueHighlights),
+// completing full six-channel saturation for both triggers.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -7014,6 +7020,88 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1152c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1152c.aftermathCount} such scenes exist elsewhere in the script. Once the audience notices the pattern, a revelation that never earns a visually charged follow-through becomes a learnable absence — disclosures register as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes
+  // anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // revelation's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from ORIGINALITY_REVELATION_CURIOSITY_AFTERMATH_VOID, ORIGINALITY_
+  // REVELATION_SUSPENSE_AFTERMATH_VOID (Wave 1124), ORIGINALITY_REVELATION_EMOTIONAL_AFTERMATH_
+  // VOID (Wave 1138), ORIGINALITY_REVELATION_RELATIONAL_AFTERMATH_VOID, and ORIGINALITY_
+  // REVELATION_STAGING_AFTERMATH_VOID (Wave 1152, same trigger paired with curiosityDelta/
+  // suspenseDelta/emotionalShift/relationshipShifts/visualBeats) — this is the sixth and final
+  // consequence channel for this trigger, completing full six-channel saturation.
+  {
+    const r1166a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1166a.fires) {
+      issues.push({
+        location: `${r1166a.triggerCount} revelation scene(s) — no dialogue highlight within 2 scenes`,
+        rule: 'ORIGINALITY_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1166a.triggerCount} scenes that reveal something is followed by two scenes with no standout line of dialogue, even though ${r1166a.aftermathCount} such lines occur elsewhere in the script. Once the audience notices the pattern, a disclosure never earning a memorable exchange in its wake becomes a learnable absence — every revelation registers as narration the dialogue itself never rises to meet.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a standout line that reckons with what was just learned, so the new information lands in what people say, not only in what the audience knows.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_STAGING_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // visualBeats absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 visually-dense scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath has no heavily-staged scene, while
+  // such staging occurs elsewhere. Distinct from ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID
+  // (Wave 1124), ORIGINALITY_TURN_SUSPENSE_AFTERMATH_VOID, ORIGINALITY_TURN_CURIOSITY_AFTERMATH_
+  // VOID (Wave 1138), and ORIGINALITY_TURN_RELATIONAL_AFTERMATH_VOID (Wave 1152, same trigger
+  // paired with emotionalShift/suspenseDelta/curiosityDelta/relationshipShifts) — this is the
+  // fifth consequence channel for this trigger.
+  {
+    const r1166b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.visualBeats ?? []).length >= 2,
+    });
+    if (r1166b.fires) {
+      issues.push({
+        location: `${r1166b.triggerCount} dramatic-turn aftermath(s) — no heavily-staged scene within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_STAGING_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1166b.triggerCount} pivots) is followed by two scenes with no heavily-staged visual beat, even though ${r1166b.aftermathCount} such scenes exist elsewhere. Once the audience notices the pattern, a pivot never earning a visually charged follow-through becomes a learnable absence — every turn reads as narrated incident rather than something the story visibly dwells on.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying dramatic-turn scenes (pos<n-2), ≥2 scenes anywhere with a
+  // highlighted line of dialogue, 2-scene lookahead. Fires when every turn's two-scene aftermath
+  // contains no highlighted dialogue, while such dialogue occurs elsewhere. Distinct from
+  // ORIGINALITY_TURN_EMOTIONAL_AFTERMATH_VOID (Wave 1124), ORIGINALITY_TURN_SUSPENSE_AFTERMATH_
+  // VOID, ORIGINALITY_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1138), ORIGINALITY_TURN_RELATIONAL_
+  // AFTERMATH_VOID (Wave 1152), and ORIGINALITY_TURN_STAGING_AFTERMATH_VOID (this wave, same
+  // trigger paired with emotionalShift/suspenseDelta/curiosityDelta/relationshipShifts/
+  // visualBeats) — this is the sixth and final consequence channel for this trigger, completing
+  // full six-channel saturation.
+  {
+    const r1166c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1166c.fires) {
+      issues.push({
+        location: `${r1166c.triggerCount} dramatic-turn aftermath(s) — no dialogue highlight within 2 scenes`,
+        rule: 'ORIGINALITY_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1166c.triggerCount} pivots) is followed by two scenes with no standout line of dialogue, even though ${r1166c.aftermathCount} such lines occur elsewhere. Once the audience notices the pattern, a pivot never earning a memorable exchange in its wake becomes a learnable absence — every turn reads as a plot event the dialogue itself never rises to meet.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, give a character a standout line that responds to what just changed, so the pivot lands in what people say, not just in what happens.`,
       });
     }
   }
