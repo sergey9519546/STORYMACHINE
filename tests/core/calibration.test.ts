@@ -183,34 +183,43 @@ describe('getReferenceDistribution', () => {
 });
 
 describe('computeRawCraftScore vs computeHealthScore', () => {
+  // Post-fix signature: both functions now also take wordCount, since
+  // craftPenalty (doctor.ts) blends a word-density term with a scene-based
+  // scarcity term instead of normalizing by scene count alone.
   it('equals computeHealthScore (up to 0.1 rounding) when unsaturated', () => {
     const bySeverity = { critical: 1, major: 1, minor: 1 };
     const sceneCount = 10;
-    const raw = computeRawCraftScore(bySeverity, sceneCount);
-    const health = computeHealthScore(bySeverity, sceneCount);
+    const wordCount = 300;
+    const raw = computeRawCraftScore(bySeverity, sceneCount, wordCount);
+    const health = computeHealthScore(bySeverity, sceneCount, wordCount);
     assert.equal(Math.round(raw * 10) / 10, health);
     assert.ok(raw > 0 && raw < 100, 'sanity: this fixture should be comfortably unsaturated');
   });
 
   it('goes negative (not 0) once the penalty exceeds 100', () => {
+    // A small wordCount (dense issue rate relative to the script's own size)
+    // is what drives the density term high enough to saturate now — see
+    // doctor.ts's craftPenalty comment for why density is word-based.
     const bySeverity = { critical: 20, major: 0, minor: 0 };
     const sceneCount = 5;
-    const raw = computeRawCraftScore(bySeverity, sceneCount);
-    const health = computeHealthScore(bySeverity, sceneCount);
+    const wordCount = 50;
+    const raw = computeRawCraftScore(bySeverity, sceneCount, wordCount);
+    const health = computeHealthScore(bySeverity, sceneCount, wordCount);
     assert.ok(raw < 0, `expected a negative raw score, got ${raw}`);
     assert.equal(health, 0, 'the displayed score should still clamp to 0');
   });
 
   it('strictly orders two saturated severity mixes that computeHealthScore ties at 0', () => {
     const sceneCount = 10;
+    const wordCount = 50;
     const lighter = { critical: 20, major: 0, minor: 0 };
     const heavier = { critical: 60, major: 0, minor: 0 };
 
-    assert.equal(computeHealthScore(lighter, sceneCount), 0);
-    assert.equal(computeHealthScore(heavier, sceneCount), 0, 'both mixes must tie at the clamped floor');
+    assert.equal(computeHealthScore(lighter, sceneCount, wordCount), 0);
+    assert.equal(computeHealthScore(heavier, sceneCount, wordCount), 0, 'both mixes must tie at the clamped floor');
 
-    const rawLighter = computeRawCraftScore(lighter, sceneCount);
-    const rawHeavier = computeRawCraftScore(heavier, sceneCount);
+    const rawLighter = computeRawCraftScore(lighter, sceneCount, wordCount);
+    const rawHeavier = computeRawCraftScore(heavier, sceneCount, wordCount);
     assert.ok(
       rawLighter > rawHeavier,
       `raw score must keep the lighter mix ranked above the heavier one: ${rawLighter} vs ${rawHeavier}`,
@@ -230,8 +239,8 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
 
 /** Recompute the same RAW (unclamped) craft-score statistic reference.ts's
  *  scoreSample uses, but from runScriptDoctor's own public report shape
- *  (DoctorPassSummary[] + sceneCount) rather than reference.ts's private
- *  scoring path — this exercises the real end-to-end pipeline
+ *  (DoctorPassSummary[] + sceneCount + wordCount) rather than reference.ts's
+ *  private scoring path — this exercises the real end-to-end pipeline
  *  (analyzeFountainText -> runRevisionPipeline -> aggregateReport) the way an
  *  actual Script Doctor request does, instead of re-deriving reference.ts's
  *  internal build. computeRawCraftScore itself is doctor.ts's published,
@@ -239,7 +248,10 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
  *  report.health, which is CLAMPED) is exactly the saturation-safe ranking
  *  statistic this whole calibration layer is built on; see doctor.ts's
  *  aggregateReport calibration-layer comment for why the raw statistic is
- *  the one that must be used for any cross-sample ranking.
+ *  the one that must be used for any cross-sample ranking. wordCount is
+ *  passed alongside sceneCount because the opportunity-based craftPenalty
+ *  (the saturation fix) blends a word-density term with a scene-scarcity
+ *  term — see craftPenalty's own comment in doctor.ts.
  */
 async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
   const report = await runScriptDoctor(sample.fountain);
@@ -251,7 +263,7 @@ async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
     }),
     { critical: 0, major: 0, minor: 0 },
   );
-  return computeRawCraftScore(bySeverity, report.sceneCount);
+  return computeRawCraftScore(bySeverity, report.sceneCount, report.wordCount);
 }
 
 async function bandAverageRawScore(band: CorpusBand): Promise<number> {
@@ -339,6 +351,86 @@ describe('band ordering through the real runScriptDoctor pipeline', () => {
         );
       }
     }
+  });
+});
+
+// ── Saturation fix regression coverage ────────────────────────────────────
+// doctor.ts's craftPenalty replaced a scene-count-only normalization with an
+// opportunity-based one (a word-density term + a scene-scarcity term) so
+// that every realistic multi-scene script no longer clamps to displayed
+// health 0. These two tests encode that fix as real, running-pipeline
+// regressions rather than leaving it as tuning-script observation only:
+//   1. no corpus sample — including the worst 'troubled' one — saturates to
+//      displayed health 0 anymore;
+//   2. the SAME craft quality at 2x/3x length (built by concatenating
+//      renamed copies of a real corpus sample's own scenes, so its planted
+//      clue/payoff pair still resolves per-copy) keeps displayed health
+//      within ~10 points of the 1x original — the direct regression test
+//      for the defect ("length-biased to the point of uselessness").
+describe('no-saturation & length-invariance (opportunity-based craftPenalty fix)', () => {
+  it('no reference-corpus sample saturates to displayed health 0, including the worst troubled sample', async () => {
+    const reports = await Promise.all(REFERENCE_CORPUS.map(s => runScriptDoctor(s.fountain)));
+    reports.forEach((report, i) => {
+      assert.ok(
+        report.health > 0,
+        `${REFERENCE_CORPUS[i].label} (${REFERENCE_CORPUS[i].band}) saturated to displayed health ${report.health}`,
+      );
+    });
+  });
+
+  it('displayed health stays within ~10 points at 2x/3x length for matched craft quality', async () => {
+    // Build 2x/3x variants of the 'competent'-band 'Zero Day' corpus sample
+    // by concatenating renamed copies of its own 10-scene pattern — same
+    // craft quality, same clue/payoff shape, just longer. This is the direct
+    // regression test for the saturation defect: before this fix, a longer
+    // script of matched quality scored MUCH worse (more accumulated issues,
+    // same scene-count-only divisor); after the fix, word-based density
+    // normalization (doctor.ts's craftPenalty) should keep it close to flat.
+    const zeroDay = REFERENCE_CORPUS.find(s => s.label === 'Zero Day');
+    assert.ok(zeroDay, "pinned sample 'Zero Day' must exist in the corpus");
+
+    // Rename the two speaking characters per extra copy so each copy's own
+    // planted clue ("Payload triggers at market open") and its payoff still
+    // resolve as a distinct, self-contained clue/payoff pair rather than
+    // three copies of literally the same character voice — see corpus.ts's
+    // header for why the reference corpus itself is controlled this way.
+    function renamedCopy(fountain: string, nadia: string, manager: string, tag: string): string {
+      return fountain
+        .replace(/\bNADIA\b/g, nadia.toUpperCase())
+        .replace(/\bNadia\b/g, nadia)
+        .replace(/\bMANAGER\b/g, manager.toUpperCase())
+        .replace(/\bManager\b/g, manager)
+        .replace(/- (NIGHT|DAY|CONTINUOUS|MORNING)$/gm, m => `${m} (${tag})`);
+    }
+
+    const copy1 = zeroDay!.fountain;
+    const copy2 = renamedCopy(zeroDay!.fountain, 'Priya', 'Rios', 'II');
+    const copy3 = renamedCopy(zeroDay!.fountain, 'Elena', 'Cho', 'III');
+
+    const [report1x, report2x, report3x] = await Promise.all([
+      runScriptDoctor(copy1),
+      runScriptDoctor([copy1, copy2].join('\n\n')),
+      runScriptDoctor([copy1, copy2, copy3].join('\n\n')),
+    ]);
+
+    // Sanity: the variants really are 2x/3x longer, not accidentally
+    // deduped or truncated — otherwise "health stayed flat" would be
+    // trivially true for the wrong reason.
+    assert.equal(report2x.sceneCount, report1x.sceneCount * 2);
+    assert.equal(report3x.sceneCount, report1x.sceneCount * 3);
+    assert.ok(report2x.wordCount > report1x.wordCount * 1.8);
+    assert.ok(report3x.wordCount > report1x.wordCount * 2.7);
+
+    const drift2x = Math.abs(report2x.health - report1x.health);
+    const drift3x = Math.abs(report3x.health - report1x.health);
+    assert.ok(
+      drift2x <= 10,
+      `2x length drifted ${drift2x.toFixed(1)} points (1x=${report1x.health}, 2x=${report2x.health}) — expected <= 10`,
+    );
+    assert.ok(
+      drift3x <= 10,
+      `3x length drifted ${drift3x.toFixed(1)} points (1x=${report1x.health}, 3x=${report3x.health}) — expected <= 10`,
+    );
   });
 });
 

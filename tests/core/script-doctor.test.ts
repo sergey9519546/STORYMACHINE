@@ -199,21 +199,47 @@ describe('runScriptDoctor — diagnose-only guarantee', () => {
 });
 
 describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
+  // Post-saturation-fix formula (doctor.ts's craftPenalty):
+  //   penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
+  //           + SCARCITY_SCALE / sceneCount
+  // with DENSITY_SCALE=2.5, WORD_COUNT_EXPONENT=0.7, DENSITY_POWER=3.75,
+  // SCARCITY_SCALE=140 (doctor.ts). The exponents are irrational-ish tuned
+  // constants (see doctor.ts's craftPenalty comment for the empirical
+  // rationale), so — like the prior formula's spot-checks — these assert
+  // against the ROUNDED displayed value rather than hand-expanded arithmetic;
+  // computeHealthScore itself is the single source of truth for the formula.
   it('matches the documented formula for a known issue count', () => {
-    // 100 - (4*1 + 1.5*2 + 0.5*3) * (30/10) = 100 - 8.5*3 = 100 - 25.5 = 74.5
-    const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10);
-    assert.equal(health, 74.5);
-    assert.equal(gradeForHealth(health), 'solid');
+    // weightedIssues = 4*1 + 1.5*2 + 0.5*3 = 8.5; sceneCount=10, wordCount=300.
+    const health = computeHealthScore({ critical: 1, major: 2, minor: 3 }, 10, 300);
+    assert.equal(health, 86);
+    assert.equal(gradeForHealth(health), 'strong');
   });
 
-  it('returns 100 (excellent) for zero issues regardless of scene count', () => {
-    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25);
-    assert.equal(health, 100);
+  it('approaches, but does not necessarily hit, 100 for zero issues at a well-evidenced scene count', () => {
+    // Zero issues still carries a small scarcityPenalty (SCARCITY_SCALE /
+    // sceneCount = 140/25 = 5.6) — a deliberate residual (see doctor.ts's
+    // craftPenalty comment): a report is never "0 issues, therefore
+    // literally 100" purely from a big denominator, it's the scarcity
+    // correction fading toward (not to) zero as scenes accumulate.
+    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25, 2000);
+    assert.equal(health, 94.4);
     assert.equal(gradeForHealth(health), 'excellent');
   });
 
+  it('does NOT return 100 for zero issues at a tiny scene/word count — small-script sanity', () => {
+    // The defect this fix targets in the other direction: a 4-scene, 80-word
+    // fixture that happens to have zero issues must not read as a proven
+    // "excellent" script — there wasn't enough material for most of the
+    // pipeline's structural checks to have had a fair chance to fire.
+    // scarcityPenalty (140/4 = 35) keeps even a clean tiny script in a
+    // plausible mid band instead of at the ceiling.
+    const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 4, 80);
+    assert.equal(health, 65);
+    assert.equal(gradeForHealth(health), 'solid');
+  });
+
   it('clamps to 0 when the penalty would exceed 100', () => {
-    const health = computeHealthScore({ critical: 10, major: 10, minor: 10 }, 5);
+    const health = computeHealthScore({ critical: 10, major: 10, minor: 10 }, 5, 50);
     assert.equal(health, 0);
     assert.equal(gradeForHealth(health), 'troubled');
   });

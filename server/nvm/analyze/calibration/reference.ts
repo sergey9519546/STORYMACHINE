@@ -89,23 +89,58 @@
 // and the test suite will (correctly) start failing again. See corpus.ts's
 // header for the full constraint and the per-sample word/scene budget.
 //
+// ── The saturation defect this file used to document (now fixed) ─────────
+// Until this fix, doctor.ts's craftPenalty normalized ONLY by scene count
+// (weightedIssues * (30 / sceneCount)). Issue volume actually scales with
+// prose length (word count) as much as with scene count, so every one of
+// this corpus's 20 richness-matched, ~300-360-word samples produced a raw
+// craft score around -180 to -330 — comfortably past the [0, 100] clamp.
+// Every realistic multi-scene script displayed health 0, grade 'troubled',
+// verdict 'PASS', regardless of authored quality; only tiny 2-4 scene
+// fixtures (too little material for the same issue volume to accumulate)
+// ever cleared the clamp. See doctor.ts's craftPenalty comment for the
+// opportunity-based replacement (a word-density term, amplified nonlinearly
+// so the corpus's narrow band-to-band density range still separates on the
+// 0-100 scale, plus an additive scene-scarcity term so a script can't read
+// as "clean" purely by being too short to accumulate issues).
+//
 // ── What remains genuinely unfixed (out of scope here) ────────────────────
-// This rebalance only controls richness INSIDE the reference corpus itself.
-// A real user-submitted script's raw craft score still experiences the same
-// richness bias doctor.ts's craftPenalty formula has: a richer, more
-// ambitious script racks up more structural-absence and prose-texture issues
-// than a thinner one of comparable authored quality, because the ~1,300-rule
-// pipeline's issue volume scales with scene count and word count faster than
-// the 30/sceneCount normalization corrects for. That is a formula-level
-// property of doctor.ts's craftPenalty (deliberately untouched by this fix —
-// see this module's and doctor.ts's own comments for why the formula itself
-// is out of scope here), not a defect in the reference corpus. Practically:
-// percentile comparisons are most meaningful between scripts of comparable
-// scope and richness; comparing a 4-scene sketch against a 40-scene feature
-// on percentile alone will still read as the sketch scoring unrealistically
-// well, purely from having fewer opportunities to accumulate issues. Fixing
-// that at the formula level (e.g. a richness-aware penalty term) remains a
-// legitimate follow-up work item, tracked separately from this corpus fix.
+// No formula is perfect; here is the honest residual bias in the NEW
+// opportunity-based craftPenalty, not the old one:
+//   1. Small-script ceiling by design, not oversight: scarcityPenalty
+//      (doctor.ts) deliberately keeps a 2-4 scene script out of the top of
+//      the range even when it's genuinely clean, because there isn't enough
+//      material for most of the pipeline's structural checks (escalation,
+//      revelation, payoff timing, relationship arcs) to have had a fair
+//      chance to fire — a "clean" reading from too little evidence isn't
+//      trustworthy. The correction is uniform, though: a genuinely
+//      exceptional 3-scene excerpt and a mediocre 3-scene fragment both
+//      absorb the same scarcity surcharge, so discrimination WITHIN the
+//      "too short to fully evaluate" bucket stays compressed relative to
+//      what the same material would show at full length. verdictFor's own
+//      sceneCount >= 8 RECOMMEND floor (unchanged by this fix) is the
+//      product's separate, coarser guard against the same concern.
+//   2. The word-count exponent (WORD_COUNT_EXPONENT in doctor.ts) that makes
+//      the penalty length-invariant was measured from ONE real concatenation
+//      experiment (a matched-quality sample duplicated to 2x/3x length, 290
+//      to 890 words) — a strong empirical signal, not a mathematical
+//      guarantee that every screenplay's own mix of per-scene vs.
+//      per-document rule firings scales identically. Real feature-length
+//      scripts run 10-50x longer than that measurement's largest point; the
+//      exponent is extrapolated past what was directly verified, so
+//      length-invariance at those larger scales is a well-founded
+//      expectation, not a proof.
+//   3. DENSITY_POWER and DENSITY_SCALE are calibrated to THIS corpus's
+//      current band-to-band density spread (roughly 1.6x, best sample to
+//      worst). CLAUDE.md's standing task adds 3 new revision-pass checks
+//      every wave, indefinitely — if that steadily widens or narrows the
+//      corpus's density spread over many waves, the achieved 0-100
+//      separation will drift with it, and these constants (like any
+//      hand-tuned constants) will eventually warrant re-tuning against the
+//      then-current corpus. tests/core/calibration.test.ts's monotonicity
+//      assertions will catch an outright ordering break; they will NOT
+//      catch a slow drift in how WIDE the separation is, since the
+//      band-average targets are documented as soft, not asserted exactly.
 
 import type { CompiledScreenplay } from '../../screenplay/compile.ts';
 import type { PassName } from '../../revision/passes/types.ts';
@@ -120,8 +155,8 @@ export interface ReferenceDistribution {
   /** Sorted ascending RAW (unclamped) craft-score statistics across the
    *  reference corpus — computeRawCraftScore's output, not the displayed
    *  computeHealthScore value. See the file header's saturation note: with
-   *  the clamp, most/all corpus samples tie at 0 and the distribution is
-   *  useless for ranking. */
+   *  the clamp, an unusually issue-dense sample could tie another at 0 and
+   *  make the distribution unable to distinguish them. */
   health: number[];
   /** Sorted ascending per-dimension RAW craft-score statistics, keyed by
    *  DimensionKey — same unclamped rationale as `health` above. */
@@ -181,16 +216,18 @@ async function scoreSample(fountain: string): Promise<{ health: number; dimensio
   for (const pr of result.passResults) {
     for (const issue of pr.issues) bySeverityTotal[issue.severity]++;
   }
-  // Raw (unclamped), NOT computeHealthScore's displayed [0, 100] value: with
-  // ~1,300 accumulated rules across 14 passes, almost every realistic 8+
-  // scene script — including this reference corpus — racks up enough
-  // minor/major issues that the clamped score saturates at 0 for most/all
-  // samples, which would make the distribution built below useless for
-  // ranking (see doctor.ts's aggregateReport calibration-layer comment for
-  // the full defect writeup). computeRawCraftScore is the identical formula
-  // without the clamp, so a 40-issue and a 400-issue sample stay
-  // distinguishable in the distribution instead of tying at the floor.
-  const health = computeRawCraftScore(bySeverityTotal, analysis.sceneCount);
+  // Raw (unclamped), NOT computeHealthScore's displayed [0, 100] value: even
+  // after doctor.ts's opportunity-based rebalance (craftPenalty now blends a
+  // word-density term with a scene-scarcity term instead of normalizing by
+  // scene count alone — see craftPenalty's own comment in doctor.ts), an
+  // exceptionally issue-dense sample can still drive the pre-clamp score
+  // deeply negative. Ranking on the unclamped statistic keeps any two such
+  // samples distinguishable in the distribution instead of tying at the
+  // clamped floor — see doctor.ts's aggregateReport calibration-layer
+  // comment for the full rationale. computeRawCraftScore now also takes
+  // wordCount (analysis.wordCount) alongside sceneCount, since the
+  // opportunity-based penalty is a blend of both.
+  const health = computeRawCraftScore(bySeverityTotal, analysis.sceneCount, analysis.wordCount);
 
   const dimensions = {} as Record<DimensionKey, number>;
   for (const def of DIMENSION_PASS_MAP) {
@@ -200,8 +237,12 @@ async function scoreSample(fountain: string): Promise<{ health: number; dimensio
       if (!passSet.has(pr.pass)) continue;
       for (const issue of pr.issues) bySeverity[issue.severity]++;
     }
-    // Same reasoning as `health` above — raw, unclamped, for ranking symmetry.
-    dimensions[def.key] = computeRawCraftScore(bySeverity, analysis.sceneCount);
+    // Same reasoning as `health` above — raw, unclamped, for ranking
+    // symmetry, using the whole sample's wordCount (a dimension is a
+    // regrouping of issues by pass, not a distinct slice of the prose, so
+    // there's no separate per-dimension word count — same rationale as
+    // doctor.ts's buildDimensions).
+    dimensions[def.key] = computeRawCraftScore(bySeverity, analysis.sceneCount, analysis.wordCount);
   }
 
   return { health, dimensions };

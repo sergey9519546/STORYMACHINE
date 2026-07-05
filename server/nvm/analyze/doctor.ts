@@ -54,12 +54,121 @@ export function computeContentHash(fountain: string): string {
   return crypto.createHash('sha256').update(fountain.trim()).digest('hex');
 }
 
+// ── Opportunity-based craft penalty (saturation fix) ────────────────────────
+// PRIOR DESIGN (superseded — kept here as the historical record the rest of
+// this comment block refers to): craftPenalty = weightedIssues * (30 /
+// sceneCount). That normalizes ONLY by scene count. With the pipeline's
+// ~1,300 accumulated rules across 14 passes, issue volume actually scales
+// with PROSE LENGTH (word count) at least as much as with scene count — a
+// script with more words per scene racks up proportionally more dialogue/
+// action-level issues that the scene-count-only divisor never discounts.
+// Empirically (calibration/corpus.ts's 20 richness-matched, 10-scene,
+// ~300-360-word samples), that produced a *raw* craft score around -180 to
+// -330 for every sample — every realistic multi-scene script saturated the
+// [0, 100] clamp at the SAME value (0), so the displayed health, grade, and
+// verdict carried no information at all for exactly the scripts that matter
+// (see calibration/reference.ts's former "what remains genuinely unfixed"
+// section, and this fix's own commit history, for the full measurement).
+//
+// NEW DESIGN: penalty is opportunity-based — proportional to issue DENSITY
+// relative to the script's own size — with two independent, additive terms:
+//
+//   1. densityPenalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT) ^ DENSITY_POWER
+//
+//      "How much worse is this script's issue rate than its size would
+//      predict, amplified so real craft-quality gaps actually separate."
+//      wordCount^WORD_COUNT_EXPONENT (not raw wordCount) is the word-based
+//      opportunity unit: WORD_COUNT_EXPONENT = 0.7 was measured, not guessed
+//      — concatenating renamed copies of the same 10-scene reference sample
+//      (verifying the SAME craft quality at 2x/3x length through the real
+//      pipeline) showed weightedIssues does NOT scale linearly with wordCount
+//      (many rules are per-document, not per-repetition: 100.5 weighted
+//      issues at 290 words became 165.5 at 590 and 230.0 at 890 —
+//      issues-per-word actually FALLS as the script gets longer). Raising
+//      wordCount to the 0.7 power before dividing tracks that same
+//      sub-linear growth, which is what makes the formula LENGTH-INVARIANT
+//      for scripts of matched quality (see the length-invariance regression
+//      test in tests/core/script-doctor.test.ts). DENSITY_POWER (3.75)
+//      exists because the reference corpus's own band-to-band density range
+//      is narrow in relative terms (best-sample density to worst-sample
+//      density is under a 2x spread) — a plain linear scaling of that
+//      density either barely separates bands or has to be so large it clips
+//      every sample to 0 or 100. Raising density to a power > 1 amplifies
+//      the SAME underlying ordering (it's still strictly increasing in
+//      density, so it changes no comparison, only the scale) into a
+//      genuinely readable 0-100 spread. DENSITY_SCALE (2.5) is the
+//      remaining unit-scale constant.
+//
+//   2. scarcityPenalty = SCARCITY_SCALE / sceneCount
+//
+//      A script with very few scenes hasn't had enough structural
+//      opportunities (escalation, revelation, relationship-arc, payoff-
+//      timing checks — most of which need several scenes to even evaluate)
+//      for its measured word-density to mean anything: a 4-scene fragment
+//      naturally registers a LOWER issue density than a full script of
+//      identical underlying quality, simply because most of the pipeline's
+//      structural rules never had enough material to fire at all. Left
+//      uncorrected, density alone rewards shortness — the small-script
+//      mirror image of the old defect. scarcityPenalty is a second,
+//      independent, always-non-negative term (it can never subtract from
+//      the density term, only add) that decays as 1/sceneCount: room for
+//      the pipeline's structural checks to have had a fair chance to run.
+//      It fades to near-nothing for realistic scene counts (SCARCITY_SCALE
+//      / 40 = 3.5 points) but dominates for a 3-4 scene fixture
+//      (SCARCITY_SCALE / 4 = 35 points), which is exactly the intended
+//      effect: a tiny script can no longer read as "clean" purely because
+//      it was too short to accumulate issues.
+//
+// All constants were tuned empirically against calibration/corpus.ts's 20
+// samples to hit, simultaneously: full four-band monotonicity on both raw
+// and displayed health; no band average pinned at either clamp; the
+// length-invariance measurement above staying within ~10 points at 2x/3x
+// length; and a 4-scene fixture landing in a plausible mid band rather than
+// 90+. See calibration/reference.ts's header for the residual bias this does
+// NOT fully correct (an individual very-short-but-genuinely-clean script
+// still can't reach the top of the range — that's scarcityPenalty working
+// as designed, not a bug).
 /** Shared penalty expression behind both computeRawCraftScore and
- *  computeHealthScore — factored out so the two can never drift apart:
- *  (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)). */
-function craftPenalty(bySeverity: { critical: number; major: number; minor: number }, sceneCount: number): number {
-  return (4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor) *
-    (30 / Math.max(sceneCount, 1));
+ *  computeHealthScore — factored out so the two can never drift apart. See
+ *  the design comment above for the full rationale; in short:
+ *    penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
+ *            + SCARCITY_SCALE / sceneCount
+ *  where weightedIssues = 4·critical + 1.5·major + 0.5·minor (unchanged from
+ *  the prior formula — only the normalization changed).
+ *
+ *  The four tuned constants are declared LOCALLY (inside this function body)
+ *  rather than at module scope — deliberately, not for style. doctor.ts and
+ *  calibration/reference.ts import each other (reference.ts's header
+ *  explains why: it reuses this exact formula to build its distribution,
+ *  without ever calling back into aggregateReport/runScriptDoctor). Whichever
+ *  of the two modules a process happens to load FIRST becomes the entry
+ *  point of that cycle; if it were doctor.ts, reference.ts's top-level
+ *  `await buildDistribution()` would call into this function while doctor.ts
+ *  was still mid-evaluation — before any module-scope `const` declared here
+ *  had run its initializer. That's a genuine TemporalDeadZone ReferenceError
+ *  (verified while building this fix), silently swallowed by reference.ts's
+ *  own top-level try/catch into an empty distribution — every report would
+ *  then quietly lose healthPercentile for the rest of the process, with
+ *  nothing crashing to reveal why. Function PARAMETERS and function-local
+ *  `const`s have no such hazard: they're initialized fresh on every call,
+ *  independent of module evaluation order, so the cycle above can never
+ *  observe them uninitialized. */
+function craftPenalty(
+  bySeverity: { critical: number; major: number; minor: number },
+  sceneCount: number,
+  wordCount: number,
+): number {
+  const WORD_COUNT_EXPONENT = 0.7;
+  const DENSITY_POWER = 3.75;
+  const DENSITY_SCALE = 2.5;
+  const SCARCITY_SCALE = 140;
+
+  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
+  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const density = weightedIssues / opportunityWords;
+  const densityPenalty = DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
+  const scarcityPenalty = SCARCITY_SCALE / Math.max(sceneCount, 1);
+  return densityPenalty + scarcityPenalty;
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
@@ -67,18 +176,24 @@ function craftPenalty(bySeverity: { critical: number; major: number; minor: numb
  *  displays, just before the [0, 100] clamp; see computeHealthScore and
  *  calibration/reference.ts for why the UNCLAMPED value is what calibration
  *  ranks on. Exported (rather than inlined) so it's independently
- *  spot-checkable, same rationale as computeHealthScore itself. */
+ *  spot-checkable, same rationale as computeHealthScore itself.
+ *
+ *  wordCount is the size parameter this fix added alongside sceneCount (see
+ *  the opportunity-based design comment above) — both are required now
+ *  because the penalty is a blend of word-based density and scene-based
+ *  scarcity correction, not scene count alone. */
 export function computeRawCraftScore(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
+  wordCount: number,
 ): number {
-  return 100 - craftPenalty(bySeverity, sceneCount);
+  return 100 - craftPenalty(bySeverity, sceneCount, wordCount);
 }
 
-/** health = 100 − (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)),
- *  clamped to [0, 100] and rounded to 1 decimal. Exported as a pure function
- *  (rather than inlined) so the formula itself can be spot-checked with a
- *  known issue count without needing to run the full 14-pass pipeline.
+/** health = 100 − craftPenalty(...), clamped to [0, 100] and rounded to 1
+ *  decimal. Exported as a pure function (rather than inlined) so the formula
+ *  itself can be spot-checked with a known issue count without needing to
+ *  run the full 14-pass pipeline.
  *
  *  Note: this is the DISPLAYED score. Ranking (healthPercentile / dimension
  *  percentile, in aggregateReport below) uses computeRawCraftScore's
@@ -86,8 +201,9 @@ export function computeRawCraftScore(
 export function computeHealthScore(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
+  wordCount: number,
 ): number {
-  const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount)));
+  const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount, wordCount)));
   return Math.round(clamped * 10) / 10;
 }
 
@@ -228,8 +344,16 @@ interface DimensionBuild {
  *  separate from aggregateReport so the pass->dimension mapping is a single,
  *  independently testable seam. Returns the internal `mix` alongside each
  *  public DimensionScore so buildPlainSummary can name a top rule area for
- *  the weakest dimension without recomputing it from scratch. */
-function buildDimensions(passes: DoctorPassSummary[], sceneCount: number): DimensionBuild[] {
+ *  the weakest dimension without recomputing it from scratch.
+ *
+ *  wordCount is the WHOLE script's word count, shared across all 5
+ *  dimensions — there's no per-dimension word count to measure (a dimension
+ *  is a regrouping of issues by PASS, not a distinct slice of the prose), so
+ *  each dimension's own opportunity-based penalty (craftPenalty in
+ *  computeHealthScore/computeRawCraftScore) is scaled against the same
+ *  script-wide word count as the overall health score, exactly as sceneCount
+ *  already was before this fix. */
+function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCount: number): DimensionBuild[] {
   return DIMENSION_DEFS.map(def => {
     const passSet = new Set<PassName>(def.passes);
     const issues = passes.filter(p => passSet.has(p.pass)).flatMap(p => p.issues);
@@ -237,8 +361,8 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number): Dimen
       (acc, i) => { acc[i.severity]++; return acc; },
       { critical: 0, major: 0, minor: 0 },
     );
-    const score = computeHealthScore(bySeverity, sceneCount);
-    const rawScore = computeRawCraftScore(bySeverity, sceneCount);
+    const score = computeHealthScore(bySeverity, sceneCount, wordCount);
+    const rawScore = computeRawCraftScore(bySeverity, sceneCount, wordCount);
     const mix = analyzeDimensionIssues(issues);
     return {
       mix,
@@ -459,11 +583,11 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
     { critical: 0, major: 0, minor: 0 },
   );
 
-  const health = computeHealthScore(bySeverity, analysis.sceneCount);
+  const health = computeHealthScore(bySeverity, analysis.sceneCount, analysis.wordCount);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
-  const dimensionBuilds = buildDimensions(passes, analysis.sceneCount);
+  const dimensionBuilds = buildDimensions(passes, analysis.sceneCount, analysis.wordCount);
   const dimensions = dimensionBuilds.map(d => d.score);
   const verdict = verdictFor(health, analysis.sceneCount);
   const anyClueSeeded = analysis.records.some(r => r.seededClueIds.length > 0);
@@ -481,24 +605,21 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
   // calibration/reference.ts's reference-corpus distribution, populating
   // types.ts's optional healthPercentile / DimensionScore.percentile fields.
   //
-  // Saturation defect (why this ranks on the UNCLAMPED craft statistic, not
-  // the displayed 0-100 score): computeHealthScore's penalty is
-  // (4·critical + 1.5·major + 0.5·minor) · (30 / sceneCount), then clamped to
-  // [0, 100]. With the pipeline's ~1,300 accumulated rules across 14 passes,
-  // almost any realistic 8+ scene script racks up enough minor/major issues
-  // that the raw penalty exceeds 100 well before the script is actually
-  // "worthless" — the clamp saturates. A script with 40 issues and one with
-  // 400 both display health 0 and, ranked on THAT number, both land at the
-  // same percentile: the ranking goes flat/meaningless exactly in the range
-  // (heavily-flagged scripts) where distinguishing "bad" from "much worse"
-  // matters most. computeRawCraftScore (doctor.ts) is the identical formula
-  // WITHOUT the clamp — it can go deeply negative — so two saturated scripts
-  // that tie at displayed health 0 still separate on the raw statistic and
-  // order correctly against the reference corpus. The displayed health/grade/
-  // verdict/dimension scores are untouched by this — only the statistic fed
-  // into percentileRank changes, per dimension too (the same saturation risk
-  // exists in principle for any dimension with enough issues relative to its
-  // pass count).
+  // Why this still ranks on the UNCLAMPED craft statistic, not the displayed
+  // 0-100 score, even after the opportunity-based rebalance above: the
+  // clamp in computeHealthScore is a floor/ceiling on what gets DISPLAYED,
+  // not a floor/ceiling on what the underlying craftPenalty formula can
+  // compute — an exceptionally issue-dense script can still drive the raw
+  // (pre-clamp) score arbitrarily negative even though the new formula no
+  // longer does this for ordinary realistic scripts (see craftPenalty's own
+  // comment above for the fix). Two scripts that both clamp to displayed
+  // health 0 would, ranked on THAT number, tie at the same percentile —
+  // computeRawCraftScore (doctor.ts) is the identical formula WITHOUT the
+  // clamp, so they still separate on the raw statistic and order correctly
+  // against the reference corpus. The displayed health/grade/verdict/
+  // dimension scores are untouched by this — only the statistic fed into
+  // percentileRank changes, per dimension too (the same clamp-vs-raw
+  // distinction applies to any dimension, not just the overall score).
   //
   // Calibration is an enhancement, not a dependency: getReferenceDistribution
   // already guards its own build (reference.ts falls back to an empty
@@ -511,7 +632,7 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
   let healthPercentile: number | undefined;
   try {
     const distribution = getReferenceDistribution();
-    const rawHealth = computeRawCraftScore(bySeverity, analysis.sceneCount);
+    const rawHealth = computeRawCraftScore(bySeverity, analysis.sceneCount, analysis.wordCount);
     if (distribution.health.length > 0) {
       healthPercentile = percentileRank(rawHealth, distribution.health);
     }
