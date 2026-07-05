@@ -78,6 +78,14 @@ export interface DimensionScore {
   issueCount: number;
   /** One plain-language sentence a non-technical writer understands. */
   summary: string;
+  /** 0–100 percentile rank of `score` against the calibration reference
+   *  corpus for THIS dimension (calibration/reference.ts). Optional so a
+   *  report built without calibration data stays valid; the doctor
+   *  populates it whenever the reference distribution is available. */
+  percentile?: number;
+  /** Plain-language gloss of `percentile`, e.g. "stronger than 74% of
+   *  produced screenplays in the reference set". */
+  percentileDescriptor?: string;
 }
 
 /** How the submitted script reached the doctor. Populated by the route, not
@@ -90,6 +98,74 @@ export interface DoctorSource {
    *  Draft paragraph type that was imported as Action). Present only when
    *  fdxToFountain produced at least one. */
   warnings?: string[];
+}
+
+/** Where in the script an issue can be pinned. Most revision-pass issues are
+ *  scene- or act-level, not line-precise (their `location` reads "Scene 3
+ *  (INT. BAR)" or "Act 1 pacing"), so honest anchoring has four tiers rather
+ *  than pretending every finding maps to a caret range:
+ *   - 'scene'     — attributed to one scene; anchored to that scene's line span.
+ *   - 'character' — about one character; anchored to their first speaking line.
+ *   - 'lines'     — the location already named an explicit line range.
+ *   - 'document'  — act-level / whole-script / prose-pattern; NO line anchor
+ *                   (startLine/endLine undefined) — surfaced in summaries, not
+ *                   as an editor squiggle. */
+export type IssueAnchor = 'scene' | 'character' | 'lines' | 'document';
+
+/** A RevisionIssue resolved against concrete Fountain text so the editor can
+ *  draw it. startLine/endLine are 1-based inclusive (CodeMirror line numbers);
+ *  both undefined when anchor === 'document'. */
+export interface LocatedIssue {
+  issue: RevisionIssue;
+  pass: PassName;
+  anchor: IssueAnchor;
+  startLine?: number;
+  endLine?: number;
+}
+
+/** A cluster of co-firing issues rolled into one named diagnosis — the
+ *  difference between a 40-item lint dump and a script reader saying "your
+ *  antagonist vanishes for act two, and these nine symptoms are all that one
+ *  wound". Deterministic: grouped by scene-span overlap + known rule
+ *  co-occurrence templates, never by an LLM. */
+export interface RootCauseFinding {
+  /** Stable id derived from the member rules + span (for React keys / dedup). */
+  id: string;
+  /** Plain-language name of the underlying problem. */
+  title: string;
+  /** One or two sentences naming the root cause and its evidence in the
+   *  writer's own vocabulary — no rule-name jargon. */
+  explanation: string;
+  /** Worst severity among members. */
+  severity: RevisionIssue['severity'];
+  /** The rules that fired together to form this finding. */
+  memberRules: string[];
+  /** How many individual issues this finding subsumes. */
+  memberCount: number;
+  /** Scenes the finding touches (for the heatmap / navigation). */
+  sceneIdxs: number[];
+  /** Line span covering the finding when it is scene/line-anchored. */
+  startLine?: number;
+  endLine?: number;
+}
+
+/** Response of POST /api/scriptide/diagnose — the lightweight, debounce-friendly
+ *  "diagnostics as you type" endpoint that powers editor squiggles. Carries only
+ *  what the editor needs (located issues + clusters + the headline numbers),
+ *  NOT the full 14-pass report, so it stays cheap to call on every pause. */
+export interface LiveDiagnosis {
+  health: number;
+  grade: DoctorGrade;
+  verdict?: CoverageVerdict;
+  sceneCount: number;
+  /** Every diagnosable issue, resolved to a line anchor where possible. */
+  locatedIssues: LocatedIssue[];
+  /** The same issues rolled up into named root-cause findings. */
+  rootCauses: RootCauseFinding[];
+  /** Determinism receipt (sha256 of trimmed fountain) so the client can skip
+   *  redundant re-renders when the text hasn't materially changed. */
+  contentHash: string;
+  analyzedAt: number;
 }
 
 export interface ScriptDoctorReport {
@@ -133,4 +209,11 @@ export interface ScriptDoctorReport {
    *  script, so their verdicts are comparable draft-over-draft, and an
    *  exported report can be re-verified byte-for-byte. */
   contentHash?: string;
+  /** 0–100 percentile rank of `health` against the calibration reference
+   *  corpus. Optional — populated only when calibration data is available. */
+  healthPercentile?: number;
+  /** Co-firing issues clustered into named diagnoses (see RootCauseFinding).
+   *  Optional so older consumers stay valid; the doctor populates it whenever
+   *  there are issues to cluster. */
+  rootCauses?: RootCauseFinding[];
 }
