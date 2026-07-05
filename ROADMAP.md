@@ -166,6 +166,19 @@ fix it before it misleads another session further.
 - [ ] **(S)** Frontend chunk splitting: the `ScriptIDE` chunk is >530KB;
   lazy-load its heavy panels.
 
+### Parity-harness findings (discovered at Run 9 close — schedule in Run 10+)
+- [ ] **(S)** Unify scene slugs across producers: `memory.ts` deriveSlug and
+  `compile.ts` projectFountain hardcode DIFFERENT slug templates (idx vs
+  idx+1, different punctuation) — have projectFountain render the record's
+  own slug. Contracted as STRUCTURAL_DIVERGENT in record-parity.test.ts;
+  flip that assertion to exact-match when fixed.
+- [ ] **(S)** Title-page boundary: projectFountain's Title:/Credit: lines
+  fold into scene 0 on the text path, producing spurious clue tokens.
+  Emit a proper Fountain title page (blank line before first slugline).
+- [ ] **(M)** Compiler richness: only 3 of 14 StoryOp kinds render any text
+  (clocks, clues, reader-state render nothing) — richer op rendering would
+  strengthen both the parity contract and compiled-screenplay quality.
+
 ---
 
 ## 6. Run 10 — Deep-read sensing layer (biggest product lever)
