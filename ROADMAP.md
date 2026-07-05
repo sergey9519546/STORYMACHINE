@@ -218,7 +218,11 @@ product's determinism claim is undisturbed.
 
 ---
 
-## 7. Run 11 — Fix-and-verify loop
+## 7. Run 11 — Fix-and-verify loop — ✅ COMPLETE
+(Span-scoped hardened rewrite + deterministic whole-document delta receipt
+with equal-prominence regressions and dual contentHashes; panel receipt card
+with accept/discard. NEXT RUN: Run 12 — wave cycles 1183-1190 under the
+health gate; cursor: 1183 = Type 2, excellence detectors.)
 
 **Why**: every revision tool in the product suggests; none proves the
 suggestion actually worked. This closes that loop and becomes the product's
