@@ -171,14 +171,69 @@ could be stronger. That is the precise, defensible meaning of the guarantee.
 
 ---
 
-## Standing process for future waves
+## Standing process for future waves — SUPERSEDED, see Program v2 below
 
-The rotation cycles through the passes in order and repeats indefinitely:
+The Program v1 rotation (cycling `dialogue → character-arc → conflict → intention →
+originality → pacing → payoff → relationship-arc → rhythm → structure → theme →
+voice → belief → causality`, +3 matrix-cell rules per wave) ran through **Wave 1181**
+and is now CLOSED: the signals × modes × positions coverage matrix it was designed to
+fill is saturated, and the marginal matrix cell is permutation farming — a weaker use
+of the wave discipline than the axes below. Do not author new v1-style matrix waves.
 
-`dialogue → character-arc → conflict → intention → originality → pacing → payoff →
-relationship-arc → rhythm → structure → theme → voice → belief → causality → (repeat)`
+---
 
-Each wave: **+3 distinct rules** to one pass (full guards, distinctness rationale in
-comments), **header comment updated**, **+6 tests** (fire + no-fire per rule, inserted
-before the previous wave's describe block), **suite green**, **commit + push**. The
-acceptance checklist above governs every iteration without exception.
+## Program v2 — the four wave types
+
+The cadence and rigor are unchanged — every wave still ships **3 new checks + 6 tests
+(fire + no-fire per check)**, full guard conditions, a distinctness-rationale comment
+per check, a "Wave N additions:" header line in every touched file, single-file test
+run then full `npm test` green before push — and the acceptance checklist above still
+governs without exception ("strongest version the data supports" now reads against
+the wave type's own axis). What changes is WHAT a wave adds. Rotation:
+**signal → excellence → genre → root-cause → (repeat)**, one type per wave.
+
+### Type 1 — Signal channels
+Extract a genuinely NEW per-scene signal in `server/nvm/analyze/fountain-analyzer.ts`
+(and, where the ops-derived path can also carry it, `screenplay/memory.ts`), then ship
+the first 3 checks that consume it in the relevant pass file(s).
+Acceptance additions: the signal itself gets analyzer-level fire/no-fire tests
+(deterministic, lexicon/structure-derived — same purity rules as the analyzer);
+the 3 checks must be impossible to express with pre-existing signals (that IS the
+distinctness rationale); candidate axes with known headroom: subtext density,
+want-vs-need divergence, dramatic-irony gap (audience-knows vs character-knows),
+question-answer latency, motif recurrence shape, power-balance shifts within scenes.
+
+### Type 2 — Excellence detectors
+3 rules that detect what a script does WELL, feeding the earned-strengths surface
+(`buildStrengths` consumers) rather than the issue list.
+Acceptance additions: never-padded is the prime directive — an excellence rule that
+fires on a mediocre fixture is a FAILING rule, and its no-fire test must use a
+competent-but-unremarkable fixture, not a broken one; each detection names its
+concrete evidence (scene indices, measured values) exactly as defect rules do.
+
+### Type 3 — Genre-conditioned variants
+Take the highest-firing generic rules (measure firing counts across the calibration
+corpus first — evidence, not intuition) and give them genre-aware thresholds via
+`server/lib/genre-router.ts`'s modifiers.
+Acceptance additions: each variant documents WHY the genre moves the threshold (craft
+argument, one sentence); behavior with no genre configured must be byte-identical to
+the generic rule (fire + no-fire tests for BOTH the genre-shifted and genre-absent
+paths — that's the 6); never weaken a rule for all genres to quiet one.
+
+### Type 4 — Root-cause templates
+New co-occurrence clusters in `server/nvm/analyze/cluster.ts` that convert recurring
+symptom groups into named, plain-language diagnoses.
+Acceptance additions: a template must subsume ≥2 real rules that demonstrably co-fire
+(show it against a corpus sample or constructed fixture in the test); titles and
+explanations follow the humanized-vocabulary rule (no ALL_CAPS tokens, no film-school
+jargon); the no-fire test proves the cluster does NOT form when the symptoms appear
+in unrelated scenes.
+
+### Shared constraints for all v2 waves
+The calibration corpus is a CONTROLLED experiment (see
+`server/nvm/analyze/calibration/reference.ts`) — new rules and signals shift its
+distribution automatically at module load, which is by design; but if a wave makes a
+band ordering test fail, the wave's thresholds are mis-tuned (fix the wave, not the
+corpus). Displayed-health constants in `doctor.ts` are calibrated to current rule
+density; a wave that measurably shifts corpus band averages by more than a few points
+should say so in its commit message so drift stays visible.

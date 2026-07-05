@@ -23,6 +23,13 @@ jobs:
       - name: Type check
         run: npm run lint
 
+      # Mechanical enforcement of CLAUDE.md's "no console.* under server/**"
+      # rule — a written convention only reliably holds when CI holds it.
+      # grep exits 1 on no-match, so `!` inverts: any hit fails the build
+      # and prints the offending lines.
+      - name: Enforce no console.* under server/
+        run: "! grep -rn 'console\\.' server --include='*.ts'"
+
       - name: Run tests
         run: npm test
         env:
