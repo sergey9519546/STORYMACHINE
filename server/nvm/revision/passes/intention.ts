@@ -532,10 +532,25 @@
 // emotionalShift). INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID, INTENTION_REVELATION_RELATIONAL_
 // AFTERMATH_VOID, and INTENTION_REVELATION_STAGING_AFTERMATH_VOID give it its third, fourth, and
 // fifth channels (suspenseDelta, relationshipShifts, visualBeats).
+// Wave 1179 additions (distinct-mode pivot — see Waves 1176/1177/1178 in dialogue.ts/character-
+// arc.ts/conflict.ts): reconnaissance found every one of the ten analytical modes represented
+// somewhere in this file's checkAftermathVoid (42 uses), checkZoneCluster (22), checkZoneImbalance
+// (23), checkDroughtRun (22), checkPeakUncaused (10 + 12 hand-rolled), and ~24 co-occurrence/
+// decoupling rules — but checkHalfLoaded (binary front/back-half distribution) had zero uses via
+// the shared helper. The half-partition *concept* is not new to this file (AGENCY_FRONTLOADED,
+// PROACTIVE_FRONTLOADED/BACKLOADED, SEED_FRONTLOADED/BACKLOADED, REVELATION_FRONTLOADED,
+// PAYOFF_BACK_LOADED all hand-roll it), but none of those seven prior checks anchor on clockDelta,
+// relationshipShifts, or dialogueHighlights — each of which already has zone-cluster/zone-imbalance/
+// drought-run/peak-uncaused coverage but no half-partition check. This wave fills that empty cell
+// for three channels via the shared helper: INTENTION_CLOCK_DELTA_BACK_LOADED, INTENTION_
+// RELATIONSHIP_FRONT_LOADED, and INTENTION_HIGHLIGHT_BACK_LOADED. Thresholds (minRecords 9,
+// minCount 3) are matched to this file's own zone-cluster precedent for each channel (Waves 717,
+// 745, 759); ratioThreshold 0.70 matches the file's existing half-partition family (PROACTIVE_*,
+// PAYOFF_BACK_LOADED all use >70%).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /** Extract unique character IDs from dialogue highlights across all records */
 function extractCharacterIds(records: PassInput['records']): Set<string> {
@@ -6759,6 +6774,87 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1165c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1165c.aftermathCount} such scenes exist elsewhere in the script. A revelation that never earns a visually charged follow-through leaves the intention layer's disclosures registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information about what the character wants registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // ── Wave 1179 (distinct-mode pivot): INTENTION_CLOCK_DELTA_BACK_LOADED,
+  //              INTENTION_RELATIONSHIP_FRONT_LOADED, INTENTION_HIGHLIGHT_BACK_LOADED ───────────
+
+  // INTENTION_CLOCK_DELTA_BACK_LOADED — Distribution/timing × clockDelta≠0 × binary half-
+  // partition. Built on checkHalfLoaded from the shared checks library (first use of this helper
+  // in this pass). n≥9, ≥3 clock-shifting scenes, fires when >70% of them fall in the second half
+  // while the first half still has at least one. Waves 675/759 gave clockDelta the backward-cause
+  // peak, run-based drought, and zone-cluster (thirds) modes; the binary half-partition mode has
+  // never been applied to it. Distinct from INTENTION_CLOCK_DELTA_ZONE_CLUSTER (Wave 759: fires
+  // on a single-third concentration >75% and can trigger on a middle-third cluster this check
+  // would miss entirely, since a middle-heavy distribution can still split evenly across halves)
+  // and INTENTION_CLOCK_DELTA_DROUGHT_RUN (Wave 675: consecutive-run absence, not a global
+  // hemispheric ratio — a clock that alternates in and out of the front half all wave would never
+  // trip a drought but would still trip this check).
+  {
+    const r1179a = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.clockDelta ?? 0) !== 0,
+    });
+    if (r1179a.fires) {
+      issues.push({
+        location: `clock-shifting scenes: ${r1179a.matchingHalfCount} back-half / ${r1179a.otherHalfCount} front-half`,
+        rule: 'INTENTION_CLOCK_DELTA_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1179a.matchingHalfCount / r1179a.count) * 100)}% of the story's clock-shifting scenes (${r1179a.matchingHalfCount} of ${r1179a.count}) fall in the second half, leaving the first half with only ${r1179a.otherHalfCount}. Time pressure is a back-half phenomenon here: the story's first half pursues its intention with no ticking clock at all, then compresses nearly every deadline beat into the finish.`,
+        suggestedFix: `Move at least one clock-shifting beat into the first half — even a minor deadline established early gives the character's pursuit of their goal a sense of mounting time pressure from the start, rather than introducing urgency only once the story is already closing out.`,
+      });
+    }
+  }
+
+  // INTENTION_RELATIONSHIP_FRONT_LOADED — Distribution/timing × relationshipShifts × binary
+  // half-partition. Built on checkHalfLoaded. n≥9, ≥3 relationship-shift scenes, fires when >70%
+  // fall in the first half while the second half still has at least one. Waves 661/731/745 gave
+  // relationshipShifts the backward-cause peak, run-based drought, and zone-cluster modes; the
+  // half-partition mode has never been applied to it. Distinct from
+  // INTENTION_RELATIONSHIP_ZONE_CLUSTER (Wave 745: a single-third concentration >75%, which can
+  // fire on a cluster confined to the middle third alone — a distribution this check would treat
+  // as evenly split across the two halves) and REVELATION_RELATIONSHIP_DECOUPLED (co-occurrence
+  // mode: whether revelation and relationship-shift scenes overlap, not where relationship shifts
+  // fall in the timeline).
+  {
+    const r1179b = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'front',
+      isPresent: r => (r.relationshipShifts ?? []).length > 0,
+    });
+    if (r1179b.fires) {
+      issues.push({
+        location: `relationship-shift scenes: ${r1179b.matchingHalfCount} front-half / ${r1179b.otherHalfCount} back-half`,
+        rule: 'INTENTION_RELATIONSHIP_FRONT_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1179b.matchingHalfCount / r1179b.count) * 100)}% of the story's relationship-shift scenes (${r1179b.matchingHalfCount} of ${r1179b.count}) fall in the first half, leaving the second half with only ${r1179b.otherHalfCount}. Every bond in the story finishes evolving before the midpoint — the character pursues their intention through the back half with their relationships already settled, so nothing relational is left at stake as the story closes.`,
+        suggestedFix: `Give at least one relationship a shift in the second half — a bond that keeps moving as the character closes in on their goal keeps relational stakes live through to the end, instead of resolving them all before the story is half over.`,
+      });
+    }
+  }
+
+  // INTENTION_HIGHLIGHT_BACK_LOADED — Distribution/timing × dialogueHighlights × binary half-
+  // partition. Built on checkHalfLoaded. n≥9, ≥3 highlighted-dialogue scenes, fires when >70% of
+  // them fall in the second half while the first half still has at least one. Waves 647/703/717
+  // gave dialogueHighlights the run-based drought, backward-cause peak, and zone-cluster modes;
+  // the half-partition mode has never been applied to it. Distinct from
+  // INTENTION_HIGHLIGHT_ZONE_CLUSTER (Wave 717: single-third concentration >75%, which can fire on
+  // a middle-third-only cluster this check would score as an even half-split) and
+  // INTENTION_HIGHLIGHT_OPEN_THREAD_DECOUPLED (co-occurrence mode: whether highlighted dialogue
+  // and open-thread scenes overlap, not where highlighted dialogue falls in the timeline).
+  {
+    const r1179c = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1179c.fires) {
+      issues.push({
+        location: `standout-dialogue scenes: ${r1179c.matchingHalfCount} back-half / ${r1179c.otherHalfCount} front-half`,
+        rule: 'INTENTION_HIGHLIGHT_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1179c.matchingHalfCount / r1179c.count) * 100)}% of the story's scenes carrying a standout line of dialogue (${r1179c.matchingHalfCount} of ${r1179c.count}) fall in the second half, leaving the first half with only ${r1179c.otherHalfCount}. The first half of the story voices the character's intentions in forgettable dialogue, with nearly every memorable line saved for the back half.`,
+        suggestedFix: `Give at least one scene in the first half a standout line of dialogue — a memorable articulation of intention early on gives the audience something to hold onto before the back half's highlights arrive.`,
       });
     }
   }

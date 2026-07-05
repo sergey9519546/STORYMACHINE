@@ -1352,6 +1352,92 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1179 — intentionPass (distinct-mode pivot): intention clock-delta back-loaded, intention relationship front-loaded, intention highlight back-loaded', async () => {
+    const makeRec1179 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], relationshipShifts: [], visualBeats: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'establish_world', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runIN1179 = async (records: any[]) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain: Array.from({ length: records.length }, (_, i) => `INT. SC${i} - DAY\n\nAction.`).join('\n\n'),
+        original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Half-partition geometry n=10, half=5: 4 clock-shifting scenes total.
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 2) has 1 — 3/4=75%>70%, front still >=1.
+    it('INTENTION_CLOCK_DELTA_BACK_LOADED fires when clock-shifting scenes concentrate in the back half', async () => {
+      const recs1179a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 6 || i === 7 || i === 8) return makeRec1179(i, { clockDelta: 1 });
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_BACK_LOADED'), 'INTENTION_CLOCK_DELTA_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 2,3) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('INTENTION_CLOCK_DELTA_BACK_LOADED does not fire when clock-shifting scenes are evenly split across halves', async () => {
+      const recs1179an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 3 || i === 6 || i === 7) return makeRec1179(i, { clockDelta: 1 });
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_CLOCK_DELTA_BACK_LOADED'), 'INTENTION_CLOCK_DELTA_BACK_LOADED should not fire');
+    });
+
+    // FIRE: front half (idx 1,2,3) has 3, back half (idx 7) has 1 — 3/4=75%>70%, back still >=1.
+    it('INTENTION_RELATIONSHIP_FRONT_LOADED fires when relationship-shift scenes concentrate in the front half', async () => {
+      const recs1179b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 3 || i === 7) {
+          return makeRec1179(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        }
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_FRONT_LOADED'), 'INTENTION_RELATIONSHIP_FRONT_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('INTENTION_RELATIONSHIP_FRONT_LOADED does not fire when relationship-shift scenes are evenly split across halves', async () => {
+      const recs1179bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) {
+          return makeRec1179(i, { relationshipShifts: [{ pairKey: 'a|b', dimension: 'trust', amount: 1 }] });
+        }
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_RELATIONSHIP_FRONT_LOADED'), 'INTENTION_RELATIONSHIP_FRONT_LOADED should not fire');
+    });
+
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 1) has 1 — 3/4=75%>70%, front still >=1.
+    it('INTENTION_HIGHLIGHT_BACK_LOADED fires when standout-dialogue scenes concentrate in the back half', async () => {
+      const recs1179c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 6 || i === 7 || i === 8) return makeRec1179(i, { dialogueHighlights: ['alice: believes X'] });
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_BACK_LOADED'), 'INTENTION_HIGHLIGHT_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('INTENTION_HIGHLIGHT_BACK_LOADED does not fire when standout-dialogue scenes are evenly split across halves', async () => {
+      const recs1179cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) return makeRec1179(i, { dialogueHighlights: ['alice: believes X'] });
+        return makeRec1179(i);
+      });
+      const res = await runIN1179(recs1179cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_HIGHLIGHT_BACK_LOADED'), 'INTENTION_HIGHLIGHT_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 1165 — intentionPass: intention revelation-suspense aftermath void, intention revelation-relational aftermath void, intention revelation-staging aftermath void', async () => {
     const makeRec1165 = (idx: number, overrides: any = {}): any => ({
       sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
