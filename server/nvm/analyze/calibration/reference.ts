@@ -56,22 +56,56 @@
 // recomputes from corpus.ts on first call in every process, memoized after
 // that (buildDistribution() below runs at most once per process).
 //
-// ── KNOWN LIMITATION — corpus band ordering is not fully monotonic ────────
-// The guarantees this module is tested to hold: strong-band average raw
-// score > troubled-band average, and the pinned strong sample outranks the
-// pinned troubled sample through the real pipeline (calibration.test.ts).
-// What does NOT hold yet: full four-band monotonicity. Averaged per band,
-// 'competent' currently scores LOWEST of all four bands, and one strong
-// sample ranks below every troubled sample. Root cause (investigated, not
-// yet fixed): the pipeline's many "structural signal absent" checks scale
-// with scene count and script richness more than with authored quality, and
-// the 30/sceneCount normalization doesn't correct for that — so a richer,
-// longer, mid-quality script can out-penalize a barren troubled one. A
-// minimal corpus edit was prototyped and closed only ~a quarter of the gap,
-// so the fix is a deliberate corpus rebalance and/or a richness-aware
-// normalization, not a patch. Until then, percentile CLAIMS remain honest
-// (they only reference "the reference set"), but mid-band rankings should be
-// read as coarse. Tracked as a follow-up work item.
+// ── Corpus band ordering: now fully monotonic (controlled-richness fix) ───
+// An earlier revision of this corpus had a real calibration defect: averaged
+// per band, 'competent' scored LOWEST of all four bands, and one strong
+// sample ranked below every troubled sample. Root cause: the pipeline's many
+// "structural signal absent" checks scale with scene count and script
+// richness more than with authored quality, and the 30/sceneCount
+// normalization (doctor.ts's craftPenalty) doesn't fully correct for that —
+// so a richer, longer, mid-quality script could out-penalize a barren
+// troubled one on the raw craft score.
+//
+// The fix was experimental design, not score-gaming: corpus.ts's 20 samples
+// were rebuilt so RICHNESS (scene count, word count, and which structural
+// signals — clock, planted clue, dialogue, action, a relationship beat — are
+// present) is held constant across all four bands, leaving CRAFT as the only
+// independent variable. See corpus.ts's header for the exact per-band craft
+// design (what 'strong' executes that 'troubled' doesn't, at matched
+// richness). With that constraint in place, tests/core/calibration.test.ts
+// now enforces, as STRICT guarantees rather than a partial one:
+//   (a) full four-band monotonicity on band-average raw craft score:
+//       strong > competent > weak > troubled;
+//   (b) no strong sample's raw score falls below the troubled-band average;
+//   (c) a pinned strong/troubled pair (the most robust — largest-gap — pair
+//       in the corpus, not a marginal one) outranks correctly on
+//       healthPercentile through the real runScriptDoctor pipeline.
+//
+// Constraint for future corpus editors: this monotonicity is a PROPERTY OF
+// THE CORPUS DESIGN, not an accident of the current 20 samples — it holds
+// because richness is matched. A future edit that changes one band's scene
+// count, word count, or structural-signal presence without changing every
+// other band the same way reintroduces the exact confound this fix removes,
+// and the test suite will (correctly) start failing again. See corpus.ts's
+// header for the full constraint and the per-sample word/scene budget.
+//
+// ── What remains genuinely unfixed (out of scope here) ────────────────────
+// This rebalance only controls richness INSIDE the reference corpus itself.
+// A real user-submitted script's raw craft score still experiences the same
+// richness bias doctor.ts's craftPenalty formula has: a richer, more
+// ambitious script racks up more structural-absence and prose-texture issues
+// than a thinner one of comparable authored quality, because the ~1,300-rule
+// pipeline's issue volume scales with scene count and word count faster than
+// the 30/sceneCount normalization corrects for. That is a formula-level
+// property of doctor.ts's craftPenalty (deliberately untouched by this fix —
+// see this module's and doctor.ts's own comments for why the formula itself
+// is out of scope here), not a defect in the reference corpus. Practically:
+// percentile comparisons are most meaningful between scripts of comparable
+// scope and richness; comparing a 4-scene sketch against a 40-scene feature
+// on percentile alone will still read as the sketch scoring unrealistically
+// well, purely from having fewer opportunities to accumulate issues. Fixing
+// that at the formula level (e.g. a richness-aware penalty term) remains a
+// legitimate follow-up work item, tracked separately from this corpus fix.
 
 import type { CompiledScreenplay } from '../../screenplay/compile.ts';
 import type { PassName } from '../../revision/passes/types.ts';

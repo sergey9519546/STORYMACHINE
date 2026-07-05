@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { percentileRank, percentileDescriptor } from '../../server/nvm/analyze/calibration/percentile.ts';
 import { getReferenceDistribution } from '../../server/nvm/analyze/calibration/reference.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
+import type { CorpusBand, CorpusSample } from '../../server/nvm/analyze/calibration/corpus.ts';
 import { runScriptDoctor, computeRawCraftScore, computeHealthScore } from '../../server/nvm/analyze/doctor.ts';
 import type { DimensionKey } from '../../server/nvm/analyze/types.ts';
 
@@ -217,12 +218,101 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
   });
 });
 
+// ── Band ordering — controlled-richness corpus design ────────────────────
+// corpus.ts's header explains the fix: every one of the 20 samples is now
+// built from the same 10-scene skeleton with a matched ~300-360 word budget,
+// so richness (scene count, word count, which structural signals are
+// present) is held constant across bands and craft is the only independent
+// variable. That design is what lets the assertions below hold as STRICT
+// guarantees rather than the old file's "known limitation" (competent
+// ranking lowest of all four bands, one strong sample ranking below every
+// troubled sample) — see reference.ts's header for the before/after.
+
+/** Recompute the same RAW (unclamped) craft-score statistic reference.ts's
+ *  scoreSample uses, but from runScriptDoctor's own public report shape
+ *  (DoctorPassSummary[] + sceneCount) rather than reference.ts's private
+ *  scoring path — this exercises the real end-to-end pipeline
+ *  (analyzeFountainText -> runRevisionPipeline -> aggregateReport) the way an
+ *  actual Script Doctor request does, instead of re-deriving reference.ts's
+ *  internal build. computeRawCraftScore itself is doctor.ts's published,
+ *  parameter-only formula — reusing it here (rather than reading
+ *  report.health, which is CLAMPED) is exactly the saturation-safe ranking
+ *  statistic this whole calibration layer is built on; see doctor.ts's
+ *  aggregateReport calibration-layer comment for why the raw statistic is
+ *  the one that must be used for any cross-sample ranking.
+ */
+async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
+  const report = await runScriptDoctor(sample.fountain);
+  const bySeverity = report.passes.reduce(
+    (acc, p) => ({
+      critical: acc.critical + p.critical,
+      major: acc.major + p.major,
+      minor: acc.minor + p.minor,
+    }),
+    { critical: 0, major: 0, minor: 0 },
+  );
+  return computeRawCraftScore(bySeverity, report.sceneCount);
+}
+
+async function bandAverageRawScore(band: CorpusBand): Promise<number> {
+  const samples = REFERENCE_CORPUS.filter(s => s.band === band);
+  assert.ok(samples.length > 0, `corpus must contain at least one '${band}' sample`);
+  const scores = await Promise.all(samples.map(rawCraftScoreFor));
+  return scores.reduce((sum, v) => sum + v, 0) / scores.length;
+}
+
 describe('band ordering through the real runScriptDoctor pipeline', () => {
-  it('a strong corpus sample outranks a troubled one on healthPercentile', async () => {
-    const strongSample = REFERENCE_CORPUS.find(s => s.band === 'strong');
-    const troubledSample = REFERENCE_CORPUS.find(s => s.band === 'troubled');
-    assert.ok(strongSample, 'corpus must contain at least one strong sample');
-    assert.ok(troubledSample, 'corpus must contain at least one troubled sample');
+  it('full band-average monotonicity: strong > competent > weak > troubled, strictly', async () => {
+    const [strongAvg, competentAvg, weakAvg, troubledAvg] = await Promise.all([
+      bandAverageRawScore('strong'),
+      bandAverageRawScore('competent'),
+      bandAverageRawScore('weak'),
+      bandAverageRawScore('troubled'),
+    ]);
+
+    assert.ok(
+      strongAvg > competentAvg,
+      `strong band average (${strongAvg.toFixed(1)}) must exceed competent (${competentAvg.toFixed(1)})`,
+    );
+    assert.ok(
+      competentAvg > weakAvg,
+      `competent band average (${competentAvg.toFixed(1)}) must exceed weak (${weakAvg.toFixed(1)})`,
+    );
+    assert.ok(
+      weakAvg > troubledAvg,
+      `weak band average (${weakAvg.toFixed(1)}) must exceed troubled (${troubledAvg.toFixed(1)})`,
+    );
+  });
+
+  it("no strong sample's raw score falls below the troubled-band average", async () => {
+    const strongSamples = REFERENCE_CORPUS.filter(s => s.band === 'strong');
+    const troubledSamples = REFERENCE_CORPUS.filter(s => s.band === 'troubled');
+    const [strongScores, troubledScores] = await Promise.all([
+      Promise.all(strongSamples.map(rawCraftScoreFor)),
+      Promise.all(troubledSamples.map(rawCraftScoreFor)),
+    ]);
+    const troubledAvg = troubledScores.reduce((sum, v) => sum + v, 0) / troubledScores.length;
+
+    strongScores.forEach((score, i) => {
+      assert.ok(
+        score > troubledAvg,
+        `${strongSamples[i].label} (${score.toFixed(1)}) fell below the troubled-band average (${troubledAvg.toFixed(1)})`,
+      );
+    });
+  });
+
+  it('a strong corpus sample outranks a troubled one on healthPercentile (pinned to the most robust pair)', async () => {
+    // Pinned by label, not by array order or .find()'s first match: "The
+    // Long Game" is the highest-scoring strong sample and "The Grift" the
+    // lowest-scoring troubled sample in this corpus (see the measurement in
+    // corpus.ts's design rationale), so this pair carries the largest
+    // available raw-score gap of any strong/troubled pair — a deliberately
+    // non-marginal pin, immune to small future corpus edits nudging any one
+    // sample by a few points.
+    const strongSample = REFERENCE_CORPUS.find(s => s.label === 'The Long Game');
+    const troubledSample = REFERENCE_CORPUS.find(s => s.label === 'The Grift');
+    assert.ok(strongSample, 'pinned strong sample "The Long Game" must exist in the corpus');
+    assert.ok(troubledSample, 'pinned troubled sample "The Grift" must exist in the corpus');
 
     const [strongReport, troubledReport] = await Promise.all([
       runScriptDoctor(strongSample!.fountain),
