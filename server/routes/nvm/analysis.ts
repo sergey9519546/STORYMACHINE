@@ -27,6 +27,34 @@ router.get('/api/nvm/tension', gameLimiter, asyncHandler(async (req, res) => {
   res.json(deriveTensionLedger(state, sceneIdx));
 }));
 
+// GET /api/nvm/metrics — deterministic narrative metrics (blueprint §27):
+// per-scene pivotStrength/cliffhangerStrength/twistImpact/surpriseProxy/
+// informationAsymmetryStrength/pacingFit, plus whole-script suspenseEntropy/
+// momentumConsistency/finalCliffhangerStrength/pacingFit/narrativeCohesion/
+// emotionalImpactRange/tensionMeasures — see server/nvm/analyze/metrics.ts's
+// header for every formula's inputs/range/craft meaning, and its
+// "Deliberately SKIPPED" section for the metrics this module can't honestly
+// support from ScreenplaySceneRecord alone. Builds records the same way
+// GET /api/nvm/screenplay/memory does (buildScreenplayMemory over the
+// session's active commits) so a caller can diff the two responses directly.
+// pacingFit additionally reads the session's configured emotional_arc (if
+// any) via stage.getIllusionState() — passed in as a plain argument so
+// metrics.ts itself stays a pure function of its inputs, never touching
+// session state directly.
+router.get('/api/nvm/metrics', gameLimiter, asyncHandler(async (req, res) => {
+  const { stage } = getOrCreateSession(sessionId(req));
+  const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
+  const { computeNarrativeMetrics } = await import('../../nvm/analyze/metrics.ts');
+
+  type StoryCommitT = import('../../nvm/state/StoryCommit.ts').StoryCommit;
+  const allCommits = (stage.getCommits() as StoryCommitT[]).filter(c => !c.reverted);
+  const records = buildScreenplayMemory(allCommits);
+  const emotionalArc = stage.getIllusionState().emotional_arc;
+
+  const { perScene, script } = computeNarrativeMetrics(records, emotionalArc);
+  res.json({ perScene, script });
+}));
+
 // GET /api/nvm/two-reader — first-watch vs rewatch scores
 router.get('/api/nvm/two-reader', gameLimiter, asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
