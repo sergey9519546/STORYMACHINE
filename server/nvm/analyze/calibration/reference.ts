@@ -55,6 +55,23 @@
 // Regeneration: there is nothing to regenerate by hand — getReferenceDistribution()
 // recomputes from corpus.ts on first call in every process, memoized after
 // that (buildDistribution() below runs at most once per process).
+//
+// ── KNOWN LIMITATION — corpus band ordering is not fully monotonic ────────
+// The guarantees this module is tested to hold: strong-band average raw
+// score > troubled-band average, and the pinned strong sample outranks the
+// pinned troubled sample through the real pipeline (calibration.test.ts).
+// What does NOT hold yet: full four-band monotonicity. Averaged per band,
+// 'competent' currently scores LOWEST of all four bands, and one strong
+// sample ranks below every troubled sample. Root cause (investigated, not
+// yet fixed): the pipeline's many "structural signal absent" checks scale
+// with scene count and script richness more than with authored quality, and
+// the 30/sceneCount normalization doesn't correct for that — so a richer,
+// longer, mid-quality script can out-penalize a barren troubled one. A
+// minimal corpus edit was prototyped and closed only ~a quarter of the gap,
+// so the fix is a deliberate corpus rebalance and/or a richness-aware
+// normalization, not a patch. Until then, percentile CLAIMS remain honest
+// (they only reference "the reference set"), but mid-band rankings should be
+// read as coarse. Tracked as a follow-up work item.
 
 import type { CompiledScreenplay } from '../../screenplay/compile.ts';
 import type { PassName } from '../../revision/passes/types.ts';

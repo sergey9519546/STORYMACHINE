@@ -160,6 +160,25 @@ describe('getReferenceDistribution', () => {
       `(${dimensionsWithSpread.join(', ')})`,
     );
   });
+
+  // MIN_CORPUS_SIZE (reference.ts) isn't directly testable from here: it's an
+  // unexported module-level const gating a build path that already ran (and
+  // memoized) at module load, before this test file's imports finish
+  // resolving — exercising the <8 branch would require re-importing
+  // reference.ts with a mocked corpus.ts under a fresh module registry, which
+  // is disproportionate to what one boolean gate is worth. This asserts the
+  // gate's *effect* indirectly instead: corpus.ts currently ships 20 samples
+  // (>= the gate's floor of 8), so getReferenceDistribution() must have taken
+  // the "build a real distribution" branch rather than emptyDistribution()'s
+  // early return — proven by a non-empty, correctly-sized distribution here,
+  // exactly the observable difference the gate exists to produce.
+  it('(indirect) MIN_CORPUS_SIZE gate: a 20-sample corpus clears the floor and yields a real, non-empty distribution', () => {
+    assert.ok(REFERENCE_CORPUS.length >= 8, 'corpus must clear MIN_CORPUS_SIZE for this assertion to be meaningful');
+    assert.ok(dist.health.length > 0, 'gate must have taken the real-build branch, not emptyDistribution()');
+    for (const key of DIMENSION_KEYS) {
+      assert.ok(dist.dimensions[key].length > 0, `dimension ${key} must be non-empty on the real-build branch`);
+    }
+  });
 });
 
 describe('computeRawCraftScore vs computeHealthScore', () => {
