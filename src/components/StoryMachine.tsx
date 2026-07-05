@@ -185,14 +185,6 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
     ledgerEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [ledger]);
 
-  // C5: unified fetch-failure notifier — shows a toast only when the component
-  // is still mounted (suppresses spurious errors fired during unmount).
-  const notifyFetchFailure = useCallback((endpoint: string, err: unknown) => {
-    if (!mountedRef.current) return; // unmounting — not a user-visible error
-    const msg = err instanceof Error ? err.message : String(err);
-    showError(`Background fetch failed (${endpoint}): ${msg}`);
-  }, [showError]);
-
   const fetchState = async () => {
     try {
       const res = await fetch("/api/state");
