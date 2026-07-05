@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { buildScenarioFromScript } from "../lib/scenario-from-script";
-import { fountainToFdx } from "../lib/fdx";
-import { fountainToPdf } from "../lib/pdf";
-import { fountainToDocx } from "../lib/docx";
+// fdx/pdf/docx exporters are dynamic-imported at their call sites below
+// (exportFDX/exportPDF/exportDOCX) — each is a one-shot user action (a
+// toolbar button click), never needed for first paint or typing latency.
 import { safeJsonParse } from "../lib/json";
 import {
   Loader2,
@@ -16,35 +16,46 @@ import {
   Sparkles,
   Camera,
   Layers,
-  BarChart3,
-  Users,
-  Map as MapIcon,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import Sidebar from "./Sidebar";
-import AIPanel from "./AIPanel";
-import DirectorPanel from "./DirectorPanel";
 
 // Sub-components
 import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
-import AnalysisPanel from "./scriptide/AnalysisPanel";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
-import ScriptDoctorPanel from "./scriptide/ScriptDoctorPanel";
 import Toolbar from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
+
+// Lazy-loaded — each is a conditionally-rendered tab/overlay, never needed on
+// first paint. AIPanel/AnalysisPanel render only behind their respective
+// activeTab; DirectorPanel/ScriptDoctorPanel render only behind their showX
+// booleans inside AnimatePresence (React.lazy + Suspense compose fine there —
+// AnimatePresence tracks exit via React context down through the tree, not by
+// requiring a motion component as its *direct* child, so nesting a Suspense
+// boundary in between doesn't break enter/exit animations; the fallback below
+// mimics each drawer's own shell so there's no layout jump on first open).
+const AIPanel = lazy(() => import("./AIPanel"));
+const DirectorPanel = lazy(() => import("./DirectorPanel"));
+const AnalysisPanel = lazy(() => import("./scriptide/AnalysisPanel"));
+const ScriptDoctorPanel = lazy(() => import("./scriptide/ScriptDoctorPanel"));
+
+// Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
+// same brutal-border/white-bg idiom) so first-open doesn't flash blank space
+// before sliding in.
+const DrawerPanelFallback = () => (
+  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+    <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
+  </div>
+);
+
+// Matches the plain in-sidebar tab content idiom used elsewhere in this file
+// (e.g. the Codex tab's "No Knowledge Ingested Yet" placeholder).
+const TabPanelFallback = () => (
+  <div className="p-8 text-center border-4 border-dashed border-gray-400 text-gray-400 font-mono text-xs uppercase animate-pulse">
+    Loading…
+  </div>
+);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -721,7 +732,13 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
-  const exportFDX = () => {
+  // Exporters are dynamic-imported at their call sites — each is a one-shot
+  // user action (toolbar button click), never needed until the user asks for
+  // that specific format, so there's no reason to pay for fdx.ts/pdf.ts/
+  // docx.ts (plus pdf.ts's screenplay-layout.ts and docx.ts's zip.ts) on
+  // first paint.
+  const exportFDX = async () => {
+    const { fountainToFdx } = await import("../lib/fdx");
     const fdx = fountainToFdx(scriptText);
     const blob = new Blob([fdx], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
@@ -732,8 +749,9 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     // Industry-standard PDF: US Letter, Courier 12pt, standard margins/indents.
+    const { fountainToPdf } = await import("../lib/pdf");
     const bytes = fountainToPdf(scriptText);
     // Copy into a fresh ArrayBuffer so the Blob owns a clean, correctly-typed buffer.
     const buf = bytes.slice().buffer;
@@ -746,8 +764,9 @@ export default function ScriptIDE({
     URL.revokeObjectURL(url);
   };
 
-  const exportDOCX = () => {
+  const exportDOCX = async () => {
     // Word-compatible .docx: OOXML parts zipped (store method), Courier styles.
+    const { fountainToDocx } = await import("../lib/docx");
     const bytes = fountainToDocx(scriptText);
     const buf = bytes.slice().buffer;
     const blob = new Blob([buf], {
@@ -896,136 +915,10 @@ export default function ScriptIDE({
     setResearchNotes(researchNotes.filter((n) => n.id !== id));
   };
 
-  // ── Render analysis tab ──────────────────────────────────────────────────────
-  const renderAnalysis = () => {
-    const { charData, locData, dialogueLines, actionLines, wordCount } = stats;
-    const totalLines = dialogueLines + actionLines;
-    const dialoguePercent =
-      totalLines > 0 ? Math.round((dialogueLines / totalLines) * 100) : 0;
-    const actionPercent =
-      totalLines > 0 ? Math.round((actionLines / totalLines) * 100) : 0;
-
-    return (
-      <div className="p-6 space-y-8 bg-[#f4f4f0] dark:bg-zinc-900 dark:text-white h-full overflow-y-auto">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
-            <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" /> Dialogue vs Action
-            </h3>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: "Dialogue", value: dialogueLines },
-                      { name: "Action", value: actionLines },
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    <Cell fill="#FF4444" />
-                    <Cell fill="#000000" />
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-between mt-4 text-[10px] font-mono">
-              <span>DIALOGUE: {dialoguePercent}%</span>
-              <span>ACTION: {actionPercent}%</span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
-            <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Users className="w-4 h-4" /> Top Characters
-            </h3>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={charData} layout="vertical">
-                  <XAxis type="number" hide />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    width={80}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#FF4444" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
-          <h3 className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
-            <MapIcon className="w-4 h-4" /> Top Locations
-          </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={locData}>
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#000000" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {(() => {
-          // Real health score: weighted rubric across 5 axes
-          const sceneCount = parsedBlocks.filter(b => b.type === 'scene_heading').length;
-          const uniqueChars = charData.length;
-          // 1. Dialogue balance (0–25): ideal 40-60% dialogue
-          const balanceScore = dialoguePercent >= 40 && dialoguePercent <= 60 ? 25
-            : dialoguePercent >= 30 && dialoguePercent <= 70 ? 18
-            : dialoguePercent > 0 ? 10 : 0;
-          // 2. Script length (0–20): sweet spot ≥ 90 lines for a short; 200+ for feature
-          const lengthScore = totalLines >= 200 ? 20 : totalLines >= 90 ? 15 : totalLines >= 40 ? 10 : totalLines > 0 ? 5 : 0;
-          // 3. Character depth (0–20): ≥3 named characters with ≥2 lines each
-          const depthScore = uniqueChars >= 4 ? 20 : uniqueChars === 3 ? 15 : uniqueChars === 2 ? 10 : uniqueChars === 1 ? 5 : 0;
-          // 4. Scene variety (0–20): ≥3 distinct scene headings signals structure
-          const sceneScore = sceneCount >= 8 ? 20 : sceneCount >= 4 ? 15 : sceneCount >= 2 ? 10 : sceneCount === 1 ? 5 : 0;
-          // 5. Character balance (0–15): top character should not speak >60% of lines
-          const topShare = charData.length > 0 && dialogueLines > 0
-            ? charData[0].value / dialogueLines : 0;
-          const balChar = topShare < 0.4 ? 15 : topShare < 0.6 ? 10 : 5;
-
-          const score = Math.min(100, balanceScore + lengthScore + depthScore + sceneScore + balChar);
-          const grade = score >= 85 ? 'STRONG' : score >= 65 ? 'SOLID' : score >= 45 ? 'DEVELOPING' : score > 0 ? 'EARLY DRAFT' : 'EMPTY';
-          const reasons: string[] = [];
-          if (balanceScore < 18) reasons.push(`dialogue at ${dialoguePercent}% (target 40–60%)`);
-          if (lengthScore < 15) reasons.push(`${totalLines} lines (target ≥ 90)`);
-          if (depthScore < 15) reasons.push(`${uniqueChars} named character${uniqueChars !== 1 ? 's' : ''} (target ≥ 3)`);
-          if (sceneScore < 15) reasons.push(`${sceneCount} scene${sceneCount !== 1 ? 's' : ''} (target ≥ 4)`);
-
-          return (
-            <div className="bg-black text-white p-4 brutal-border-thick">
-              <h3 className="text-xs font-bold uppercase tracking-widest mb-2">
-                Script Health Score
-              </h3>
-              <div className="flex items-center gap-4">
-                <div className="text-4xl font-bold text-[#FF4444]">{score}</div>
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-widest text-[#FF4444]">{grade}</div>
-                  <div className="text-[10px] font-mono opacity-70 mt-1">
-                    {reasons.length > 0 ? `Improve: ${reasons.join(' · ')}` : 'Balance, length, characters, scenes — all looking good.'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    );
-  };
+  // renderAnalysis() removed — dead code (never called; superseded by the
+  // "analysis" tab's <AnalysisPanel/>, which has no recharts dependency).
+  // Removing it drops recharts entirely from the bundle: it was the only
+  // remaining import site in the whole src tree.
 
   // ── Title page ───────────────────────────────────────────────────────────────
   const renderTitlePage = () => (
@@ -1415,11 +1308,13 @@ export default function ScriptIDE({
           {/* ── STORY ENGINE TAB ── */}
           {activeTab === "storyEngine" && (
             <div className="space-y-6">
-              <AIPanel
-                script={scriptText}
-                characters={characters}
-                onApplySuggestion={handleApplySuggestion}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <AIPanel
+                  script={scriptText}
+                  characters={characters}
+                  onApplySuggestion={handleApplySuggestion}
+                />
+              </Suspense>
 
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1652,13 +1547,15 @@ export default function ScriptIDE({
               animate={{ opacity: 1 }}
               className="space-y-6"
             >
-              <AnalysisPanel
-                engineState={engineState}
-                scriptText={scriptText}
-                parsedBlocks={parsedBlocks}
-                isCleaning={isCleaning}
-                onCleanAction={handleCleanAction}
-              />
+              <Suspense fallback={<TabPanelFallback />}>
+                <AnalysisPanel
+                  engineState={engineState}
+                  scriptText={scriptText}
+                  parsedBlocks={parsedBlocks}
+                  isCleaning={isCleaning}
+                  onCleanAction={handleCleanAction}
+                />
+              </Suspense>
             </motion.div>
           )}
 
@@ -1723,7 +1620,7 @@ export default function ScriptIDE({
       {/* ── DIRECTOR HUD OVERLAY ── */}
       <AnimatePresence>
         {showDirectorHUD && engineState && (
-          <DirectorPanel
+          <Suspense fallback={<DrawerPanelFallback />}><DirectorPanel
             onClose={() => setShowDirectorHUD(false)}
             state={{
               config: engineState.config,
@@ -1779,14 +1676,14 @@ export default function ScriptIDE({
                 };
               });
             }}
-          />
+          /></Suspense>
         )}
       </AnimatePresence>
 
       {/* ── SCRIPT DOCTOR OVERLAY ── */}
       <AnimatePresence>
         {showScriptDoctor && (
-          <ScriptDoctorPanel
+          <Suspense fallback={<DrawerPanelFallback />}><ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
             onLoadFountain={(text) => {
@@ -1798,7 +1695,7 @@ export default function ScriptIDE({
               triggerAnalysis(text);
             }}
             onClose={() => setShowScriptDoctor(false)}
-          />
+          /></Suspense>
         )}
       </AnimatePresence>
 
