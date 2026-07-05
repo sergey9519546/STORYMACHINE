@@ -215,6 +215,28 @@ export interface ScriptDoctorReport {
   plainSummary?: string;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
+  /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).
+   *  Deep read is the one deliberate exception to the doctor's determinism:
+   *  an LLM reads each scene's MEANING (subtext, stakes, motivation, irony)
+   *  and emits values into the SAME record-signal schema the 1,300 rules
+   *  already judge — the model senses, the rules still deliver every
+   *  verdict. Annotations are cached per scene-content hash, so unchanged
+   *  scenes reuse prior readings; scenes whose annotation fails or doesn't
+   *  validate fall back to the lexicon signals (never a hard failure).
+   *  A quick (deterministic) report NEVER carries this field, and consumers
+   *  must treat deep and quick reports as distinct lineages: same
+   *  contentHash + different mode = NOT comparable draft-over-draft. */
+  deepRead?: {
+    /** Scenes whose signals came from the LLM reading (vs lexicon fallback). */
+    scenesRead: number;
+    scenesTotal: number;
+    /** False when no key was available — every scene fell back to lexicon
+     *  and the report is effectively a quick read that was ASKED to be deep. */
+    usedLLM: boolean;
+    /** Scene indices that fell back to lexicon signals (failed/invalid
+     *  annotation), so the panel can mark them honestly. Empty when all read. */
+    fallbackScenes: number[];
+  };
   /** sha256 hex of the trimmed analyzed Fountain text. The determinism
    *  receipt: two reports with equal contentHash came from the identical
    *  script, so their verdicts are comparable draft-over-draft, and an
