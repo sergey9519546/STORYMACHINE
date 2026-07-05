@@ -534,6 +534,13 @@
 // BELIEF_TURN_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID and BELIEF_TURN_STAGING_AFTERMATH_VOID give
 // dramaticTurn its fifth and sixth channels (dialogueHighlights, visualBeats), completing full
 // six-channel saturation for both of this wave's tracked triggers.
+// Wave 1174 additions: with all seven tracked triggers (raise_stakes, payoffSetupIds,
+// seededClueIds, unresolvedClues-debt, revelation, clockRaised, dramaticTurn) fully saturated,
+// this wave introduces suspenseDelta and emotionalShift as genuinely fresh checkAftermathVoid
+// triggers — neither has ever anchored the isTrigger side of a check in this file. BELIEF_
+// SUSPENSE_CURIOSITY_AFTERMATH_VOID and BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID give
+// suspenseDelta its first two channels (curiosityDelta, emotionalShift); BELIEF_EMOTION_
+// CURIOSITY_AFTERMATH_VOID gives emotionalShift its first channel (curiosityDelta).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6587,6 +6594,80 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1160c.triggerCount} dramatic-turn scenes is followed by two scenes with no heavily-staged visual beat, even though ${r1160c.aftermathCount} such scenes exist elsewhere in the script. A pivot that never earns a visually charged follow-through leaves the belief layer's turns registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one dramatic turn, stage at least two concrete visual beats, so the pivot's consequences for what the character believes register in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from every existing suspenseDelta
+  // reference in this file: prior rules use it only as an aftermath channel for other triggers,
+  // never as the isTrigger side of a check — this is the first check to use suspenseDelta as a
+  // trigger in this pass.
+  {
+    const r1174a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1174a.fires) {
+      issues.push({
+        location: `${r1174a.triggerCount} suspense-spike scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1174a.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1174a.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the belief layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath registers no emotional
+  // shift, while such shifts occur elsewhere. Distinct from BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_
+  // VOID (this wave, same trigger paired with curiosityDelta) — this is the second consequence
+  // channel for this trigger.
+  {
+    const r1174b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1174b.fires) {
+      issues.push({
+        location: `${r1174b.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1174b.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1174b.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it leaves the belief layer's tension reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a character's emotional register shift in response to the danger, so the tension carries felt weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × emotionalShift (non-neutral)
+  // trigger → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library.
+  // n≥8, ≥2 qualifying emotionally-charged scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere,
+  // 2-scene lookahead. Fires when every emotionally-charged scene's two-scene aftermath carries
+  // no rise in curiosity, while such rises occur elsewhere. Distinct from every existing
+  // emotionalShift reference in this file: prior rules use it only as an aftermath channel for
+  // other triggers, never as the isTrigger side of a check — this is the first check to use
+  // emotionalShift as a trigger in this pass.
+  {
+    const r1174c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1174c.fires) {
+      issues.push({
+        location: `${r1174c.triggerCount} emotionally-charged scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1174c.triggerCount} emotionally-charged scenes is followed by two scenes with no rise in curiosity, even though ${r1174c.aftermathCount} such rises occur elsewhere. A strong feeling that never opens a fresh question right after it lands leaves the belief layer's emotional beats registering as closed moments rather than links that pull the audience forward.`,
+        suggestedFix: `In the two scenes following at least one emotionally-charged moment, let a new question surface from what the character now feels, so the emotion keeps generating curiosity, not just internal state.`,
       });
     }
   }

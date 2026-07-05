@@ -1204,6 +1204,58 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1174 — beliefPass: belief suspense-curiosity aftermath void, belief suspense-emotional aftermath void, belief emotion-curiosity aftermath void', async () => {
+    const runBF1174 = async (records: ScreenplaySceneRecord[]) => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      return beliefPass({ fountain: '', original: '', records, structure: {} as any, annotations: [], approvedSpans: [] });
+    };
+
+    // Aftermath-void geometry n=10, window=2: triggers at 0 and 3 (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal only at 8,9 — outside both trigger windows {1,2} and {4,5} → every trigger
+    // void → fires. NO-FIRE: aftermath at 1 (inside trigger 0's window) and 9 → trigger 0 not void → no fire.
+    it('BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID fires when every suspense-spike has no curiosity rise within 2 scenes', async () => {
+      const recs1174a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1174(recs1174a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID does not fire when a suspense-spike is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1174an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1174(recs1174an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID fires when every suspense-spike has no emotional shift within 2 scenes', async () => {
+      const recs1174b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([8, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1174(recs1174b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID does not fire when a suspense-spike is followed by an emotional shift within 2 scenes', async () => {
+      const recs1174bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { suspenseDelta: 1 } : ([1, 9].includes(i) ? { emotionalShift: 'positive' } : {})));
+      const res = await runBF1174(recs1174bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID'), 'BELIEF_SUSPENSE_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID fires when every emotionally-charged scene has no curiosity rise within 2 scenes', async () => {
+      const recs1174c = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { emotionalShift: 'positive' } : ([8, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1174(recs1174c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID should fire');
+    });
+
+    it('BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID does not fire when an emotionally-charged scene is followed by a curiosity rise within 2 scenes', async () => {
+      const recs1174cn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 3].includes(i) ? { emotionalShift: 'positive' } : ([1, 9].includes(i) ? { curiosityDelta: 1 } : {})));
+      const res = await runBF1174(recs1174cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID'), 'BELIEF_EMOTION_CURIOSITY_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1160 — beliefPass: belief clock-staging aftermath void, belief turn-dialogue-highlight aftermath void, belief turn-staging aftermath void', async () => {
     const runBF1160 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
