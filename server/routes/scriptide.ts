@@ -12,7 +12,7 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import { validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
@@ -526,6 +526,49 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
     analyzedAt: Date.now(),
   };
   res.json(diagnosis);
+}));
+
+// ── Fix & Verify (Run 11, bridge half 5) ────────────────────────────────────
+// POST /api/scriptide/fix — the feature no competitor can claim: a targeted
+// rewrite whose improvement is PROVEN by the deterministic doctor re-running
+// on the whole candidate document, not merely promised by the model that
+// wrote it. Generation (the LLM rewrite of the caller's span) is opt-in and
+// clearly labeled via `usedLLM`; VERIFICATION — the health/verdict delta and
+// the cleared/introduced issue lists — is entirely deterministic, computed by
+// re-running runScriptDoctor exactly as /doctor does. Both `before` and
+// `after` carry their own contentHash (server/nvm/analyze/doctor.ts's
+// computeContentHash), so the receipt is reproducible: anyone can re-POST
+// either the original or candidate text to /doctor and get byte-identical
+// numbers back.
+//
+// aiLimiter, not gameLimiter — unlike /doctor and /diagnose, this route DOES
+// reach the LLM (fix.ts's one generation call), so it belongs on the same
+// stricter, LLM-aware budget every other generative route in this file uses.
+//
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage — the
+// route only needs the fountain text, the target span, and the issues to fix,
+// exactly what FixBodySchema (validation.ts) validates.
+//
+// Keyless / model-failure behavior is a 200, never a 500 — fixAndVerify
+// (server/nvm/analyze/fix.ts) degrades to { usedLLM: false, note } for a
+// missing key, a network failure, or any of its four validation-guard
+// rejections (empty output, out-of-range length ratio, a slugline-count
+// mismatch, or an unchanged rewrite), matching the keyless-honesty posture
+// every other AI-backed route in this file already holds.
+router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandler(async (req, res) => {
+  const { fountain, span, issues } = req.body as {
+    fountain: string;
+    span: { startLine: number; endLine: number };
+    issues: Array<{ rule: string; description: string; suggestedFix?: string }>;
+  };
+
+  // Dynamic import — same lazy-load convention as the doctor routes above:
+  // fix.ts pulls in the full analyzer + all 14 revision passes via
+  // runScriptDoctor, so routes that never call it don't pay the cost at
+  // startup.
+  const { fixAndVerify } = await import('../nvm/analyze/fix.ts');
+  const result = await fixAndVerify(fountain, span, issues);
+  res.json(result);
 }));
 
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────

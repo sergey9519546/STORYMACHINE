@@ -421,6 +421,43 @@ export const InterviewBodySchema = z.object({
   history: z.array(InterviewHistoryItemSchema).max(20).optional(),
 });
 
+// POST /api/scriptide/fix — Run 11's fix-and-verify. Stateless (no
+// sessionId), same 900_000-char fountain ceiling and rationale as
+// DoctorBodySchema (deliberately below express's 1mb JSON body cap so THIS
+// schema's max-length check is the one that fires with a specific message).
+// `span` mirrors ApprovedSpan/LocatedIssue's 1-based inclusive line-number
+// convention used throughout this bridge (revision/passes/types.ts,
+// analyze/locate.ts) — endLine >= startLine is enforced by the refinement
+// below; fix.ts's own clampSpan defensively re-clamps against the document's
+// actual bounds regardless (a span naming lines past EOF is a normal,
+// non-error case handled there, not rejected here). `issues` is capped at 10
+// (a single fix call is meant to address a handful of co-located findings,
+// not restate the whole report) and each field is capped to match
+// fix.ts's/rewrite.ts's sanitizeForPrompt truncation lengths for the
+// corresponding field, so nothing here can be silently truncated by the
+// prompt builder that wasn't already validated to roughly that size.
+const FixSpanSchema = z
+  .object({
+    startLine: z.number().int().min(1),
+    endLine: z.number().int().min(1),
+  })
+  .refine((s) => s.endLine >= s.startLine, {
+    message: 'endLine must be >= startLine',
+    path: ['endLine'],
+  });
+
+const FixIssueItemSchema = z.object({
+  rule: z.string().min(1).max(80),
+  description: z.string().min(1).max(500),
+  suggestedFix: z.string().max(500).optional(),
+});
+
+export const FixBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000),
+  span: FixSpanSchema,
+  issues: z.array(FixIssueItemSchema).min(1).max(10),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
