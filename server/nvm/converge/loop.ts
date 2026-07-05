@@ -18,7 +18,7 @@ import type { QualityReport } from '../quality/index.ts';
 import type { MutationOperator } from './operators.ts';
 import type { CandidateGenerator, SceneTarget } from '../generate/proof-spec.ts';
 import type { GhostReason } from '../repro/ghost-ledger.ts';
-import type { WritersRoomResult } from '../room/room.ts';
+import type { WritersRoomResult, Critique } from '../room/room.ts';
 import type { DirectorPolicy } from '../selfplay/mine.ts';
 import { runTier1, tier1Passes, runTier2, runTier3, tier3Rank, failedProofs } from '../proof/kernel.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
@@ -61,6 +61,50 @@ export interface ConvergeStep {
   writersRoomSummary?: string;
 }
 
+// Deliverable 1 (close the generate→audit→select loop): previously every
+// candidate's composite/tension/quality scores and Tier1/Tier2 findings were
+// computed solely to pick `best`, then discarded — a caller had no way to see
+// why a candidate lost, inspect a non-winner, or commit anything other than the
+// loop's own argmax. ConvergeCandidateRecord is that missing per-candidate audit
+// trail; `winner` below is what makes the argmax's pick actually committable.
+export type CandidateSource = 'llm' | 'mutation' | 'seed';
+export type CandidateStatus = 'winner' | 'pass' | 'ghost';
+
+export interface ConvergeCandidateRecord {
+  /**
+   * Deterministic — `c<iteration>-<index within that iteration's batch>`.
+   * Unlike `ConvergeStep.candidateId` (which now reuses this same id) this never
+   * depends on Date.now() or the generator's own transitionId, so a streamed
+   * step, a ghosted candidate, and the final `winner` can all be correlated by
+   * the exact same identifier.
+   */
+  candidateId: string;
+  iteration: number;
+  /**
+   * 'seed' = part of iteration 0's initial population (no `best` exists yet);
+   * 'mutation' = operator-mutated from `best` via applyOperator() (iter > 0,
+   * always index 0 of that iteration's batch); 'llm' = a fresh same-iteration
+   * generation alongside the mutation (iter > 0, index ≥ 1).
+   */
+  source: CandidateSource;
+  status: CandidateStatus;
+  ghostReason?: GhostReason;
+  composite: number;
+  tension: number;
+  quality: number;
+  tier1Failures: string[];
+  tier2Flags: string[];
+  ir: NarrativeTransitionIR;
+}
+
+export interface ConvergeWinner {
+  candidateId: string;
+  ir: NarrativeTransitionIR;
+  composite: number;
+  tension: number;
+  quality: number;
+}
+
 export interface ConvergeResult {
   ir: NarrativeTransitionIR;
   history: ConvergeStep[];
@@ -69,7 +113,38 @@ export interface ConvergeResult {
   finalValuation: number;
   finalQuality: number;
   finalComposite: number;
-  ghosts: Array<{ ir: NarrativeTransitionIR; reason: GhostReason }>;
+  ghosts: Array<{
+    ir: NarrativeTransitionIR;
+    reason: GhostReason;
+    /**
+     * Populated at ghosting time (below) so a rejected candidate's scores
+     * survive into the persisted Ghost Ledger (server/nvm/repro/ghost-ledger.ts)
+     * without the caller having to re-run the proof/quality/valuation engines.
+     * Optional — strictly additive alongside the pre-existing {ir, reason} shape,
+     * so ghosts written before this change (and any code that only reads
+     * ir/reason) remain valid.
+     */
+    composite?: number;
+    tension?: number;
+    quality?: number;
+  }>;
+  /** Every candidate this run evaluated, winner included — see ConvergeCandidateRecord. */
+  candidates: ConvergeCandidateRecord[];
+  /**
+   * The LAST writers'-room's full critique transcript — one entry per critic
+   * objection (criticId, severity, objection text, attentionBid, suggested
+   * operator) — kept in full alongside the pre-existing abridged
+   * `writersRoomSummary` on each ConvergeStep. Undefined when the room never ran
+   * (e.g. a 1-iteration budget, or no `best` ever existed to critique).
+   */
+  roomTranscript?: Critique[];
+  /**
+   * Whichever candidate the pre-existing composite-argmax actually picked — null
+   * only when no candidate this run ever passed Tier 1 (nothing is safe to
+   * commit). server/routes/nvm.ts's POST /api/nvm/converge/commit takes exactly
+   * this candidate's ops and re-proves them against current session state.
+   */
+  winner: ConvergeWinner | null;
 }
 
 export interface ConvergeBudget {
@@ -137,6 +212,20 @@ export async function convergeScene(
   // Operator rotation: prefer untried operators before repeating; reset after full cycle.
   const triedOperators = new Set<MutationOperator>();
 
+  // Deliverable 1 accumulators. `candidateRecords` spans ALL iterations — the
+  // function can return mid-loop from the Tier-3-ranked convergedThisIter branch
+  // below, so it's declared once, outside the iteration loop, not per-iteration.
+  const candidateRecords: ConvergeCandidateRecord[] = [];
+  let lastRoomResult: WritersRoomResult | null = null;
+  // Mirrors `best`/`bestComposite` below but also remembers which candidateId and
+  // raw tension/quality produced that composite, so the budget-exhausted return
+  // path can populate `winner` without recomputing anything.
+  let bestCandidateId: string | null = null;
+  let bestValuation = 0;
+  // Named distinctly from the pre-existing local `bestQuality` (a QualityReport,
+  // assigned further below inside `if (best) {...}`) to avoid shadowing it.
+  let bestQualityScore = 0;
+
   for (let iter = 0; iter < budget.maxIterations; iter++) {
     if (llmCallCount >= llmCallLimit) break;
     // Quality-aware spec (Wave 27): quality warnings + Propp gaps feed back as constraints.
@@ -198,13 +287,24 @@ export async function convergeScene(
       llmCallCount += budget.candidatesPerIteration;
     }
     lastCandidates = candidates;
+    if (roomResult) lastRoomResult = roomResult;
+
+    // Parallel to `candidates`: which generation path produced each entry, for
+    // ConvergeCandidateRecord.source. Iteration 0 has no `best` yet, so its whole
+    // batch is the initial 'seed' population; iter>0 batches are [mutation, ...llm]
+    // (mirrors the exact branch condition above that assembled `candidates`).
+    const candidateSources: CandidateSource[] = (best && iter > 0)
+      ? ['mutation' as const, ...candidates.slice(1).map(() => 'llm' as const)]
+      : candidates.map(() => 'seed' as const);
 
     // Buffer of fully-converged candidates this iteration (for Tier 3 ranking)
     const convergedThisIter: Array<{
-      ir: NarrativeTransitionIR; valuation: number; quality: number; composite: number; t3: number;
+      ir: NarrativeTransitionIR; candidateId: string; valuation: number; quality: number; composite: number; t3: number;
     }> = [];
 
-    for (const candidate of candidates) {
+    for (let ci = 0; ci < candidates.length; ci++) {
+      const candidate = candidates[ci];
+      const candidateId = `c${iter}-${ci}`;
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
       // Apply candidate ops to get post-transition state before valuing — otherwise
@@ -222,6 +322,11 @@ export async function convergeScene(
       // Tier 3 ranking — non-blocking; influences candidate preference.
       const t3Results = runTier3(candidate, state);
       const t3 = tier3Rank(t3Results);
+
+      // Tier 2 quality-gate proofs, evaluated per-candidate (not just for `best`,
+      // as the post-iteration feedback step below already does) so
+      // ConvergeCandidateRecord.tier2Flags reflects THIS candidate's own findings.
+      const tier2Results = runTier2(candidate, state);
 
       const tensionNorm = normalizeTension(valuationScore, target.tensionTarget);
       // Guard the composite at its source so a single non-finite signal can't
@@ -246,7 +351,12 @@ export async function convergeScene(
 
       const step: ConvergeStep = {
         iteration: iter,
-        candidateId: candidate.transitionId,
+        // Wave: was `candidate.transitionId` (Date.now()-suffixed for LLM/stub
+        // IRs, so non-deterministic and unrelated to the id ConvergeCandidateRecord
+        // uses below). Switched to the same deterministic id so a streamed step,
+        // a ghosted candidate, and the final winner all correlate by one identifier.
+        // The field's type (string) — the "exact shape" callers depend on — is unchanged.
+        candidateId,
         tier1Results,
         passed,
         tensionLedger: ledger,
@@ -263,9 +373,27 @@ export async function convergeScene(
       history.push(step);
       budget.onStep?.(step);
 
+      // Deliverable 1: keep every candidate's full record, not just the ones that
+      // shaped `best` or got ghosted. Status starts as pass/ghost; whichever
+      // candidate the argmax ultimately settles on (immediately below, or at the
+      // budget-exhausted return path) gets flipped to 'winner' in place afterward.
+      candidateRecords.push({
+        candidateId,
+        iteration: iter,
+        source: candidateSources[ci] ?? 'llm',
+        status: ghostReason ? 'ghost' : 'pass',
+        ghostReason,
+        composite: compositeScore,
+        tension: valuationScore,
+        quality: qualityScore,
+        tier1Failures: failedProofs(tier1Results).map(r => r.proof),
+        tier2Flags: failedProofs(tier2Results).map(r => r.proof),
+        ir: candidate,
+      });
+
       // Buffer fully-converged candidates for Tier 3 ranking
       if (passed && tensionMet && qualityMet) {
-        convergedThisIter.push({ ir: candidate, valuation: valuationScore, quality: qualityScore, composite: compositeScore, t3 });
+        convergedThisIter.push({ ir: candidate, candidateId, valuation: valuationScore, quality: qualityScore, composite: compositeScore, t3 });
       }
 
       // Track best composite — only among Tier-1-passing candidates, so mutations
@@ -274,11 +402,16 @@ export async function convergeScene(
       if (passed && compositeScore > bestComposite) {
         best = candidate;
         bestComposite = compositeScore;
+        bestCandidateId = candidateId;
+        bestValuation = valuationScore;
+        bestQualityScore = qualityScore;
       }
 
-      // Ghost if it failed any gate significantly
+      // Ghost if it failed any gate significantly — carry its scores along so the
+      // Ghost Ledger can display a rejected candidate's numbers without re-running
+      // the proof/quality/valuation engines against it later.
       if (ghostReason) {
-        ghosts.push({ ir: candidate, reason: ghostReason });
+        ghosts.push({ ir: candidate, reason: ghostReason, composite: compositeScore, tension: valuationScore, quality: qualityScore });
       }
     }
 
@@ -287,6 +420,11 @@ export async function convergeScene(
     if (convergedThisIter.length > 0) {
       convergedThisIter.sort((a, b) => b.t3 - a.t3 || b.composite - a.composite);
       const winner = convergedThisIter[0];
+      // Flip the winning candidate's own record to 'winner' in place — it was
+      // pushed as 'pass' above (convergedThisIter only ever holds candidates that
+      // passed Tier 1 and met both the tension and quality targets).
+      const winnerRecord = candidateRecords.find(r => r.candidateId === winner.candidateId);
+      if (winnerRecord) winnerRecord.status = 'winner';
       return {
         ir: winner.ir,
         history,
@@ -296,6 +434,15 @@ export async function convergeScene(
         finalQuality: winner.quality,
         finalComposite: winner.composite,
         ghosts,
+        candidates: candidateRecords,
+        roomTranscript: lastRoomResult?.critiques,
+        winner: {
+          candidateId: winner.candidateId,
+          ir: winner.ir,
+          composite: winner.composite,
+          tension: winner.valuation,
+          quality: winner.quality,
+        },
       };
     }
 
@@ -340,6 +487,16 @@ export async function convergeScene(
   }
   const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
+  const safeBestComposite = (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite;
+
+  // Deliverable 1: the budget-exhausted path's "winner" is exactly the argmax the
+  // loop already computed via `best`/`bestComposite` above — null only when
+  // nothing this run ever passed Tier 1 (bestCandidateId stays null in that case,
+  // since it's set in lockstep with `best` inside the per-candidate loop).
+  if (bestCandidateId) {
+    const winnerRecord = candidateRecords.find(r => r.candidateId === bestCandidateId);
+    if (winnerRecord) winnerRecord.status = 'winner';
+  }
 
   return {
     ir: finalIR,
@@ -348,7 +505,12 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite,
+    finalComposite: safeBestComposite,
     ghosts,
+    candidates: candidateRecords,
+    roomTranscript: lastRoomResult?.critiques,
+    winner: (bestCandidateId && best)
+      ? { candidateId: bestCandidateId, ir: best, composite: safeBestComposite, tension: bestValuation, quality: bestQualityScore }
+      : null,
   };
 }

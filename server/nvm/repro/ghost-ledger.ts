@@ -20,6 +20,16 @@ export interface GhostCommit {
   ir: NarrativeTransitionIR;
   reason: GhostReason;
   rejectedAt: number;
+  /**
+   * Convergence-loop scores (server/nvm/converge/loop.ts) captured at the
+   * moment this candidate was ghosted — composite/tension/quality, 0–100 each
+   * (matching ConvergeCandidateRecord). Optional and additive: ghosts rejected
+   * outside convergeScene() (e.g. `editor_reject`) have no loop scores to carry,
+   * and ghosts persisted before this field existed remain valid without it.
+   */
+  composite?: number;
+  tension?: number;
+  quality?: number;
 }
 
 export interface BranchResult {

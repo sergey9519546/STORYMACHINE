@@ -9,8 +9,9 @@ import {
 import {
   validate, GhostBranchBodySchema, RedteamBodySchema, QualityBodySchema, TwinDoBodySchema,
   FixedPointsBodySchema, BackchainBodySchema, InjectOpsBodySchema, ConvergeBodySchema,
-  ConvergeArcBodySchema, SelfplayBodySchema, GenomeDiffBodySchema, GenomeBreedBodySchema,
-  RepairBodySchema, LiveMoveBodySchema, LiveAdvanceBodySchema, CompileBodySchema, ReviseBodySchema,
+  ConvergeCommitBodySchema, ConvergeArcBodySchema, SelfplayBodySchema, GenomeDiffBodySchema,
+  GenomeBreedBodySchema, RepairBodySchema, LiveMoveBodySchema, LiveAdvanceBodySchema,
+  CompileBodySchema, ReviseBodySchema,
 } from '../lib/validation.ts';
 
 const router = express.Router();
@@ -327,7 +328,14 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncH
   };
   const result = await convergeScene(state, target, generate, budget, seed);
 
-  // Persist any new ghost commits from convergence into Stage ghost ledger
+  // Persist any new ghost commits from convergence into Stage ghost ledger.
+  // Wave (Deliverable 1): ghost.composite/tension/quality are populated by
+  // convergeScene() at ghosting time — threaded through here so a rejected
+  // candidate's scores are available wherever GhostCommit is read. (NOTE:
+  // Stage.ghostLedgerAppend's SQLite schema — server/engine/Stage.ts, out of
+  // scope for this change — has no columns for these three fields yet, so they
+  // will round-trip as undefined until that table gets a migration; this call
+  // site is forward-compatible with that follow-up.)
   const { appendGhost } = await import('../nvm/repro/ghost-ledger.ts');
   for (const ghost of result.ghosts) {
     appendGhost(stage, {
@@ -337,6 +345,9 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncH
       ir: ghost.ir,
       reason: ghost.reason,
       rejectedAt: Date.now(),
+      composite: ghost.composite,
+      tension: ghost.tension,
+      quality: ghost.quality,
     });
   }
 
@@ -349,6 +360,14 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), asyncH
     history: result.history,
     ghostCount: result.ghosts.length,
     ir: result.ir,
+    // Deliverable 2 — previously the loop's winner and per-candidate scores were
+    // computed and discarded; now the caller gets exactly what it needs to make
+    // (and commit) a deliberate selection. `candidates[]` carries each entry's
+    // own `ir` so the UI can POST /api/nvm/converge/commit for ANY candidate,
+    // not just `winner`.
+    winner: result.winner,
+    candidates: result.candidates,
+    roomTranscript: result.roomTranscript,
   });
 }));
 
@@ -419,6 +438,10 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
       bibleSummary: bibleSummary || undefined,
       openPromises: arcReport.openPromises.length > 0 ? arcReport.openPromises : undefined,
       onStep: (step: import('../nvm/converge/loop.ts').ConvergeStep) => {
+        // Deliverable 2: per-step events already carried candidateId + the three
+        // scores; `step.candidateId` is now the SAME deterministic `c<iter>-<idx>`
+        // id used by the final summary's `candidates[]`/`winner` below, so a
+        // streaming client can correlate a live step with its eventual outcome.
         emitSSE({
           type: 'converge_step',
           step: {
@@ -438,7 +461,9 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
 
     const result = await convergeScene(state, target, generate, budget, seed);
 
-    // Persist ghosts
+    // Persist ghosts — see the matching comment in POST /api/nvm/converge above
+    // re: Stage.ts's Ghost_Commits table not yet having composite/tension/quality
+    // columns (out of scope here; this call site is forward-compatible).
     const { appendGhost } = await import('../nvm/repro/ghost-ledger.ts');
     for (const ghost of result.ghosts) {
       appendGhost(stage, {
@@ -448,6 +473,9 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
         ir: ghost.ir,
         reason: ghost.reason,
         rejectedAt: Date.now(),
+        composite: ghost.composite,
+        tension: ghost.tension,
+        quality: ghost.quality,
       });
     }
 
@@ -460,6 +488,11 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
         finalQuality: result.finalQuality,
         finalComposite: result.finalComposite,
         ghostCount: result.ghosts.length,
+        // Deliverable 2: the final summary is where a streaming client gets the
+        // committable payload — same fields as the non-streaming /api/nvm/converge.
+        winner: result.winner,
+        candidates: result.candidates,
+        roomTranscript: result.roomTranscript,
         history: result.history.map(s => ({
           iteration: s.iteration,
           candidateId: s.candidateId,
@@ -478,6 +511,101 @@ router.get('/api/nvm/converge-stream', aiLimiter, async (req, res) => {
     ensureEnded();
   }
 });
+
+// POST /api/nvm/converge/commit — the missing back-half of generate→audit→select.
+// Before this route existed, convergeScene() computed a winner (and, per-candidate,
+// every runner-up's and ghost's scores) purely to pick an argmax that was then
+// discarded — nothing ever turned that decision into a StoryCommit. This route is
+// where a human (or an automated policy reading `winner`/`candidates[]` off
+// /api/nvm/converge) actually exercises the commit pen: the writer, not the
+// argmax, decides what becomes canon. It's deliberately generic over WHICH
+// candidate — the same `ops` shape POST /api/nvm/ghost-commits/branch already
+// returns (`branchedOps`) restores a rejected ghost through this exact route too.
+// gameLimiter (not aiLimiter): unlike /api/nvm/converge, this route makes no LLM
+// call — it only re-proves and commits already-generated ops, same cost profile
+// as /api/nvm/inject-ops.
+router.post('/api/nvm/converge/commit', gameLimiter, validate(ConvergeCommitBodySchema), asyncHandler(async (req, res) => {
+  const { stage } = getOrCreateSession(sessionId(req));
+  const { runTier1, tier1Passes, failedProofs } = await import('../nvm/proof/kernel.ts');
+  const { applyStoryOps } = await import('../nvm/ops/dispatcher.ts');
+  const { stateHash } = await import('../nvm/state/NarrativeState.ts');
+  const { summarizeOps } = await import('../nvm/state/StoryCommit.ts');
+  const { randomUUID } = await import('node:crypto');
+
+  type StoryOpT = import('../nvm/ops/StoryOp.ts').StoryOp;
+  type NarrativeTransitionIRT = import('../nvm/ir/NarrativeTransitionIR.ts').NarrativeTransitionIR;
+  const {
+    ops, sceneIdx: bodySceneIdx, activeMechanisms, preconditions, summary,
+  } = req.body as {
+    ops: StoryOpT[]; sceneIdx?: number; activeMechanisms?: string[]; preconditions?: string[]; summary?: string;
+  };
+
+  const state = buildEnrichedState(stage);
+  const sceneIdx = typeof bodySceneIdx === 'number' ? bodySceneIdx : state.turn;
+
+  // Re-prove Tier 1 against the CURRENT session state — NOT the state the
+  // candidate was scored against inside convergeScene() (or whenever a ghost was
+  // rejected). Session state can move between "the loop picked a winner" and "the
+  // client clicks commit": other commits may have landed, an OVERRULE may have
+  // reverted one, a parallel scene may have consumed a clue this candidate also
+  // relied on. A candidate that legitimately passed Tier 1 when it was generated
+  // can therefore legitimately fail it here — that's the story timeline racing
+  // ahead of the selection, not a malformed request, hence 409 rather than 400.
+  // activeMechanisms/preconditions default to [] when the caller omits them, which
+  // will (correctly) fail MechanismProof/CausalProof for any non-trivial scene —
+  // see the ConvergeCommitBodySchema comment for why a caller should pass the
+  // candidate's own IR fields through rather than relying on the default.
+  const shellIR: NarrativeTransitionIRT = {
+    transitionId: `converge-commit-check-${randomUUID()}`,
+    sceneIdx,
+    sceneFunction: 'advance_plot',
+    activeMechanisms: activeMechanisms ?? [],
+    beforeStateHash: stateHash(state),
+    ops,
+    preconditions: preconditions ?? [],
+    postconditions: [],
+    provenance: { origin: 'model_generated', createdAt: Date.now() },
+  };
+  const tier1Results = runTier1(shellIR, state);
+  if (!tier1Passes(tier1Results)) {
+    res.status(409).json({
+      error: 'Tier 1 proofs failed against the current session state — these ops were valid when scored, but the story has moved on since',
+      failures: failedProofs(tier1Results).map(r => ({ proof: r.proof, reason: r.reason })),
+    });
+    return;
+  }
+
+  const newState = applyStoryOps(state, ops);
+  const commits = stage.getCommits().filter(c => !c.reverted);
+  const parentId = commits[commits.length - 1]?.commitId ?? null;
+  // StoryCommit (server/nvm/state/StoryCommit.ts) has no dedicated origin/author
+  // field — inject-ops's own "marker" (the `label` in its response, defaulting to
+  // 'director_cut') is likewise never persisted, just echoed back once. Extending
+  // StoryCommit's schema is out of scope for this change, so the distinct
+  // 'converge_selected' marker is embedded directly in the commitId itself — the
+  // one part of a commit that IS persisted verbatim and always returned by
+  // GET /api/nvm/commits — so a converge-selected commit stays identifiable in
+  // the ledger without a schema change.
+  const commitId = `converge_selected-${randomUUID()}`;
+  stage.appendCommit({
+    commitId,
+    parentId,
+    sceneIdx,
+    ops,
+    deltaSummary: summarizeOps(ops),
+    reverted: false,
+    createdAt: Date.now(),
+  });
+
+  res.json({
+    commitId,
+    sceneIdx,
+    ops: ops.length,
+    newStateHash: stateHash(newState),
+    marker: 'converge_selected',
+    summary: summary ?? null,
+  });
+}));
 
 // GET /api/nvm/corpus — top corpus runs + Director policy
 router.get('/api/nvm/corpus', gameLimiter, asyncHandler(async (req, res) => {
@@ -806,7 +934,9 @@ router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema),
     const target = sceneTargets[i];
     const result = await convergeScene(rollingState, target, generate, budget, baseSeed + i * 1000);
 
-    // Persist ghosts
+    // Persist ghosts — same composite/tension/quality threading as
+    // POST /api/nvm/converge above (see that route's comment re: Stage.ts's
+    // Ghost_Commits schema not yet having columns for these fields).
     for (const ghost of result.ghosts) {
       appendGhost(stage, {
         ghostId: ghost.ir.transitionId,
@@ -815,6 +945,9 @@ router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema),
         ir: ghost.ir,
         reason: ghost.reason,
         rejectedAt: Date.now(),
+        composite: ghost.composite,
+        tension: ghost.tension,
+        quality: ghost.quality,
       });
     }
 

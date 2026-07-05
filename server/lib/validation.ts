@@ -183,6 +183,32 @@ export const ConvergeBodySchema = z.object({
   }).passthrough().optional(),
 });
 
+// POST /api/nvm/converge/commit — the missing back-half of generate→audit→select
+// (server/nvm/converge/loop.ts now returns per-candidate scores + a `winner`
+// instead of discarding them; this is where one of those candidates — winner,
+// runner-up, or a restored ghost's `branchedOps` — actually becomes a
+// StoryCommit). `ops` shape mirrors InjectOpsBodySchema/StoryOpItemSchema exactly:
+// same op-kind discriminator check, since the handler builds the same kind of
+// minimal IR shell inject-ops's proof-inspection routes already use.
+// `activeMechanisms`/`preconditions` are optional but matter more than they look:
+// the handler re-runs Tier 1 before committing, and MechanismProof/CausalProof
+// (server/nvm/proof/tier1/{mechanism,causal}.ts) block on the IR's OWN declared
+// metadata regardless of session state — MechanismProof unconditionally fails an
+// empty activeMechanisms list, and CausalProof requires ≥1 precondition for any
+// non-initial (sceneIdx > 0) scene with ops. A caller committing a candidate or
+// ghost already has both fields on that candidate's own `ir` (server/routes/nvm.ts
+// now returns `candidates[].ir` / ghost `.ir` in full) — passing them through here
+// lets that declarative half of Tier 1 re-verify meaningfully instead of always
+// failing on an empty default.
+export const ConvergeCommitBodySchema = z.object({
+  sessionId: sessionIdField,
+  ops: z.array(StoryOpItemSchema).min(1),
+  sceneIdx: z.number().optional(),
+  activeMechanisms: z.array(z.string().min(1).max(128)).max(10).optional(),
+  preconditions: z.array(z.string().max(256)).max(20).optional(),
+  summary: z.string().max(500).optional(),
+});
+
 export const ConvergeArcBodySchema = z.object({
   sessionId: sessionIdField,
   scenes: z.array(z.unknown()).min(1).max(8),
