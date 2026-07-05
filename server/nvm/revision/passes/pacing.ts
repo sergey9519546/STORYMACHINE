@@ -532,11 +532,23 @@
 // as an aftermath channel in this file, never as the isTrigger side of a check. PACING_
 // CURIOSITY_SUSPENSE_AFTERMATH_VOID pairs curiosityDelta with suspenseDelta; PACING_CURIOSITY_
 // EMOTIONAL_AFTERMATH_VOID pairs it with emotionalShift.
+// Wave 1181 additions (distinct-mode pivot — see Waves 1176-1180 in dialogue.ts/character-
+// arc.ts/conflict.ts/intention.ts/originality.ts): reconnaissance found this file's channels
+// saturated across zone-cluster (23), zone-imbalance (22), drought-run (23), peak-uncaused (8),
+// and aftermath-void (48) uses, but checkHalfLoaded had zero uses, and — like originality.ts —
+// this file has no hand-rolled binary half-partition check anywhere (grep for FRONTLOADED/
+// BACKLOADED/FRONT_LOADED/BACK_LOADED returns only two comment references to intention.ts's
+// PAYOFF_BACK_LOADED, never a local rule). This wave introduces the mode for the first time, on
+// three channels that already carry the full zone-cluster/zone-imbalance/drought-run/
+// peak-uncaused quartet: PACING_PAYOFF_BACK_LOADED, PACING_OPEN_THREAD_FRONT_LOADED, and
+// PACING_HIGHLIGHT_BACK_LOADED. Thresholds (minRecords 9, minCount 3) match this file's own
+// zone-cluster precedent for each channel; ratioThreshold 0.70 matches the half-partition
+// convention established across the other four passes touched by this pivot.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
-import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
 /**
  * Compute weighted line counts per scene.
@@ -6712,6 +6724,85 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1167c.triggerCount} curiosity-spike scenes is followed by two scenes with no emotional shift, even though ${r1167c.aftermathCount} such shifts occur elsewhere. A fresh question that never registers on any character's felt state right after it opens leaves the pacing's curiosity reading as a purely intellectual hook rather than something the audience feels invested in through a character.`,
         suggestedFix: `In the two scenes following at least one curiosity spike, let the new question land on a character's emotional register, so the pacing's intrigue carries felt weight, not just a puzzle to solve.`,
+      });
+    }
+  }
+
+  // ── Wave 1181 (distinct-mode pivot): PACING_PAYOFF_BACK_LOADED,
+  //              PACING_OPEN_THREAD_FRONT_LOADED, PACING_HIGHLIGHT_BACK_LOADED ─────────────────
+
+  // PACING_PAYOFF_BACK_LOADED — Distribution/timing × payoffSetupIds × binary half-partition.
+  // Built on checkHalfLoaded from the shared checks library (first use of this helper in this
+  // pass). n≥9, ≥3 payoff scenes, fires when >70% fall in the second half while the first half
+  // still has at least one. payoffSetupIds already carries zone-cluster, zone-imbalance,
+  // drought-run, and peak-uncaused coverage in this file; the half-partition mode has never been
+  // applied to it here. Distinct from PACING_PAYOFF_ZONE_CLUSTER (single-third concentration
+  // >75%, which a middle-third-only cluster can trigger while this check would treat it as an
+  // even half-split) and the aftermath-void checks anchored on payoffSetupIds (sequence/aftermath
+  // mode: whether a consequence signal follows each payoff, not where payoffs fall in the
+  // timeline).
+  {
+    const r1181a = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.payoffSetupIds ?? []).length > 0,
+    });
+    if (r1181a.fires) {
+      issues.push({
+        location: `payoff scenes: ${r1181a.matchingHalfCount} back-half / ${r1181a.otherHalfCount} front-half`,
+        rule: 'PACING_PAYOFF_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1181a.matchingHalfCount / r1181a.count) * 100)}% of the story's thread-resolution scenes (${r1181a.matchingHalfCount} of ${r1181a.count}) fall in the second half, leaving the first half with only ${r1181a.otherHalfCount}. Resolution is a back-half phenomenon here: the first half's pacing accumulates open material without ever delivering on it, leaving nothing for the audience to feel satisfied about until the story is already closing out.`,
+        suggestedFix: `Resolve at least one thread in the first half — an early payoff gives the story's pacing an intermediate release of pressure instead of saving every resolution for the finish.`,
+      });
+    }
+  }
+
+  // PACING_OPEN_THREAD_FRONT_LOADED — Distribution/timing × unresolvedClues × binary half-
+  // partition. Built on checkHalfLoaded. n≥9, ≥3 open-thread scenes, fires when >70% fall in the
+  // first half while the second half still has at least one. unresolvedClues already carries
+  // zone-cluster, zone-imbalance, drought-run, and peak-uncaused coverage; the half-partition mode
+  // has never been applied to it. Distinct from PACING_OPEN_THREAD_ZONE_CLUSTER (single-third
+  // concentration >75%, which a middle-third-only cluster can trigger while this check would
+  // treat it as an even half-split) and the aftermath-void checks anchored on unresolvedClues
+  // (sequence/aftermath mode: whether a consequence signal follows heavy clue-debt, not where
+  // open threads fall in the timeline).
+  {
+    const r1181b = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'front',
+      isPresent: r => (r.unresolvedClues ?? []).length > 0,
+    });
+    if (r1181b.fires) {
+      issues.push({
+        location: `open-thread scenes: ${r1181b.matchingHalfCount} front-half / ${r1181b.otherHalfCount} back-half`,
+        rule: 'PACING_OPEN_THREAD_FRONT_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1181b.matchingHalfCount / r1181b.count) * 100)}% of the story's scenes carrying outstanding clue-debt (${r1181b.matchingHalfCount} of ${r1181b.count}) fall in the first half, leaving the second half with only ${r1181b.otherHalfCount}. Every live question is asked before the midpoint — the back half's pacing coasts on almost nothing unresolved to modulate against, since the story stops raising new open threads well before it ends.`,
+        suggestedFix: `Let at least one clue remain outstanding into the second half — keeping a question alive past the midpoint gives the back half's pacing something unresolved to modulate against.`,
+      });
+    }
+  }
+
+  // PACING_HIGHLIGHT_BACK_LOADED — Distribution/timing × dialogueHighlights × binary half-
+  // partition. Built on checkHalfLoaded. n≥9, ≥3 highlighted-dialogue scenes, fires when >70% fall
+  // in the second half while the first half still has at least one. dialogueHighlights already
+  // carries zone-cluster, zone-imbalance, drought-run, and peak-uncaused coverage; the
+  // half-partition mode has never been applied to it. Distinct from PACING_HIGHLIGHT_ZONE_CLUSTER
+  // (single-third concentration >75%, which a middle-third-only cluster can trigger while this
+  // check would treat it as an even half-split) and the aftermath-void checks anchored on
+  // dialogueHighlights (sequence/aftermath mode: whether a consequence signal follows a standout
+  // line, not where standout lines fall in the timeline).
+  {
+    const r1181c = checkHalfLoaded({
+      records, minRecords: 9, minCount: 3, ratioThreshold: 0.70, direction: 'back',
+      isPresent: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1181c.fires) {
+      issues.push({
+        location: `standout-dialogue scenes: ${r1181c.matchingHalfCount} back-half / ${r1181c.otherHalfCount} front-half`,
+        rule: 'PACING_HIGHLIGHT_BACK_LOADED',
+        severity: 'minor',
+        description: `${Math.round((r1181c.matchingHalfCount / r1181c.count) * 100)}% of the story's scenes carrying a standout line of dialogue (${r1181c.matchingHalfCount} of ${r1181c.count}) fall in the second half, leaving the first half with only ${r1181c.otherHalfCount}. The first half's pacing runs on forgettable dialogue almost exclusively, with nearly every memorable line saved for the back half.`,
+        suggestedFix: `Give at least one scene in the first half a standout line of dialogue — a memorable exchange early on gives the front half's pacing a verbal high point instead of saving them all for later.`,
       });
     }
   }

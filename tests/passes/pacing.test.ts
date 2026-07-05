@@ -934,6 +934,80 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1181 — pacingPass (distinct-mode pivot): pacing payoff back-loaded, pacing open-thread front-loaded, pacing highlight back-loaded', async () => {
+    const runP1181 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Half-partition geometry n=10, half=5: 4 qualifying scenes total.
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 2) has 1 — 3/4=75%>70%, front still >=1.
+    it('PACING_PAYOFF_BACK_LOADED fires when payoff scenes concentrate in the back half', async () => {
+      const recs1181a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 6 || i === 7 || i === 8) return makeSharedRecord(i, { payoffSetupIds: ['thread-1'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_BACK_LOADED'), 'PACING_PAYOFF_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 2,3) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('PACING_PAYOFF_BACK_LOADED does not fire when payoff scenes are evenly split across halves', async () => {
+      const recs1181an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 2 || i === 3 || i === 6 || i === 7) return makeSharedRecord(i, { payoffSetupIds: ['thread-1'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_PAYOFF_BACK_LOADED'), 'PACING_PAYOFF_BACK_LOADED should not fire');
+    });
+
+    // FIRE: front half (idx 1,2,3) has 3, back half (idx 7) has 1 — 3/4=75%>70%, back still >=1.
+    it('PACING_OPEN_THREAD_FRONT_LOADED fires when open-thread scenes concentrate in the front half', async () => {
+      const recs1181b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 3 || i === 7) return makeSharedRecord(i, { unresolvedClues: ['clue-1'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_FRONT_LOADED'), 'PACING_OPEN_THREAD_FRONT_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('PACING_OPEN_THREAD_FRONT_LOADED does not fire when open-thread scenes are evenly split across halves', async () => {
+      const recs1181bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) return makeSharedRecord(i, { unresolvedClues: ['clue-1'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_OPEN_THREAD_FRONT_LOADED'), 'PACING_OPEN_THREAD_FRONT_LOADED should not fire');
+    });
+
+    // FIRE: back half (idx 6,7,8) has 3, front half (idx 1) has 1 — 3/4=75%>70%, front still >=1.
+    it('PACING_HIGHLIGHT_BACK_LOADED fires when standout-dialogue scenes concentrate in the back half', async () => {
+      const recs1181c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 6 || i === 7 || i === 8) return makeSharedRecord(i, { dialogueHighlights: ['alice: believes X'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_BACK_LOADED'), 'PACING_HIGHLIGHT_BACK_LOADED should fire');
+    });
+
+    // NO-FIRE: front (idx 1,2) has 2, back (idx 6,7) has 2 — 2/4=50%, not >70%.
+    it('PACING_HIGHLIGHT_BACK_LOADED does not fire when standout-dialogue scenes are evenly split across halves', async () => {
+      const recs1181cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 1 || i === 2 || i === 6 || i === 7) return makeSharedRecord(i, { dialogueHighlights: ['alice: believes X'] });
+        return makeSharedRecord(i);
+      });
+      const res = await runP1181(recs1181cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'PACING_HIGHLIGHT_BACK_LOADED'), 'PACING_HIGHLIGHT_BACK_LOADED should not fire');
+    });
+  });
+
   describe('Wave 1167 — pacingPass: pacing emotion-recurrence aftermath void, pacing curiosity-suspense aftermath void, pacing curiosity-emotional aftermath void', async () => {
     const runP1167 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
