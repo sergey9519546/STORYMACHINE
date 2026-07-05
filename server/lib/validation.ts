@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
+import { TONE_NAME_LIST } from './genre-router.ts';
 
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
@@ -187,6 +188,16 @@ export const OutlineBodySchema = z.object({
 
 export const CollabTokenBodySchema = z.object({
   room: roomIdField,
+});
+
+// POST /api/story-tone (B1-a — Genre Engine Expansion). Mirrors the shape of
+// the existing story-genre route's validation intent (reject anything not in
+// the known name list with a clean 400), but expressed as a proper zod schema
+// against TONE_NAME_LIST (server/lib/genre-router.ts) — the single source of
+// truth for the 16 tone registers — so a stray/misspelled tone never reaches
+// server/routes/config.ts's handler.
+export const StoryToneSchema = z.object({
+  tone: z.enum(TONE_NAME_LIST),
 });
 
 // ── NVM route schemas (audit M2.3) ───────────────────────────────────────────

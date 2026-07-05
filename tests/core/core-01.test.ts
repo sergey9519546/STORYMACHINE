@@ -1950,16 +1950,19 @@ describe('genre-router — genrePromptBlock', () => {
     }
   });
 
-  it('genres absent from GENRE_RULE_MODIFIERS (noir) have no live rule modifier yet', () => {
+  it('every original genre now has a live rule modifier (noir closed by B1-a)', () => {
     // Coverage-honesty pin for future Type 3 waves: this asserts the CURRENT set of
     // genres with no rule-threshold modifier, not a permanent restriction — a future
     // wave that adds one should update this list, not delete the test. Wave 1188 closed
-    // the romance/sci_fi/mystery gaps (see the GENRE_RULE_MODIFIERS entries and their
-    // WEAK_MIDPOINT/EXPOSITION_DUMP/ACT3_SCENE_EXCESS call sites); noir remains open.
-    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = ['noir'];
+    // the romance/sci_fi/mystery gaps; the B1-a genre expansion closed noir
+    // (pacingPlateauRatio relaxed for slow-burn, expositionDumpStreak tightened
+    // for hard-boiled economy), so no original genre remains without one.
+    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = [];
     for (const genre of genresWithoutModifier) {
       assert.equal(GENRE_RULE_MODIFIERS[genre], undefined, `${genre} should not yet have a live rule modifier`);
     }
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.noir ?? {}).sort(),
+      ['expositionDumpStreak', 'pacingPlateauRatio']);
   });
 
   // Wave 1188 additions (Program v2, Type 3 — genre-conditioned, second of its kind):
