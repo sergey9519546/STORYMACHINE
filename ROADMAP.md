@@ -371,7 +371,9 @@ doctor-panel buttons. NEXT RUN: Run 15 — trust & publishing.)
 
 ---
 
-## 11. Run 15 — Trust & publishing
+## 11. Run 15 — Trust & publishing — ✅ COMPLETE
+(Rulebook: 3,196 rules extracted + staleness test; CALIBRATION.md; verify
+endpoint. NEXT RUN: Run 16 — deployment hardening.)
 
 - [ ] **(M)** Rulebook generation: extract all ~1,300 rules (name, pass,
   description) into browsable docs. This is both a depth proof and an SEO
