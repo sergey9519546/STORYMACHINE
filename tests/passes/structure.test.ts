@@ -1005,6 +1005,106 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+  describe('Wave 1188 — structurePass (Program v2, Type 3 — genre-conditioned, second of its kind): WEAK_MIDPOINT and ACT3_SCENE_EXCESS genre thresholds', async () => {
+    const makeRec1188 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain1188 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    // ── WEAK_MIDPOINT genre threshold ────────────────────────────────────────
+    // Craft argument: romance's central pivot is relationship risk, not thriller-style
+    // suspense (GENRE_MODIFIERS.romance — "tension lives in proximity, restraint, and
+    // the gap between what is wanted and what is said"), so a midpoint suspense reading
+    // of 0.7 (above romance's looser 0.4 floor but below the generic 1) is still a
+    // legitimate dramatic pivot for the genre, not a flat midpoint.
+    it("structurePass: WEAK_MIDPOINT fires generically at midpointPressure=0.7 but not under romance's looser floor", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec1188(i));
+      const baseInput = {
+        fountain: blankFountain1188(8), original: blankFountain1188(8),
+        records: records as any, structure: { midpointPressure: 0.7 } as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'WEAK_MIDPOINT'),
+        `Expected WEAK_MIDPOINT generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const romanceResult = await structurePass({ ...baseInput, storyContext: { genre: 'romance' } });
+      assert.ok(
+        !romanceResult.issues.some(i => i.rule === 'WEAK_MIDPOINT'),
+        "Should NOT fire under romance's looser 0.4 midpoint-pressure floor at 0.7",
+      );
+    });
+
+    it('structurePass: WEAK_MIDPOINT genre-absent path is byte-identical to the pre-Wave-1188 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec1188(i));
+      const result = await structurePass({
+        fountain: blankFountain1188(8), original: blankFountain1188(8),
+        records: records as any, structure: { midpointPressure: 0.5 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const weak = result.issues.filter(i => i.rule === 'WEAK_MIDPOINT');
+      assert.ok(weak.length >= 1, 'Should fire generically at midpointPressure=0.5');
+      assert.equal(
+        weak[0].description,
+        'Midpoint suspense pressure is flat — the story lacks a dramatic pivot',
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+
+    // ── ACT3_SCENE_EXCESS genre threshold ────────────────────────────────────
+    // Craft argument: mystery's climax is the extended solution reveal — gathering
+    // suspects, walking the clues back (GENRE_MODIFIERS.mystery — "the solution must
+    // be surprising yet inevitable in hindsight") — which legitimately runs longer than
+    // Act 1's setup, so an Act 3 that merely out-counts Act 1 by one scene (5 vs 4) is
+    // not yet the bloated resolution the generic 1x ratio flags.
+    it("structurePass: ACT3_SCENE_EXCESS fires generically at a 5-vs-4 scene split but not under mystery's looser 1.3x ratio", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      // n=17: act1SceneCount=floor(17*0.25)=4; act3SceneStart=floor(17*0.75)=12; act3SceneCount=5.
+      const records = Array.from({ length: 17 }, (_, i) => makeRec1188(i));
+      const baseInput = {
+        fountain: blankFountain1188(17), original: blankFountain1188(17),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'ACT3_SCENE_EXCESS'),
+        `Expected ACT3_SCENE_EXCESS generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const mysteryResult = await structurePass({ ...baseInput, storyContext: { genre: 'mystery' } });
+      assert.ok(
+        !mysteryResult.issues.some(i => i.rule === 'ACT3_SCENE_EXCESS'),
+        "Should NOT fire under mystery's looser 1.3x Act3-vs-Act1 ratio at a 5-vs-4 split",
+      );
+    });
+
+    it('structurePass: ACT3_SCENE_EXCESS genre-absent path is byte-identical to the pre-Wave-1188 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 17 }, (_, i) => makeRec1188(i));
+      const result = await structurePass({
+        fountain: blankFountain1188(17), original: blankFountain1188(17),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const excess = result.issues.filter(i => i.rule === 'ACT3_SCENE_EXCESS');
+      assert.ok(excess.length >= 1, 'Should fire generically at a 5-vs-4 scene split');
+      assert.equal(
+        excess[0].description,
+        "Act 3 has 5 scenes while Act 1 has only 4 — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.",
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+  });
+
   describe('Wave 1184 — structurePass (Program v2, Type 3 — genre-conditioned): DARK_NIGHT_ABSENT genre threshold', async () => {
     const makeRec1184 = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

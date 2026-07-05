@@ -560,8 +560,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   const issues: RevisionIssue[] = [];
   const n = records.length;
 
-  // Wave 1184: resolved once per pass, consumed by DARK_NIGHT_ABSENT below. Undefined
-  // when storyContext/genre is absent or the genre has no live rule modifier — the
+  // Wave 1184: resolved once per pass, consumed by DARK_NIGHT_ABSENT below.
+  // Wave 1188: also consumed by WEAK_MIDPOINT and ACT3_SCENE_EXCESS below. Undefined
+  // when storyContext/genre is absent or the genre has no live rule modifier — every
   // consumer falls through to its own generic constant in that case.
   const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
   const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
@@ -590,11 +591,16 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Midpoint pressure ─────────────────────────────────────────────────────
-  if (n >= 6 && structure.midpointPressure < 1) {
+  // Wave 1188: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS (see the
+  // file-header comment and genre-router.ts for the craft argument). Absent/unknown
+  // genre falls through to the pre-wave 1 constant.
+  const weakMidpointFloor1188 = genreMod1184?.weakMidpointPressureFloor ?? 1;
+  if (n >= 6 && structure.midpointPressure < weakMidpointFloor1188) {
+    const genreNote1188 = genreMod1184?.weakMidpointPressureFloor !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
     issues.push({
       location: `Scene ${Math.floor(n / 2)} (midpoint)`,
       rule: 'WEAK_MIDPOINT',
-      description: 'Midpoint suspense pressure is flat — the story lacks a dramatic pivot',
+      description: `Midpoint suspense pressure is flat — the story lacks a dramatic pivot${genreNote1188}`,
       severity: 'major',
       suggestedFix: 'Insert a surprise revelation or reversal at the midpoint scene',
     });
@@ -992,11 +998,16 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act1SceneCount = Math.floor(n * 0.25);
     const act3SceneStart = Math.floor(n * 0.75);
     const act3SceneCount = n - act3SceneStart;
-    if (act3SceneCount > act1SceneCount) {
+    // Wave 1188: generic ratio 1 (Act 3 merely has to out-count Act 1), genre-shifted
+    // per GENRE_RULE_MODIFIERS (see the file-header comment). Absent/unknown genre
+    // falls through to the pre-wave ratio of 1.
+    const act3ExcessRatio1188 = genreMod1184?.act3ExcessRatio ?? 1;
+    if (act3SceneCount > act1SceneCount * act3ExcessRatio1188) {
+      const genreNote1188b = genreMod1184?.act3ExcessRatio !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
       issues.push({
         location: `Act 1 (${act1SceneCount} scenes) vs Act 3 (${act3SceneCount} scenes)`,
         rule: 'ACT3_SCENE_EXCESS',
-        description: `Act 3 has ${act3SceneCount} scenes while Act 1 has only ${act1SceneCount} — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.`,
+        description: `Act 3 has ${act3SceneCount} scenes while Act 1 has only ${act1SceneCount} — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.${genreNote1188b}`,
         severity: 'minor',
         suggestedFix: 'Trim Act 3 to match or be shorter than Act 1. The denouement should be crisp: show the new equilibrium, land the emotional note, and leave. Resolution scenes that outlast the setup are usually filling silence, not delivering story.',
       });

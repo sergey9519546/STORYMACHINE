@@ -233,6 +233,12 @@ export const GENRE_NAMES: Record<StoryGenre, string> = {
 // — see server/nvm/revision/passes/pacing.ts (ENERGY_MONOTONE,
 // PACING_PLATEAU) and structure.ts (DARK_NIGHT_ABSENT) for the call sites and
 // the one-sentence craft argument behind each threshold.
+//
+// Wave 1188 additions (Program v2, Type 3 — genre-conditioned, second of its
+// kind): three more fields closing genre-coverage gaps (romance, sci_fi,
+// mystery previously had no live modifier — see WEAK_MIDPOINT, ACT3_SCENE_
+// EXCESS in structure.ts and EXPOSITION_DUMP in belief.ts for the call sites).
+// noir remains uncovered pending a future wave's honest craft argument.
 export interface GenreRuleThresholds {
   /** ENERGY_MONOTONE (pacing.ts): the scene-length coefficient-of-variation
    *  cutoff below which the story is flagged as rhythmically monotone.
@@ -247,6 +253,21 @@ export interface GenreRuleThresholds {
    *  story's "all is lost" beat. Generic default 1 (a higher floor makes the
    *  beat harder to satisfy, so absence fires more readily). */
   darkNightSuspenseFloor?: number;
+  /** WEAK_MIDPOINT (structure.ts): the midpointPressure (raw suspenseDelta at
+   *  the structural midpoint scene) floor below which the midpoint is flagged
+   *  as dramatically flat. Generic default 1 (a lower floor makes the beat
+   *  easier to satisfy, so absence fires less readily). */
+  weakMidpointPressureFloor?: number;
+  /** ACT3_SCENE_EXCESS (structure.ts): the multiple of Act 1's scene count
+   *  that Act 3's scene count must exceed to count as a bloated resolution.
+   *  Generic default 1 (Act 3 merely has to out-count Act 1; a higher ratio
+   *  makes the check fire only on a more lopsided imbalance). */
+  act3ExcessRatio?: number;
+  /** EXPOSITION_DUMP (belief.ts): the number of consecutive told-only scenes
+   *  (dialogue assertions with no witnessed revelation) required to flag an
+   *  inert exposition streak. Generic default 3 (a higher streak length makes
+   *  the check tolerate a longer run of told-only scenes before firing). */
+  expositionDumpStreak?: number;
 }
 
 export const GENRE_RULE_MODIFIERS: Partial<Record<StoryGenre, GenreRuleThresholds>> = {
@@ -278,5 +299,29 @@ export const GENRE_RULE_MODIFIERS: Partial<Record<StoryGenre, GenreRuleThreshold
   // beat needs a higher suspense floor to count as earned — the floor tightens.
   horror: {
     darkNightSuspenseFloor: 1.5,
+  },
+  // Romance's central pivot is relationship risk, not thriller-style suspense
+  // (GENRE_MODIFIERS.romance: "tension lives in proximity, restraint... the gap
+  // between what is wanted and what is said"), so a midpoint that reads as
+  // suspense-flat by the generic yardstick can still be a real dramatic pivot —
+  // the pressure floor loosens.
+  romance: {
+    weakMidpointPressureFloor: 0.4,
+  },
+  // Sci-fi legitimately carries heavier early exposition than other genres
+  // (GENRE_MODIFIERS.sci_fi: "one rigorously-applied premise reshapes human
+  // behavior; follow it to its honest consequences" — establishing that premise
+  // costs scenes), so one additional consecutive told-only scene is tolerated
+  // before the streak reads as inert — the streak length loosens.
+  sci_fi: {
+    expositionDumpStreak: 4,
+  },
+  // Mystery's climax is the extended solution reveal — walking the clues back,
+  // gathering and confronting suspects (GENRE_MODIFIERS.mystery: "the solution
+  // must be surprising yet inevitable in hindsight") — which legitimately runs
+  // longer than Act 1's setup, so a bigger Act 3 vs Act 1 imbalance is tolerated
+  // before it reads as a bloated resolution — the excess ratio loosens.
+  mystery: {
+    act3ExcessRatio: 1.3,
   },
 };

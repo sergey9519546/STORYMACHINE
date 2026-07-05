@@ -1950,14 +1950,24 @@ describe('genre-router — genrePromptBlock', () => {
     }
   });
 
-  it('genres absent from GENRE_RULE_MODIFIERS (romance, sci_fi, noir, mystery) have no live rule modifier yet', () => {
+  it('genres absent from GENRE_RULE_MODIFIERS (noir) have no live rule modifier yet', () => {
     // Coverage-honesty pin for future Type 3 waves: this asserts the CURRENT set of
     // genres with no rule-threshold modifier, not a permanent restriction — a future
-    // wave that adds one should update this list, not delete the test.
-    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = ['romance', 'sci_fi', 'noir', 'mystery'];
+    // wave that adds one should update this list, not delete the test. Wave 1188 closed
+    // the romance/sci_fi/mystery gaps (see the GENRE_RULE_MODIFIERS entries and their
+    // WEAK_MIDPOINT/EXPOSITION_DUMP/ACT3_SCENE_EXCESS call sites); noir remains open.
+    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = ['noir'];
     for (const genre of genresWithoutModifier) {
       assert.equal(GENRE_RULE_MODIFIERS[genre], undefined, `${genre} should not yet have a live rule modifier`);
     }
+  });
+
+  // Wave 1188 additions (Program v2, Type 3 — genre-conditioned, second of its kind):
+  // pin the three new genres' modifier shapes now that romance/sci_fi/mystery are live.
+  it('romance, sci_fi, and mystery each have exactly the one field Wave 1188 gave them', () => {
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.romance ?? {}), ['weakMidpointPressureFloor']);
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.sci_fi ?? {}), ['expositionDumpStreak']);
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.mystery ?? {}), ['act3ExcessRatio']);
   });
 });
 
