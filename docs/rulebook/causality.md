@@ -1,6 +1,19 @@
 # Pass: `causality`
 
-Founding wave: 39. Total distinct rules: 231 (178 attributed to a specific wave, 53 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 235 (184 attributed to a specific wave, 51 unattributed — see docs/rulebook/README.md's methodology note).
+
+## Wave 1191
+
+Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list; see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): PLOT_ARMOR (the protagonist repeatedly survives lethal/high-danger scenes with zero recorded cost — no injury, no negative emotional aftermath, no relationship/resource loss — across 3+ danger scenes, a genre-aware threshold for comedy-coded scripts), COINCIDENCE_RESOLUTION (a payoff scene closes the story using lucky-arrival phrasing and a brand-new proper noun/object never mentioned before, tracing to no seeded clue — distinct in scope from DEUS_EX_MACHINA, which is revelation-only, position-gated, and phrasing-agnostic), UNMOTIVATED_BETRAYAL (an established-ally relationship flips to hostile with zero prior strain anywhere in the run-up, zero suspicion/deception vocabulary, and no earlier revelation naming either party — distinct from MOTIVATION_REVERSAL_UNCAUSED, which uses a tight 2-scene window and only three numeric guards), and PROTAGONIST_UNTESTED (the protagonist never suffers ANY setback anywhere in the script — emotional, textual, or relational — while the story demonstrably can render one elsewhere; distinct from character-arc.ts's ARC_PROTAGONIST_UNTESTED_SOCIALLY, which is relationship-shift-only and requires 2+ shifts, not a scene-presence population). All four share a small file-local text/speaker infrastructure block (composite per-scene text, cue-based speaker/protagonist detection) duplicated here rather than added to lib/checks.ts, which is reserved for numeric analytical-mode templates, not lexicon extraction — matches the precedent of theme.ts's buildSceneText (Wave 130) and dialogue.ts's extractDialogue.
+
+Rules named in this wave's header:
+
+- `COINCIDENCE_RESOLUTION`
+- `DEUS_EX_MACHINA`
+- `MOTIVATION_REVERSAL_UNCAUSED`
+- `PLOT_ARMOR`
+- `PROTAGONIST_UNTESTED`
+- `UNMOTIVATED_BETRAYAL`
 
 ## Wave 1175
 
@@ -577,7 +590,6 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `CONSEQUENCE_DELAY_EXCESSIVE` — Wave 166: Chekhov's gun, consequence delay, revelation front-loading
 - `CURIOSITY_OPEN_LOOP` — Wave 240: CURIOSITY_OPEN_LOOP
 - `CURIOSITY_PEAK_NO_FOLLOWTHROUGH` — Wave 447: SUSPENSE_DECLINE_RUN, DRAMATIC_TURN_RELATIONSHIP_VOID, CURIOSITY_PEAK_NO_FOLLOWTHROUGH
-- `DEUS_EX_MACHINA` — Wave 155: Deus ex machina, suspense spike, goal-conflict absence
 - `DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
 - `EMOTION_WITHOUT_DRIVER_RUN` — Wave 310: EMOTION_WITHOUT_DRIVER_RUN
 - `EMOTIONAL_MONOTONY` — Consecutive scenes with identical emotional shift
@@ -585,7 +597,6 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `EMOTIONAL_WHIPLASH` — Wave 240: EMOTIONAL_WHIPLASH
 - `ESCALATION_PLATEAU` — Wave 226: ESCALATION_PLATEAU
 - `GOAL_WITHOUT_OPPOSITION` — Wave 155: Deus ex machina, suspense spike, goal-conflict absence
-- `MOTIVATION_REVERSAL_UNCAUSED` — Wave 197: Causal Act1 void, Act3 discharge absent, motivation reversal
 - `NEGATIVE_EMOTION_UNBROKEN_RUN` — Wave 503 checks
 - `PAYOFF_CLOSING_THIRD_ABSENT` — Wave 531: SUSPENSE_SPIKE_RELATIONSHIP_VOID, CLOCK_TEMPORAL_CLUSTER, SEED_AFTERMATH_SUSPENSE_VOID
 - `PAYOFF_PEAK_INERT` — Wave 433: SUSPENSE_PEAK_UNCAUSED, CURIOSITY_DECLINE_RUN, PAYOFF_PEAK_INERT

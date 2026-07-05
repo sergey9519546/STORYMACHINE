@@ -1,6 +1,15 @@
 # Pass: `structure`
 
-Founding wave: 139. Total distinct rules: 233 (162 attributed to a specific wave, 71 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 139. Total distinct rules: 235 (164 attributed to a specific wave, 71 unattributed — see docs/rulebook/README.md's methodology note).
+
+## Wave 1191
+
+Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list; see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): IDIOT_PLOT (a revelation or resolved question is known by a specific character in an early scene, that character shares 2+ later scenes with another character while the same clue/conflict stays open, and nothing on the page — no secret/deception vocabulary — explains the silence; distinct from every existing revelation check in this file, none of which track co-presence between a specific knowing character and an affected character across multiple later scenes), and UNSEEDED_TWIST (hardens the turn-without-cause coverage already in this file (DRAMATIC_TURN_CAUSELESS) and in payoff.ts's dramatic-turn co-occurrence/aftermath family — read read-only first — with an actual TEXT-CONTENT check those never perform: DRAMATIC_TURN_CAUSELESS asks whether a NUMERIC signal preceded a turn; this asks whether the turn's own key noun phrase was ever mentioned in ANY earlier scene at all, independent of numeric signals. Single-peak isolation x content-overlap mode x final-third position — a genuinely new (channel, mode) cell). Both share the file-local composite-text + cue-based speaker infrastructure duplicated from causality.ts's Wave 1191 block (per the project's per-pass-file duplication convention — see tests/passes/ helpers.ts header and theme.ts's buildSceneText, Wave 130).
+
+Rules named in this wave's header:
+
+- `IDIOT_PLOT`
+- `UNSEEDED_TWIST`
 
 ## Wave 1184
 
