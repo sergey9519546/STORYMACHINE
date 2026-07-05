@@ -331,7 +331,9 @@ inventory, not capability; v1 died of exactly this at scale):
 
 ---
 
-## 9. Run 13 — Keyless deterministic simulation
+## 9. Run 13 — Keyless deterministic simulation — ✅ COMPLETE
+(Identical-shape fallbacks, shared downstream code, real ops keyless —
+live-smoked. Flag not persisted to Action_Log schema: follow-up if wanted.)
 
 **Why**: a scouting pass this session found the keyless simulation is
 hollow — structure advances turn to turn, but beliefs, relationships, and
@@ -353,7 +355,9 @@ simulation layer specifically.
 
 ---
 
-## 10. Run 14 — Producer tier (revenue features)
+## 10. Run 14 — Producer tier — ✅ COMPLETE
+(Slate triage JSON+HTML, breakdown CSV, pitch-kit SVG HTML, SlatePanel +
+doctor-panel buttons. NEXT RUN: Run 15 — trust & publishing.)
 
 - [ ] **(M)** Batch slate triage: upload N scripts, get a ranked comparative
   table — deterministic doctor run per script, percentile-ranked against the
