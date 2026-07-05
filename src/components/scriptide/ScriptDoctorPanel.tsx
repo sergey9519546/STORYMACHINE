@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   Stethoscope,
@@ -22,6 +22,7 @@ import {
   ArrowDown,
   Minus,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import type {
   ScriptDoctorReport,
@@ -30,12 +31,14 @@ import type {
   CoverageVerdict,
   DimensionKey,
   RootCauseFinding,
+  FixVerifyResult,
 } from "../../../server/nvm/analyze/types.ts";
 import type {
   RevisionIssue,
   PassName,
 } from "../../../server/nvm/revision/passes/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
+import { diffLines } from "../../lib/diff.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -635,7 +638,16 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
  *  state (each card opens independently) — mirrors the per-pass collapsible
  *  pattern below (aria-expanded + chevron) rather than introducing a new
  *  interaction idiom. */
-function RootCauseCard({ finding }: { finding: RootCauseFinding }) {
+function RootCauseCard({
+  finding,
+  fixState,
+}: {
+  finding: RootCauseFinding;
+  /** Null when the finding has no line anchor (startLine/endLine both
+   *  undefined) — there's no honest span to send POST /api/scriptide/fix,
+   *  so no fix affordance renders at all for those findings. */
+  fixState: RootCauseFixState | null;
+}) {
   const [open, setOpen] = useState(false);
   const meta = SEVERITY_META[finding.severity];
   const Icon = meta.icon;
@@ -698,6 +710,315 @@ function RootCauseCard({ finding }: { finding: RootCauseFinding }) {
           )}
         </div>
       )}
+      {fixState && (
+        <div className="pt-2 border-t border-black/10 dark:border-white/10 space-y-2">
+          {!fixState.run && (
+            <button
+              onClick={fixState.onRunFix}
+              disabled={
+                fixState.pending ||
+                fixState.blockedByOtherPending ||
+                fixState.llmReady === false ||
+                !fixState.hasSourceText
+              }
+              title={
+                fixState.llmReady === false
+                  ? "Fix & verify needs an AI key configured — set one in Settings."
+                  : fixState.blockedByOtherPending
+                  ? "Another fix is already running — wait for it to finish."
+                  : !fixState.hasSourceText
+                  ? "No analyzable script text is available for this report."
+                  : undefined
+              }
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            >
+              {fixState.pending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
+            </button>
+          )}
+          {fixState.error && (
+            <p role="alert" className="text-[10px] font-mono text-red-600 dark:text-red-400">
+              {fixState.error}
+            </p>
+          )}
+          {fixState.run && (
+            <FixReceiptCard
+              run={fixState.run}
+              isSample={fixState.isSample}
+              applied={fixState.applied}
+              diffOpen={fixState.diffOpen}
+              onToggleDiff={fixState.onToggleDiff}
+              onAccept={fixState.onAccept}
+              onDiscard={fixState.onDiscard}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Fix & verify (Run 11) ───────────────────────────────────────────────────
+// A root-cause finding's fix-and-verify lifecycle, kept alongside its
+// receipt: generation is the LLM's, verification is the deterministic
+// doctor's (see FixVerifyResult's doc comment in server/nvm/analyze/types.ts)
+// — `originalSpanText` is captured client-side at request time (the exact
+// lines of the analyzed text the request's `span` names) purely so the
+// receipt can render a real diffLines(before, after) for the span; it is
+// never sent anywhere and never substitutes for the server's own honesty
+// fields.
+interface FixRunState {
+  result: FixVerifyResult;
+  originalSpanText: string;
+}
+
+/** Everything a RootCauseCard needs to render its "Fix & verify" affordance
+ *  and, once a result lands, its receipt — computed once per finding by the
+ *  panel (which owns all of the underlying state) and handed down as a
+ *  single bundle so RootCauseCard stays a plain presentational component.
+ *  Null when the finding carries no line anchor at all (no honest span to
+ *  send the server), in which case RootCauseCard renders no fix affordance. */
+interface RootCauseFixState {
+  pending: boolean;
+  blockedByOtherPending: boolean;
+  llmReady: boolean | null;
+  hasSourceText: boolean;
+  isSample: boolean;
+  error?: string;
+  run?: FixRunState;
+  applied: boolean;
+  diffOpen: boolean;
+  onRunFix: () => void;
+  onToggleDiff: () => void;
+  onAccept: () => void;
+  onDiscard: () => void;
+}
+
+/** One side (cleared or introduced) of the receipt's issue-delta lists.
+ *  Deliberately dumb and symmetric: introduced renders with the exact same
+ *  structure and prominence as cleared (same heading weight, same list
+ *  styling, both always mounted) so a regression can never end up visually
+ *  buried relative to a win — the one honesty rule about this list that the
+ *  task is explicit about. */
+function FixDeltaList({
+  items,
+  tone,
+  emptyLabel,
+}: {
+  items: Array<RevisionIssue & { pass: PassName }>;
+  tone: "cleared" | "introduced";
+  emptyLabel: string;
+}) {
+  const isCleared = tone === "cleared";
+  return (
+    <div>
+      <p
+        className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
+          isCleared ? "text-green-600" : "text-red-600"
+        }`}
+      >
+        {isCleared ? "Cleared" : "Introduced"} ({items.length})
+      </p>
+      {items.length === 0 ? (
+        <p className="text-[10px] font-mono text-gray-400">{emptyLabel}</p>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((issue, i) => (
+            <li
+              key={i}
+              className={`text-[10px] font-mono leading-snug ${
+                isCleared
+                  ? "text-green-700 dark:text-green-400"
+                  : "text-red-700 dark:text-red-400"
+              }`}
+            >
+              <span className="font-bold uppercase">{humanizeRule(issue.rule)}</span>
+              {" — "}
+              {issue.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** The fix-and-verify receipt card, rendered inline under a root-cause card
+ *  once POST /api/scriptide/fix returns. Two shapes, matching
+ *  FixVerifyResult's honesty contract exactly: a keyless/failed run
+ *  (usedLLM false, or a candidate that didn't survive validation) renders
+ *  `note` verbatim with no fabricated health/verdict numbers; a real
+ *  candidate renders the full receipt — health X → Y with a colored arrow,
+ *  a verdict change if any, the cleared/introduced lists at equal
+ *  prominence, the span diff collapsed behind "View change", and Accept/
+ *  Discard actions. */
+function FixReceiptCard({
+  run,
+  isSample,
+  applied,
+  diffOpen,
+  onToggleDiff,
+  onAccept,
+  onDiscard,
+}: {
+  run: FixRunState;
+  isSample: boolean;
+  applied: boolean;
+  diffOpen: boolean;
+  onToggleDiff: () => void;
+  onAccept: () => void;
+  onDiscard: () => void;
+}) {
+  const { result, originalSpanText } = run;
+  const hasCandidate =
+    result.usedLLM &&
+    !!result.candidateFountain &&
+    typeof result.spanReplacement === "string" &&
+    !!result.span &&
+    !!result.before &&
+    !!result.after;
+
+  // Memoized purely so re-renders triggered by sibling state (e.g. another
+  // card's fix running) don't re-run the LCS diff on an unchanged span —
+  // same idiom as RevisionPanel's PassDiffView.
+  const diff = useMemo(
+    () =>
+      hasCandidate ? diffLines(originalSpanText, result.spanReplacement as string) : [],
+    [hasCandidate, originalSpanText, result.spanReplacement]
+  );
+
+  if (!hasCandidate) {
+    return (
+      <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+            Fix &amp; verify — no candidate
+          </p>
+          <button
+            onClick={onDiscard}
+            aria-label="Dismiss"
+            className="p-1 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+        <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
+          {result.note ?? "No fix could be generated for this finding."}
+        </p>
+      </div>
+    );
+  }
+
+  // Narrowed by hasCandidate above — non-null assertions below are safe.
+  const before = result.before!;
+  const after = result.after!;
+  const span = result.span!;
+  const healthDelta = Math.round((after.health - before.health) * 10) / 10;
+  const verdictChanged = !!before.verdict && !!after.verdict && before.verdict !== after.verdict;
+  const cleared = result.cleared ?? [];
+  const introduced = result.introduced ?? [];
+
+  return (
+    <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+          Fix &amp; verify receipt
+        </p>
+        {applied && (
+          <span className="text-[9px] font-bold uppercase tracking-widest text-green-600 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Applied to editor
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap text-xs font-mono text-black dark:text-gray-100">
+        <span className="flex items-center gap-1.5">
+          Health {Math.round(before.health)} &rarr; {Math.round(after.health)}{" "}
+          <DeltaGlyph delta={healthDelta} />
+        </span>
+        {verdictChanged && (
+          <span className="uppercase font-bold flex items-center gap-1">
+            {before.verdict} &rarr; {after.verdict}
+          </span>
+        )}
+      </div>
+
+      {/* Cleared / introduced — same prominence, always both mounted (never
+          one collapsed while the other is open); only the span diff below
+          hides behind its own toggle. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FixDeltaList items={cleared} tone="cleared" emptyLabel="No issues cleared." />
+        <FixDeltaList items={introduced} tone="introduced" emptyLabel="No issues introduced." />
+      </div>
+
+      <div>
+        <button
+          onClick={onToggleDiff}
+          aria-expanded={diffOpen}
+          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-white hover:underline"
+        >
+          {diffOpen ? (
+            <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+          )}
+          View change (lines {span.startLine}&ndash;{span.endLine})
+        </button>
+        {diffOpen && (
+          <div className="mt-1.5 border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 font-mono text-[10px] overflow-x-auto">
+            {diff.map((d, i) => (
+              <div
+                key={i}
+                className={`flex px-2 ${
+                  d.type === "added"
+                    ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                    : d.type === "removed"
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                <span className="w-3 shrink-0 select-none">
+                  {d.type === "added" ? "+" : d.type === "removed" ? "-" : " "}
+                </span>
+                <span className="whitespace-pre-wrap break-all flex-1">
+                  {d.line.length > 0 ? d.line : " "}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {applied ? (
+        <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          Re-run diagnosis to see the new report.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onAccept}
+            disabled={isSample}
+            title={
+              isSample
+                ? "This is the read-only sample script — try Fix & verify on your own script to accept a change."
+                : undefined
+            }
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-black text-white hover:bg-green-600 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Accept
+          </button>
+          <button
+            onClick={onDiscard}
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Discard
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -743,6 +1064,13 @@ export default function ScriptDoctorPanel({
   // report must never get relabeled under whatever project title happens to
   // be open, since the two have nothing to do with each other.
   const [activeReportTitle, setActiveReportTitle] = useState<string | undefined>(undefined);
+  // Whether the currently-displayed report was generated from the built-in
+  // sample script — snapshotted alongside analyzedSnapshot/activeReportTitle
+  // for the same reason: `uploadedFile` is live state that can move on (e.g.
+  // cleared) after diagnosis succeeds, so the fix-and-verify flow's "is this
+  // report a read-only demo" gate must reuse what THIS report actually was,
+  // not whatever source happens to be active right now.
+  const [analyzedIsSample, setAnalyzedIsSample] = useState(false);
 
   // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
   const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
@@ -804,6 +1132,31 @@ export default function ScriptDoctorPanel({
   // clobber the state of a newer run — same guard pattern as
   // ScriptIDE.triggerAnalysis's analysisGenerationRef.
   const generationRef = useRef(0);
+
+  // ── Fix & verify (Run 11) ──────────────────────────────────────────────
+  // Keyed by RootCauseFinding.id. Only root-cause findings carry a genuine
+  // line anchor on this report shape (RootCauseFinding.startLine/endLine);
+  // topPriorities issues carry only a prose `location` string with no line
+  // numbers anywhere on ScriptDoctorReport, so there is no honest span to
+  // hang a fix button on them here — see the fix affordance's render guard
+  // in the root-causes section below.
+  const [fixPendingId, setFixPendingId] = useState<string | null>(null);
+  const [fixResults, setFixResults] = useState<Record<string, FixRunState>>({});
+  const [fixErrors, setFixErrors] = useState<Record<string, string>>({});
+  const [appliedFixIds, setAppliedFixIds] = useState<Set<string>>(new Set());
+  const [fixDiffOpenIds, setFixDiffOpenIds] = useState<Set<string>>(new Set());
+  // Transient success confirmation after Accept — same "banner + auto-clear
+  // timer" idiom as `loadedNotice` above, just its own state since it can
+  // fire independently of the .fdx/.pdf "load converted Fountain" path.
+  const [fixToast, setFixToast] = useState<string | null>(null);
+  const fixToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One in-flight fix at a time: the UI disables every OTHER finding's fix
+  // button while fixPendingId is set (see the root-causes section below),
+  // and this abort/generation pair is the backstop against a stale response
+  // landing after a newer request superseded it — same pattern as
+  // abortRef/generationRef above.
+  const fixAbortRef = useRef<AbortController | null>(null);
+  const fixGenerationRef = useRef(0);
 
   const isPdfUpload = uploadedFile?.format === "pdf";
   // The uploaded file's content, once present, IS the thing being diagnosed —
@@ -998,6 +1351,17 @@ export default function ScriptDoctorPanel({
         setReport(data);
         setAnalyzedSnapshot(snapshotForThisRun);
         setActiveReportTitle(effectiveTitle);
+        setAnalyzedIsSample(isSampleRun);
+        // A fresh diagnosis starts a new fix-and-verify lifecycle: any prior
+        // report's receipts are keyed by root-cause finding ids that likely
+        // no longer exist (or mean something different) against the new
+        // report, so carrying them forward would risk mismatched or stale
+        // receipts under new cards.
+        setFixResults({});
+        setFixErrors({});
+        setAppliedFixIds(new Set());
+        setFixDiffOpenIds(new Set());
+        setFixPendingId(null);
         setOpenPasses({});
         setStatus("success");
         // Draft-over-draft history: a sample run is a one-click demo, not the
@@ -1121,13 +1485,190 @@ export default function ScriptDoctorPanel({
       });
   };
 
+  /** The exact Fountain text the DISPLAYED report analyzed — same snapshot
+   *  rationale as handleExportReport's payload above (never live editor/
+   *  upload state, which may have moved on since diagnosis succeeded).
+   *  fdx/pdf-sourced reports have no plain-fountain analyzedSnapshot (their
+   *  snapshot, if any, holds the raw upload bytes/XML instead); the server
+   *  always returns the actual Fountain text it analyzed as
+   *  report.source.convertedFountain for both of those formats, so that's
+   *  what a fix request targets instead — the fix must work on the
+   *  convertedFountain text, exactly like the existing "Load converted
+   *  Fountain into editor" path already does. Null only in the defensive
+   *  edge case where neither is available (an older report shape). */
+  const fixSourceText: string | null =
+    report && (report.source?.format === "fdx" || report.source?.format === "pdf")
+      ? report.source.convertedFountain ?? null
+      : (analyzedSnapshot?.fountain ?? null);
+
+  /** Sends a root-cause finding's span + member rules to POST
+   *  /api/scriptide/fix and stores the resulting FixVerifyResult (or a
+   *  human-readable failure) keyed by the finding's id. Targets
+   *  `fixSourceText` — whatever the currently displayed report actually
+   *  analyzed — never live editor state. Only one fix runs at a time: the
+   *  root-causes section below disables every other finding's button while
+   *  `fixPendingId` is set, and the abort/generation pair here is the real
+   *  backstop against a stale response landing after a newer request
+   *  superseded it (same idiom as runDiagnosis's generationRef). */
+  const runFix = (finding: RootCauseFinding) => {
+    const startLine = finding.startLine;
+    const endLine = finding.endLine;
+    if (startLine === undefined || endLine === undefined) return;
+    if (fixPendingId) return;
+    if (!fixSourceText) return;
+
+    const lines = fixSourceText.split("\n");
+    const originalSpanText = lines.slice(startLine - 1, endLine).join("\n");
+
+    fixAbortRef.current?.abort();
+    const controller = new AbortController();
+    fixAbortRef.current = controller;
+    const myGeneration = ++fixGenerationRef.current;
+
+    // Same generous timeout as runDiagnosis's — a fix is generation (LLM)
+    // plus a full re-run of the deterministic doctor for verification.
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+    setFixPendingId(finding.id);
+    setFixErrors((prev) => {
+      if (!(finding.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[finding.id];
+      return next;
+    });
+
+    // Request contract: issues is 1-10 items of { rule, description,
+    // suggestedFix? }. A RootCauseFinding only carries the bare rule
+    // identifiers that fired together (memberRules) plus one shared
+    // explanation sentence — not the original per-issue RevisionIssue
+    // objects — so each member rule becomes its own issue entry (capped at
+    // 10 per the contract), sharing the finding's explanation as the
+    // description. Falls back to the finding's own title/explanation on the
+    // (currently impossible, but defensive) chance memberRules is empty.
+    const issues =
+      finding.memberRules.length > 0
+        ? finding.memberRules.slice(0, 10).map((rule) => ({ rule, description: finding.explanation }))
+        : [{ rule: finding.title, description: finding.explanation }];
+
+    fetch("/api/scriptide/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fountain: fixSourceText,
+        span: { startLine, endLine },
+        issues,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback =
+            res.status === 404
+              ? "Fix & verify isn't live yet — the /api/scriptide/fix route hasn't been deployed."
+              : `Fix failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        return (await res.json()) as FixVerifyResult;
+      })
+      .then((data) => {
+        if (myGeneration !== fixGenerationRef.current) return; // superseded — ignore
+        setFixResults((prev) => ({ ...prev, [finding.id]: { result: data, originalSpanText } }));
+        setFixPendingId(null);
+      })
+      .catch((err: unknown) => {
+        if (myGeneration !== fixGenerationRef.current) return; // superseded — ignore
+        const message =
+          err instanceof DOMException && err.name === "AbortError"
+            ? "Fix timed out (120s) or was cancelled — try again."
+            : err instanceof Error
+            ? err.message
+            : "Fix failed";
+        setFixErrors((prev) => ({ ...prev, [finding.id]: message }));
+        setFixPendingId(null);
+      })
+      .finally(() => clearTimeout(timeoutId));
+  };
+
+  const toggleFixDiff = (findingId: string) => {
+    setFixDiffOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(findingId)) next.delete(findingId);
+      else next.add(findingId);
+      return next;
+    });
+  };
+
+  /** Accept applies the receipt's candidateFountain into the editor via
+   *  onLoadFountain — the exact same "load into editor" mechanism the
+   *  .fdx/.pdf conversion path already uses — then marks the card applied
+   *  and shows a transient success confirmation. Disabled outright (via the
+   *  receipt card's `isSample` prop) for a sample-sourced report; this
+   *  early-return is the defensive backstop for the same rule. Deliberately
+   *  does NOT touch draft history or trigger a re-diagnosis: the receipt is
+   *  transient proof-of-work UI, not the durable record — that's whatever
+   *  report the writer's NEXT diagnosis produces once they choose to re-run
+   *  it against the now-changed editor text, via the ordinary
+   *  recordDoctorHistory path every ordinary diagnosis already goes through.
+   *  Writing a history entry here too would double-count one edit as two
+   *  drafts: one fabricated from a receipt that was never itself measured
+   *  against the full 14-pass pipeline's OWN read of the resulting script,
+   *  one from the actual next report. */
+  const acceptFix = (findingId: string) => {
+    const entry = fixResults[findingId];
+    if (!entry?.result.candidateFountain) return;
+    if (analyzedIsSample) return; // read-only demo source — button is disabled too
+    onLoadFountain?.(entry.result.candidateFountain);
+    setAppliedFixIds((prev) => {
+      if (prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.add(findingId);
+      return next;
+    });
+    if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
+    setFixToast("Fix applied to the editor. Re-run diagnosis to see the new report.");
+    fixToastTimerRef.current = setTimeout(() => setFixToast(null), 5000);
+  };
+
+  /** Discard just removes the receipt card (and any error/applied/diff-open
+   *  state for it) — nothing was ever written anywhere else (Accept is the
+   *  only action with a side effect), so there's nothing else to undo. */
+  const discardFix = (findingId: string) => {
+    setFixResults((prev) => {
+      if (!(findingId in prev)) return prev;
+      const next = { ...prev };
+      delete next[findingId];
+      return next;
+    });
+    setFixErrors((prev) => {
+      if (!(findingId in prev)) return prev;
+      const next = { ...prev };
+      delete next[findingId];
+      return next;
+    });
+    setAppliedFixIds((prev) => {
+      if (!prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.delete(findingId);
+      return next;
+    });
+    setFixDiffOpenIds((prev) => {
+      if (!prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.delete(findingId);
+      return next;
+    });
+  };
+
   // Abort any in-flight request when the panel unmounts (e.g. user closes it),
   // and clear the "loaded into editor" confirmation timer alongside it.
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
       exportAbortRef.current?.abort();
+      fixAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
+      if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
     };
   }, []);
 
@@ -1302,6 +1843,19 @@ export default function ScriptDoctorPanel({
           >
             <X className="w-3 h-3" aria-hidden="true" />
           </button>
+        </div>
+      )}
+
+      {/* Transient success confirmation after a fix's Accept — same
+          "banner + auto-clear timer" idiom as loadedNotice, its own state
+          since it can fire independently of the .fdx/.pdf load-into-editor
+          path. */}
+      {fixToast && (
+        <div
+          role="status"
+          className="px-6 py-2 bg-green-50 dark:bg-green-950/40 border-b-2 border-green-300 dark:border-green-800 text-[10px] font-mono text-green-700 dark:text-green-300 shrink-0 flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {fixToast}
         </div>
       )}
 
@@ -1568,9 +2122,31 @@ export default function ScriptDoctorPanel({
                   clears the most issues at once.
                 </p>
                 <div className="space-y-2">
-                  {report.rootCauses.map((finding) => (
-                    <RootCauseCard key={finding.id} finding={finding} />
-                  ))}
+                  {report.rootCauses.map((finding) => {
+                    // Only findings with a genuine line anchor get a fix
+                    // affordance at all — there's no honest span to send
+                    // POST /api/scriptide/fix otherwise (see FixRunState's
+                    // doc comment).
+                    const hasAnchor = finding.startLine !== undefined && finding.endLine !== undefined;
+                    const fixState: RootCauseFixState | null = hasAnchor
+                      ? {
+                          pending: fixPendingId === finding.id,
+                          blockedByOtherPending: fixPendingId !== null && fixPendingId !== finding.id,
+                          llmReady,
+                          hasSourceText: !!fixSourceText,
+                          isSample: analyzedIsSample,
+                          error: fixErrors[finding.id],
+                          run: fixResults[finding.id],
+                          applied: appliedFixIds.has(finding.id),
+                          diffOpen: fixDiffOpenIds.has(finding.id),
+                          onRunFix: () => runFix(finding),
+                          onToggleDiff: () => toggleFixDiff(finding.id),
+                          onAccept: () => acceptFix(finding.id),
+                          onDiscard: () => discardFix(finding.id),
+                        }
+                      : null;
+                    return <RootCauseCard key={finding.id} finding={finding} fixState={fixState} />;
+                  })}
                 </div>
               </div>
             )}
