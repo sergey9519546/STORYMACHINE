@@ -15,13 +15,19 @@ import {
   FileText,
   CheckCircle2,
   ArrowRightLeft,
+  Download,
+  History as HistoryIcon,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  Minus,
 } from "lucide-react";
 import type {
   ScriptDoctorReport,
   DoctorGrade,
   SceneDiagnostics,
   CoverageVerdict,
-  DoctorSource,
+  DimensionKey,
 } from "../../../server/nvm/analyze/types.ts";
 import type {
   RevisionIssue,
@@ -45,11 +51,16 @@ interface ScriptDoctorPanelProps {
 }
 
 /** A file read client-side to diagnose instead of the editor's `fountain` prop.
- *  `format` decides which request field (fountain vs fdx) the POST body uses. */
+ *  `format` decides how the request is built: `fountain`/`fdx` send the read
+ *  text as JSON (same as before); `pdf` sends the raw bytes with no JSON
+ *  wrapper, so `content` stays empty and the bytes live in `pdfBytes` instead
+ *  — the server converts PDF→Fountain itself, there's nothing to read as text
+ *  client-side. */
 interface UploadedScript {
   name: string;
   content: string;
-  format: "fountain" | "fdx";
+  format: "fountain" | "fdx" | "pdf";
+  pdfBytes?: ArrayBuffer;
 }
 
 // Matches the request-contract guard on the doctor route: reject oversized
@@ -57,16 +68,16 @@ interface UploadedScript {
 // know locally.
 const MAX_UPLOAD_CHARS = 900_000;
 
-// DoctorSource per server/nvm/analyze/types.ts doesn't (yet) declare
-// `warnings` — the task's request contract mentions fdx-conversion warnings,
-// but that field isn't part of the shared contract this wave. Rather than
-// edit the shared types.ts (owned by parallel server-agent work), augment
-// the shape locally; DoctorSource's fields stay untouched so this is a safe
-// narrowing cast, and every access below is optional-chained so it degrades
-// to "no warnings" until/unless the field actually ships.
-type DoctorSourceWithWarnings = DoctorSource & { warnings?: string[] };
+// Matches POST /api/scriptide/doctor/pdf's 15MB request-body cap — same
+// "fail fast client-side" rationale as MAX_UPLOAD_CHARS above.
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
 type Status = "idle" | "loading" | "success" | "error";
+// Export is a fully independent, secondary in-flight action (a report is
+// already on screen when it runs) — kept as its own status rather than
+// folded into the main `Status` so an export failure/retry never disturbs
+// the displayed diagnosis.
+type ExportStatus = "idle" | "loading" | "error";
 
 // ─── Presentation tables ─────────────────────────────────────────────────────
 // health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled
@@ -143,6 +154,244 @@ function heatmapClass(scene: SceneDiagnostics): string {
   if (scene.issueCount <= 2) return "bg-yellow-300";
   if (scene.issueCount <= 4) return "bg-orange-400";
   return "bg-red-500";
+}
+
+// ─── Draft history (client-side, localStorage) ──────────────────────────────
+// Draft-over-draft tracking lives entirely in the browser: one compact entry
+// per genuinely-changed diagnosis, keyed by the report's contentHash (the
+// determinism receipt from server/nvm/analyze/types.ts). Every access is
+// wrapped in try/catch — private-mode browsers throw on localStorage access
+// entirely, and quota can be exceeded — so the feature always degrades to
+// "no history" rather than ever breaking a diagnosis run.
+
+const DOCTOR_HISTORY_KEY = "sm_doctor_history_v1";
+// Stored oldest-first (append at the end); capped by dropping the oldest
+// entries first so the list always keeps the most recent drafts.
+const DOCTOR_HISTORY_MAX_ENTRIES = 50;
+const DOCTOR_HISTORY_DISPLAY_MAX = 10;
+
+interface DoctorHistoryEntry {
+  at: number;
+  title: string;
+  contentHash: string;
+  health: number;
+  verdict?: CoverageVerdict;
+  totalIssues: number;
+  bySeverity: { critical: number; major: number; minor: number };
+  dimensions: Array<{ key: DimensionKey; score: number }>;
+}
+
+function loadDoctorHistory(): DoctorHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(DOCTOR_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as DoctorHistoryEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDoctorHistory(entries: DoctorHistoryEntry[]): void {
+  try {
+    localStorage.setItem(DOCTOR_HISTORY_KEY, JSON.stringify(entries));
+  } catch {
+    // Private-mode localStorage access, or quota exceeded — this run's
+    // history entry just doesn't persist; nothing else depends on it.
+  }
+}
+
+function clearDoctorHistory(): void {
+  try {
+    localStorage.removeItem(DOCTOR_HISTORY_KEY);
+  } catch {
+    // Nothing to clean up if localStorage was never reachable.
+  }
+}
+
+/** Append a new history entry for `report` (unless it's an exact repeat of
+ *  the most recently recorded draft, i.e. same contentHash — an unchanged
+ *  script has nothing new to record), capped at 50 entries with the oldest
+ *  dropped first. Returns the resulting history (for the list UI) alongside
+ *  whichever entry was newest *before* this call — the caller uses that as
+ *  the delta baseline, or to detect the "identical script" case when its
+ *  contentHash matches the new report's. A missing contentHash (a report
+ *  shape older than this feature) skips recording entirely rather than
+ *  storing an entry that could never be matched against later. */
+function recordDoctorHistory(
+  report: ScriptDoctorReport,
+  title: string,
+): { history: DoctorHistoryEntry[]; previous: DoctorHistoryEntry | null } {
+  const existing = loadDoctorHistory();
+  const previous = existing.length > 0 ? existing[existing.length - 1] : null;
+
+  if (!report.contentHash) return { history: existing, previous };
+  if (previous && previous.contentHash === report.contentHash) {
+    return { history: existing, previous };
+  }
+
+  const entry: DoctorHistoryEntry = {
+    at: Date.now(),
+    title: title.trim() || "Untitled",
+    contentHash: report.contentHash,
+    health: report.health,
+    verdict: report.verdict,
+    totalIssues: report.totalIssues,
+    bySeverity: report.bySeverity,
+    dimensions: (report.dimensions ?? []).map((d) => ({ key: d.key, score: d.score })),
+  };
+  const next = [...existing, entry].slice(-DOCTOR_HISTORY_MAX_ENTRIES);
+  saveDoctorHistory(next);
+  return { history: next, previous };
+}
+
+/** Coarse, human relative-time phrase ("3 hours ago") for the delta strip's
+ *  "vs. previous draft (…)" label — deliberately coarse-grained (no seconds
+ *  beyond "just now") since draft comparisons are meaningful at the
+ *  minute-to-month scale, not the second scale. */
+function relativeTimeFrom(at: number): string {
+  const diffSec = Math.round((Date.now() - at) / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+  const diffMonth = Math.round(diffDay / 30);
+  if (diffMonth < 12) return `${diffMonth} month${diffMonth === 1 ? "" : "s"} ago`;
+  const diffYear = Math.round(diffMonth / 12);
+  return `${diffYear} year${diffYear === 1 ? "" : "s"} ago`;
+}
+
+/** Up (green) / down (red) / flat (neutral) arrow for a numeric delta.
+ *  `invert` flips which sign counts as "improved" — a rising health/dimension
+ *  score is good, but a rising issue count is bad, so the two deltas can't
+ *  share one polarity rule. */
+function DeltaGlyph({ delta, invert = false }: { delta: number; invert?: boolean }) {
+  const improved = invert ? delta < 0 : delta > 0;
+  const flat = delta === 0;
+  const color = flat ? "text-gray-400" : improved ? "text-green-600" : "text-red-500";
+  const Icon = flat ? Minus : delta > 0 ? ArrowUp : ArrowDown;
+  return (
+    <span className={`inline-flex items-center gap-0.5 font-bold ${color}`}>
+      <Icon className="w-3 h-3" aria-hidden="true" />
+      {flat ? "0" : `${delta > 0 ? "+" : ""}${delta}`}
+    </span>
+  );
+}
+
+/** Draft-over-draft delta strip: shown above the dimension bars whenever a
+ *  previous, DIFFERENT-hash history entry exists. Every number here is a
+ *  plain subtraction over already-computed report/entry fields — no new
+ *  heuristics, so it can never disagree with what the two reports actually
+ *  say. Dimensions that didn't move are omitted per the task's "only
+ *  dimensions that moved" rule, so a script with no dimension movement still
+ *  shows the health/verdict/issue lines without a misleading empty row. */
+function DraftDeltaStrip({
+  previous,
+  current,
+}: {
+  previous: DoctorHistoryEntry;
+  current: ScriptDoctorReport;
+}) {
+  const healthDelta = Math.round((current.health - previous.health) * 10) / 10;
+  const verdictChanged =
+    !!previous.verdict && !!current.verdict && previous.verdict !== current.verdict;
+  // Positive issuesDelta = more issues than before (regression); negative =
+  // fewer (net cleared) — invert=true on its DeltaGlyph below since fewer is
+  // the improvement here, the opposite polarity from health/dimension scores.
+  const issuesDelta = current.totalIssues - previous.totalIssues;
+
+  const dimensionDeltas = (current.dimensions ?? [])
+    .map((dim) => {
+      const prior = previous.dimensions.find((d) => d.key === dim.key);
+      if (!prior) return null;
+      const delta = Math.round((dim.score - prior.score) * 10) / 10;
+      return delta !== 0 ? { key: dim.key, label: dim.label, delta } : null;
+    })
+    .filter((d): d is { key: DimensionKey; label: string; delta: number } => d !== null);
+
+  return (
+    <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+        vs. previous draft ({relativeTimeFrom(previous.at)})
+      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-mono text-black dark:text-gray-100">
+        <span className="flex items-center gap-1.5">
+          Health <DeltaGlyph delta={healthDelta} />
+        </span>
+        {verdictChanged && (
+          <span className="flex items-center gap-1.5 uppercase font-bold">
+            {previous.verdict} &rarr; {current.verdict}
+          </span>
+        )}
+        {issuesDelta !== 0 && (
+          <span className="flex items-center gap-1.5">
+            Issues <DeltaGlyph delta={issuesDelta} invert />{" "}
+            {issuesDelta < 0 ? "cleared" : "added"}
+          </span>
+        )}
+        {issuesDelta === 0 && (
+          <span className="text-gray-400">Issue count unchanged</span>
+        )}
+      </div>
+      {dimensionDeltas.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 border-t border-black/10 dark:border-white/10 text-[10px] font-mono text-gray-600 dark:text-gray-300">
+          {dimensionDeltas.map((d) => (
+            <span key={d.key} className="flex items-center gap-1">
+              {d.label} <DeltaGlyph delta={d.delta} />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Export helpers ──────────────────────────────────────────────────────────
+
+/** Pull a filename out of a Content-Disposition header, preferring the
+ *  RFC 5987 `filename*=UTF-8''…` form (percent-encoded, handles non-ASCII
+ *  titles) and falling back to the plain `filename="…"` form. Returns null
+ *  for a missing/unparsable header so the caller can fall back to its own
+ *  sensible default rather than downloading a file named "null". */
+function parseFilenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const extended = /filename\*=(?:UTF-8''|utf-8'')?([^;]+)/i.exec(header);
+  if (extended?.[1]) {
+    try {
+      return decodeURIComponent(extended[1].trim().replace(/^"|"$/g, ""));
+    } catch {
+      // Malformed percent-encoding — fall through to the plain form below.
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
+/** Trigger a browser download of `blob` named `filename` via a throwaway
+ *  anchor element — the standard blob-URL download pattern, since the
+ *  response body is opaque bytes (an HTML attachment) rather than something
+ *  the app can navigate to directly. */
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Sanitize a report title into a safe filename stem: strip characters that
+ *  are invalid (or awkward) across Windows/macOS/Linux filesystems, collapse
+ *  whitespace, and fall back to a generic name so an empty/symbol-only title
+ *  never produces an empty or all-underscore filename. */
+function safeFilenameStem(title: string | undefined): string {
+  const cleaned = (title ?? "").trim().replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, "-");
+  return cleaned || "coverage-report";
 }
 
 // ─── Small presentational pieces ─────────────────────────────────────────────
@@ -225,6 +474,29 @@ export default function ScriptDoctorPanel({
   // Transient confirmation after "Load converted Fountain into editor".
   const [loadedNotice, setLoadedNotice] = useState(false);
 
+  // Exact payload the currently-displayed report was generated from, snapshot
+  // at the moment diagnosis succeeds. Export must reuse this rather than
+  // recomputing from `uploadedFile`/`fountain` live, since either can change
+  // (further edits, a cleared upload) while the report from an earlier run is
+  // still on screen. Null for pdf-sourced reports — those export from
+  // report.source.convertedFountain instead, which the server already returns.
+  const [analyzedSnapshot, setAnalyzedSnapshot] = useState<{ fountain?: string; fdx?: string } | null>(null);
+
+  // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
+  const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
+  // The entry to compare the current report against: null on the very first
+  // diagnosis ever recorded (nothing to compare to), or an entry whose
+  // contentHash may equal the current report's (render the "identical
+  // script" notice) or differ (render the full delta strip).
+  const [previousEntry, setPreviousEntry] = useState<DoctorHistoryEntry | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [confirmingClearHistory, setConfirmingClearHistory] = useState(false);
+
+  // "Export report" is independent of the main diagnosis lifecycle.
+  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -233,14 +505,54 @@ export default function ScriptDoctorPanel({
   // ScriptIDE.triggerAnalysis's analysisGenerationRef.
   const generationRef = useRef(0);
 
+  const isPdfUpload = uploadedFile?.format === "pdf";
   // The uploaded file's content, once present, IS the thing being diagnosed —
   // upload guards already reject empty files, so `fountain` only matters here
-  // when there is no upload.
-  const activeText = uploadedFile ? uploadedFile.content : fountain;
-  const isEmpty = !activeText || activeText.trim().length === 0;
+  // when there is no upload. A pdf upload has no client-readable text at all
+  // (the server converts it), so it never contributes to `activeText`.
+  const activeText = uploadedFile && !isPdfUpload ? uploadedFile.content : fountain;
+  const isEmpty = isPdfUpload
+    ? !uploadedFile?.pdfBytes || uploadedFile.pdfBytes.byteLength === 0
+    : !activeText || activeText.trim().length === 0;
 
   const handleFileSelected = async (file: File) => {
     setUploadError(null);
+
+    const lowerName = file.name.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
+
+    if (isPdf) {
+      // PDF path: read as raw bytes, not text — conversion happens server-side
+      // (POST /api/scriptide/doctor/pdf), so there's nothing to sniff or parse
+      // client-side beyond the size guard.
+      let buffer: ArrayBuffer;
+      try {
+        buffer = await file.arrayBuffer();
+      } catch {
+        setUploadError(
+          `Couldn't read "${file.name}" — try re-exporting the PDF and uploading again.`
+        );
+        return;
+      }
+      if (buffer.byteLength === 0) {
+        setUploadError(`"${file.name}" is empty — there's nothing to diagnose.`);
+        return;
+      }
+      if (buffer.byteLength > MAX_PDF_BYTES) {
+        setUploadError(
+          `"${file.name}" is ${(buffer.byteLength / (1024 * 1024)).toFixed(1)}MB, over the ` +
+            `${(MAX_PDF_BYTES / (1024 * 1024)).toFixed(0)}MB limit for a single diagnosis. Trim it and try again.`
+        );
+        return;
+      }
+      setUploadedFile({ name: file.name, content: "", format: "pdf", pdfBytes: buffer });
+      abortRef.current?.abort();
+      setStatus("idle");
+      setReport(null);
+      setErrorMessage(null);
+      return;
+    }
+
     let text: string;
     try {
       text = await file.text();
@@ -265,7 +577,6 @@ export default function ScriptDoctorPanel({
     // Format detection: trust the extension first; fall back to sniffing the
     // content (XML prolog or a literal FinalDraft tag) for files renamed or
     // exported without a reliable extension.
-    const lowerName = file.name.toLowerCase();
     const sniffedFdx = /^\s*<\?xml/.test(text) || text.includes("<FinalDraft");
     const format: "fountain" | "fdx" = lowerName.endsWith(".fdx") || sniffedFdx ? "fdx" : "fountain";
 
@@ -304,26 +615,45 @@ export default function ScriptDoctorPanel({
     setStatus("loading");
     setErrorMessage(null);
 
-    // Request contract: exactly one of fountain|fdx. An .fdx upload sends its
-    // raw text as `fdx`; everything else (editor text, or an uploaded
-    // .fountain/.txt file) sends `fountain` as before.
-    const requestBody =
-      uploadedFile?.format === "fdx"
-        ? { fdx: uploadedFile.content, title }
-        : { fountain: activeText, title };
+    // Request contract: exactly one of fountain|fdx as JSON, OR raw PDF bytes
+    // with no JSON wrapper. A .fdx upload sends its raw text as `fdx`; a .pdf
+    // upload POSTs the bytes directly to the dedicated pdf route; everything
+    // else (editor text, or an uploaded .fountain/.txt file) sends `fountain`.
+    // `snapshotForThisRun` mirrors whichever branch fires — it's what "Export
+    // report" reuses later, since by then `uploadedFile`/`fountain` may have
+    // moved on. pdf has no snapshot: the server's response itself carries
+    // convertedFountain, which export reads directly off the report.
+    const isPdf = uploadedFile?.format === "pdf";
+    const isFdx = uploadedFile?.format === "fdx";
+    const snapshotForThisRun: { fountain?: string; fdx?: string } | null = isPdf
+      ? null
+      : isFdx
+      ? { fdx: uploadedFile!.content }
+      : { fountain: activeText };
 
-    fetch("/api/scriptide/doctor", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    })
+    const request = isPdf
+      ? fetch("/api/scriptide/doctor/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/pdf" },
+          body: uploadedFile!.pdfBytes,
+          signal: controller.signal,
+        })
+      : fetch("/api/scriptide/doctor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(isFdx ? { fdx: uploadedFile!.content, title } : { fountain: activeText, title }),
+          signal: controller.signal,
+        });
+
+    request
       .then(async (res) => {
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
           const fallback =
             res.status === 404
-              ? "Script Doctor isn't live yet — the /api/scriptide/doctor route hasn't been deployed."
+              ? isPdf
+                ? "PDF diagnosis isn't live yet — the /api/scriptide/doctor/pdf route hasn't been deployed."
+                : "Script Doctor isn't live yet — the /api/scriptide/doctor route hasn't been deployed."
               : `Diagnosis failed (${res.status})`;
           throw new Error(body?.error ?? fallback);
         }
@@ -332,8 +662,15 @@ export default function ScriptDoctorPanel({
       .then((data) => {
         if (myGeneration !== generationRef.current) return; // superseded by a newer run
         setReport(data);
+        setAnalyzedSnapshot(snapshotForThisRun);
         setOpenPasses({});
         setStatus("success");
+        // Draft-over-draft history: record this diagnosis (unless it's an
+        // exact repeat of the last one) and capture whatever was newest
+        // *before* this call as the delta baseline / identical-script check.
+        const { history: nextHistory, previous } = recordDoctorHistory(data, title ?? "");
+        setHistory(nextHistory);
+        setPreviousEntry(previous);
       })
       .catch((err: unknown) => {
         if (myGeneration !== generationRef.current) return; // superseded — ignore
@@ -348,11 +685,76 @@ export default function ScriptDoctorPanel({
       .finally(() => clearTimeout(timeoutId));
   };
 
+  const handleExportReport = () => {
+    if (!report) return;
+
+    exportAbortRef.current?.abort();
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
+
+    setExportStatus("loading");
+    setExportError(null);
+
+    // Reuse whatever content the DISPLAYED report was actually generated
+    // from — never live editor/upload state, which may have moved on since
+    // diagnosis succeeded. pdf-sourced reports have no fountain/fdx snapshot
+    // (the doctor/pdf route takes raw bytes, not JSON), so they export the
+    // server's own convertedFountain instead.
+    let payload: { fountain?: string; fdx?: string; title?: string };
+    if (report.source?.format === "pdf") {
+      const converted = report.source.convertedFountain;
+      if (!converted) {
+        setExportStatus("error");
+        setExportError("This PDF-sourced report has no converted Fountain text to export.");
+        return;
+      }
+      payload = { fountain: converted, title };
+    } else if (analyzedSnapshot) {
+      payload = { ...analyzedSnapshot, title };
+    } else {
+      // Defensive fallback — unreachable in practice, since analyzedSnapshot
+      // is set in lockstep with the report itself for every non-pdf source.
+      payload = { fountain: activeText, title };
+    }
+
+    fetch("/api/export/coverage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback =
+            res.status === 404
+              ? "Coverage export isn't live yet — the /api/export/coverage route hasn't been deployed."
+              : `Export failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        const filename =
+          parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+          `${safeFilenameStem(title)}-coverage.html`;
+        const blob = await res.blob();
+        return { blob, filename };
+      })
+      .then(({ blob, filename }) => {
+        downloadBlob(blob, filename);
+        setExportStatus("idle");
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return; // cancelled — no error state
+        setExportStatus("error");
+        setExportError(err instanceof Error ? err.message : "Export failed");
+      });
+  };
+
   // Abort any in-flight request when the panel unmounts (e.g. user closes it),
   // and clear the "loaded into editor" confirmation timer alongside it.
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      exportAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
     };
   }, []);
@@ -391,14 +793,15 @@ export default function ScriptDoctorPanel({
           Script Doctor
         </h2>
         {/* Hidden file input + styled trigger button. Accepts Fountain, plain
-            text, and Final Draft XML; format is decided client-side in
-            handleFileSelected (extension first, content sniff as fallback). */}
+            text, Final Draft XML, and PDF; format is decided client-side in
+            handleFileSelected (extension first, content sniff as fallback for
+            fountain/fdx; PDF is read as raw bytes and diagnosed server-side). */}
         <input
           ref={fileInputRef}
           type="file"
-          accept=".fountain,.txt,.fdx"
+          accept=".fountain,.txt,.fdx,.pdf"
           className="hidden"
-          aria-label="Upload script file (.fountain, .txt, or .fdx)"
+          aria-label="Upload script file (.fountain, .txt, .fdx, or .pdf)"
           onChange={(e) => {
             const file = e.target.files?.[0];
             // Reset so re-selecting the same filename still fires onChange.
@@ -410,11 +813,27 @@ export default function ScriptDoctorPanel({
           onClick={() => fileInputRef.current?.click()}
           disabled={status === "loading"}
           aria-label="Upload script file to diagnose instead of the editor content"
-          title="Upload a .fountain, .txt, or Final Draft (.fdx) file to diagnose instead of the editor content"
+          title="Upload a .fountain, .txt, Final Draft (.fdx), or PDF file to diagnose instead of the editor content"
           className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Upload script
         </button>
+        {status === "success" && report && (
+          <button
+            onClick={handleExportReport}
+            disabled={exportStatus === "loading"}
+            aria-label="Export coverage report as an HTML document"
+            title="Export the current report as a downloadable HTML coverage document"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {exportStatus === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            Export report
+          </button>
+        )}
         {status === "success" && (
           <button
             onClick={runDiagnosis}
@@ -464,6 +883,25 @@ export default function ScriptDoctorPanel({
           className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0"
         >
           {uploadError}
+        </div>
+      )}
+
+      {/* Export failures (route not deployed yet, network error, etc.) —
+          distinct from both the upload guard and diagnosis error states,
+          since exporting never disturbs the report already on screen. */}
+      {exportStatus === "error" && exportError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Export failed: {exportError}</span>
+          <button
+            onClick={() => setExportError(null)}
+            aria-label="Dismiss export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
         </div>
       )}
 
@@ -620,6 +1058,21 @@ export default function ScriptDoctorPanel({
               </p>
             )}
 
+            {/* Draft-over-draft: only rendered once a PREVIOUS entry exists at
+                all (nothing to compare on the very first-ever diagnosis).
+                Identical contentHash to that previous entry gets the flat
+                "no changes" notice per the determinism nuance in the task
+                spec, rather than a delta strip showing all-zero deltas. */}
+            {previousEntry && report.contentHash && (
+              previousEntry.contentHash === report.contentHash ? (
+                <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
+                  No changes since last diagnosis — identical script.
+                </p>
+              ) : (
+                <DraftDeltaStrip previous={previousEntry} current={report} />
+              )
+            )}
+
             {/* Craft dimensions — 14 passes rolled up into 5 writer-facing scores. */}
             {report.dimensions && report.dimensions.length > 0 && (
               <div>
@@ -682,15 +1135,17 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
-            {/* Source note — only meaningful for .fdx submissions. */}
-            {report.source?.format === "fdx" &&
+            {/* Source note — meaningful whenever the submission was converted
+                to Fountain server-side (.fdx or .pdf); the label names which. */}
+            {(report.source?.format === "fdx" || report.source?.format === "pdf") &&
               (() => {
-                const source = report.source as DoctorSourceWithWarnings;
+                const source = report.source!;
+                const sourceLabel =
+                  source.format === "pdf" ? "Converted from PDF" : "Converted from Final Draft (.fdx)";
                 return (
                   <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5" aria-hidden="true" /> Converted from Final
-                      Draft (.fdx)
+                      <FileText className="w-3.5 h-3.5" aria-hidden="true" /> {sourceLabel}
                     </p>
                     {source.warnings && source.warnings.length > 0 && (
                       <ul className="space-y-1">
@@ -828,6 +1283,91 @@ export default function ScriptDoctorPanel({
                 })}
               </div>
             </div>
+
+            {/* Draft history — collapsed by default, most-recent-first, up to
+                10 shown (of up to 50 retained). Purely client-side
+                (localStorage); degrades to "nothing to show" if unavailable. */}
+            {history.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setHistoryOpen((open) => !open)}
+                  aria-expanded={historyOpen}
+                  className="w-full flex items-center justify-between gap-2 p-3 text-left border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <span className="flex items-center gap-2 font-bold uppercase text-xs tracking-widest">
+                    {historyOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    )}
+                    <HistoryIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Draft History
+                  </span>
+                  <span className="text-[9px] font-mono text-gray-500 dark:text-gray-400 uppercase">
+                    {history.length} draft{history.length === 1 ? "" : "s"}
+                  </span>
+                </button>
+                {historyOpen && (
+                  <div className="border-2 border-t-0 border-black dark:border-white/20 p-3 space-y-3">
+                    <ul className="space-y-1.5">
+                      {[...history]
+                        .reverse()
+                        .slice(0, DOCTOR_HISTORY_DISPLAY_MAX)
+                        .map((entry) => (
+                          <li
+                            key={`${entry.at}-${entry.contentHash}`}
+                            className="flex items-center justify-between gap-2 text-[10px] font-mono text-black dark:text-gray-100 border-b border-black/10 dark:border-white/10 pb-1.5 last:border-b-0 last:pb-0"
+                          >
+                            <span className="text-gray-500 dark:text-gray-400 shrink-0">
+                              {new Date(entry.at).toLocaleString()}
+                            </span>
+                            <span className="font-bold shrink-0">{Math.round(entry.health)}</span>
+                            {entry.verdict && (
+                              <span className="uppercase font-bold shrink-0">{entry.verdict}</span>
+                            )}
+                            <span className="text-gray-600 dark:text-gray-300 truncate">
+                              {entry.totalIssues} issue{entry.totalIssues === 1 ? "" : "s"}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                    <div className="pt-2 border-t border-black/10 dark:border-white/10">
+                      {confirmingClearHistory ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono text-red-600 dark:text-red-400">
+                            Clear all {history.length} saved draft{history.length === 1 ? "" : "s"}?
+                          </span>
+                          <button
+                            onClick={() => {
+                              clearDoctorHistory();
+                              setHistory([]);
+                              setPreviousEntry(null);
+                              setConfirmingClearHistory(false);
+                            }}
+                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-red-600 text-white hover:bg-red-700 transition-colors"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setConfirmingClearHistory(false)}
+                            className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingClearHistory(true)}
+                          aria-label="Clear all saved draft history"
+                          className="px-2 py-1 text-[9px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-3 h-3" aria-hidden="true" /> Clear history
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -21,6 +21,7 @@
 // text itself, and no LLM, so the same report is produced byte-for-byte
 // (minus analyzedAt) for the same input every time.
 
+import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { CompiledScreenplay } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
@@ -31,6 +32,17 @@ import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
   CoverageVerdict, DimensionKey, DimensionScore,
 } from './types.ts';
+
+/** sha256 hex of the trimmed Fountain text — the determinism receipt on
+ *  ScriptDoctorReport.contentHash (types.ts). Trimmed (not raw) so that
+ *  incidental leading/trailing whitespace — which affects nothing the doctor
+ *  actually analyzes (analyzeFountainText already tolerates it) — doesn't
+ *  register as "a different draft" for the client's draft-over-draft history.
+ *  Exported as a pure function, same rationale as computeHealthScore below:
+ *  spot-checkable against node:crypto directly without running the pipeline. */
+export function computeContentHash(fountain: string): string {
+  return crypto.createHash('sha256').update(fountain.trim()).digest('hex');
+}
 
 /** health = 100 − (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)),
  *  clamped to [0, 100] and rounded to 1 decimal. Exported as a pure function
@@ -393,7 +405,7 @@ function buildTopPriorities(passes: DoctorPassSummary[]): Array<RevisionIssue & 
   return tagged.slice(0, 10).map(({ passOrder: _passOrder, ...rest }) => rest);
 }
 
-function aggregateReport(result: RevisionResult, analysis: FountainAnalysis): ScriptDoctorReport {
+function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fountain: string): ScriptDoctorReport {
   const passes: DoctorPassSummary[] = result.passResults.map(pr => ({
     pass: pr.pass,
     issues: pr.issues,
@@ -442,6 +454,7 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis): Sc
     dimensions,
     strengths,
     plainSummary,
+    contentHash: computeContentHash(fountain),
   };
 }
 
@@ -481,6 +494,7 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
       plainSummary:
         'PASS — this submission is empty, so there is nothing to score; overall craft score 0/100. ' +
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
+      contentHash: computeContentHash(fountain),
     };
   }
 
@@ -496,5 +510,5 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
     runRevisionPipeline(compiled, analysis.records, analysis.structure, [], undefined, storyContext),
   );
 
-  return aggregateReport(result, analysis);
+  return aggregateReport(result, analysis, fountain);
 }

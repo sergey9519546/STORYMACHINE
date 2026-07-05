@@ -4,6 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
 } from '../../server/nvm/analyze/doctor.ts';
@@ -427,5 +428,59 @@ describe('runScriptDoctor — degenerate zero-scene coverage layer', () => {
 
     assert.ok(report.plainSummary && report.plainSummary.length > 0);
     assert.ok(report.plainSummary!.includes('PASS'));
+  });
+});
+
+// ── contentHash ───────────────────────────────────────────────────────────────
+// The determinism receipt (types.ts's ScriptDoctorReport.contentHash doc
+// comment): sha256 hex of the TRIMMED analyzed Fountain text, present on
+// every report — including the degenerate zero-scene one — so draft-over-
+// draft comparisons (the client's history feature) have a stable identity
+// key that's independent of analyzedAt or any other timestamp.
+describe('runScriptDoctor — contentHash', () => {
+  it('is present and is a 64-char lowercase hex string', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    assert.ok(report.contentHash, 'contentHash must be populated');
+    assert.equal(report.contentHash!.length, 64, 'sha256 hex digest must be 64 characters');
+    assert.match(report.contentHash!, /^[0-9a-f]{64}$/, 'contentHash must be lowercase hex');
+  });
+
+  it('is stable across two runs on the same input', async () => {
+    const fountain = buildMultiSceneFountain();
+    const first = await runScriptDoctor(fountain);
+    const second = await runScriptDoctor(fountain);
+    assert.equal(first.contentHash, second.contentHash, 'identical input must hash identically');
+  });
+
+  it('differs across different inputs', async () => {
+    const a = await runScriptDoctor(buildMultiSceneFountain());
+    const b = await runScriptDoctor(buildMultiSceneFountain() + '\n\nEXT. NEW LOCATION - DAY\n\nSomething new happens here.');
+    assert.notEqual(a.contentHash, b.contentHash, 'different scripts must not collide');
+  });
+
+  it('is present on the degenerate whitespace-only report', async () => {
+    const report = await runScriptDoctor('   \n\n  \t  ');
+    assert.ok(report.contentHash, 'contentHash must be populated even on the zero-scene report');
+    assert.equal(report.contentHash!.length, 64);
+    assert.match(report.contentHash!, /^[0-9a-f]{64}$/);
+  });
+
+  it('equals an independently computed createHash("sha256") of the trimmed fixture', async () => {
+    const fountain = buildMultiSceneFountain();
+    const report = await runScriptDoctor(fountain);
+    const expected = createHash('sha256').update(fountain.trim()).digest('hex');
+    assert.equal(report.contentHash, expected);
+  });
+
+  it('trims before hashing, so incidental surrounding whitespace does not change the degenerate hash', async () => {
+    // The degenerate zero-scene path is the one place where the raw input can
+    // be pure whitespace of varying shape (different amounts/kinds of
+    // whitespace) yet still be "the same empty submission" — proving the
+    // trim happens even on that branch, not just the non-degenerate one.
+    const a = await runScriptDoctor('   \n\n  \t  ');
+    const b = await runScriptDoctor('\t\t\n   ');
+    assert.equal(a.contentHash, b.contentHash, 'different whitespace-only inputs must trim to the same hash');
+    const expected = createHash('sha256').update(''.trim()).digest('hex');
+    assert.equal(a.contentHash, expected);
   });
 });
