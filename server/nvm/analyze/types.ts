@@ -78,10 +78,15 @@ export interface DimensionScore {
   issueCount: number;
   /** One plain-language sentence a non-technical writer understands. */
   summary: string;
-  /** 0–100 percentile rank of `score` against the calibration reference
-   *  corpus for THIS dimension (calibration/reference.ts). Optional so a
-   *  report built without calibration data stays valid; the doctor
-   *  populates it whenever the reference distribution is available. */
+  /** 0–100 percentile rank against the calibration reference corpus for THIS
+   *  dimension (calibration/reference.ts). Computed on the UNCLAMPED craft
+   *  statistic underlying `score` (doctor.ts's computeRawCraftScore), not on
+   *  `score` itself — `score` is clamped to [0, 100] and, with enough
+   *  accumulated issues, saturates at 0/100 for many scripts at once; ranking
+   *  the unclamped statistic keeps two saturated scripts ordered correctly
+   *  instead of tying. Optional so a report built without calibration data
+   *  stays valid; the doctor populates it whenever the reference
+   *  distribution is available. */
   percentile?: number;
   /** Plain-language gloss of `percentile`, e.g. "stronger than 74% of
    *  produced screenplays in the reference set". */
@@ -209,8 +214,13 @@ export interface ScriptDoctorReport {
    *  script, so their verdicts are comparable draft-over-draft, and an
    *  exported report can be re-verified byte-for-byte. */
   contentHash?: string;
-  /** 0–100 percentile rank of `health` against the calibration reference
-   *  corpus. Optional — populated only when calibration data is available. */
+  /** 0–100 percentile rank against the calibration reference corpus.
+   *  Computed on the UNCLAMPED craft statistic underlying `health` (doctor.ts's
+   *  computeRawCraftScore), not on `health` itself — `health` is clamped to
+   *  [0, 100] and, with enough accumulated issues, saturates at 0 for many
+   *  scripts at once; ranking the unclamped statistic keeps two saturated
+   *  scripts ordered correctly instead of tying at the same percentile.
+   *  Optional — populated only when calibration data is available. */
   healthPercentile?: number;
   /** Co-firing issues clustered into named diagnoses (see RootCauseFinding).
    *  Optional so older consumers stay valid; the doctor populates it whenever

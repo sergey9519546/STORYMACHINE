@@ -20,6 +20,14 @@
 // data the pipeline already computed — no new heuristics over the fountain
 // text itself, and no LLM, so the same report is produced byte-for-byte
 // (minus analyzedAt) for the same input every time.
+//
+// ── Calibration layer ─────────────────────────────────────────────────────
+// On top of the coverage layer, aggregateReport also ranks health and each
+// dimension score against calibration/reference.ts's reference-corpus
+// distribution, populating types.ts's optional healthPercentile /
+// DimensionScore.percentile+percentileDescriptor fields. Calibration is an
+// enhancement, not a dependency — see aggregateReport's own comment for the
+// guard that keeps a calibration failure from ever crashing the doctor.
 
 import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
@@ -28,6 +36,8 @@ import type { StructureState } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
+import { getReferenceDistribution } from './calibration/reference.ts';
+import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
   CoverageVerdict, DimensionKey, DimensionScore,
@@ -44,18 +54,40 @@ export function computeContentHash(fountain: string): string {
   return crypto.createHash('sha256').update(fountain.trim()).digest('hex');
 }
 
+/** Shared penalty expression behind both computeRawCraftScore and
+ *  computeHealthScore — factored out so the two can never drift apart:
+ *  (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)). */
+function craftPenalty(bySeverity: { critical: number; major: number; minor: number }, sceneCount: number): number {
+  return (4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor) *
+    (30 / Math.max(sceneCount, 1));
+}
+
+/** 100 − craftPenalty, with NO clamping — can go deeply negative for a
+ *  heavily-flagged script. This is the same statistic computeHealthScore
+ *  displays, just before the [0, 100] clamp; see computeHealthScore and
+ *  calibration/reference.ts for why the UNCLAMPED value is what calibration
+ *  ranks on. Exported (rather than inlined) so it's independently
+ *  spot-checkable, same rationale as computeHealthScore itself. */
+export function computeRawCraftScore(
+  bySeverity: { critical: number; major: number; minor: number },
+  sceneCount: number,
+): number {
+  return 100 - craftPenalty(bySeverity, sceneCount);
+}
+
 /** health = 100 − (4·critical + 1.5·major + 0.5·minor) · (30 / max(sceneCount, 1)),
  *  clamped to [0, 100] and rounded to 1 decimal. Exported as a pure function
  *  (rather than inlined) so the formula itself can be spot-checked with a
- *  known issue count without needing to run the full 14-pass pipeline. */
+ *  known issue count without needing to run the full 14-pass pipeline.
+ *
+ *  Note: this is the DISPLAYED score. Ranking (healthPercentile / dimension
+ *  percentile, in aggregateReport below) uses computeRawCraftScore's
+ *  unclamped value instead — see that function's comment for why. */
 export function computeHealthScore(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
 ): number {
-  const rawPenalty =
-    (4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor) *
-    (30 / Math.max(sceneCount, 1));
-  const clamped = Math.max(0, Math.min(100, 100 - rawPenalty));
+  const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount)));
   return Math.round(clamped * 10) / 10;
 }
 
@@ -185,6 +217,11 @@ function buildDimensionSummary(
 interface DimensionBuild {
   score: DimensionScore;
   mix: DimensionIssueMix | null;
+  /** computeRawCraftScore for this dimension's own issue mix — unclamped,
+   *  used only for calibration ranking (aggregateReport below), never
+   *  displayed. See computeRawCraftScore's comment for why ranking needs the
+   *  unclamped statistic. */
+  rawScore: number;
 }
 
 /** Roll the 14 per-pass summaries up into the 5 contract dimensions. Kept
@@ -201,9 +238,11 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number): Dimen
       { critical: 0, major: 0, minor: 0 },
     );
     const score = computeHealthScore(bySeverity, sceneCount);
+    const rawScore = computeRawCraftScore(bySeverity, sceneCount);
     const mix = analyzeDimensionIssues(issues);
     return {
       mix,
+      rawScore,
       score: {
         key: def.key,
         label: def.label,
@@ -437,6 +476,58 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
   });
   const plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
 
+  // ── Calibration layer ─────────────────────────────────────────────────────
+  // Rank this report's health and each dimension's score against
+  // calibration/reference.ts's reference-corpus distribution, populating
+  // types.ts's optional healthPercentile / DimensionScore.percentile fields.
+  //
+  // Saturation defect (why this ranks on the UNCLAMPED craft statistic, not
+  // the displayed 0-100 score): computeHealthScore's penalty is
+  // (4·critical + 1.5·major + 0.5·minor) · (30 / sceneCount), then clamped to
+  // [0, 100]. With the pipeline's ~1,300 accumulated rules across 14 passes,
+  // almost any realistic 8+ scene script racks up enough minor/major issues
+  // that the raw penalty exceeds 100 well before the script is actually
+  // "worthless" — the clamp saturates. A script with 40 issues and one with
+  // 400 both display health 0 and, ranked on THAT number, both land at the
+  // same percentile: the ranking goes flat/meaningless exactly in the range
+  // (heavily-flagged scripts) where distinguishing "bad" from "much worse"
+  // matters most. computeRawCraftScore (doctor.ts) is the identical formula
+  // WITHOUT the clamp — it can go deeply negative — so two saturated scripts
+  // that tie at displayed health 0 still separate on the raw statistic and
+  // order correctly against the reference corpus. The displayed health/grade/
+  // verdict/dimension scores are untouched by this — only the statistic fed
+  // into percentileRank changes, per dimension too (the same saturation risk
+  // exists in principle for any dimension with enough issues relative to its
+  // pass count).
+  //
+  // Calibration is an enhancement, not a dependency: getReferenceDistribution
+  // already guards its own build (reference.ts falls back to an empty
+  // distribution rather than throwing), but this pass gets a defensive
+  // try/catch on top anyway, plus an explicit empty-array check per
+  // distribution, so no future change to the calibration module can ever
+  // turn a Script Doctor request into a 500 — worst case, a report simply
+  // comes back without percentile fields, which every consumer already
+  // treats as optional.
+  let healthPercentile: number | undefined;
+  try {
+    const distribution = getReferenceDistribution();
+    const rawHealth = computeRawCraftScore(bySeverity, analysis.sceneCount);
+    if (distribution.health.length > 0) {
+      healthPercentile = percentileRank(rawHealth, distribution.health);
+    }
+    for (const build of dimensionBuilds) {
+      const referenceScores = distribution.dimensions[build.score.key];
+      if (referenceScores && referenceScores.length > 0) {
+        build.score.percentile = percentileRank(build.rawScore, referenceScores);
+        build.score.percentileDescriptor = percentileDescriptor(build.score.percentile, build.score.label);
+      }
+    }
+  } catch {
+    // Leave healthPercentile / dim.percentile / dim.percentileDescriptor
+    // undefined for this report — the raw health/dimension scores above are
+    // computed independently of calibration and remain fully valid on their own.
+  }
+
   return {
     health,
     grade: gradeForHealth(health),
@@ -455,6 +546,7 @@ function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fou
     strengths,
     plainSummary,
     contentHash: computeContentHash(fountain),
+    healthPercentile,
   };
 }
 
