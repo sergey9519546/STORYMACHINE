@@ -190,7 +190,10 @@ fix it before it misleads another session further.
 
 ---
 
-## 6. Run 10 — Deep-read sensing layer (biggest product lever)
+## 6. Run 10 — Deep-read sensing layer — ✅ COMPLETE
+(Sensing core with injection-hardened per-scene annotation, six-signal merge
+boundary, scene-hash cache, bounded spend; /doctor/deep route + labeled panel
+toggle with full lineage discipline. NEXT RUN: Run 11 — fix-and-verify.) (biggest product lever)
 
 **Why**: today's signals are lexicon/structure-derived; an LLM reading each
 scene for subtext, motivation, irony, and stakes can sense far more than
