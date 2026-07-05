@@ -35,6 +35,30 @@
 // Persistence note: story_tone is NOT added to IllusionState (engine/types.ts
 // is foreign to this module) — see server/routes/config.ts's story-tone route
 // for the in-memory, per-session mechanism used instead.
+//
+// Genre-completion wave — exhaustive real-screenwriter coverage:
+// Expands the roster from 28 to 47 genres (19 new: dark_comedy,
+// romantic_comedy, spy_espionage, gangster, political_thriller,
+// psychological_thriller, police_procedural, cosmic_horror, slasher,
+// space_opera, time_travel, post_apocalyptic, urban_fantasy, sports_drama,
+// disaster, road_movie, prison_drama, noir_comedy, superhero), 8 new tone
+// registers (16 → 24: dread_driven, cathartic, nihilistic, spiritual,
+// chaotic, romantic, maximalist, emotional), and 6 new genre-conditioned
+// threshold modifiers where a genuine one-line craft argument exists
+// (psychological_thriller, slasher, gangster, disaster, road_movie,
+// superhero). engine/types.ts's StoryGenre union now carries all 47 genres
+// directly (it is the source of truth the wave's own comment there points
+// back to), so GenreId collapses to a plain alias — see its definition
+// below. Distinctness was checked against every sibling genre before
+// authoring (see each new genre's inline rationale comment); four candidates
+// from the brief were declined as duplicates rather than shipped thin:
+// mockumentary (documentary_style's toneInstruction already explicitly
+// covers mockumentary/found-footage/verite), epic_fantasy (scale alone is
+// not a structural-contract difference from fantasy, which already frames
+// itself at "the history of the world" scale), and k_drama/telenovela
+// (market/language categories, not distinct dramatic contracts — their
+// craft identity is already carried by melodrama + romance/romantic_comedy
+// plus the operatic/nostalgic tone registers).
 
 import type { StoryGenre, DirectorStyle } from '../engine/types.ts';
 import { STYLE_MODIFIERS } from './structure-presets.ts';
@@ -81,32 +105,17 @@ export interface GenreRules {
   forbiddenShortcuts: string[];
 }
 
-// TO ADD A NEW GENRE: add the literal to GenreId below, then add a matching
-// entry to GENRE_MODIFIERS. engine/types.ts's StoryGenre union only needs to
-// grow if a caller wants to *persist* the new genre through IllusionState —
-// GenreId itself does not depend on that union changing.
-export type GenreId =
-  | StoryGenre
-  | 'action'
-  | 'adventure'
-  | 'crime'
-  | 'fantasy'
-  | 'western'
-  | 'war'
-  | 'historical'
-  | 'biopic'
-  | 'musical'
-  | 'family'
-  | 'documentary_style'
-  | 'heist'
-  | 'courtroom'
-  | 'survival'
-  | 'coming_of_age'
-  | 'satire'
-  | 'folk_horror'
-  | 'cyberpunk'
-  | 'gothic'
-  | 'melodrama';
+// TO ADD A NEW GENRE: add the literal to StoryGenre in engine/types.ts
+// first (that union is now the single source of truth for the roster — see
+// its own comment), then add a matching entry to GENRE_MODIFIERS and
+// GENRE_NAMES below. GenreId used to widen the routing surface beyond
+// StoryGenre with 20, then 39, locally-declared literals; now that
+// engine/types.ts carries the full 47-genre roster directly, GenreId
+// collapses to a plain alias — every existing call site typed to
+// `GenreId | undefined` or `StoryGenre | undefined` keeps compiling
+// unchanged since the two types are now identical, not just structurally
+// compatible.
+export type GenreId = StoryGenre;
 
 export const GENRE_MODIFIERS: Record<GenreId, GenreModifier> = {
   // ── Original 8 (unchanged tone/register/cliché/emotional fields — only the
@@ -645,6 +654,450 @@ export const GENRE_MODIFIERS: Record<GenreId, GenreModifier> = {
       ],
     },
   },
+
+  // ── Genre-completion wave (19 new) ──────────────────────────────────────────
+  // Each entry below is checked for distinctness against every existing genre's
+  // genreRules before being written — see the "Distinctness was checked"
+  // header note above for the four candidates declined as duplicates.
+  dark_comedy: {
+    toneInstruction: 'GENRE — DARK COMEDY: The subject is genuinely tragic — death, illness, cruelty, despair — and the comedy is mined from that truth without softening it. The laugh and the wound occur in the same beat; neither cancels the other. Characters treat catastrophe with an inappropriate, specific composure that is itself the joke.',
+    register: 'Deadpan precision colliding with real stakes; comic timing applied to material that refuses to become safe.',
+    forbiddenCliches: ['a death played for cheap shock with no grief underneath', 'darkness for its own sake with no real target being satirized or examined', 'tragedy softened into a redemptive group hug by the end', 'a funeral scene that plays purely for gags with zero weight', 'the reveal that the awful thing "wasn\'t real" purely to cushion the audience'],
+    emotionalRegister: 'gallows laughter that never fully releases the underlying grief',
+    genreRules: {
+      // Distinct from comedy (whose engine is misplaced confidence pursued
+      // buoyantly) and from melodrama (which amplifies feeling rather than
+      // undercutting it) — dark comedy's contract is that the tragedy stays
+      // real and costly even at its funniest.
+      threatType: 'a genuinely tragic circumstance the characters must survive without the comedy erasing its real cost',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'keep the tragic subject real weight legible even at its funniest',
+        'let the comedy arise from specific character behavior under catastrophe, not random shock',
+        'refuse a redemptive ending that erases the cost the story spent its runtime establishing',
+      ],
+      forbiddenShortcuts: [
+        'a tragedy played for shock with no grief or cost underneath it',
+        'an ending that resolves the darkness into simple uplift with nothing earned',
+      ],
+    },
+  },
+  romantic_comedy: {
+    toneInstruction: 'GENRE — ROMANTIC COMEDY: Two people who could be genuinely happy together are kept apart by an obstacle rooted in their own flawed self-protection, not by outside misunderstanding. Wit is how intimacy travels between them — banter is how they fall for each other while insisting they are not. The comedy and the romance escalate together; neither is allowed to stall while the other runs.',
+    register: 'Buoyant, verbally quick, warm underneath the jokes. Physical comedy and emotional vulnerability share the same scene.',
+    forbiddenCliches: ['the meet-cute collision with no follow-through consequence', 'a third-act breakup caused by a misunderstanding a single sentence would fix', 'the grand public gesture as the only proof of real feeling', 'a wisecracking best friend who exists solely to deliver advice', 'a makeover that unlocks romantic desirability'],
+    emotionalRegister: 'flirtatious wit guarding real vulnerability',
+    genreRules: {
+      // Distinct from romance (internal fear as the sole obstacle, register
+      // is intimate rather than buoyant) and from comedy (no romantic
+      // throughline) — this genre requires the wit and the romantic risk to
+      // escalate as one braided contract.
+      threatType: 'the couple own fear of real intimacy, dressed up as an external obstacle',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'root the central obstacle in a specific fear or flaw each person carries, not a plot misunderstanding alone',
+        'let wit escalate the intimacy between the couple scene to scene',
+        'make the romance and the comedy raise the stakes of the same scene together, not in separate beats',
+      ],
+      forbiddenShortcuts: [
+        'a breakup engineered by a misunderstanding a single honest sentence would dissolve',
+        'a grand gesture that substitutes for the internal change the story has not yet earned',
+      ],
+    },
+  },
+  spy_espionage: {
+    toneInstruction: 'GENRE — SPY / ESPIONAGE: Trust is the currency and everyone is spending counterfeit. Identity is a constructed cover that can crack under specific pressure; the protagonist operates inside an institution that will disown them the moment they become inconvenient. Tradecraft is rendered with real procedural specificity — the dead drop, the burn notice, the handler who may already be compromised.',
+    register: 'Controlled, watchful, precise about method. Dialogue conceals as much as it reveals; every exchange is a negotiation.',
+    forbiddenCliches: ['a gadget that conveniently solves the exact problem with no prior setup', 'a double-agent reveal with no seeded behavioral tell', 'a villain monologuing the entire plan while holding a captured hero', 'an institution that is uniformly trustworthy with no self-interest of its own', 'a cover identity that never once costs the protagonist anything personal'],
+    emotionalRegister: 'guarded control fraying under the weight of an unsustainable double life',
+    genreRules: {
+      // Distinct from thriller (generic real-time antagonist) and crime
+      // (criminal/institutional mirroring) — espionage's specific contract is
+      // tradecraft, cover, and an institution that will discard its own.
+      threatType: 'an institution or opposing service that will use or discard the protagonist the moment their cover fails or their use expires',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'render tradecraft with real procedural specificity, not gestural spy-movie shorthand',
+        'give the protagonist cover identity a genuine, specific personal cost',
+        'seed any double-agent or betrayal reveal in an earlier, re-readable behavioral tell',
+      ],
+      forbiddenShortcuts: [
+        'a double-agent reveal with no earlier seeded tell',
+        'a gadget or resource solving the exact problem with no setup earlier in the story',
+      ],
+    },
+  },
+  gangster: {
+    toneInstruction: 'GENRE — GANGSTER: The rise is built on a specific, escalating series of transgressive choices, and the fall is the same arithmetic run in reverse — the ambition that built the empire is what tears it down. Loyalty and family (blood or chosen) are the load-bearing structure; betrayal from within costs more than any outside threat. The audience should be implicated in admiring what the story ultimately punishes.',
+    register: 'Operatic but grounded, patient about the accumulation of power, unsentimental about its cost.',
+    forbiddenCliches: ['the one last score before getting out, played with no irony', 'a rise to power shown entirely in a single montage with no earned specific choices', 'a downfall caused by outside bad luck disconnected from the protagonist own decisions', 'a rival organization that exists only as a faceless obstacle', 'a loyal lieutenant betrayed for no motivated, specific reason'],
+    emotionalRegister: 'magnetic ambition curdling into inevitable, self-authored ruin',
+    genreRules: {
+      // Distinct from crime (whose contract is one pressured choice
+      // reshaping relationships inside a mirrored institutional/criminal
+      // system) — gangster is specifically a rise-and-fall arc where loyalty
+      // structure, not procedural mechanics, is the load-bearing element.
+      threatType: 'the same transgressive ambition that built the rise, now turned against the protagonist by their own organization or family',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'chart the rise through specific, escalating transgressive choices, not a montage',
+        'make the downfall an earned consequence of the same ambition or flaw that built the rise',
+        'root betrayal in the loyalty structure of the family or organization, not an outside force',
+      ],
+      forbiddenShortcuts: [
+        'a downfall caused by outside misfortune disconnected from the protagonist own choices',
+        'a rise depicted with no specific, escalating transgressions the audience can trace',
+      ],
+    },
+  },
+  political_thriller: {
+    toneInstruction: 'GENRE — POLITICAL THRILLER: Institutional power protects itself first; the truth the protagonist is chasing threatens people with the resources to bury it. Conspiracy is not paranoia if it is real — but every claim must be earned through the same evidentiary rigor as any thriller reveal. The personal cost of pursuing the truth (career, safety, relationships) rises in lockstep with how close the protagonist gets.',
+    register: 'Measured, procedural, and quietly urgent. Institutions speak in euphemism; the protagonist has to translate.',
+    forbiddenCliches: ['a conspiracy revealed via one dramatic document dump with no groundwork', 'a whistleblower who faces zero real institutional retaliation', 'a villain who is simply "the system," rendered with no specific human agent driving it', 'a journalist or investigator who breaks every professional rule with no consequence', 'a cover-up that collapses the instant one honest person speaks up'],
+    emotionalRegister: 'controlled paranoia sharpening into moral resolve',
+    genreRules: {
+      // Distinct from thriller (informationPositionDefault 'superior', a
+      // known antagonist in real time) — political thriller flips to
+      // 'inferior': the institution knows more than the protagonist for most
+      // of the runtime, discovered piece by piece.
+      threatType: 'an entrenched institutional power actively protecting itself from a truth the protagonist is uncovering',
+      informationPositionDefault: 'inferior',
+      requiredBehaviors: [
+        'give the conspiracy a specific human agent and mechanism, not just "the system"',
+        'raise the protagonist personal and professional cost in lockstep with their proximity to the truth',
+        'earn every conspiracy claim through the same evidentiary rigor as any thriller reveal',
+      ],
+      forbiddenShortcuts: [
+        'a conspiracy exposed by one convenient document dump with no groundwork',
+        'institutional retaliation that vanishes the instant the truth becomes inconvenient to the plot',
+      ],
+    },
+  },
+  psychological_thriller: {
+    toneInstruction: 'GENRE — PSYCHOLOGICAL THRILLER: The central threat is whether the protagonist own perception of reality can be trusted. Dread accrues through internal erosion — memory gaps, unreliable narration, a growing gap between what is felt and what is verifiably true — more than through external event. The audience should share the protagonist uncertainty about what is actually happening, not simply watch it from outside.',
+    register: 'Interior, unstable, and quietly compounding. Repetition and contradiction do the work jump-cuts would do in a louder genre.',
+    forbiddenCliches: ['the twist that "it was all in their head" used as a cheap reset with no earlier groundwork', 'a therapist who exists only to deliver exposition about the diagnosis', 'unreliable narration that turns out to be simple lying with no genuine perceptual doubt', 'a mental break rendered as a single dramatic scene rather than an accumulating erosion', 'a clean, fully-explained resolution that erases all the ambiguity the story spent its runtime building'],
+    emotionalRegister: 'quiet dread compounding into genuine doubt about what is real',
+    genreRules: {
+      // Distinct from thriller (external antagonist, audience ahead of a
+      // character) and horror (an external, if unexplained, force) —
+      // psychological thriller's threat is entirely interior: the
+      // protagonist own mind, informationPositionDefault 'inferior' because
+      // the audience should share the doubt, not stand safely outside it.
+      threatType: 'the reliability of the protagonist own perception, memory, or grip on reality',
+      informationPositionDefault: 'inferior',
+      requiredBehaviors: [
+        'let the audience share the protagonist genuine uncertainty about what is actually happening',
+        'build the erosion of certainty gradually across the story, not in one dramatic break',
+        'seed any perceptual twist in earlier, re-readable contradictions',
+      ],
+      forbiddenShortcuts: [
+        'a "it was all in their head" twist with no earlier groundwork',
+        'ambiguity resolved into a single tidy explanation that erases the doubt the story built',
+      ],
+    },
+  },
+  police_procedural: {
+    toneInstruction: 'GENRE — POLICE PROCEDURAL: The work is the drama — the chain of custody, the warrant, the interview technique, the jurisdictional friction between units. Every investigative step is shown, not skipped, and the rules of evidence are a real constraint the story respects even when they slow the case down. The procedure itself, followed correctly, is what makes the solve earned.',
+    register: 'Methodical, technical, and precise about jurisdiction and process. Dialogue is functional and specific to the job.',
+    forbiddenCliches: ['a warrantless search or database lookup treated as routine with no consequence', 'a confession obtained through unconstitutional coercion with no institutional pushback', 'forensic evidence that arrives instantly with lab-defying speed', 'a rogue detective who breaks every procedural rule and faces zero consequence', 'a case solved by a hunch with no evidentiary chain supporting it'],
+    emotionalRegister: 'methodical patience under institutional and time pressure',
+    genreRules: {
+      // Distinct from mystery (fair-play puzzle solvable by any sharp
+      // observer, informationPositionDefault 'parity' via clue logic) and
+      // courtroom (post-arrest legal proceeding) — procedural's contract is
+      // the investigative process and its institutional rules themselves.
+      threatType: 'a case whose solve depends on a defensible, procedurally sound chain of evidence',
+      informationPositionDefault: 'parity',
+      requiredBehaviors: [
+        'show the chain of custody and evidentiary process as a real constraint on the investigation',
+        'render jurisdictional and institutional friction as a genuine obstacle, not set dressing',
+        'make the eventual solve traceable to procedure followed correctly, not a hunch',
+      ],
+      forbiddenShortcuts: [
+        'a warrantless search or an implausible instant database match treated as routine',
+        'a confession or piece of evidence obtained in a way that would collapse the case in the real world, with no story consequence',
+      ],
+    },
+  },
+  cosmic_horror: {
+    toneInstruction: 'GENRE — COSMIC HORROR: The threat is vast, ancient, and fundamentally indifferent to human survival — its scale exceeds human moral or physical categories entirely. Understanding the truth is itself the danger; knowledge corrodes sanity faster than the entity threatens the body. Human institutions, science, and belief are all revealed as fragile, provincial defenses against something that was never impressed by them.',
+    register: 'Escalating, awestruck, and precise about the limits of human comprehension. Description strains at the edges of what language can hold.',
+    forbiddenCliches: ['the entity fully revealed and explained in mundane, comprehensible terms', 'the threat defeated by conventional heroism (a gun, a punch, a clever trick)', 'a protagonist who learns the cosmic truth with no cost to their sanity or worldview', 'an ancient evil motivated by simple villainy rather than genuine incomprehensibility', 'a cult that is simply evil with no sincere, coherent belief system of its own'],
+    emotionalRegister: 'awe curdling into an insignificance too vast to fully process',
+    genreRules: {
+      // Distinct from horror (a force whose full nature is unknown but
+      // eventually earns internal logic) and folk_horror (a closed
+      // community's sincere belief) — cosmic horror's threat stays
+      // genuinely incomprehensible even once understood, and understanding
+      // itself is the cost.
+      threatType: 'a vast, indifferent force whose scale and nature exceed ordinary human moral or physical categories',
+      informationPositionDefault: 'inferior',
+      requiredBehaviors: [
+        'keep the entity genuinely incomprehensible to a human framework, never fully explained',
+        'make understanding the truth cost the protagonist something real — sanity, worldview, or self',
+        'render human institutions and beliefs as fragile against a force that predates and ignores them',
+      ],
+      forbiddenShortcuts: [
+        'the threat defeated by conventional heroism with no acknowledgment of its true scale',
+        'the entity fully explained in mundane terms that erase its incomprehensibility',
+      ],
+    },
+  },
+  slasher: {
+    toneInstruction: 'GENRE — SLASHER: The killer has a learnable pattern — a method, a territory, a rule the audience can come to recognize and even anticipate. Victims are picked off through specific, escalating vulnerability, never through the sole excuse of stupidity; each death should be a consequence of a choice or circumstance the story actually earned. A "final girl" (or equivalent) survives by actively learning the pattern and turning it against the killer.',
+    register: 'Visceral, rhythmic, and structured around escalating dread-then-release beats. Geography of the killing ground stays legible.',
+    forbiddenCliches: ['a victim making an inexplicably stupid choice purely to enable the kill', 'the killer appearing via impossible teleportation with no established method', 'a final girl who survives by pure luck rather than earned competence', 'a mask or gimmick with no consistent internal rule governing it', 'a fake-out death that resurrects the killer with zero narrative cost'],
+    emotionalRegister: 'mounting dread punctuated by visceral release',
+    genreRules: {
+      // Distinct from horror (threat nature initially unknown) and cosmic
+      // horror (threat stays incomprehensible) — the slasher's killer is
+      // knowable by design; the contract is that the pattern must be
+      // learnable, and victim stupidity alone is a forbidden shortcut.
+      threatType: 'a killer whose method and pattern are consistent enough for the audience to learn and anticipate',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'keep the killer pattern and rules consistent enough to be learnable across the story',
+        'give each victim death a specific, earned vulnerability, not stupidity alone',
+        'let the survivor defeat or evade the killer by actively learning and exploiting the established pattern',
+      ],
+      forbiddenShortcuts: [
+        'victim stupidity as the sole driver of a kill, with no earned vulnerability behind it',
+        'the killer breaking their own established rules or method with no explanation, purely for shock',
+      ],
+    },
+  },
+  space_opera: {
+    toneInstruction: 'GENRE — SPACE OPERA: Scale and melodrama are the point — dynasties, factions, and destinies play out across star systems, and the emotional stakes are pitched as large as the setting. Unlike hard science fiction, the technology and physics may bend to serve the drama, but the human (or alien) relationships, loyalties, and betrayals must remain rigorously consistent. Wonder is delivered through scope: this is a story too big for one world.',
+    register: 'Sweeping, mythic, and unafraid of grandeur. Dialogue can be heightened without becoming empty.',
+    forbiddenCliches: ['a galactic empire that is evil with no specific culture or internal logic', 'a chosen-one lineage that substitutes for earned character growth', 'a space battle rendered with no clear stakes or geography', 'a wise alien mentor who exists only to explain the plot', 'peace or victory achieved with no lasting political or personal cost'],
+    emotionalRegister: 'mythic wonder at galactic scale grounded in intimate loyalty and betrayal',
+    genreRules: {
+      // Distinct from sci_fi (whose contract is rigorous, honest
+      // consequence of ONE premise) — space opera explicitly allows
+      // technology/physics to bend for drama, and trades rigor for scale;
+      // the rigor it keeps is relational, not scientific.
+      threatType: 'a galaxy- or dynasty-spanning conflict whose outcome is measured through specific factions and relationships, not physics rigor',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'keep relationships, loyalties, and betrayals rigorously consistent even as technology serves the drama',
+        'give every faction or empire a specific culture and internal logic, not generic villainy',
+        'deliver wonder through scope while keeping the human stakes of the conflict legible',
+      ],
+      forbiddenShortcuts: [
+        'a chosen-one lineage substituting for earned character growth',
+        'a galactic conflict resolved with no lasting political or personal cost to any faction',
+      ],
+    },
+  },
+  time_travel: {
+    toneInstruction: 'GENRE — TIME TRAVEL: The rules of the mechanism must be established before they bind the plot — what can and cannot be changed, and at what cost, is a contract with the audience that must be set before it is tested. Every use of the mechanism should be the honest, logical consequence of those stated rules, including in the climax. Paradox, when it appears, is a puzzle to be reasoned through on-screen, not a mood to be gestured at.',
+    register: 'Precise, rule-literate, and patient about consequence. Causality is treated as a structural material, not a special effect.',
+    forbiddenCliches: ['a rule invented in the final act purely to resolve the plot', 'a paradox resolved by vague hand-waving ("timey-wimey") with no on-screen logic', 'a time-travel device with unlimited, consequence-free use', 'a character who remembers a timeline that was supposedly erased, with no rule established for why', 'a loop or branch that resets with zero cost paid by anyone involved'],
+    emotionalRegister: 'controlled vertigo at consequence, disciplined by rule',
+    genreRules: {
+      // Distinct from sci_fi's generic premise-consequence contract — time
+      // travel's specific requirement is that the RULES precede the plot
+      // that depends on them, and paradox is solved on-screen, not by vibes.
+      threatType: 'the honest, stated consequences of a time mechanism whose rules are fixed before the story tests them',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'state the rules of the time mechanism before the plot depends on them',
+        'resolve every paradox through on-screen logic consistent with those stated rules',
+        'make every use of the mechanism cost something, closing off the temptation of a free reset',
+      ],
+      forbiddenShortcuts: [
+        'a paradox resolved by vague mood or hand-waving instead of the stated rules',
+        'a new rule invented in the climax purely to make the ending possible',
+      ],
+    },
+  },
+  post_apocalyptic: {
+    toneInstruction: 'GENRE — POST-APOCALYPTIC: Civilization has collapsed for a specific, legible reason, and that collapse presses on every daily choice the characters make — scarcity, lost infrastructure, and the absence of law are structural facts, not backdrop. The real conflict is as often between survivors with competing visions of what should be rebuilt as it is against the ruined world itself. Nostalgia for what was lost coexists with clear eyes about what deserved to end.',
+    register: 'Spare, scoured, and attentive to the specific texture of what remains and what is gone.',
+    forbiddenCliches: ['raiders or a rival faction who are evil with no comprehensible motive of their own', 'resources or fuel appearing conveniently whenever the plot requires them', 'a fully functioning pre-collapse technology surviving with no maintenance or cost', 'a return to "the way things were" as an uncomplicated happy ending', 'a collapse whose specific cause is never established or explored'],
+    emotionalRegister: 'scoured endurance holding a fragile ember of purpose',
+    genreRules: {
+      // Distinct from survival (an indifferent environment or body limit,
+      // any setting) — post-apocalyptic's threat is specifically the
+      // ongoing social/structural aftermath of a named collapse, including
+      // conflict between survivors over how to rebuild.
+      threatType: 'the ongoing pressure of a specific civilizational collapse on scarcity, order, and daily survival',
+      informationPositionDefault: 'parity',
+      requiredBehaviors: [
+        'keep the specific cause and texture of the collapse legible and pressing on daily choices',
+        'render competing visions of what should be rebuilt as a real source of conflict among survivors',
+        'ration resources and safety consistently, with no convenient exceptions for the plot',
+      ],
+      forbiddenShortcuts: [
+        'resources or intact technology appearing conveniently whenever the plot needs them',
+        'a return to the old world played as an uncomplicated happy ending',
+      ],
+    },
+  },
+  urban_fantasy: {
+    toneInstruction: 'GENRE — URBAN FANTASY: Magic is real and hidden inside the recognizably contemporary world, and the concealment itself is a constant, active constraint — every character with knowledge of the hidden layer must manage the risk of exposure. The mundane world ignorance of magic is not just set dressing; it shapes what characters can do, say, and ask for help with. Wonder lives in the collision between the ordinary commute and the impossible thing happening one street over.',
+    register: 'Grounded and contemporary in its surface, textured and rule-bound underneath. Wit often coexists with real danger.',
+    forbiddenCliches: ['the hidden magical world exposed to the mundane public with no consequence or cover-up required', 'a secret society that never actually polices its own secrecy', 'magic used in public with no risk management or cost considered', 'an ordinary character who "always secretly knew" magic was real with no real disorientation', 'a masquerade-breaking event resolved by simply erasing everyone memory with a shortcut spell'],
+    emotionalRegister: 'streetwise wit stretched taut over a hidden, dangerous world',
+    genreRules: {
+      // Distinct from fantasy (generic secondary-world magic system with no
+      // concealment contract) — urban fantasy's specific requirement is
+      // that the mundane world's ignorance of magic actively constrains
+      // characters, generating its own ongoing tension.
+      threatType: 'the risk of the hidden magical world being exposed to, or colliding destructively with, the mundane one',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'keep the mundane world ignorance of magic an active constraint on what characters can do',
+        'make managing the risk of exposure a real, ongoing cost for characters who know the truth',
+        'ground the wonder of magic in specific collision with recognizably ordinary contemporary life',
+      ],
+      forbiddenShortcuts: [
+        'the hidden world exposed to the mundane world with no consequence or cover-up required',
+        'a memory-erasure or cover-up shortcut used with no cost or narrative weight',
+      ],
+    },
+  },
+  sports_drama: {
+    toneInstruction: 'GENRE — SPORTS DRAMA: The competition is a legible structure for measuring a personal or team transformation that matters more than the scoreboard. Skill is built visibly, through specific setbacks and repetition, never assumed or montaged into existence for free. Winning the game and winning the internal argument of the story are not always the same event — and the story must know which one it is actually about.',
+    register: 'Physical, disciplined, and attentive to the specific mechanics of the sport as a language for character.',
+    forbiddenCliches: ['a training montage substituting for earned, specific skill growth', 'a championship win that resolves the internal arc with no other cost or complication', 'a rival who is talented but a cartoonish jerk with no real interiority', 'an underdog victory achieved through a contrivance the sport itself would not allow', 'a coach whose only function is the inspirational speech before the big game'],
+    emotionalRegister: 'disciplined striving under the pressure of a legible, countable outcome',
+    genreRules: {
+      // Distinct from drama (no legible competitive structure) and
+      // coming_of_age (first-time-stakes framing rather than competition
+      // mechanics) — sports drama's contract is specifically that the
+      // scoreboard and the internal arc are tracked as two separate,
+      // sometimes divergent, outcomes.
+      threatType: 'a competition whose outcome legibly measures a personal or team transformation',
+      informationPositionDefault: 'parity',
+      requiredBehaviors: [
+        'build competitive skill visibly, through specific setbacks and repetition',
+        'make the internal transformation the story is actually tracking distinct from, and not automatically resolved by, the scoreboard result',
+        'ground victory or defeat in mechanics the sport itself would plausibly allow',
+      ],
+      forbiddenShortcuts: [
+        'a training montage substituting for earned, specific skill growth',
+        'a championship win resolving the internal arc with no other cost or complication',
+      ],
+    },
+  },
+  disaster: {
+    toneInstruction: 'GENRE — DISASTER: A large-scale catastrophic event threatens an ensemble cast, and its escalation follows a legible chain of cause and effect that the story tracks with specificity, not just spectacle. Each ensemble thread carries its own distinct human stake so the scale of the disaster is felt through particular people, not an abstraction. Warning signs are ignored for reasons the story actually establishes — institutional failure, denial, competing priorities — never for simple contrivance.',
+    register: 'Escalating, cross-cutting, and specific about mechanism. Spectacle is in service of legible stakes, not a replacement for them.',
+    forbiddenCliches: ['warning signs ignored with no institutional or human reason given', 'a hero who defeats the disaster itself as though it were a villain with intent', 'an ensemble thread that exists purely to be killed with no established human stake', 'a rescue that arrives with perfect timing and no cost paid to get there', 'the disaster resolved by a single technical fix with no earlier setup'],
+    emotionalRegister: 'mounting collective dread cut through with flashes of specific human courage',
+    genreRules: {
+      // Distinct from survival (an individual or small group against an
+      // indifferent environment) and war (a command/combat human threat) —
+      // disaster's contract is specifically an ensemble structure tracking a
+      // large-scale event's cause-and-effect escalation.
+      threatType: 'a large-scale catastrophic event whose escalation follows a legible chain of cause and effect across an ensemble',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'track the disaster escalation through a legible, specific chain of cause and effect',
+        'give every ensemble thread a distinct, established human stake in the outcome',
+        'ground any ignored warning sign in an institutional or human reason the story actually establishes',
+      ],
+      forbiddenShortcuts: [
+        'the disaster resolved by a technical fix with no earlier setup',
+        'an ensemble thread killed off with no previously established human stake',
+      ],
+    },
+  },
+  road_movie: {
+    toneInstruction: 'GENRE — ROAD MOVIE: The journey is the structure — a sequence of stops, encounters, and detours, each of which tests or reveals something specific about the travelers. What changes by the end is the relationship between the people in the vehicle, at least as much as anything about the destination. The literal act of movement (the car, the highway, the small enforced intimacy of travel) generates the drama as much as any single event along the way.',
+    register: 'Episodic, observational, and loose enough to let odd encounters breathe, while the relationship thread stays taut underneath.',
+    forbiddenCliches: ['a destination whose arrival resolves the entire emotional arc with no work done en route', 'a quirky stranger picked up purely for comic relief with no bearing on the travelers own arc', 'car trouble used as a filler incident with no consequence for the relationship', 'a road trip where the travelers relationship does not change at all by the end', 'a detour or stop that exists only to pad runtime with no test of character'],
+    emotionalRegister: 'restless momentum forcing an intimacy the travelers cannot drive away from',
+    genreRules: {
+      // Distinct from adventure (exotic/dangerous unknown world as the
+      // obstacle) and coming_of_age (worldview correction, any setting) —
+      // road movie's contract is specifically the episodic journey
+      // structure and the enforced-proximity relationship change it forces.
+      threatType: 'the enforced proximity and momentum of the journey itself, testing the relationship between the travelers',
+      informationPositionDefault: 'parity',
+      requiredBehaviors: [
+        'let each stop or encounter along the way test or reveal something specific about the travelers',
+        'make the change in the relationship between travelers at least as important as the destination',
+        'use the literal mechanics of travel (the vehicle, the road, forced proximity) to generate dramatic pressure',
+      ],
+      forbiddenShortcuts: [
+        'a destination whose arrival resolves the arc with no work done during the journey',
+        'a stop or detour that exists purely to pad runtime with no test of character',
+      ],
+    },
+  },
+  prison_drama: {
+    toneInstruction: 'GENRE — PRISON DRAMA: The institution of incarceration is a total, legible power structure, and the protagonist identity is tested by learning to survive inside it without disappearing into it. Hierarchies among inmates and staff are specific and consequential; small transactions of favor, protection, and information carry real weight. Any escape, release, or survival must be earned at a cost the story has been honest about all along.',
+    register: 'Contained, watchful, and attentive to the specific rules and hierarchies of institutional confinement.',
+    forbiddenCliches: ['guards or inmates rendered as uniformly cartoonish with no interiority', 'an escape plan executed with no earlier groundwork or cost', 'a release or parole that resolves the internal arc with no lingering cost', 'a prison hierarchy that exists only as scenery with no real stakes attached to it', 'a new inmate who instantly commands respect with no earned standing'],
+    emotionalRegister: 'contained endurance under a power structure that tests identity itself',
+    genreRules: {
+      // Distinct from crime (broader criminal/institutional mirroring) and
+      // courtroom (pre-verdict legal proceeding) — prison drama's contract
+      // is specifically a contained institution whose hierarchy tests the
+      // protagonist identity over the duration of confinement.
+      threatType: 'the total institutional power structure of incarceration, testing whether the protagonist identity survives it',
+      informationPositionDefault: 'parity',
+      requiredBehaviors: [
+        'render the specific hierarchies and transactions of institutional power as consequential, not scenery',
+        'earn any escape, release, or survival at a cost the story has established honestly',
+        'let the protagonist standing within the hierarchy be earned rather than assumed',
+      ],
+      forbiddenShortcuts: [
+        'an escape or release resolving the internal stakes with no earned cost',
+        'guards or inmates rendered as uniformly cartoonish with no interiority',
+      ],
+    },
+  },
+  noir_comedy: {
+    toneInstruction: 'GENRE — NOIR COMEDY: The noir machinery — the compromised protagonist, the femme fatale, the case that spirals out of control — is played by the characters with total sincerity, even as the plot mechanics escalate into absurd, chaotic overreach. The comedy comes from watching noir stakes taken completely seriously inside a world that keeps generating more and more disproportionate chaos from one small greedy or foolish choice.',
+    register: 'Deadpan and shadowed, but the escalation is comic overreach rather than genuine dread; timing matters as much as atmosphere.',
+    forbiddenCliches: ['a character winking at the audience to signal the parody', 'noir atmosphere used as pure decoration with no comic escalation attached', 'a case that resolves neatly with none of the accumulated chaos paying off', 'a femme fatale played purely as a joke with no genuine menace underneath', 'a mystery solved through competence rather than the absurd chaos the story built'],
+    emotionalRegister: 'sincere noir dread undercut by escalating, absurd comic overreach',
+    genreRules: {
+      // Distinct from noir (dead serious, fatalistic cool) and dark_comedy
+      // (tragic/taboo subject as the engine, not crime-plot chaos) — noir
+      // comedy's specific contract is sincere noir stakes generating comic,
+      // disproportionate escalation.
+      threatType: 'an escalating chain of disproportionate, absurd chaos triggered by one small greedy or foolish choice, taken completely seriously by the characters',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'let characters play the noir stakes with total sincerity even as the plot turns absurd',
+        'escalate chaos as the logical, if disproportionate, consequence of the inciting small choice',
+        'pay off the accumulated chaos in the resolution rather than resolving it neatly away',
+      ],
+      forbiddenShortcuts: [
+        'a character winking at the audience to signal the parody',
+        'the mystery solved through straightforward competence rather than the absurd chaos the story built',
+      ],
+    },
+  },
+  superhero: {
+    toneInstruction: 'GENRE — SUPERHERO: Power comes bundled with a specific, personal cost or responsibility; the ability to help is never free of what it demands from the life underneath the mask. The antagonist should function as a thematic mirror of the hero, testing exactly the value or flaw the hero has not yet resolved. A secret identity, when present, generates real, ongoing dramatic tension from the concealment itself, not just a plot device to enable action scenes.',
+    register: 'Heightened but emotionally grounded; spectacle is in service of a legible personal stake underneath the cape.',
+    forbiddenCliches: ['a power that solves every problem with no cost to the life underneath the mask', 'a secret identity maintained with no real tension or near-discovery', 'a villain who is powerful with no thematic connection to the hero own unresolved flaw', 'an origin that grants power with no accompanying responsibility or cost explored', 'a climactic battle resolved by a bigger power-up with no earned character choice behind it'],
+    emotionalRegister: 'earnest resolve under the specific cost of extraordinary responsibility',
+    genreRules: {
+      // Distinct from action (physical stakes/competence under pressure,
+      // no thematic-mirror or secret-identity contract) and fantasy/sci_fi
+      // (no power-cost or dual-identity requirement) — superhero's specific
+      // contract is a thematically mirrored antagonist plus a personally
+      // costly power.
+      threatType: 'an antagonist who mirrors the hero own unresolved flaw or value, backed by a power the hero must specifically answer',
+      informationPositionDefault: 'superior',
+      requiredBehaviors: [
+        'give the hero power a specific, personal cost or responsibility, not a free ability',
+        'root the antagonist opposition in a thematic mirror of the hero own unresolved flaw',
+        'generate real dramatic tension from a secret identity concealment where one exists',
+      ],
+      forbiddenShortcuts: [
+        'a power that resolves the climax with no earned character choice behind it',
+        'a secret identity maintained with no real tension or near-discovery moment',
+      ],
+    },
+  },
 };
 
 /**
@@ -844,6 +1297,25 @@ export const GENRE_NAMES: Record<GenreId, string> = {
   cyberpunk:         'Cyberpunk',
   gothic:            'Gothic',
   melodrama:         'Melodrama',
+  dark_comedy:            'Dark Comedy',
+  romantic_comedy:        'Romantic Comedy',
+  spy_espionage:          'Spy / Espionage',
+  gangster:               'Gangster',
+  political_thriller:     'Political Thriller',
+  psychological_thriller: 'Psychological Thriller',
+  police_procedural:      'Police Procedural',
+  cosmic_horror:          'Cosmic Horror',
+  slasher:                'Slasher',
+  space_opera:            'Space Opera',
+  time_travel:            'Time Travel',
+  post_apocalyptic:       'Post-Apocalyptic',
+  urban_fantasy:          'Urban Fantasy',
+  sports_drama:           'Sports Drama',
+  disaster:               'Disaster',
+  road_movie:             'Road Movie',
+  prison_drama:           'Prison Drama',
+  noir_comedy:            'Noir Comedy',
+  superhero:              'Superhero',
 };
 
 // ── Wave 1184 additions (Program v2, Type 3 — genre-conditioned) ────────────
@@ -1015,6 +1487,65 @@ export const GENRE_RULE_MODIFIERS: Partial<Record<GenreId, GenreRuleThresholds>>
   folk_horror: {
     darkNightSuspenseFloor: 1.6,
   },
+
+  // ── Genre-completion wave: 6 new genres get a live modifier here, exactly
+  // where a genuine one-line craft argument exists — the other 13 new genres
+  // (dark_comedy, romantic_comedy, spy_espionage, political_thriller,
+  // police_procedural, cosmic_horror, space_opera, time_travel,
+  // post_apocalyptic, urban_fantasy, sports_drama, prison_drama, noir_comedy)
+  // deliberately have none: their craft identity lives entirely in
+  // GENRE_MODIFIERS/genreRules above, and inventing a numeric nudge with no
+  // honest argument is exactly the padding this table forbids.
+  //
+  // psychological_thriller's dread is interior erosion of certainty, not
+  // external event (see GENRE_MODIFIERS.psychological_thriller: "dread
+  // accrues through internal erosion... more than through external event"),
+  // so a sustained, uniform cadence is often the intended slow-bleed effect
+  // rather than a stall — the same argument noir's slow burn already
+  // earned, so the plateau tolerance loosens identically.
+  psychological_thriller: {
+    pacingPlateauRatio: 1.1,
+  },
+  // slasher's climax must clear genuinely maximal terror: the pattern
+  // established across the body count means the "all is lost" beat has to
+  // exceed even horror's own elevated floor (1.5) to register as earned
+  // rather than just another kill in the sequence — the floor tightens
+  // beyond horror's, matching folk_horror's reasoning for the same reason.
+  slasher: {
+    darkNightSuspenseFloor: 1.7,
+  },
+  // gangster's downfall movement — the unraveling of loyalty, the reckoning
+  // — legitimately outsizes the rise's setup scenes (GENRE_MODIFIERS.gangster:
+  // "the fall is the same arithmetic run in reverse"), the same argument
+  // drama's extended aftermath and mystery's extended reveal already earned
+  // — the excess ratio loosens.
+  gangster: {
+    act3ExcessRatio: 1.25,
+  },
+  // disaster's ensemble structure needs every thread escalating in real
+  // time simultaneously (GENRE_MODIFIERS.disaster: "its escalation follows a
+  // legible chain of cause and effect"), so a uniform cadence across that
+  // many simultaneous threads reads as a genuine stall more readily than
+  // baseline — the monotony floor tightens, though less sharply than
+  // thriller's single-throughline urgency.
+  disaster: {
+    energyMonotoneCoV: 0.42,
+  },
+  // road_movie's episodic stop-and-go structure is a deliberate genre
+  // feature (GENRE_MODIFIERS.road_movie: "a sequence of stops, encounters,
+  // and detours"), the same repeated-rhythm argument action and survival
+  // already earned — the monotony floor loosens.
+  road_movie: {
+    energyMonotoneCoV: 0.2,
+  },
+  // superhero's climactic battle legitimately outsizes the origin/setup
+  // scenes of Act 1 (GENRE_MODIFIERS.superhero: antagonist confrontation as
+  // thematic-mirror payoff), the same argument courtroom's verdict stack
+  // and mystery's extended reveal already earned — the excess ratio
+  // loosens.
+  superhero: {
+    act3ExcessRatio: 1.3,
+  },
 };
 
 // ── Threshold plausibility bounds (B1-a) ─────────────────────────────────────
@@ -1100,6 +1631,14 @@ export const TONE_NAME_LIST = [
   'austere',
   'irreverent',
   'nostalgic',
+  'dread_driven',
+  'cathartic',
+  'nihilistic',
+  'spiritual',
+  'chaotic',
+  'romantic',
+  'maximalist',
+  'emotional',
 ] as const;
 
 export type ToneName = typeof TONE_NAME_LIST[number];
@@ -1194,6 +1733,66 @@ export const TONE_REGISTERS: Record<ToneName, ToneRegister> = {
     // before it reads as a bloated Act 3.
     thresholdDeltas: { act3ExcessRatio: 0.2 },
   },
+
+  // ── Genre-completion wave: 8 new tones (16 → 24). Two (spiritual,
+  // emotional) deliberately carry no thresholdDeltas — the same
+  // never-padded discipline as deadpan/satirical/irreverent: a voice-only
+  // instruction is a complete entry when no honest numeric argument exists.
+  dread_driven: {
+    instruction: 'TONE — DREAD-DRIVEN: Anticipation of harm is the engine, not the harm itself. Let the audience feel what is coming well before it arrives, and let waiting be the tension.',
+    // A dread-driven register's low point must clear a deeper trough before
+    // it counts as earned — the anticipatory dread the tone promises is
+    // measured in how bad the worst moment actually gets.
+    thresholdDeltas: { darkNightSuspenseFloor: 0.4 },
+  },
+  cathartic: {
+    instruction: 'TONE — CATHARTIC: The story is building toward a release of long-held feeling. Let the pressure accumulate honestly so the release, when it comes, actually discharges it.',
+    // Catharsis needs room to be felt — the release/processing movement
+    // after the climax legitimately runs longer before it reads as a
+    // bloated Act 3, the same allowance operatic and nostalgic already earn.
+    thresholdDeltas: { act3ExcessRatio: 0.25 },
+  },
+  nihilistic: {
+    instruction: 'TONE — NIHILISTIC: No cosmic ledger balances the suffering shown. Meaning is not restored by the ending; refuse any gesture that quietly implies it was.',
+    // Nihilism's flat, grinding sameness — nothing changes, nothing
+    // matters — is the intended effect at its most extreme, a stronger,
+    // more permissive version of bleak's milder loosening.
+    thresholdDeltas: { energyMonotoneCoV: -0.1 },
+  },
+  spiritual: {
+    instruction: 'TONE — SPIRITUAL: The story is oriented toward transcendence, faith, or a search for meaning beyond the material. Treat belief and doubt both as serious, lived positions, not props.',
+    // A register of faith/transcendence with no honest numeric rhythm
+    // argument distinct from its content — a prompt-only voice instruction.
+  },
+  chaotic: {
+    instruction: 'TONE — CHAOTIC: The rhythm itself is unstable — scenes swing unpredictably in length, intensity, and direction. Let the disorder feel governed by an internal logic even when it cannot be predicted.',
+    // Chaotic promises a rhythm that swings unpredictably scene to scene;
+    // a story that reads as uniformly paced undercuts that promise more
+    // than baseline, so even a moderately even cadence should register as
+    // monotone sooner — the floor tightens.
+    thresholdDeltas: { energyMonotoneCoV: 0.15 },
+  },
+  romantic: {
+    instruction: 'TONE — ROMANTIC: Feeling between people is the primary lens, even in a scene ostensibly about something else. Let proximity, glance, and restraint carry as much weight as event.',
+    // A romantic register's pivot is measured in emotional risk taken, not
+    // raw suspense, so a lower pressure floor still honestly counts as the
+    // midpoint's turn — the same direction romance's own genre modifier
+    // already establishes, applied as a portable tone nudge.
+    thresholdDeltas: { weakMidpointPressureFloor: -0.3 },
+  },
+  maximalist: {
+    instruction: 'TONE — MAXIMALIST: More is more. Amplify image, incident, and feeling past the point of restraint, and commit to the excess rather than apologizing for it.',
+    // Maximalism's whole aesthetic is more — the climactic movement is
+    // expected to run the largest and most elaborate of any register, an
+    // even more permissive allowance than operatic's already-large one.
+    thresholdDeltas: { act3ExcessRatio: 0.35 },
+  },
+  emotional: {
+    instruction: 'TONE — EMOTIONAL: Feeling is foregrounded and unguarded; let characters register what they feel openly rather than deflecting it.',
+    // A broad heightened-feeling instruction with no numeric argument
+    // distinct from melancholic's or operatic's own already-claimed fields
+    // — voice only.
+  },
 };
 
 export const TONE_NAMES: Record<ToneName, string> = {
@@ -1213,6 +1812,14 @@ export const TONE_NAMES: Record<ToneName, string> = {
   austere: 'Austere',
   irreverent: 'Irreverent',
   nostalgic: 'Nostalgic',
+  dread_driven: 'Dread-Driven',
+  cathartic: 'Cathartic',
+  nihilistic: 'Nihilistic',
+  spiritual: 'Spiritual',
+  chaotic: 'Chaotic',
+  romantic: 'Romantic',
+  maximalist: 'Maximalist',
+  emotional: 'Emotional',
 };
 
 /** Build the tone's standalone prompt instruction block, or '' when unset/unknown. */

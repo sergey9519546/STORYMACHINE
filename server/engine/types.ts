@@ -246,8 +246,17 @@ export type DirectorStyle =
   | 'park_chan_wook'
   | 'miyazaki';
 
-// TO ADD A NEW GENRE: extend this union, then add an entry in
-//   server/lib/genre-router.ts GENRE_MODIFIERS.
+// TO ADD A NEW GENRE: extend this union, then add a matching entry in
+//   server/lib/genre-router.ts's GENRE_MODIFIERS (toneInstruction, register,
+//   forbiddenCliches, emotionalRegister, and the genreRules structural
+//   contract — threatType, informationPositionDefault, requiredBehaviors,
+//   forbiddenShortcuts) and GENRE_NAMES. genre-router.ts's GenreId is a
+//   direct alias of this union (`export type GenreId = StoryGenre`), so the
+//   two stay in lockstep by construction — add here first, then there.
+// Genre-completion wave (44+ roster): grew from the original 8 through the
+// B1-a expansion (20 more) to this 47-genre roster (19 more), spanning the
+// highest-coverage real-world submission categories a screenwriting tool
+// needs to route tone, vocabulary, and structural contract for.
 export type StoryGenre =
   | 'thriller'
   | 'horror'
@@ -256,7 +265,46 @@ export type StoryGenre =
   | 'romance'
   | 'sci_fi'
   | 'noir'
-  | 'mystery';
+  | 'mystery'
+  | 'action'
+  | 'adventure'
+  | 'crime'
+  | 'fantasy'
+  | 'western'
+  | 'war'
+  | 'historical'
+  | 'biopic'
+  | 'musical'
+  | 'family'
+  | 'documentary_style'
+  | 'heist'
+  | 'courtroom'
+  | 'survival'
+  | 'coming_of_age'
+  | 'satire'
+  | 'folk_horror'
+  | 'cyberpunk'
+  | 'gothic'
+  | 'melodrama'
+  | 'dark_comedy'
+  | 'romantic_comedy'
+  | 'spy_espionage'
+  | 'gangster'
+  | 'political_thriller'
+  | 'psychological_thriller'
+  | 'police_procedural'
+  | 'cosmic_horror'
+  | 'slasher'
+  | 'space_opera'
+  | 'time_travel'
+  | 'post_apocalyptic'
+  | 'urban_fantasy'
+  | 'sports_drama'
+  | 'disaster'
+  | 'road_movie'
+  | 'prison_drama'
+  | 'noir_comedy'
+  | 'superhero';
 
 export interface IllusionState {
   phase: IllusionPhase;
