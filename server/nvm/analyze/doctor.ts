@@ -31,11 +31,13 @@
 
 import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
-import type { CompiledScreenplay } from '../screenplay/compile.ts';
+import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
+import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
+import { deepReadRecords } from './deep-read.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import type {
@@ -75,6 +77,18 @@ export function computeContentHash(fountain: string): string {
 // StoryContext fields (not just theme/genre) so a future pass that starts
 // reading directorStyle/characters in its diagnostics can't silently go
 // stale against this cache.
+//
+// Key ALSO includes a 'q'/'d' mode discriminator (quick vs deep read):
+// deep-read.ts's LLM sensor makes a deep report's signals genuinely different
+// from a quick report's for the identical (contentHash, storyContext) pair —
+// types.ts's deepRead doc comment is explicit that the two are NOT the same
+// lineage and must never be compared draft-over-draft. Without the
+// discriminator, whichever mode ran FIRST for a given input would silently
+// serve its report to a caller asking for the other mode — a `q` result
+// masquerading as `d` (missing the deepRead field entirely) or vice versa.
+// The discriminator prefixes the key (rather than appending) purely so it's
+// visually obvious at a glance in a debugger/log dump which lineage a given
+// cache entry belongs to.
 const DOCTOR_CACHE_CAPACITY = 64;
 /** Plain Map, no deps: insertion order is the recency order because every
  *  hit deletes-then-re-sets its key (bumping it to "most recent"), and every
@@ -106,8 +120,8 @@ function storyContextCacheKey(storyContext?: StoryContext): string {
   return fields.map(f => `${f.length}:${f}`).join('');
 }
 
-function doctorCacheKey(contentHash: string, storyContext?: StoryContext): string {
-  return `${contentHash}${storyContextCacheKey(storyContext)}`;
+function doctorCacheKey(contentHash: string, storyContext?: StoryContext, deepRead = false): string {
+  return `${deepRead ? 'd' : 'q'}${contentHash}${storyContextCacheKey(storyContext)}`;
 }
 
 function doctorCacheGet(key: string): Omit<ScriptDoctorReport, 'analyzedAt'> | undefined {
@@ -762,19 +776,61 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   };
 }
 
+/** Rebuild SceneAnnotation[] from records — the same field-for-field mapping
+ *  compile.ts's compileScreenplay and fountain-analyzer.ts's
+ *  analyzeFountainText both inline (neither exports it, and this module is
+ *  constrained to touch only itself + deep-read.ts + its own test, so it's
+ *  re-derived here rather than imported). Needed after a deep read merges new
+ *  purpose/dramaticTurn/revelation/emotionalShift values into `records`:
+ *  annotations are a pure projection of those same four fields (plus
+ *  clockRaised/openClues, which deep read never touches) — deep-read's
+ *  overridden signals only reach the revision pipeline if annotations are
+ *  rebuilt from the MERGED records rather than reused from the original
+ *  lexicon-only analysis. */
+function buildAnnotationsFromRecords(records: FountainAnalysis['records']): SceneAnnotation[] {
+  return records.map(r => ({
+    sceneIdx: r.sceneIdx,
+    purpose: r.purpose,
+    dramaticTurn: r.dramaticTurn,
+    revelation: r.revelation,
+    emotionalShift: r.emotionalShift,
+    clockRaised: r.clockRaised,
+    openClues: r.unresolvedClues.length,
+  }));
+}
+
 /**
  * Run the full Script Doctor checkup on raw Fountain text: analyze it into
  * scene records (no LLM, no I/O), then run all 14 revision passes in
  * diagnose-only mode (issues collected, no rewrite ever attempted), then
  * aggregate into a single report.
+ *
+ * opts.deepRead (additive, default off — the quick path below is byte-
+ * identical to before this option existed, a deliberate regression gate):
+ * when true, runs deep-read.ts's LLM scene sensor over the SAME lexicon
+ * records analyzeFountainText produced, merges its (validated-only, per-
+ * scene) signals in, and rebuilds structure/annotations from the merged
+ * records before they reach the 14-pass pipeline — see deep-read.ts's own
+ * header for the full non-determinism/injection/cache story. Keyless or
+ * total-failure degrades to the quick signals with report.deepRead.usedLLM
+ * === false; it never throws for lack of a key (see deep-read.ts).
  */
-export async function runScriptDoctor(fountain: string, storyContext?: StoryContext): Promise<ScriptDoctorReport> {
+export async function runScriptDoctor(
+  fountain: string,
+  storyContext?: StoryContext,
+  opts?: { deepRead?: boolean },
+): Promise<ScriptDoctorReport> {
+  const deepReadMode = opts?.deepRead === true;
+
   // ── Cache check ────────────────────────────────────────────────────────
   // contentHash is cheap (one sha256 over the trimmed text) relative to the
   // 14-pass pipeline, so it's always worth computing up front and checking
-  // the cache before touching the analyzer at all.
+  // the cache before touching the analyzer at all. The cache key folds in
+  // deepReadMode (see doctorCacheKey's comment) so quick and deep lineages
+  // for the same (contentHash, storyContext) never collide or serve each
+  // other's report.
   const contentHash = computeContentHash(fountain);
-  const cacheKey = doctorCacheKey(contentHash, storyContext);
+  const cacheKey = doctorCacheKey(contentHash, storyContext, deepReadMode);
   const cached = doctorCacheGet(cacheKey);
   if (cached) {
     // Shallow copy: callers get their own top-level object (safe to
@@ -799,7 +855,7 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
   // spend one of the 64 LRU slots on a report that costs next to nothing to
   // rebuild — a strictly worse trade than caching a real pipeline run.
   if (analysis.sceneCount === 0) {
-    return {
+    const degenerate: ScriptDoctorReport = {
       health: 0,
       grade: 'troubled',
       totalIssues: 0,
@@ -820,21 +876,51 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
       contentHash,
     };
+    // A deep-read request against an empty submission is still a "deep"
+    // lineage report — types.ts's deepRead field is populated on every
+    // non-degenerate deep run, so an all-zero one here (nothing to read)
+    // keeps that promise rather than silently omitting the field.
+    if (deepReadMode) {
+      degenerate.deepRead = { scenesRead: 0, scenesTotal: 0, usedLLM: false, fallbackScenes: [] };
+    }
+    return degenerate;
+  }
+
+  // ── Deep read (additive) ──────────────────────────────────────────────
+  // Quick path (deepReadMode === false) never touches analysis beyond this
+  // point unmodified — byte-identical to pre-deep-read behavior.
+  let mergedAnalysis: FountainAnalysis = analysis;
+  let deepReadField: ScriptDoctorReport['deepRead'] | undefined;
+
+  if (deepReadMode) {
+    const { records, deepRead } = await deepReadRecords(fountain, analysis.records);
+    // Rebuild, don't reuse: structure.ts's analyzeStructure and this file's
+    // buildAnnotationsFromRecords both derive purely from record signals
+    // (suspenseDelta/revelation/clockRaised/unresolvedClues for structure;
+    // purpose/dramaticTurn/revelation/emotionalShift/clockRaised/
+    // unresolvedClues for annotations) — reusing analysis.structure/
+    // analysis.annotations here would silently discard every signal deep
+    // read just overrode.
+    const structure = analyzeStructure(records, []);
+    const annotations = buildAnnotationsFromRecords(records);
+    mergedAnalysis = { ...analysis, records, structure, annotations };
+    deepReadField = deepRead;
   }
 
   const compiled: CompiledScreenplay = {
     fountain,
-    annotations: analysis.annotations,
-    structureSummary: buildStructureSummaryLine(analysis),
-    wordCount: analysis.wordCount,
+    annotations: mergedAnalysis.annotations,
+    structureSummary: buildStructureSummaryLine(mergedAnalysis),
+    wordCount: mergedAnalysis.wordCount,
     compiledAt: Date.now(),
   };
 
   const result = await runDiagnoseOnly(() =>
-    runRevisionPipeline(compiled, analysis.records, analysis.structure, [], undefined, storyContext),
+    runRevisionPipeline(compiled, mergedAnalysis.records, mergedAnalysis.structure, [], undefined, storyContext),
   );
 
-  const report = aggregateReport(result, analysis, fountain);
+  const report = aggregateReport(result, mergedAnalysis, fountain);
+  if (deepReadField) report.deepRead = deepReadField;
 
   // Store a shallow copy (not the object about to be returned) so nothing
   // the caller later does to their own report — e.g. reassigning a
