@@ -93,9 +93,20 @@ const MAX_BATCHES = 10;
 // under it separately makes the compiler reject any listed string that ISN'T
 // a valid ScenePurpose (catches a typo, though not an omission — cross-check
 // memory.ts's union by eye whenever a new purpose is added there).
+//
+// Wave E1-b: 9 → 16. All 7 new values are listed here (not just the 3
+// memory.ts's own doc comment calls "LLM-only") because this enum is this
+// module's OWN output contract, independent of what derivePurpose can reach
+// deterministically — a model reading a batch of several scenes' text at
+// once (see buildBatchPrompt below) has strictly MORE context than
+// derivePurpose's single-commit view, so it can plausibly assign
+// setup_planting/relationship_beat/echo_coda/breather too, not only the 3
+// truly cross-scene ones (subplot_complication, false_victory, dark_night).
 const SCENE_PURPOSES = [
   'establish_world', 'introduce_conflict', 'complicate', 'raise_stakes', 'revelation',
   'turning_point', 'climax', 'resolution', 'character_moment',
+  'setup_planting', 'relationship_beat', 'echo_coda', 'breather',
+  'subplot_complication', 'false_victory', 'dark_night',
 ] as const;
 const _purposesAreScenePurposes: readonly ScenePurpose[] = SCENE_PURPOSES;
 
@@ -192,7 +203,13 @@ function buildBatchPrompt(scenes: Array<{ sceneIdx: number; text: string }>): st
     '  suspenseDelta: integer, -5..5 — net change in physical/visceral tension this scene creates.',
     '  curiosityDelta: integer, -5..5 — net change in the audience\'s unanswered questions this scene creates.',
     `  emotionalShift: exactly one of ${EMOTIONAL_SHIFTS.map(v => `"${v}"`).join(', ')} — net emotional valence.`,
-    `  purpose: exactly one of ${SCENE_PURPOSES.map(v => `"${v}"`).join(', ')} — the scene's dramatic function.`,
+    `  purpose: exactly one of ${SCENE_PURPOSES.map(v => `"${v}"`).join(', ')} — the scene's dramatic function. ` +
+      'Notes on the less obvious values: "setup_planting" = mainly plants clues/foreshadowing, nothing paid off ' +
+      'yet; "relationship_beat" = mainly moves a bond between two characters; "echo_coda" = a claim or beat from ' +
+      'earlier in the script is deliberately restated here; "breather" = a genuinely quiet, low-key scene between ' +
+      'louder ones; "subplot_complication" = complicates a B-story/subplot rather than the main plot; ' +
+      '"false_victory" = an apparent win the audience should not fully trust, because it gets undercut or reversed ' +
+      'later; "dark_night" = the protagonist at their lowest point.',
     '  dramaticTurn: string, at most 160 characters — the single dramatic thing that changes this scene ' +
       '("" if nothing changes).',
     '  revelation: string at most 160 characters, or null — a truth newly disclosed to the audience this ' +

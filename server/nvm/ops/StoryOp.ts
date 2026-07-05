@@ -19,18 +19,39 @@ export interface AtomicFact {
 }
 
 export interface RelationshipDelta {
+  // Wave E1-b: +4 dimensions (jealousy, respect, rivalry, protectiveness),
+  // 10 → 14. `shame` was evaluated and deliberately excluded: EmotionState
+  // (server/engine/types.ts) already has its own `shame` field — shame is a
+  // feeling a character holds about themselves, not an axis a relationship
+  // BETWEEN two people moves along, so admitting it here would duplicate an
+  // emotion as a relationship dimension rather than describe a genuinely
+  // relational quantity (contrast with `contempt`, which is inherently
+  // directed AT the other party and so is relational).
   dimension: 'love' | 'trust' | 'intimacy' | 'admiration' | 'resentment'
-           | 'fear' | 'contempt' | 'guilt' | 'obligation' | 'dependency';
+           | 'fear' | 'contempt' | 'guilt' | 'obligation' | 'dependency'
+           | 'jealousy' | 'respect' | 'rivalry' | 'protectiveness';
   amount: number;   // signed, -1..1
   reason: string;
 }
 
-// 8 clue carrier types (GODMODE Stage 8 — clue ecology).
+// 18 clue carrier types (GODMODE Stage 8 — clue ecology). Wave E1-b: +10
+// (costume, lighting, timing, silence, transformation, wound, document,
+// symbol, animal, price), 8 → 18.
 export type ClueCarrier =
-  'object' | 'line' | 'gesture' | 'location' | 'absence' | 'behavior' | 'camera' | 'sound';
+  'object' | 'line' | 'gesture' | 'location' | 'absence' | 'behavior' | 'camera' | 'sound'
+  | 'costume' | 'lighting' | 'timing' | 'silence' | 'transformation' | 'wound' | 'document'
+  | 'symbol' | 'animal' | 'price';
 
-// Theme argumentation moves (GODMODE Stage 2 — ThemeArgumentGraph).
-export type ThemeMove = 'support' | 'attack' | 'undercut' | 'complicate' | 'resolve';
+// Theme argumentation moves (GODMODE Stage 2 — ThemeArgumentGraph). Wave
+// E1-b: +6 (invert, parallel, echo, interrogate, demonstrate_through_failure,
+// humanize), 5 → 11. A 7th candidate, 'subvert', was evaluated and dropped as
+// a synonym of the existing `undercut` (both mean "weaken/undermine the
+// claim from within") — no craft-plausible two-voice rendering reliably
+// distinguished it from undercut's; see project/index.ts's themeArgumentLines
+// and this wave's final report for the reasoning.
+export type ThemeMove =
+  'support' | 'attack' | 'undercut' | 'complicate' | 'resolve'
+  | 'invert' | 'parallel' | 'echo' | 'interrogate' | 'demonstrate_through_failure' | 'humanize';
 
 export interface ReaderStateDelta {
   suspense?: number;     // signed deltas

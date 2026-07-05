@@ -97,17 +97,29 @@ function capitalize(s: string): string {
 
 /** Concrete descriptive noun-phrase per clue carrier (GODMODE Stage 8) — lets
  *  SEED_CLUE's rendering name the carrier TYPE itself as a screenplay detail
- *  rather than a bare enum value. */
+ *  rather than a bare enum value. Wave E1-b added the 10 carriers below
+ *  'sound' (costume through price) — each a distinct craft-plausible vehicle
+ *  a clue can ride in on, none overlapping an existing carrier's phrasing. */
 function carrierPhrase(carrier: ClueCarrier): string {
   switch (carrier) {
-    case 'object':   return 'A small object';
-    case 'line':     return 'A stray remark';
-    case 'gesture':  return 'A small gesture';
-    case 'location': return 'A detail in the room';
-    case 'absence':  return 'A conspicuous absence';
-    case 'behavior': return 'A telling habit';
-    case 'camera':   return 'A held frame';
-    case 'sound':    return 'A faint sound';
+    case 'object':         return 'A small object';
+    case 'line':           return 'A stray remark';
+    case 'gesture':        return 'A small gesture';
+    case 'location':       return 'A detail in the room';
+    case 'absence':        return 'A conspicuous absence';
+    case 'behavior':       return 'A telling habit';
+    case 'camera':         return 'A held frame';
+    case 'sound':          return 'A faint sound';
+    case 'costume':        return 'A change of clothes';
+    case 'lighting':       return 'A shift in the light';
+    case 'timing':         return 'A telling delay';
+    case 'silence':        return 'A held silence';
+    case 'transformation': return 'A visible transformation';
+    case 'wound':          return 'A fresh wound';
+    case 'document':       return 'A folded document';
+    case 'symbol':         return 'A recurring symbol';
+    case 'animal':         return 'A watchful animal';
+    case 'price':          return 'A quoted price';
   }
 }
 
@@ -142,12 +154,35 @@ function emotionBeat(charId: string, dominant: string): string {
  *  first speaker's dialogue. */
 function themeArgumentLines(claimId: string, move: ThemeMove): string[] {
   const claim = cleanId(claimId);
+  // Wave E1-b added the 6 exchanges below 'resolve' (invert through humanize)
+  // — each a genuinely distinct dramaturgical move, not a reworded synonym of
+  // one of the original 5 (see StoryOp.ts's ThemeMove comment for why a 7th
+  // candidate, 'subvert', was rejected as a synonym of 'undercut' instead of
+  // being added here):
+  //   invert   — the claim's OPPOSITE is now asserted as true (a polarity
+  //              flip), distinct from attack's mere negation of the claim.
+  //   parallel — a different, structurally similar case is offered as proof,
+  //              not a new argument about THIS claim directly.
+  //   echo     — an earlier claim is restated verbatim through a new voice,
+  //              with no new argument added (a callback, not reinforcement).
+  //   interrogate — the claim is cross-examined and left UNRESOLVED; unlike
+  //              every other move, it takes no side for or against.
+  //   demonstrate_through_failure — the claim is proven by showing what
+  //              happens to someone who lacked/ignored it, not by arguing it.
+  //   humanize — the claim is grounded in a personal stake instead of being
+  //              argued at all; a register shift from idea to feeling.
   const EXCHANGES: Record<ThemeMove, [string, string]> = {
     support:    [`Maybe ${claim} really is true.`, `It's earned, if nothing else.`],
     attack:     [`${capitalize(claim)}? Not anymore.`, `It was never as true as we thought.`],
     undercut:   [`You still believe ${claim}?`, `Not after everything that's happened.`],
     complicate: [`${capitalize(claim)}? It's not that simple.`, `Nothing about this is simple.`],
     resolve:    [`So that's it, then. ${capitalize(claim)}.`, `That's it. Finally.`],
+    invert:     [`We always said ${claim}.`, `No — the truth was the opposite all along.`],
+    parallel:   [`It happened to them too, didn't it — ${claim}.`, `The same shape, wearing a different name.`],
+    echo:       [`Someone said that once before.`, `${capitalize(claim)}. Still true, coming from me now.`],
+    interrogate: [`Is it even true that ${claim}?`, `I don't know. Ask me again after.`],
+    demonstrate_through_failure: [`He never believed ${claim} — and look what it cost him.`, `That's the whole lesson, isn't it.`],
+    humanize:   [`Forget the argument for a second — ${claim}.`, `Then it's not a theory anymore.`],
   };
   const [a, b] = EXCHANGES[move];
   return ['\t\t\tVOICE A', a, '', '\t\t\tVOICE B', b];

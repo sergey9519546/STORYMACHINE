@@ -11,6 +11,20 @@ import type { StoryCommit } from '../state/StoryCommit.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// Wave E1-b: 9 → 16. The 7 new values below 'character_moment' split further
+// along two axes: some (setup_planting, relationship_beat, echo_coda,
+// breather) are inferable from a SINGLE commit's ops alone, so derivePurpose
+// below can assign them deterministically on the ops-derived path. The other
+// three (subplot_complication, false_victory, dark_night) genuinely require
+// context derivePurpose does not have — knowing what counts as "the main
+// plot" vs. a subplot, or whether a later scene reverses this one's apparent
+// win, or this scene's POSITION relative to the story's low point — none of
+// which a single StoryCommit's ops can honestly support. Those three are
+// LLM-ONLY: only server/nvm/analyze/deep-read.ts's model-based reader (whose
+// batched prompt gives the model several neighboring scenes' text at once,
+// unlike derivePurpose's single-commit view) can plausibly assign them; the
+// ops-derived path never emits them, and callers must not assume every
+// ScenePurpose value is reachable from annotateCommit.
 export type ScenePurpose =
   | 'establish_world'
   | 'introduce_conflict'
@@ -20,7 +34,31 @@ export type ScenePurpose =
   | 'turning_point'
   | 'climax'
   | 'resolution'
-  | 'character_moment';
+  | 'character_moment'
+  /** Ops-derived-reachable: 2+ SEED_CLUE ops in the same scene (planting
+   *  dominates the scene, distinct from a single clue woven into an
+   *  introduce_conflict scene — see derivePurpose). */
+  | 'setup_planting'
+  /** Ops-derived-reachable: a SHIFT_RELATIONSHIP op is present — a more
+   *  precise label than the old catch-all `character_moment` for a scene
+   *  whose main business is moving a bond between two characters. */
+  | 'relationship_beat'
+  /** Ops-derived-reachable: an ADVANCE_THEME_ARGUMENT op whose move is
+   *  'echo' — the theme argument literally restates an earlier claim through
+   *  a new voice, which is what an "echo coda" beat structurally is. */
+  | 'echo_coda'
+  /** Ops-derived-reachable: the true fallback — no clue/clock/relationship/
+   *  theme/emotion signal at all. A quiet, low-key scene between beats. */
+  | 'breather'
+  /** LLM-ONLY (see file-header note above): a subplot complicates rather
+   *  than the A-plot — requires knowing which thread is the main one. */
+  | 'subplot_complication'
+  /** LLM-ONLY: an apparent win the audience should not yet trust, because a
+   *  later scene reverses it — requires reading past this scene. */
+  | 'false_victory'
+  /** LLM-ONLY: the protagonist's lowest point — requires knowing this
+   *  scene's position relative to the story's overall shape. */
+  | 'dark_night';
 
 export interface ScreenplaySceneRecord {
   commitId: string;
@@ -256,7 +294,17 @@ export function buildScreenplayMemory(commits: StoryCommit[]): ScreenplaySceneRe
 function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
   if (sceneIdx === 0) return 'establish_world';
   if (ops.some(o => o.op === 'PAYOFF_SETUP')) return 'revelation';
-  if (ops.some(o => o.op === 'SEED_CLUE')) return 'introduce_conflict';
+
+  // Wave E1-b: a scene devoted to planting MULTIPLE clues at once reads as a
+  // dedicated setup beat rather than a scene that merely introduces conflict
+  // in passing (the original, still-correct meaning for a single seed) — see
+  // the ScenePurpose doc comment above for why this split is honestly
+  // derivable from one commit's ops alone (a plain count, no cross-scene
+  // knowledge required).
+  const seedClueOps = ops.filter(o => o.op === 'SEED_CLUE');
+  if (seedClueOps.length >= 2) return 'setup_planting';
+  if (seedClueOps.length === 1) return 'introduce_conflict';
+
   const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
   if (clockOps.length > 0) {
     const totalAmount = clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0);
@@ -264,9 +312,30 @@ function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
     if (totalAmount >= 2) return 'raise_stakes';
     return 'complicate';
   }
-  if (ops.some(o => o.op === 'SHIFT_RELATIONSHIP')) return 'character_moment';
-  if (ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT')) return 'turning_point';
-  return 'character_moment';
+
+  // Wave E1-b: SHIFT_RELATIONSHIP now gets its own, more precise purpose
+  // (relationship_beat) instead of falling into the generic character_moment
+  // catch-all below.
+  if (ops.some(o => o.op === 'SHIFT_RELATIONSHIP')) return 'relationship_beat';
+
+  const themeOps = ops.filter(o => o.op === 'ADVANCE_THEME_ARGUMENT');
+  if (themeOps.length > 0) {
+    // Wave E1-b: an 'echo' theme move IS structurally an echo-coda beat (the
+    // argument restates an earlier claim through a new voice) — the one
+    // ThemeMove value with a direct, honest ScenePurpose counterpart.
+    const hasEcho = themeOps.some(o => (o as Extract<StoryOp, {op:'ADVANCE_THEME_ARGUMENT'}>).move === 'echo');
+    if (hasEcho) return 'echo_coda';
+    return 'turning_point';
+  }
+
+  // Wave E1-b: split the old blanket character_moment fallback in two — a
+  // scene that actually appraises a character's emotion keeps that label
+  // (it IS a character-focused beat); a scene with no signal channel at all
+  // (no clue/clock/relationship/theme/emotion) is more honestly a breather —
+  // a quiet beat between louder ones — than a "character moment" it never
+  // earned.
+  if (ops.some(o => o.op === 'APPRAISE_EMOTION')) return 'character_moment';
+  return 'breather';
 }
 
 function deriveDramaticTurn(ops: StoryOp[], purpose: ScenePurpose): string {
