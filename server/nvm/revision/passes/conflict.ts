@@ -547,6 +547,14 @@
 // fifth and sixth channels (visualBeats, dialogueHighlights), completing full six-channel
 // saturation for this trigger. CONFLICT_REVELATION_STAGING_AFTERMATH_VOID gives revelation its
 // fifth channel (visualBeats).
+// Wave 1164 additions: after Wave 1150, revelation stood at five of six channels, missing only
+// dialogueHighlights. CONFLICT_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID gives it its sixth
+// and final channel, completing full six-channel saturation for every existing trigger in this
+// pass. With those exhausted, this wave introduces suspenseDelta as a genuinely fresh
+// checkAftermathVoid trigger — it has only ever appeared as an aftermath channel or a compound
+// negative-conflict signal in this file, never as the isTrigger side of a check.
+// CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID pairs suspenseDelta with emotionalShift;
+// CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID pairs it with curiosityDelta.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6770,6 +6778,84 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1150c.triggerCount} scenes that reveal something is followed by two scenes with no heavily-staged visual beat, even though ${r1150c.aftermathCount} such scenes exist elsewhere in the script. A revelation that never earns a visually charged follow-through leaves the conflict layer's disclosures registering as narrated information rather than something the story visibly dwells on.`,
         suggestedFix: `In the two scenes following at least one revelation, stage at least two concrete visual beats, so the new information registers in image, not just in plot bookkeeping.`,
+      });
+    }
+  }
+
+  // CONFLICT_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID — Sequence/aftermath × revelation
+  // trigger → dialogueHighlights absence. Built on checkAftermathVoid from the shared checks
+  // library. n≥8, ≥2 qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 scenes
+  // anywhere with a highlighted line of dialogue, 2-scene lookahead. Fires when every
+  // revelation's two-scene aftermath contains no highlighted dialogue, while such dialogue
+  // occurs elsewhere. Distinct from CONFLICT_REVELATION_CURIOSITY_AFTERMATH_VOID (Wave 1108),
+  // CONFLICT_REVELATION_EMOTIONAL_AFTERMATH_VOID, CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID
+  // (Wave 1122), CONFLICT_REVELATION_RELATIONAL_AFTERMATH_VOID (Wave 1136), and CONFLICT_
+  // REVELATION_STAGING_AFTERMATH_VOID (Wave 1150, same trigger paired with curiosityDelta/
+  // emotionalShift/suspenseDelta/relationshipShifts/visualBeats) — this is the sixth and final
+  // consequence channel for this trigger, completing full six-channel saturation.
+  {
+    const r1164a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.dialogueHighlights ?? []).length > 0,
+    });
+    if (r1164a.fires) {
+      issues.push({
+        location: `${r1164a.triggerCount} revelation scene(s) — no dialogue highlight within 2 scenes`,
+        rule: 'CONFLICT_REVELATION_DIALOGUE_HIGHLIGHT_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1164a.triggerCount} scenes that reveal something is followed by two scenes with no standout line of dialogue, even though ${r1164a.aftermathCount} such lines occur elsewhere in the script. A truth that surfaces without earning a memorable exchange in its wake leaves the conflict layer's disclosures unvoiced — no character's speech processes what the new information means for the fight.`,
+        suggestedFix: `In the two scenes following at least one revelation, give a character a standout line that reckons with what was just learned, so the new information lands in what people say, not just in what happens.`,
+      });
+    }
+  }
+
+  // CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere,
+  // 2-scene lookahead. Fires when every suspense-spike's two-scene aftermath registers no
+  // emotional shift, while such shifts occur elsewhere. Distinct from every existing suspenseDelta
+  // reference in this file: prior rules use it only as an aftermath channel for other triggers
+  // (clockRaised, dramaticTurn, seededClueIds, revelation, etc.) or as a compound negative-
+  // conflict signal (CONFLICT_CLOCK_AFTERMATH_VOID's suspenseDelta<-1 predicate) — this is the
+  // first check to use suspenseDelta as the isTrigger side in this pass.
+  {
+    const r1164b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1164b.fires) {
+      issues.push({
+        location: `${r1164b.triggerCount} suspense-spike scene(s) — no emotional shift within 2 scenes of any`,
+        rule: 'CONFLICT_SUSPENSE_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1164b.triggerCount} suspense-spike scenes is followed by two scenes with no emotional shift, even though ${r1164b.aftermathCount} such shifts occur elsewhere. A spike in danger that never registers on any character's felt state right after it leaves the conflict layer's tension reading as mechanics rather than something anyone actually feels the weight of.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a character's emotional register shift in response to the danger, so the tension carries felt weight, not just structural pressure.`,
+      });
+    }
+  }
+
+  // CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID — Sequence/aftermath × suspenseDelta (>0) trigger
+  // → curiosityDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8,
+  // ≥2 qualifying suspense-spike scenes (pos<n-2), ≥2 curiosity-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every suspense-spike's two-scene aftermath carries no rise in
+  // curiosity, while such rises occur elsewhere. Distinct from CONFLICT_SUSPENSE_EMOTIONAL_
+  // AFTERMATH_VOID (this wave, same trigger paired with emotionalShift) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1164c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.suspenseDelta ?? 0) > 0,
+      isAftermath: r => (r.curiosityDelta ?? 0) > 0,
+    });
+    if (r1164c.fires) {
+      issues.push({
+        location: `${r1164c.triggerCount} suspense-spike scene(s) — no curiosity rise within 2 scenes of any`,
+        rule: 'CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1164c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1164c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the conflict layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
+        suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
       });
     }
   }
