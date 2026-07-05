@@ -526,6 +526,10 @@
 // genuinely fresh checkAftermathVoid triggers — neither has ever anchored the isTrigger side of
 // a check in this file. THEME_TURN_CURIOSITY_AFTERMATH_VOID pairs dramaticTurn with
 // curiosityDelta; THEME_REVELATION_CURIOSITY_AFTERMATH_VOID pairs revelation with curiosityDelta.
+// Wave 1172 additions: after Wave 1158, dramaticTurn and revelation were each at one channel
+// (curiosityDelta). THEME_TURN_EMOTIONAL_AFTERMATH_VOID and THEME_TURN_SUSPENSE_AFTERMATH_VOID
+// give dramaticTurn its second and third channels (emotionalShift, suspenseDelta); THEME_
+// REVELATION_EMOTIONAL_AFTERMATH_VOID gives revelation its second channel (emotionalShift).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6678,6 +6682,78 @@ export async function themePass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1158c.triggerCount} scenes that reveal something is followed by two scenes with no rise in curiosity, even though ${r1158c.aftermathCount} such rises occur elsewhere in the script. A revelation that closes a question without opening a new one about the story's central concern leaves the theme layer's disclosures reading as plot resolution rather than a deepening of what the story is really about.`,
         suggestedFix: `In the two scenes following at least one revelation, let the new information provoke a fresh question about the story's theme, so disclosure keeps generating curiosity about meaning instead of only closing plot threads.`,
+      });
+    }
+  }
+
+  // THEME_TURN_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 emotionally-shifted scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath registers no emotional shift, while
+  // such shifts occur elsewhere. Distinct from THEME_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1158,
+  // same trigger paired with curiosityDelta) — this is the second consequence channel for this
+  // trigger.
+  {
+    const r1172a = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1172a.fires) {
+      issues.push({
+        location: `${r1172a.triggerCount} dramatic-turn aftermath(s) — no emotional shift within 2 scenes`,
+        rule: 'THEME_TURN_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1172a.triggerCount} pivots) is followed by two scenes with no emotional shift, even though ${r1172a.aftermathCount} such shifts occur elsewhere. A pivot that never registers on any character's felt state leaves the theme's turns reading as plot mechanics rather than moments that change how someone feels about the story's central concern.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, let it visibly shift a character's emotional register, so the pivot's meaning for the theme lands as something felt, not just executed as a beat.`,
+      });
+    }
+  }
+
+  // THEME_TURN_SUSPENSE_AFTERMATH_VOID — Sequence/aftermath × dramaticTurn trigger →
+  // suspenseDelta absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying dramatic-turn scenes (pos<n-2), ≥2 suspense-rising scenes anywhere, 2-scene
+  // lookahead. Fires when every turn's two-scene aftermath carries no rise in suspense, while
+  // such rises occur elsewhere. Distinct from THEME_TURN_CURIOSITY_AFTERMATH_VOID (Wave 1158) and
+  // THEME_TURN_EMOTIONAL_AFTERMATH_VOID (this wave, same trigger paired with curiosityDelta/
+  // emotionalShift) — this is the third consequence channel for this trigger.
+  {
+    const r1172b = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => (r.dramaticTurn ?? 'nothing') !== 'nothing',
+      isAftermath: r => (r.suspenseDelta ?? 0) > 0,
+    });
+    if (r1172b.fires) {
+      issues.push({
+        location: `${r1172b.triggerCount} dramatic-turn aftermath(s) — no suspense rise within 2 scenes`,
+        rule: 'THEME_TURN_SUSPENSE_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every dramatic-turn scene in the story (${r1172b.triggerCount} pivots) is followed by two scenes with no rise in suspense, even though ${r1172b.aftermathCount} such rises occur elsewhere. A pivot that never sharpens the stakes of the story's central concern right after it happens leaves the theme's turns reading as incident rather than a turn that raises what the story is really about.`,
+        suggestedFix: `In the two scenes following at least one dramatic turn, sharpen what's now at risk for the theme, so the pivot compounds the tension around the story's central question rather than resolving into a flat new normal.`,
+      });
+    }
+  }
+
+  // THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID — Sequence/aftermath × revelation trigger →
+  // emotionalShift absence. Built on checkAftermathVoid from the shared checks library. n≥8, ≥2
+  // qualifying revelation scenes (pos<n-2, revelation non-null), ≥2 emotionally-shifted scenes
+  // anywhere, 2-scene lookahead. Fires when every revelation's two-scene aftermath registers no
+  // emotional shift, while such shifts occur elsewhere. Distinct from THEME_REVELATION_CURIOSITY_
+  // AFTERMATH_VOID (Wave 1158, same trigger paired with curiosityDelta) — this is the second
+  // consequence channel for this trigger.
+  {
+    const r1172c = checkAftermathVoid({
+      records, minRecords: 8, minTriggerCount: 2, minAftermathCount: 2, window: 2,
+      isTrigger: r => r.revelation != null,
+      isAftermath: r => (r.emotionalShift ?? 'neutral') !== 'neutral',
+    });
+    if (r1172c.fires) {
+      issues.push({
+        location: `${r1172c.triggerCount} revelation scene(s) — no emotional shift within 2 scenes`,
+        rule: 'THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID',
+        severity: 'minor',
+        description: `Every one of the story's ${r1172c.triggerCount} scenes that reveal something is followed by two scenes with no emotional shift, even though ${r1172c.aftermathCount} such shifts occur elsewhere. A revelation that never registers on any character's felt state leaves the theme layer's disclosures reading as information delivered to the audience rather than something that visibly changes how anyone feels about the story's central concern.`,
+        suggestedFix: `In the two scenes following at least one revelation, let it visibly shift a character's emotional register, so the new information about the theme lands as something felt, not just something known.`,
       });
     }
   }

@@ -931,6 +931,80 @@ betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal betrayal
   });
 
 
+  describe('Wave 1172 — themePass: theme turn-emotional aftermath void, theme turn-suspense aftermath void, theme revelation-emotional aftermath void', async () => {
+    const runT1172 = async (records: ScreenplaySceneRecord[]) => {
+      const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
+      return themePass({
+        fountain: '', original: '', records,
+        structure: {} as any, annotations: [], approvedSpans: [],
+        storyContext: { theme: 'redemption courage hope' },
+      });
+    };
+
+    // Aftermath geometry n=10, window=2: triggers at {0,3} (both have a full 2-scene lookahead).
+    // FIRE: aftermath signal placed only at {8,9} — outside both trigger windows {1,2} and {4,5}.
+    // NO-FIRE: aftermath at {1,9} — index 1 falls inside trigger 0's window, breaking voidness.
+    it('THEME_TURN_EMOTIONAL_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no emotional shift', async () => {
+      const recs1172a = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_EMOTIONAL_AFTERMATH_VOID'), 'THEME_TURN_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_TURN_EMOTIONAL_AFTERMATH_VOID does not fire when a dramatic turn is followed by an emotional shift within its window', async () => {
+      const recs1172an = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_EMOTIONAL_AFTERMATH_VOID'), 'THEME_TURN_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_TURN_SUSPENSE_AFTERMATH_VOID fires when every dramatic turn is followed by two scenes with no suspense rise', async () => {
+      const recs1172b = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_TURN_SUSPENSE_AFTERMATH_VOID'), 'THEME_TURN_SUSPENSE_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_TURN_SUSPENSE_AFTERMATH_VOID does not fire when a dramatic turn is followed by a suspense rise within its window', async () => {
+      const recs1172bn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { dramaticTurn: 'reversal' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { suspenseDelta: 1 });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_TURN_SUSPENSE_AFTERMATH_VOID'), 'THEME_TURN_SUSPENSE_AFTERMATH_VOID should not fire');
+    });
+
+    it('THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID fires when every revelation is followed by two scenes with no emotional shift', async () => {
+      const recs1172c = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 8 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID should fire');
+    });
+
+    it('THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID does not fire when a revelation is followed by an emotional shift within its window', async () => {
+      const recs1172cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0 || i === 3) return makeSharedRecord(i, { revelation: 'the truth about the letter' });
+        if (i === 1 || i === 9) return makeSharedRecord(i, { emotionalShift: 'positive' });
+        return makeSharedRecord(i);
+      });
+      const res = await runT1172(recs1172cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID'), 'THEME_REVELATION_EMOTIONAL_AFTERMATH_VOID should not fire');
+    });
+  });
+
   describe('Wave 1158 — themePass: theme clock-staging aftermath void, theme turn-curiosity aftermath void, theme revelation-curiosity aftermath void', async () => {
     const runT1158 = async (records: ScreenplaySceneRecord[]) => {
       const { themePass } = await import('../../server/nvm/revision/passes/theme.ts');
