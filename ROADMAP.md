@@ -538,6 +538,26 @@ missing or thin, ranked by product value:
   menace target-curve delta audit (expectedTensionAt exists, nothing
   compares measured scene tension against it); contradiction families
   (PHYSICAL/KNOWLEDGE/MOTIVATION/TIMELINE) layered over rootCauses.
+- [ ] **R-wave (70-point research memo, 2026-07-05):** (1) Scene economy
+  score + value-shift contract — objective/conflict/turn/value-shift per
+  scene, scenes scored by jobs done (plot/character/relationship/tension/
+  setup/theme/information); deterministic doctor checks. (2) Fair-play
+  mystery solver — genre-conditioned: all clues needed for the solution
+  seeded before the reveal, red herrings factually-true-but-misleading,
+  no late culprit. (3) Confusion-vs-mystery metric — confusion penalty
+  (unclear speaker/cause/timeline, unresolved-name pileup) distinct from
+  suspense. (4) Speech-act signal channel — per-line accuse/deny/
+  threaten/confess/deflect/bargain classification in fountain-analyzer
+  (Type-1 wave material). (5) Epistemic contract + unreliability budget
+  + 10 narrator types (enriches B-wave-3 narrator item). (6) Clock
+  segments + threat fronts + antagonist autonomy (sim depth). (7) Canon
+  tiers (hard/soft/provisional) + retcon governance over the commit
+  ledger. (8) Evaluator hard-veto audit — Fabula-violation vetoes must
+  beat score averaging in room critique. (9) Benchmark scenario suite —
+  locked-room / betrayal-dinner / missing-person golden scenarios with
+  expected truth/belief/clue/payoff outputs, extending the
+  discrimination harness. Filed-not-scheduled: BOID obligations,
+  factions, spatial line-of-sight, streaming tags, TTS/storyboards.
 - [ ] **B-wave 3:** Setup/payoff TYPING (plot/character/emotional/mystery/
   visual/irony/thematic + visibility + required window on SEED_CLUE/
   PAYOFF_SETUP — StoryOp contract change, sequence with parity);
