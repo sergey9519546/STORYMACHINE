@@ -32,8 +32,13 @@ function buildDecorations(state: EditorState): DecorationSet {
   for (const block of blocks) {
     const cls = BLOCK_CLASSES[block.type];
     if (!cls) continue;
-    const blockLines = block.text.split('\n');
-    for (let offset = 0; offset < blockLines.length; offset++) {
+
+    // ⚡ Bolt: Zero-allocation line counting to avoid array creation on every keystroke
+    let lineCount = 1;
+    let pos = -1;
+    while ((pos = block.text.indexOf('\n', pos + 1)) !== -1) lineCount++;
+
+    for (let offset = 0; offset < lineCount; offset++) {
       const lineNo = block.lineNumber + offset;          // 1-indexed
       if (lineNo < 1 || lineNo > state.doc.lines) continue;
       const line = state.doc.line(lineNo);
