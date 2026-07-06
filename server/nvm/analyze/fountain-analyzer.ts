@@ -858,7 +858,7 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
 
   const dialogueLineCount = blocks.filter(b => b.type === 'dialogue' && b.text.trim() !== '').length;
   const actionLineCount = blocks.filter(b => b.type === 'action' && b.text.trim() !== '').length;
-  const wordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  const wordCount = (fountain.match(/\S+/g) || []).length;
 
   return { records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount };
 }

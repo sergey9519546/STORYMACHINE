@@ -450,8 +450,8 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    const trimmedText = scriptText.trim();
+    let wordCount = trimmedText === "" ? 0 : (trimmedText.match(/\S+/g) || []).length;
 
     blocks.forEach((block) => {
       if (block.type === "character") {
