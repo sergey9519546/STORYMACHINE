@@ -4,3 +4,6 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2026-07-07 - [Word Count Regex Matching]
+**Learning:** Replaced split(/\s+/) with match(/\S+/g) which safely handles Unicode whitespace while allocating less memory and avoiding large intermediate array creations for non-word tokens.
+**Action:** Use match(/\S+/g) for word counting in high frequency renders instead of split.
