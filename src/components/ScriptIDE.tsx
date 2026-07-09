@@ -450,8 +450,12 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+
+    // Performance optimization: Avoid String.prototype.split() for word counting.
+    // split(/\s+/) allocates large intermediate arrays during high-frequency keystroke renders
+    // causing GC pauses. match(/\S+/g) safely extracts non-whitespace blocks directly
+    // and properly returns 0 length for whitespace-only strings without needing an explicit trim() check.
+    let wordCount = (scriptText.match(/\S+/g) || []).length;
 
     blocks.forEach((block) => {
       if (block.type === "character") {
