@@ -32,16 +32,37 @@ function buildDecorations(state: EditorState): DecorationSet {
   for (const block of blocks) {
     const cls = BLOCK_CLASSES[block.type];
     if (!cls) continue;
-    const blockLines = block.text.split('\n');
-    for (let offset = 0; offset < blockLines.length; offset++) {
-      const lineNo = block.lineNumber + offset;          // 1-indexed
-      if (lineNo < 1 || lineNo > state.doc.lines) continue;
-      const line = state.doc.line(lineNo);
-      try {
-        builder.add(line.from, line.from, Decoration.line({ class: cls }));
-      } catch {
-        // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
+
+    let startIndex = 0;
+    let offset = 0;
+    while (startIndex <= block.text.length) {
+      let nextIndex = block.text.indexOf('\n', startIndex);
+      if (nextIndex === -1) {
+        // We still need to process the last line (or the only line if no newlines).
+        const lineNo = block.lineNumber + offset;
+        if (lineNo >= 1 && lineNo <= state.doc.lines) {
+          const line = state.doc.line(lineNo);
+          try {
+            builder.add(line.from, line.from, Decoration.line({ class: cls }));
+          } catch {
+            // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
+          }
+        }
+        break; // Reached the end of the block text.
       }
+
+      const lineNo = block.lineNumber + offset;
+      if (lineNo >= 1 && lineNo <= state.doc.lines) {
+        const line = state.doc.line(lineNo);
+        try {
+          builder.add(line.from, line.from, Decoration.line({ class: cls }));
+        } catch {
+          // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
+        }
+      }
+
+      startIndex = nextIndex + 1;
+      offset++;
     }
   }
 
