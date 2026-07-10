@@ -114,7 +114,13 @@ const BLIND_SPOT_NOTE: Record<string, string> = {
   'composite-reviewer-scenario':
     "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '
-    + 'from a dead tie) — real but short of the 5.0-point floor below',
+    + 'from a dead tie) — real but short of the 5.0-point floor below. DIAGNOSED 2026-07-10 (rule-level diff): '
+    + 'the bad half already fires 22 rules the good half does not (EXPOSITION_DUMP x2, NO_RELATIONSHIP_MOVEMENT, '
+    + 'dialogue floods) — the residual gap is ~19 STYLE-MINOR false positives on the GOOD half (rhythm/dialogue '
+    + 'line-shape rules: LONG_LINE_FLOOD, ACTION_CONSECUTIVE_LONG_RUN, DIALOGUE_ANAPHORA_RUN, etc.) tripping on '
+    + 'dramatized action prose, the same D2 pattern spread thin across many rules. Closing it honestly is a '
+    + 'dedicated guard wave over those rhythm minors (each measured against calibration), not a lexicon chase '
+    + 'on this fixture',
 };
 
 function topIssues(report: ScriptDoctorReport, n = 3): string {
