@@ -520,6 +520,18 @@ ProjectionGalleryPanel; CHARACTER_ARC_MODES → config route + prompt
 consumption; discrimination-harness todos → drive the next detector
 wave (told-exposition inversion first).
 
+**I-wave 1 — ✅ COMPLETE.** All wired: I1-a (tone persistence +
+composeThresholds live in pacing/structure/belief passes +
+character-arc-mode route + genrePromiseBlock in prompts), I1-b (cascade
++ trinity in keyless deterministic fallback, byte-stable at baseline),
+I1-c (metrics in ScriptDoctorReport + panel Story Metrics section on
+the text path), I1-d (6 projection targets in gallery + Story tab with
+all axes + DirectorPanel de-hardcoded via story-axes), I1-e (Wave 1192:
+betrayal/power/irony record fields both paths + 3 checks, parity matrix
+→29, calibration/discrimination held). Suite 8628/0, rulebook 3204.
+Remaining discrimination-harness todos (told-exposition inversion #1)
+are the next detector wave's target — still open.
+
 ## STANDING DIRECTIVE — Exhaustive coverage (user, 2026-07-05)
 
 Every configurable/enumerable axis in the product must be pushed to
