@@ -1,6 +1,14 @@
 # Pass: `conflict`
 
-Founding wave: 39. Total distinct rules: 233 (165 attributed to a specific wave, 68 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 234 (166 attributed to a specific wave, 68 unattributed — see docs/rulebook/README.md's methodology note).
+
+## Wave 1192
+
+Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): BETRAYAL_WITHOUT_SETUP — first consumer of the new per-scene betrayalSignal channel (fountain-analyzer.ts's computeBetrayalSignals, wired onto ScreenplaySceneRecord this wave): a betrayal-vocabulary spike with zero prior strain trajectory anywhere in the run-up. See the rule's own comment for the measured threshold and the scope boundary against causality.ts's UNMOTIVATED_BETRAYAL. (The wave's second check, POWER_STASIS, consumes the sibling powerDynamicsIntensity channel in relationship-arc.ts. The chartered third check, IRONY_DESERT, was measured against the 20-sample calibration corpus and DROPPED: ironyMarkerCount is 0 in every scene of every band, and a strong-band sample ('Low Tide') has suspense variance 0 with 100% neutral emotionalShift — so every earnestness-monotone formulation of the guard fires on known-good material. The check cannot separate honest drama from defect with the data this engine exposes; shipping it would violate guarantee item 2 (no rule fires on noise), so this wave honestly ships 2 checks.)
+
+Rules named in this wave's header:
+
+- `BETRAYAL_WITHOUT_SETUP`
 
 ## Wave 1186
 

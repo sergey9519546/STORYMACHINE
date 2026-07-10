@@ -1,6 +1,14 @@
 # Pass: `relationship-arc`
 
-Founding wave: 134. Total distinct rules: 224 (163 attributed to a specific wave, 61 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 134. Total distinct rules: 225 (164 attributed to a specific wave, 61 unattributed — see docs/rulebook/README.md's methodology note).
+
+## Wave 1192
+
+Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): POWER_STASIS — first consumer of the new per-scene powerDynamicsIntensity channel (fountain-analyzer.ts's computePowerDynamicsIntensity, wired onto ScreenplaySceneRecord this wave), joined with Wave 1186's powerHolder/powerFlipped: a control-CHARGED relationship thread (>=4 scenes whose vocabulary is explicitly about domination/submission) where control nonetheless never moves — same holder every time, no mid-scene flip. Domination without dramatic movement. See the rule's own comment for the measured threshold and distinctness rationale. (This wave's sibling check BETRAYAL_WITHOUT_SETUP lives in conflict.ts; the chartered third check IRONY_DESERT was measured against the calibration corpus and honestly dropped — see conflict.ts's Wave 1192 header note for the evidence.)
+
+Rules named in this wave's header:
+
+- `POWER_STASIS`
 
 ## Wave 1169
 
