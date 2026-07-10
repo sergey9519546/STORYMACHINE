@@ -18,7 +18,7 @@ import {
 import { Stage } from '../../server/engine/Stage.ts';
 import { Agent } from '../../server/engine/Agent.ts';
 import { resetLLMProvider } from '../../server/engine/ai.ts';
-import type { ActionLogEntry, CharacterSheet, EmotionState, Location } from '../../server/engine/types.ts';
+import type { ActionLogEntry, CharacterSheet, DramaticPressure, EmotionState, Location } from '../../server/engine/types.ts';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -192,6 +192,252 @@ describe('agent/deterministic — composeDeterministicAction', () => {
       const first = composeDeterministicAction(sheet, stage, node, others);
       const second = composeDeterministicAction(sheet, stage, node, others);
       assert.deepEqual(first, second);
+    } finally {
+      stage.close();
+    }
+  });
+});
+
+// ── Cascade + trinity integration (I1-b) ─────────────────────────────────────
+// composeDeterministicAction now arbitrates its legacy priority tiers through
+// the same computeDefenseCascadeState / arbitrateTrinity layers decision.ts
+// applies to LLM candidates (cascadeActionBias × trinityActionBias over the
+// candidate scores). Fire tests below drive a real cascade state via live
+// engine signals (emotion fear/distress fields + dramatic pressure + ToM
+// power_balance — exactly what deriveCascadeInputs reads); the byte-stability
+// block pins that at baseline ('arousal': calm emotion, no pressure) output
+// is IDENTICAL to the pre-integration composer, literal string for literal
+// string.
+
+// EmotionState with the component field set (deriveCascadeInputs reads
+// es.fear/es.distress, not just dominant/intensity — the emotion() helper
+// above leaves components at 0).
+function fearEmotion(fear: number): EmotionState {
+  return { joy: 0, distress: 0, anger: 0, fear, pride: 0, shame: 0, dominant: 'fear', intensity: fear, last_updated_at: 0 };
+}
+
+function pressure(overrides: Partial<DramaticPressure> = {}): DramaticPressure {
+  return {
+    pressure_id: 'p1',
+    target_char_id: 'a1',
+    trigger_event_id: 'evt-1',
+    pressure_type: 'CONFRONT',
+    intensity: 90,
+    bias_hint: 'You are being confronted directly.',
+    expires_at_turn: 10,
+    applied: false,
+    ...overrides,
+  };
+}
+
+describe('agent/deterministic — cascade + trinity arbitration of the keyless composer', () => {
+  it('freeze (fire): a frozen character no longer selects the bold deceptive/confrontational action', () => {
+    const stage = makeStageWithExits();
+    try {
+      // Deceptive traits that — calm — select LIE (pinned by the legacy
+      // deception fire test above). Under a sudden, high-intensity threat
+      // (fresh pressure ⇒ suddenness 90; fear 80 ⇒ threatLevel 80; suspicion
+      // 10 ⇒ exposureTurns 0, inside the first-instant freeze window) the
+      // cascade reads FREEZE and its ×0.40 LIE / ×1.5 WAIT bias must flip the
+      // selection away from the confrontational move.
+      const sheet = baseAgent({
+        darkTriad: { machiavellianism: 85, narcissism: 50, psychopathy: 40 },
+        emotionState: fearEmotion(80),
+      });
+      stage.addAgent(sheet); // Dramatic_Pressure.target_char_id has an FK to Characters
+      stage.addDramaticPressure(pressure());
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.notEqual(action.action_type, 'LIE', 'frozen character must not produce the bold deceptive action');
+      assert.equal(action.action_type, 'WAIT');
+      assert.equal(action.deterministic, true);
+      assert.match(action.content, /I— no\.|I need a second/, 'freeze WAIT line uses the fragmented, halting phrasing');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('freeze (no-fire): the same deceptive character WITHOUT the sudden threat still selects LIE', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({ darkTriad: { machiavellianism: 85, narcissism: 50, psychopathy: 40 } });
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.equal(action.action_type, 'LIE');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('fawn (fire): social threat from a dominant party skews the composed line to appeasement/submission', () => {
+    const stage = makeStageWithExits();
+    try {
+      // fear 65 ⇒ threat past activation; suspicion 45 ⇒ exposureTurns 2 (past
+      // the freeze window); pressure WITH source_char_id + Bob present ⇒
+      // socialThreat; ToM power_balance 0.1 ⇒ powerDifferential -80 ⇒ FAWN.
+      const sheet = baseAgent({
+        suspicion_score: 45,
+        emotionState: fearEmotion(65),
+        theoryOfMind: {
+          a2: { subject_id: 'a2', believed_knowledge: [], believed_motive: 'unknown', trust_level: 0.4, power_balance: 0.1 },
+        },
+      });
+      stage.addAgent(sheet); // FK: pressure target must exist in Characters
+      stage.addDramaticPressure(pressure({ source_char_id: 'a2', intensity: 70 }));
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.equal(action.action_type, 'SPEAK', 'fawn keeps the character talking (appeasing), not fleeing or lying');
+      assert.match(action.content, /I don't want any trouble — you're right, of course\./, 'fawn recolors the line with appeasing phrasing');
+      assert.match(action.content, /I need to find out who forged the painting/, 'the underlying goal-voiced line is recolored, not replaced');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('fawn (no-fire): the same character at baseline gets the plain goal line with no appeasing prefix', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({
+        suspicion_score: 45,
+        theoryOfMind: {
+          a2: { subject_id: 'a2', believed_knowledge: [], believed_motive: 'unknown', trust_level: 0.4, power_balance: 0.1 },
+        },
+      }); // no emotion, no pressure ⇒ threatLevel 0 ⇒ arousal
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.equal(action.action_type, 'SPEAK');
+      assert.ok(!/you're right, of course/.test(action.content), 'no appeasing flavor at baseline');
+      assert.equal(action.content, 'I need to find out who forged the painting.');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('flight via cascade (fire): an id-dominated character under survival threat skews to the evasive RELOCATE', () => {
+    const stage = makeStageWithExits();
+    try {
+      // fear 90 + active survival stake 90 ⇒ trinity ID wins; no pressure ⇒
+      // suddenness 0 (no freeze), threat not social, anger not dominant, a
+      // real exit exists ⇒ cascade FLIGHT. Attachment is secure and suspicion
+      // low, so the LEGACY flight trigger does NOT fire — the RELOCATE here
+      // can only come from the cascade's ×1.5 evasive bias.
+      const sheet = baseAgent({
+        emotionState: fearEmotion(90),
+        stakes: [{ id: 's1', char_id: 'a1', category: 'survival', description: 'Might not survive the night.', magnitude: 90, is_active: true }],
+      });
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.equal(action.action_type, 'RELOCATE');
+      assert.equal(action.target, 'Hallway');
+      assert.equal(action.deterministic, true);
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('flight via cascade (no-fire): same character with no exit cannot flee — and no exit means no RELOCATE at all', () => {
+    const stage = new Stage(':memory:');
+    try {
+      const sealed: Location = { location_id: 'room-a', name: 'Vault', description: 'A sealed vault.', adjacent_locations: [] };
+      stage.addLocation(sealed);
+      const sheet = baseAgent({
+        emotionState: fearEmotion(90),
+        stakes: [{ id: 's1', char_id: 'a1', category: 'survival', description: 'Might not survive the night.', magnitude: 90, is_active: true }],
+      });
+      const action = composeDeterministicAction(sheet, stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.notEqual(action.action_type, 'RELOCATE');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('determinism: identical cascade-active state (freeze fixture) yields byte-identical actions twice', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({
+        darkTriad: { machiavellianism: 85, narcissism: 50, psychopathy: 40 },
+        emotionState: fearEmotion(80),
+      });
+      stage.addAgent(sheet); // FK: pressure target must exist in Characters
+      stage.addDramaticPressure(pressure());
+      const node = stage.getLocation('room-a')!;
+      const others = [otherAgent(), otherAgent({ char_id: 'a3', name: 'Cass' })];
+      const first = composeDeterministicAction(sheet, stage, node, others);
+      const second = composeDeterministicAction(sheet, stage, node, others);
+      assert.deepEqual(first, second);
+    } finally {
+      stage.close();
+    }
+  });
+});
+
+// ── Baseline byte-stability regression (I1-b guarantee) ─────────────────────
+// At baseline — arousal cascade state (calm/no-threat emotion, no dramatic
+// pressure) — the cascade contributes NO bias ({}), and the BASE_SCORE tier
+// separation guarantees the always-on trinity bias can never reorder the
+// legacy priority (see the contract comment in deterministic.ts). These pins
+// are the exact pre-integration outputs, asserted literal-for-literal: if any
+// refactor perturbs baseline text, target, or type by one byte, this fails.
+
+describe('agent/deterministic — baseline output is byte-identical to the pre-cascade composer', () => {
+  it('calm default fixture: exact legacy SPEAK action, byte for byte', () => {
+    const stage = makeStageWithExits();
+    try {
+      const action = composeDeterministicAction(baseAgent(), stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.deepEqual(action, {
+        action_type: 'SPEAK',
+        target: 'a2',
+        content: 'I need to find out who forged the painting.',
+        deterministic: true,
+      });
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('calm denial-defense fixture: exact legacy defense-colored SPEAK (shame carries no fear/distress, so cascade stays at arousal)', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({ defenseMechanisms: ['denial'], emotionState: emotion('shame', 60) });
+      const action = composeDeterministicAction(sheet, stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.deepEqual(action, {
+        action_type: 'SPEAK',
+        target: 'a2',
+        content: `That's not true. None of this happened the way you're describing.`,
+        deterministic: true,
+      });
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('calm avoidant-flight fixture: exact legacy RELOCATE with the same seeded exit pick', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({ attachmentStyle: 'avoidant', suspicion_score: 60 });
+      const action = composeDeterministicAction(sheet, stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.deepEqual(action, {
+        action_type: 'RELOCATE',
+        target: 'Hallway',
+        content: `I can't stay in this room right now.`,
+        deterministic: true,
+      });
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('calm deceptive fixture: exact legacy LIE action, byte for byte', () => {
+    const stage = makeStageWithExits();
+    try {
+      const sheet = baseAgent({ darkTriad: { machiavellianism: 85, narcissism: 50, psychopathy: 40 } });
+      const action = composeDeterministicAction(sheet, stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.deepEqual(action, {
+        action_type: 'LIE',
+        target: 'a2',
+        content: `Whatever you heard, that isn't what happened. You can trust me on that.`,
+        deterministic: true,
+      });
     } finally {
       stage.close();
     }

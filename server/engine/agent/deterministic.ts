@@ -46,6 +46,7 @@
 
 import type {
   ActionLogEntry,
+  ActionType,
   BeliefSource,
   CharacterSheet,
   DefenseMechanism,
@@ -55,9 +56,15 @@ import type {
 import type { Stage } from '../Stage.ts';
 import { makePrng, randInt, seedFromString } from '../../nvm/repro/seed.ts';
 import {
+  arbitrateTrinity,
+  cascadeActionBias,
+  computeDefenseCascadeState,
   computeDefenseLevel,
+  deriveCascadeInputs,
   getReadyGoals,
   selectActiveDefense,
+  trinityActionBias,
+  type CascadeState,
 } from './psychology.ts';
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -148,6 +155,77 @@ function goalVoicingLine(goal: string, underPressure: boolean): string {
   return `${underPressure ? 'Right now, ' : ''}I need to ${goal}.`;
 }
 
+// ── Cascade integration (defense cascade + trinity arbitration) ──────────────
+// The keyless fallback consumes the SAME two arbitration layers decision.ts
+// applies to LLM candidates: computeDefenseCascadeState(deriveCascadeInputs(…))
+// and arbitrateTrinity(sheet), with cascadeActionBias × trinityActionBias
+// multiplied into candidate scores before selection — so a FROZEN character
+// stops producing bold confrontational actions in keyless mode too, and a
+// flight-state character skews toward evasive RELOCATE.
+//
+// BYTE-STABILITY CONTRACT: at baseline (cascade state 'arousal' — the no-threat
+// state, where cascadeActionBias() is {}), output is byte-identical to the
+// pre-integration priority cascade. That holds because the BASE_SCORE tiers
+// below are separated by more than the worst-case ratio the trinity bias alone
+// can apply between any two action types (blended trinity multipliers span
+// SPEAK [1.03, 1.135], LIE [0.655, 1.11], RELOCATE [0.915, 1.055],
+// WAIT [0.825, 1.07] — every adjacent tier gap below exceeds the max
+// cross-type ratio, e.g. LIE_FIRED/SPEAK_DEFENSE = 55/30 > 1.135/0.655).
+// Trinity alone therefore never reorders the legacy priority; only a
+// non-arousal cascade state (a real threat response) can — which is exactly
+// the intended semantics. Regression-pinned in deterministic-sim.test.ts.
+const BASE_SCORE = {
+  FLIGHT_FIRED: 100,   // legacy trigger 1: avoidant + suspicion + exit
+  LIE_FIRED: 55,       // legacy trigger 2: high-dark-triad deception
+  SPEAK_DEFENSE: 30,   // legacy trigger 3: active defense mechanism
+  SPEAK_DEFAULT: 26,   // legacy trigger 4: plain goal voicing
+  WAIT_LATENT: 22,     // never wins at arousal; freeze/collapse (×1.5/×1.6) lift it
+  RELOCATE_LATENT: 20, // never wins at arousal; flight state (×1.5) lifts it
+} as const;
+
+interface DeterministicCandidate {
+  action: NarrativeAction;
+  base: number;
+}
+
+// Deterministic phrasing hooks implementing cascadeBehaviorProfile(state)
+// .dialogueStyle for the states that recolor speech (freeze: "fragmented,
+// halting … sentences trail off mid-clause"; fawn: "appeasing, over-agreeing,
+// apologetic"; flight: "urgent, clipped, escape-oriented"; collapse:
+// "minimal, monosyllabic, dissociated"). Identity at 'arousal' (baseline —
+// byte-stability) and at 'fight' (the legacy lines are already assertive;
+// sharpening them further would overwrite defense-mechanism coloring).
+function cascadeFlavor(state: CascadeState, line: string): string {
+  switch (state) {
+    case 'freeze': {
+      const words = line.split(' ');
+      const head = words.slice(0, Math.max(3, Math.ceil(words.length / 2))).join(' ').replace(/[.,;:!?…]+$/, '');
+      return `${head}— I… give me a second.`;
+    }
+    case 'fawn':
+      return `I don't want any trouble — you're right, of course. ${line}`;
+    case 'flight':
+      return `${line} I can't keep standing here.`;
+    case 'collapse': {
+      const head = line.split(' ').slice(0, 4).join(' ').replace(/[.,;:!?…]+$/, '');
+      return `${head}… it doesn't matter now.`;
+    }
+    default:
+      return line;
+  }
+}
+
+// Line for the latent WAIT candidate — only ever selected when a non-arousal
+// cascade state lifts it past the composed SPEAK (freeze/collapse), so its
+// phrasing is written for those states.
+function waitLine(state: CascadeState, goal: string): string {
+  switch (state) {
+    case 'collapse': return `…It doesn't matter. None of it does.`;
+    case 'freeze':   return `I— no. ${capitalize(goal)}… I need a second.`;
+    default:         return `Not yet. ${capitalize(goal)} — but not yet.`;
+  }
+}
+
 /**
  * Compose one turn's NarrativeAction with no LLM call, purely from the
  * agent's actual live state. Called from Agent.takeTurn() only when
@@ -166,6 +244,13 @@ function goalVoicingLine(goal: string, underPressure: boolean): string {
  *      already gates this on emotional intensity >= 30) recolors — not
  *      replaces — the goal-voicing line.
  *   4. Composed default SPEAK — plainly voices the live goal.
+ *
+ * Those tiers are then arbitrated by the SAME defense cascade + trinity
+ * layers the LLM path uses (cascadeActionBias × trinityActionBias over the
+ * candidate scores — see the BASE_SCORE contract above): under a real threat
+ * response the winner can change (freeze → WAIT, flight → evasive RELOCATE),
+ * and the winning line is recolored via cascadeFlavor; at baseline ('arousal')
+ * neither layer alters the output byte.
  *
  * Pure with respect to its inputs (only reads Stage, never writes) — the same
  * (sheet, stage-state, node, otherAgents) always produces the same action,
@@ -186,53 +271,106 @@ export function composeDeterministicAction(
   const underPressure = stage.getActivePressures(sheet.char_id).length > 0;
   const addressee = pickAddressee(sheet, otherAgents, turn, 'addressee');
 
-  // 1. FLIGHT
+  // Same derivations decision.ts's selectBestAction applies to LLM candidates
+  // (identical inputs: sheet, stage, node, otherAgents), so keyless and LLM
+  // turns are arbitrated by the SAME cascade + trinity state, turn-for-turn.
+  const cascade = computeDefenseCascadeState(deriveCascadeInputs(sheet, stage, node, otherAgents));
+  const cascadeBias = cascadeActionBias(cascade.state);
+  const trinity = arbitrateTrinity(sheet);
+  const trinityBias = trinityActionBias(trinity.winner, trinity.colorer);
+
+  // Seeded (never Math.random) exit pick — same seed string as before the
+  // cascade integration, so a fired flight's chosen exit is unchanged.
+  const pickExit = (): { target: string } | null => {
+    if (node.adjacent_locations.length === 0) return null;
+    const prng = makePrng(seedFromString(`${sheet.char_id}:${turn}:exit`));
+    const exitId = node.adjacent_locations[randInt(prng, node.adjacent_locations.length)];
+    return { target: stage.getLocation(exitId)?.name ?? exitId };
+  };
+
+  // ── Candidate set: the four legacy priority tiers as scored candidates, plus
+  // two latent candidates (WAIT, evasive RELOCATE) that only a non-arousal
+  // cascade state can lift into first place (see BASE_SCORE's contract).
+  const candidates: DeterministicCandidate[] = [];
+  const exit = pickExit();
+
+  // 1. FLIGHT (legacy trigger: avoidant + suspicion + composure cracking + exit)
   if (
     sheet.attachmentStyle === 'avoidant' &&
     suspicion > 40 &&
     !defenseLevel.startsWith('low') &&
-    node.adjacent_locations.length > 0
+    exit
   ) {
-    const prng = makePrng(seedFromString(`${sheet.char_id}:${turn}:exit`));
-    const exitId = node.adjacent_locations[randInt(prng, node.adjacent_locations.length)];
-    const exitLoc = stage.getLocation(exitId);
-    return {
-      action_type: 'RELOCATE',
-      target: exitLoc?.name ?? exitId,
-      content: flightLine(),
-      deterministic: true,
-    };
+    candidates.push({
+      base: BASE_SCORE.FLIGHT_FIRED,
+      action: { action_type: 'RELOCATE', target: exit.target, content: flightLine(), deterministic: true },
+    });
   }
 
-  // 2. DECEPTION
+  // 2. DECEPTION (legacy trigger: Machiavellian/psychopathic traits + addressee)
   const dt = sheet.darkTriad;
   const deceptive = (dt?.machiavellianism ?? 0) > 70 || (dt?.psychopathy ?? 0) > 70;
   if (deceptive && addressee) {
-    return {
-      action_type: 'LIE',
-      target: addressee.char_id,
-      content: deceptionLine(),
-      deterministic: true,
-    };
+    candidates.push({
+      base: BASE_SCORE.LIE_FIRED,
+      action: { action_type: 'LIE', target: addressee.char_id, content: deceptionLine(), deterministic: true },
+    });
   }
 
   // 3. DEFENSE-COLORED SPEAK
   if (activeDefense) {
-    return {
-      action_type: 'SPEAK',
-      target: addressee?.char_id ?? null,
-      content: DEFENSE_LINES[activeDefense](goalText, addressee?.name ?? null),
-      deterministic: true,
-    };
+    candidates.push({
+      base: BASE_SCORE.SPEAK_DEFENSE,
+      action: {
+        action_type: 'SPEAK',
+        target: addressee?.char_id ?? null,
+        content: DEFENSE_LINES[activeDefense](goalText, addressee?.name ?? null),
+        deterministic: true,
+      },
+    });
   }
 
-  // 4. Composed default
-  return {
-    action_type: 'SPEAK',
-    target: addressee?.char_id ?? null,
-    content: goalVoicingLine(goalText, underPressure),
-    deterministic: true,
+  // 4. Composed default SPEAK — always present, so the set is never empty.
+  candidates.push({
+    base: BASE_SCORE.SPEAK_DEFAULT,
+    action: {
+      action_type: 'SPEAK',
+      target: addressee?.char_id ?? null,
+      content: goalVoicingLine(goalText, underPressure),
+      deterministic: true,
+    },
+  });
+
+  // 5. Latent WAIT — the freeze/collapse outlet (hesitation instead of a bold move).
+  candidates.push({
+    base: BASE_SCORE.WAIT_LATENT,
+    action: { action_type: 'WAIT', target: null, content: waitLine(cascade.state, goalText), deterministic: true },
+  });
+
+  // 6. Latent evasive RELOCATE — the flight-state outlet, only when the legacy
+  // flight trigger did not already produce a RELOCATE and a real exit exists.
+  if (exit && candidates[0]?.action.action_type !== 'RELOCATE') {
+    candidates.push({
+      base: BASE_SCORE.RELOCATE_LATENT,
+      action: { action_type: 'RELOCATE', target: exit.target, content: flightLine(), deterministic: true },
+    });
+  }
+
+  // ── Selection: base × cascadeActionBias × trinityActionBias, mirroring
+  // decision.ts's `effectiveScore(...) * cascadeBias * trinityBias`. Stable
+  // reduce (strict >) so ties resolve to the earlier — higher-legacy-priority —
+  // candidate, a fixed deterministic tie-break.
+  const score = (c: DeterministicCandidate): number => {
+    const t: ActionType = c.action.action_type;
+    return c.base * (cascadeBias[t] ?? 1.0) * (trinityBias[t] ?? 1.0);
   };
+  const best = candidates.reduce((top, c) => (score(c) > score(top) ? c : top), candidates[0]);
+
+  // Cascade speech flavoring (identity at 'arousal' — baseline byte-stability).
+  if (best.action.action_type === 'SPEAK' || best.action.action_type === 'LIE') {
+    best.action.content = cascadeFlavor(cascade.state, best.action.content);
+  }
+  return best.action;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
