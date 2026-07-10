@@ -6,6 +6,7 @@ import { logger } from '../lib/logger.ts';
 import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
+import { version as buildVersion, commit as buildCommit } from '../lib/build-info.ts';
 import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
@@ -23,8 +24,21 @@ const router = express.Router();
 export default router;
 
 // Health check — no rate limit, no auth, responds even when Gemini is down.
+// version/commit identify what's actually running in a deployed instance so
+// ops can tell what's live and pick a known-good image to roll back to (see
+// README.md "Releases"). Both are additive/byte-compatible with the prior
+// shape: version comes from package.json (falls back to "unknown"), commit
+// comes from a build-time GIT_SHA baked in by the Dockerfile (falls back to
+// "dev") — see server/lib/build-info.ts. Neither can throw, so this endpoint
+// keeps responding even when Gemini/keys/everything else is down.
 router.get('/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: Math.round(process.uptime()), sessions: sessions.size });
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    sessions: sessions.size,
+    version: buildVersion,
+    commit: buildCommit,
+  });
 });
 
 // Metrics — Gemini call volume, latency, retries and failures per category
