@@ -615,6 +615,24 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkZoneCluster, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
+
+// D2-c (subtext-aware movement guard): emotionalShift is a whole-scene valence-lexicon
+// count — it sees explicit feeling-naming but is blind to arcs conveyed through subtext.
+// True when at least one subtextual channel shows movement across the record set: the
+// conversational-control holder alternates between two or more named characters,
+// control flips within any single scene, any scene surfaces a revelation, or any scene
+// carries a relationship shift. Used to rescue genuinely-moving arcs from raw-valence
+// monotone detectors; a script with NO movement on any of these channels still trips
+// the caller's monotone check.
+function hasSubtextualMovement(records: ScreenplaySceneRecord[]): boolean {
+  const powerHolders = new Set(records.map(r => r.powerHolder).filter((h): h is string => !!h));
+  if (powerHolders.size >= 2) return true;
+  if (records.some(r => r.powerFlipped)) return true;
+  if (records.some(r => r.revelation)) return true;
+  if (records.some(r => (r.relationshipShifts?.length ?? 0) > 0)) return true;
+  return false;
+}
 
 export async function characterArcPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, structure, annotations, approvedSpans } = input;
@@ -784,7 +802,7 @@ export async function characterArcPass(input: PassInput): Promise<PassResult> {
     // Dominant shift covers ≥90% of scenes → monotone emotional landscape
     const dominantCount = Math.max(...shiftCounts.values());
     const dominantRatio = dominantCount / records.length;
-    if (dominantRatio >= 0.9) {
+    if (dominantRatio >= 0.9 && !hasSubtextualMovement(records)) {
       const dominant = [...shiftCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
       issues.push({
         location: 'Emotional landscape',

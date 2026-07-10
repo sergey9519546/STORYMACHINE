@@ -13,6 +13,7 @@ import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
+import type { NarrativeMetricsReport } from './metrics.ts';
 
 /** Output of the heuristic Fountain analyzer — everything the revision
  *  pipeline needs, reconstructed from raw text instead of StoryCommits. */
@@ -173,6 +174,36 @@ export interface LiveDiagnosis {
   analyzedAt: number;
 }
 
+/** Response of POST /api/scriptide/fix — the fix-and-verify receipt.
+ *  Generation is the LLM's (opt-in, aiLimiter, span-scoped); VERIFICATION is
+ *  the deterministic doctor's: the delta below is computed by re-running the
+ *  full diagnose-only pipeline on the exact candidate text, so the receipt is
+ *  proof, not promise. Both contentHashes are included so anyone can re-run
+ *  the doctor on either text and get byte-identical numbers. Keyless: 200
+ *  with usedLLM false and no candidate — never a 500. */
+export interface FixVerifyResult {
+  usedLLM: boolean;
+  /** One honest sentence when no candidate could be produced (keyless, model
+   *  failure, or the rewrite failed validation guards). */
+  note?: string;
+  /** The full document with the span replaced — what "Accept" applies. */
+  candidateFountain?: string;
+  /** Just the replacement span text (for the diff view). */
+  spanReplacement?: string;
+  /** 1-based inclusive lines of the span that was rewritten. */
+  span?: { startLine: number; endLine: number };
+  before?: { health: number; verdict?: CoverageVerdict; contentHash: string };
+  after?: { health: number; verdict?: CoverageVerdict; contentHash: string };
+  /** Issues present in the baseline report and absent from the candidate's —
+   *  matched by (rule, location) identity. The whole document is compared,
+   *  not just the span: a fix can ripple, and hiding ripples would make the
+   *  receipt a lie. */
+  cleared?: Array<RevisionIssue & { pass: PassName }>;
+  /** Issues absent from the baseline and present in the candidate's report —
+   *  regressions the fix introduced, shown with the same prominence as wins. */
+  introduced?: Array<RevisionIssue & { pass: PassName }>;
+}
+
 export interface ScriptDoctorReport {
   /** 0–100 deterministic health score. 100-ceiling, opportunity-normalized:
    *  weighted issues (4·critical + 1.5·major + 0.5·minor) are read as a
@@ -215,6 +246,28 @@ export interface ScriptDoctorReport {
   plainSummary?: string;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
+  /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).
+   *  Deep read is the one deliberate exception to the doctor's determinism:
+   *  an LLM reads each scene's MEANING (subtext, stakes, motivation, irony)
+   *  and emits values into the SAME record-signal schema the 1,300 rules
+   *  already judge — the model senses, the rules still deliver every
+   *  verdict. Annotations are cached per scene-content hash, so unchanged
+   *  scenes reuse prior readings; scenes whose annotation fails or doesn't
+   *  validate fall back to the lexicon signals (never a hard failure).
+   *  A quick (deterministic) report NEVER carries this field, and consumers
+   *  must treat deep and quick reports as distinct lineages: same
+   *  contentHash + different mode = NOT comparable draft-over-draft. */
+  deepRead?: {
+    /** Scenes whose signals came from the LLM reading (vs lexicon fallback). */
+    scenesRead: number;
+    scenesTotal: number;
+    /** False when no key was available — every scene fell back to lexicon
+     *  and the report is effectively a quick read that was ASKED to be deep. */
+    usedLLM: boolean;
+    /** Scene indices that fell back to lexicon signals (failed/invalid
+     *  annotation), so the panel can mark them honestly. Empty when all read. */
+    fallbackScenes: number[];
+  };
   /** sha256 hex of the trimmed analyzed Fountain text. The determinism
    *  receipt: two reports with equal contentHash came from the identical
    *  script, so their verdicts are comparable draft-over-draft, and an
@@ -232,4 +285,19 @@ export interface ScriptDoctorReport {
    *  Optional so older consumers stay valid; the doctor populates it whenever
    *  there are issues to cluster. */
   rootCauses?: RootCauseFinding[];
+  /** Deterministic narrative-shape metrics from analyze/metrics.ts (blueprint
+   *  §27) — pivot/cliffhanger/twist/surprise/information-asymmetry per scene,
+   *  plus suspense/momentum/cohesion/final-hook/emotional-range/tension-
+   *  measures for the whole script. Reuses metrics.ts's own
+   *  NarrativeMetricsReport shape verbatim (no redeclaration here) so the two
+   *  can never drift apart. Optional so reports serialized/cached before this
+   *  field existed stay valid: a missing `metrics` means "not computed for
+   *  this report", never "computed as empty" (the doctor always populates it
+   *  on every non-degenerate run — see doctor.ts's aggregateReport). Every
+   *  pacingFit inside (per-scene and script-level) is `null` on every doctor
+   *  report: the doctor has no session `emotional_arc` to pass
+   *  computeNarrativeMetrics, and metrics.ts reports that absence honestly
+   *  rather than fabricating a neutral score — see computePacingFit's header
+   *  in metrics.ts. */
+  metrics?: NarrativeMetricsReport;
 }

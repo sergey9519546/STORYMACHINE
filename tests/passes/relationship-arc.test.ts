@@ -1376,6 +1376,63 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  // Wave 1192 (Program v2, Type 1 signal channel, cycle 3) — first consumer of
+  // the new powerDynamicsIntensity channel, joined with Wave 1186's
+  // powerHolder/powerFlipped. See relationship-arc.ts's Wave 1192 header
+  // comment for the measured threshold and distinctness rationale (vs
+  // CONFLICT_POWER_STATIC_FLATLINE and POWER_DYNAMIC_UNCHANGED).
+  describe('Wave 1192 — relationshipArcPass (Program v2, Type 1 — signal channel): power stasis', async () => {
+    const runRA1192 = async (records: ScreenplaySceneRecord[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('POWER_STASIS fires when 4 control-charged dyad scenes all resolve to the same holder with no flip', async () => {
+      // 8 scenes: 1,3,5,7 charged (intensity >= 2) and dyad-scored, ALICE holds
+      // all four, no mid-scene flip anywhere. Scene 2 has a DIFFERENT holder but
+      // is NOT charged (intensity 0) — proving the rule is scoped to the charged
+      // subset, exactly the case CONFLICT_POWER_STATIC_FLATLINE cannot fire on.
+      const recs1192a = Array.from({ length: 8 }, (_, i) => {
+        if ([1, 3, 5, 7].includes(i)) return makeSharedRecord(i, { powerHolder: 'ALICE', powerDynamicsIntensity: 2 + (i % 2), powerFlipped: false });
+        if (i === 2) return makeSharedRecord(i, { powerHolder: 'BOB', powerDynamicsIntensity: 0, powerFlipped: false });
+        return makeSharedRecord(i);
+      });
+      const res = await runRA1192(recs1192a);
+      const fired = res.issues.filter((i: any) => i.rule === 'POWER_STASIS');
+      assert.ok(fired.length >= 1, `POWER_STASIS should fire; got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+      assert.equal(fired[0].severity, 'major');
+      assert.ok(fired[0].description.includes('ALICE'), 'description names the monotone holder');
+    });
+
+    it('POWER_STASIS does not fire when control flips mid-scene in one charged scene, when a second holder appears, or below the charged-scene floor', async () => {
+      // Near-miss 1: identical to the fire fixture but scene 5's exchange flips mid-scene.
+      const flipped = Array.from({ length: 8 }, (_, i) =>
+        [1, 3, 5, 7].includes(i)
+          ? makeSharedRecord(i, { powerHolder: 'ALICE', powerDynamicsIntensity: 2, powerFlipped: i === 5 })
+          : makeSharedRecord(i));
+      // Near-miss 2: scene 7's charged exchange is held by BOB — the thread is contested.
+      const contested = Array.from({ length: 8 }, (_, i) =>
+        [1, 3, 5, 7].includes(i)
+          ? makeSharedRecord(i, { powerHolder: i === 7 ? 'BOB' : 'ALICE', powerDynamicsIntensity: 2, powerFlipped: false })
+          : makeSharedRecord(i));
+      // Near-miss 3: only 3 charged same-holder scenes (below the >= 4 thread floor).
+      const thin = Array.from({ length: 8 }, (_, i) =>
+        [1, 3, 5].includes(i)
+          ? makeSharedRecord(i, { powerHolder: 'ALICE', powerDynamicsIntensity: 2, powerFlipped: false })
+          : makeSharedRecord(i));
+      for (const [label, records] of [['mid-scene flip', flipped], ['contested holder', contested], ['thin thread', thin]] as const) {
+        const res = await runRA1192(records);
+        assert.ok(!res.issues.some((i: any) => i.rule === 'POWER_STASIS'), `POWER_STASIS should not fire on the ${label} near-miss`);
+      }
+    });
+  });
+
   describe('Wave 1169 — relationshipArcPass: relationship turn-emotional aftermath void, relationship turn aftermath void, relationship payoff-emotional aftermath void', async () => {
     const runRA1169 = async (records: ScreenplaySceneRecord[]) => {
       const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
@@ -6933,6 +6990,37 @@ describe('Wave 134 — Relationship Arc Pass', () => {
     assert.ok(
       result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
       'static multi-scene story should flag idle emotional engine',
+    );
+  });
+
+  // D2-c fix — subtext-aware movement guard: relationshipShifts is a per-pair
+  // valence-lexicon count over dialogue only, blind to bonds that move through
+  // subtext (professional shorthand, a shifting balance of control) rather than
+  // characters naming their feelings.
+  it('does NOT fire NO_RELATIONSHIP_MOVEMENT when relationshipShifts is empty but conversational control passes between characters', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        relationshipShifts: [],
+        powerHolder: i < 3 ? 'ALICE' : 'BOB',
+      }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
+      'Should NOT fire when conversational control shifts between two named characters even though no pair crosses the valence-shift threshold',
+    );
+  });
+
+  it('still fires NO_RELATIONSHIP_MOVEMENT when every movement channel is flat, not just relationshipShifts', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        relationshipShifts: [], powerHolder: null, powerFlipped: false, revelation: null,
+      }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
+      'Should still fire when no channel — relationship shifts, power, or revelation — shows any movement at all',
     );
   });
 

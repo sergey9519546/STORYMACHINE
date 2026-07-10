@@ -519,6 +519,27 @@
 // suspenseDelta>0 as a genuinely fresh checkAftermathVoid trigger — it has only ever appeared
 // as an aftermath channel in this file, never as the isTrigger side of a check. RHYTHM_SUSPENSE_
 // CURIOSITY_AFTERMATH_VOID pairs suspenseDelta with curiosityDelta.
+// Wave 1190 additions (Program v2, Type 1 — signal channel #3, closes cycle 2): fountain-
+// analyzer.ts's new speakingCharacterCount signal (distinct dialogue speakers per scene — 0/1/2+;
+// see that file's Wave 1190 header for the corpus-density prerequisite that led here) gets its
+// first 3 consumers, all in this pass because "rhythm" is precisely the cadence of solo beats vs
+// shared exchange across the structure. Measured directly against the 20-sample calibration
+// corpus (not assumed): solo-shaped scenes (speakingCharacterCount<=1) in every strong/competent
+// sample either recur throughout all three structural thirds or cluster only mildly, while every
+// weak/troubled sample collapses into ONE uninterrupted multi-voice-exchange run of 6-7
+// consecutive scenes with zero solo beats past the opening third. RHYTHM_SOLO_VOICE_DROUGHT_RUN
+// (run-based) fires on 9/20 samples (all weak/troubled but one), RHYTHM_SOLO_VOICE_ZONE_CLUSTER
+// (distribution/timing × structural thirds) fires on 10/20 (every weak/troubled sample, zero
+// false positives on strong/competent) — both LIVE on real corpus text, the explicit goal the
+// Cycle-1 gate's prerequisite was filed to achieve. RHYTHM_MONOLOGUE_REVELATION_DECOUPLED
+// (co-occurrence/decoupling, pairing the new channel with the pre-existing revelation field) is
+// fixture-only this wave: revelation fires on at most 1 scene in any single corpus sample (a
+// pre-existing analyzer sparsity noted at Wave 1183, not a defect of this new signal), too sparse
+// to clear the co-occurrence template's minimum-population guard on this corpus. Distinct from
+// powerHolder/powerBalance/powerFlipped (Wave 1186): those are null/0 for three different reasons
+// (fewer than two speakers, an ambiguous near-zero balance, or too few dyad lines to judge) and
+// cannot by themselves separate a true solo scene from a close two-hander; speakingCharacterCount
+// is the first field to expose raw per-scene voice count at any value, independent of control.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6167,6 +6188,103 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         severity: 'minor',
         description: `Every one of the story's ${r1170c.triggerCount} suspense-spike scenes is followed by two scenes with no rise in curiosity, even though ${r1170c.aftermathCount} such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the rhythm's tension registering as isolated pressure rather than a source of the next thing worth wondering about.`,
         suggestedFix: `In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread.`,
+      });
+    }
+  }
+
+  // ── Wave 1190 additions (Program v2, Type 1 signal channel #3, closes cycle 2) ─
+  // fountain-analyzer.ts's new speakingCharacterCount signal (see that file's Wave 1190 header for
+  // the corpus-density prerequisite: the three charter-suggested candidates — entry/exit dynamics,
+  // emotional-whiplash rate, dialogue-action interleave rhythm — were measured against all 20
+  // calibration samples and found corpus-DEGENERATE (0% variance on two of the three, 91% neutral
+  // on the third), so this channel was chosen by evidence instead) gets its first 3 consumers,
+  // placed here because rhythm is precisely the cadence of solo beats vs shared exchange across
+  // the structure. Distinct from powerHolder/powerBalance/powerFlipped (Wave 1186): those report
+  // null/0 for three different, unrelated reasons (fewer than two speakers, an ambiguous near-zero
+  // balance, or too few dyad lines to judge) and so cannot separate a true solo scene from a close
+  // two-hander; speakingCharacterCount exposes the raw voice count at any value, independent of
+  // control. RHYTHM_SOLO_VOICE_DROUGHT_RUN (run-based) and RHYTHM_SOLO_VOICE_ZONE_CLUSTER
+  // (distribution/timing) both apply modes already used elsewhere in this pass (e.g. Wave 610's
+  // RELATIONAL_SIGNAL_DROUGHT_RUN / RELATIONAL_SIGNAL_ZONE_CLUSTER pair) to this genuinely new
+  // channel for the first time — distinctness here is channel-novelty, not mode-novelty.
+  // RHYTHM_MONOLOGUE_REVELATION_DECOUPLED (co-occurrence/decoupling) pairs the new channel with
+  // the pre-existing revelation field, a pairing never tried in this pass.
+
+  // RHYTHM_SOLO_VOICE_DROUGHT_RUN — Run-based × speakingCharacterCount<=1 absence. Built on
+  // checkDroughtRun from the shared checks library. n≥8, ≥2 scenes elsewhere where a single
+  // character holds the floor alone (a solo/monologue beat), longest consecutive run of scenes
+  // that are ALL multi-voice exchange (no solo beat anywhere in the run) ≥5 → fire. Measured
+  // against the calibration corpus: fires on 9/20 samples (every weak/troubled sample but one),
+  // zero false positives on strong/competent (whose longest such run never exceeds 2). A story
+  // where every character always has someone else in the room to answer them, scene after scene
+  // for an extended run, never lets a single voice carry a beat alone — the rhythm of solo
+  // reflection or uncontested statement goes completely silent for a long stretch, even though the
+  // story proves elsewhere it can grant that room.
+  {
+    const r1190a = checkDroughtRun({
+      records, minRecords: 8, minPresentCount: 2, runThreshold: 5,
+      isPresent: r => (r.speakingCharacterCount ?? 0) <= 1,
+    });
+    if (r1190a.fires) {
+      issues.push({
+        location: `longest stretch with no solo/monologue beat: ${r1190a.longestRun} consecutive scenes`,
+        rule: 'RHYTHM_SOLO_VOICE_DROUGHT_RUN',
+        severity: 'minor',
+        description: `The story contains a run of ${r1190a.longestRun} consecutive scenes where every single one is a multi-voice exchange — no scene anywhere in that stretch lets one character hold the floor alone — even though ${r1190a.presentCount} solo/monologue beat(s) exist elsewhere in the script. An extended run with nobody ever speaking uncontested flattens the rhythm into constant back-and-forth, with no room for a single voice to land a statement, a confession, or a reflection without someone immediately answering it.`,
+        suggestedFix: `Give at least one scene within the ${r1190a.longestRun}-scene stretch to a single character alone — a beat where they state something and nobody answers back, even briefly. Uncontested solo beats are where a line gets to land without being immediately contested or diluted.`,
+      });
+    }
+  }
+
+  // RHYTHM_SOLO_VOICE_ZONE_CLUSTER — Distribution/timing × speakingCharacterCount<=1 presence ×
+  // structural thirds. Built on checkZoneCluster from the shared checks library. n≥8, ≥2 solo/
+  // monologue scenes, fires when more than 60% of them fall in a single structural third. Measured
+  // against the calibration corpus: fires on 10/20 samples (every weak/troubled sample), zero false
+  // positives on strong/competent (whose solo beats spread across at least two thirds every time).
+  // The structural-position counterpart to RHYTHM_SOLO_VOICE_DROUGHT_RUN above (a run-based check
+  // can be satisfied even when solo beats survive but only in a narrow band — this catches that
+  // narrower failure mode directly): a story whose solo beats are ALL front-loaded into one act
+  // means every later act relies exclusively on shared exchange, so any single-voice landing this
+  // story is capable of only ever happens once, early, and never again.
+  {
+    const r1190b = checkZoneCluster({
+      records, minRecords: 8, minCount: 2, ratioThreshold: 0.6,
+      isPresent: r => (r.speakingCharacterCount ?? 0) <= 1,
+    });
+    if (r1190b.fires) {
+      const zoneName1190b = r1190b.zoneNames[r1190b.maxZoneIdx];
+      issues.push({
+        location: `${zoneName1190b} — ${r1190b.maxZoneCount}/${r1190b.count} solo/monologue beats`,
+        rule: 'RHYTHM_SOLO_VOICE_ZONE_CLUSTER',
+        severity: 'minor',
+        description: `${r1190b.maxZoneCount} of the story's ${r1190b.count} solo/monologue beats (${Math.round((r1190b.maxZoneCount / r1190b.count) * 100)}%) fall in the ${zoneName1190b} third alone. Once that third ends, every remaining scene relies on shared, multi-voice exchange — the story's capacity to let one character hold a beat uncontested is used up early and never returns.`,
+        suggestedFix: `Place at least one solo/monologue beat outside the ${zoneName1190b} third — a scene later in the story where a single character speaks without another voice answering back, so the rhythm of uncontested statement isn't confined to one part of the structure.`,
+      });
+    }
+  }
+
+  // RHYTHM_MONOLOGUE_REVELATION_DECOUPLED — Co-occurrence/decoupling × speakingCharacterCount===1
+  // (a true solo scene, not merely "no dialogue") × revelation. Built on checkCoOccurrenceDecoupled
+  // from the shared checks library. n≥8, ≥3 monologue scenes, ≥2 revelation scenes anywhere, fires
+  // when zero scenes are both. A monologue is the single best structural venue for a revelation to
+  // land — nobody interrupts, nothing competes for the audience's attention but one voice — so a
+  // story with genuine monologue scenes that NEVER once uses that uncontested attention to disclose
+  // anything new is wasting its most attentive real estate: every monologue is filler, and every
+  // revelation instead has to be extracted through dialogue exchange. Fixture-only this wave per
+  // the header comment (revelation's pre-existing sparsity on this corpus, not a defect here).
+  {
+    const r1190c = checkCoOccurrenceDecoupled({
+      records, minRecords: 8, minACount: 3, minBCount: 2,
+      isA: r => (r.speakingCharacterCount ?? 0) === 1,
+      isB: r => r.revelation != null,
+    });
+    if (r1190c.fires) {
+      issues.push({
+        location: `${r1190c.aCount} monologue scene(s), ${r1190c.bCount} revelation scene(s) — never the same scene`,
+        rule: 'RHYTHM_MONOLOGUE_REVELATION_DECOUPLED',
+        severity: 'minor',
+        description: `The story has ${r1190c.aCount} scenes where a single character speaks alone and ${r1190c.bCount} scenes carrying a revelation, and the two never coincide. A monologue is the story's most attentive uncontested moment — nobody competing for the room — and none of them is ever used to disclose something new; every revelation instead has to be pried out through back-and-forth dialogue.`,
+        suggestedFix: `Let at least one monologue carry the weight of a revelation — a confession, an admission, a truth spoken into a room where nobody interrupts. Uncontested solo attention is the cheapest way to make a disclosure land.`,
       });
     }
   }

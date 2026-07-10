@@ -42,7 +42,37 @@ export interface Location {
 //   4. CausalSpine.processEvent(): decide whether the action emits an
 //      EventProposition (SPEAK / LIE / EXAMINE currently do).
 //   5. Stage.recordAction(): set the is_audible flag for the new type.
-export const ACTION_TYPES = ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT'] as const;
+//
+// Blueprint action-vocabulary expansion (X1): the blueprint's fuller agent
+// action set is `hide, search, observe, listen, reveal, threaten, attack,
+// flee, protect, steal, destroy, plant_evidence, send_message, form_alliance,
+// betray`. Ten of those are HONESTLY simulable against state this engine
+// already tracks (locations/adjacency, the belief+knowledge ledger,
+// TheoryOfMind, the defense cascade) and are included below: HIDE, OBSERVE,
+// LISTEN, SEARCH, REVEAL, THREATEN, BETRAY, PROTECT, FORM_ALLIANCE, FLEE.
+// Five are DELIBERATELY EXCLUDED because they need state this engine does not
+// model, and a no-op action that pretends to work is worse than an honest gap:
+//   - STEAL / DESTROY:    need an inventory/object-ownership system (no
+//                          CharacterSheet field tracks possessions).
+//   - PLANT_EVIDENCE:     needs an evidence/clue-placement system distinct
+//                          from the belief ledger (a planted clue must be
+//                          discoverable independent of any character's
+//                          beliefs about it — nothing here models that).
+//   - SEND_MESSAGE:       needs asynchronous, location-independent delivery;
+//                          every existing action resolves synchronously
+//                          within one location via the sensory filter.
+//   - ATTACK:             CharacterState.is_alive is a binary flag with no
+//                          hit/injury/health resolution behind it. Reusing it
+//                          for a scored, LLM/deterministic-selected action
+//                          would mean silently killing characters off a
+//                          personality-weighted coin flip with no combat
+//                          model — narrative-consequential enough that it
+//                          needs a real resolution system, not a stretch.
+export const ACTION_TYPES = [
+  'SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT',
+  'HIDE', 'OBSERVE', 'LISTEN', 'SEARCH', 'REVEAL',
+  'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE', 'FLEE',
+] as const;
 export type ActionType = typeof ACTION_TYPES[number];
 
 export interface ActionLogEntry {
@@ -60,6 +90,14 @@ export interface NarrativeAction {
   action_type: ActionType;
   content: string;
   target: string | null;
+  // Run 13 (keyless deterministic simulation): true when this action was
+  // composed by the rule-based fallback (agent/deterministic.ts) rather than
+  // an LLM. Additive — omitted entirely (not just `false`) on every
+  // LLM-produced action, so a successful-provider turn's JSON stays
+  // byte-identical to pre-Run-13 output. Surfaced by /api/turn's response and
+  // /api/run-room-stream's `agent_action` events so the UI can label
+  // rule-based turns.
+  deterministic?: boolean;
 }
 
 // ── Psychology substrate ─────────────────────────────────────────────────────
@@ -174,7 +212,23 @@ export type StoryStructure =
   | 'john_yorke'
   | 'freytag'
   | 'sequence'
-  | 'kishotenketsu';
+  | 'kishotenketsu'
+  | 'three_act'
+  | 'syd_field'
+  | 'rashomon'
+  | 'non_linear'
+  | 'circular'
+  | 'hyperlink'
+  | 'fichtean_curve'
+  | 'in_media_res'
+  | 'snowflake'
+  | 'mystery_box'
+  | 'closed_circle'
+  | 'procedural_case'
+  | 'heist_structure'
+  | 'trial_structure'
+  | 'survival_structure'
+  | 'hero_journey';
 
 // TO ADD A NEW EMOTIONAL ARC: extend this union, then add an entry in
 //   server/lib/structure-presets.ts ARC_TENSION_CURVES.
@@ -184,7 +238,11 @@ export type EmotionalArc =
   | 'man_in_a_hole'
   | 'icarus'
   | 'cinderella'
-  | 'oedipus';
+  | 'oedipus'
+  | 'flat_tension_baseline'
+  | 'sine_wave'
+  | 'double_man_in_a_hole'
+  | 'tragedy_spiral';
 
 // TO ADD A NEW DIRECTOR STYLE: extend this union, then add an entry in
 //   server/lib/structure-presets.ts STYLE_MODIFIERS.
@@ -194,10 +252,41 @@ export type DirectorStyle =
   | 'nolan'
   | 'villeneuve'
   | 'aster'
-  | 'lynch';
+  | 'lynch'
+  | 'kubrick'
+  | 'tarantino'
+  | 'scorsese'
+  | 'coen_brothers'
+  | 'wes_anderson'
+  | 'spielberg'
+  | 'kurosawa'
+  | 'leone'
+  | 'malick'
+  | 'michael_mann'
+  | 'edgar_wright'
+  | 'refn'
+  | 'eggers'
+  | 'bong_joon_ho'
+  | 'del_toro'
+  | 'gerwig'
+  | 'chazelle'
+  | 'pta'
+  | 'claire_denis'
+  | 'almodovar'
+  | 'park_chan_wook'
+  | 'miyazaki';
 
-// TO ADD A NEW GENRE: extend this union, then add an entry in
-//   server/lib/genre-router.ts GENRE_MODIFIERS.
+// TO ADD A NEW GENRE: extend this union, then add a matching entry in
+//   server/lib/genre-router.ts's GENRE_MODIFIERS (toneInstruction, register,
+//   forbiddenCliches, emotionalRegister, and the genreRules structural
+//   contract — threatType, informationPositionDefault, requiredBehaviors,
+//   forbiddenShortcuts) and GENRE_NAMES. genre-router.ts's GenreId is a
+//   direct alias of this union (`export type GenreId = StoryGenre`), so the
+//   two stay in lockstep by construction — add here first, then there.
+// Genre-completion wave (44+ roster): grew from the original 8 through the
+// B1-a expansion (20 more) to this 47-genre roster (19 more), spanning the
+// highest-coverage real-world submission categories a screenwriting tool
+// needs to route tone, vocabulary, and structural contract for.
 export type StoryGenre =
   | 'thriller'
   | 'horror'
@@ -206,7 +295,46 @@ export type StoryGenre =
   | 'romance'
   | 'sci_fi'
   | 'noir'
-  | 'mystery';
+  | 'mystery'
+  | 'action'
+  | 'adventure'
+  | 'crime'
+  | 'fantasy'
+  | 'western'
+  | 'war'
+  | 'historical'
+  | 'biopic'
+  | 'musical'
+  | 'family'
+  | 'documentary_style'
+  | 'heist'
+  | 'courtroom'
+  | 'survival'
+  | 'coming_of_age'
+  | 'satire'
+  | 'folk_horror'
+  | 'cyberpunk'
+  | 'gothic'
+  | 'melodrama'
+  | 'dark_comedy'
+  | 'romantic_comedy'
+  | 'spy_espionage'
+  | 'gangster'
+  | 'political_thriller'
+  | 'psychological_thriller'
+  | 'police_procedural'
+  | 'cosmic_horror'
+  | 'slasher'
+  | 'space_opera'
+  | 'time_travel'
+  | 'post_apocalyptic'
+  | 'urban_fantasy'
+  | 'sports_drama'
+  | 'disaster'
+  | 'road_movie'
+  | 'prison_drama'
+  | 'noir_comedy'
+  | 'superhero';
 
 export interface IllusionState {
   phase: IllusionPhase;
@@ -222,6 +350,15 @@ export interface IllusionState {
   expected_turns?: number;      // writer's estimate of total session length for arc curve
   story_theme?: string;         // author-declared thematic statement ("power corrupts", etc.)
   story_genre?: StoryGenre;     // genre routing signal — selects tone/vocabulary/cliché modifiers
+  // Tone register (I1-a): the orthogonal mood/register axis alongside genre —
+  // see server/lib/genre-router.ts's TONE_REGISTERS. Typed via an inline
+  // type-only import (erased at runtime) so this file stays import-free and no
+  // runtime cycle forms with genre-router.ts, which imports StoryGenre above.
+  story_tone?: import('../lib/genre-router.ts').ToneName;
+  // Character arc mode (I1-a): moral/psychological direction of the central
+  // character — see server/lib/structure-presets.ts's CHARACTER_ARC_MODES.
+  // Same inline type-only import rationale as story_tone.
+  character_arc_mode?: import('../lib/structure-presets.ts').CharacterArcMode;
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────
@@ -428,6 +565,10 @@ export interface EpistemicUpdate {
   contradiction_detected: boolean;
   contradicted_propositions: string[];    // text of beliefs that were contradicted
   source_event_id?: string;              // primary trigger event for this update
+  // Run 13: true when this update was produced by the keyless rule-based
+  // fallback (agent/deterministic.ts's buildDeterministicEpistemics) rather
+  // than an LLM call. Additive — omitted (not `false`) on the LLM path.
+  deterministic?: boolean;
 }
 
 // ── Director evaluation result ───────────────────────────────────────────────
@@ -464,7 +605,8 @@ export interface StageSnapshot {
   illusion_state: Pick<IllusionState,
     | 'phase' | 'planted_elements' | 'pending_recontextualization'
     | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'
-    | 'director_style' | 'expected_turns' | 'story_theme' | 'story_genre'>;
+    | 'director_style' | 'expected_turns' | 'story_theme' | 'story_genre'
+    | 'story_tone' | 'character_arc_mode'>;
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];

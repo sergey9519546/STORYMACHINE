@@ -45,3 +45,69 @@ Dual-engine creative writing tool: a multi-agent narrative simulation (Story Mac
 ```
 npm test
 ```
+
+## Deployment
+
+### Reverse proxies and rate limiting
+
+`gameLimiter`/`aiLimiter`/`heavyBodyLimiter` (`server/lib/session-store.ts`)
+key on `req.ip`, Express's default client identity. Running this server
+directly (no proxy in front) needs no configuration. **If you put a reverse
+proxy or load balancer in front of it** (nginx, Cloudflare, a PaaS edge),
+every request's socket address becomes the proxy's own IP, so all visitors
+collapse onto one shared rate-limit budget unless Express is told to trust
+the proxy's `X-Forwarded-For` header. Set:
+
+```
+TRUST_PROXY=1
+```
+
+(`1` = trust exactly one proxy hop, the normal single-reverse-proxy setup —
+also accepts a specific hop count, `loopback`, or an IP/CIDR; see Express's
+`trust proxy` docs.) Leave it unset for direct/no-proxy deployments — trusting
+`X-Forwarded-For` unconditionally would let any direct client forge it to
+spoof another IP and dodge or target rate limits, so this is opt-in only.
+
+### Session data (`data/sessions/`)
+
+With `SESSION_DB_DIR` unset (or any value other than `:memory:`), each
+session id gets its own SQLite file at `data/sessions/<sessionId>.db` — this
+is the "PERSIST_SESSIONS" mode and is the default outside tests. Every
+browser tab mints its own random session id (`src/lib/session.ts`), so this
+directory holds one file per visitor, not per logical user.
+
+Growth is bounded automatically, in two independent ways:
+- **In-memory cap** (`MAX_SESSIONS`, default 100) and **idle-TTL eviction**
+  (`SESSION_IDLE_TTL_MINUTES`, default 1440 = 24h) close a session's open
+  file handle, but never delete the file — the session resumes on its next
+  request.
+- **Disk cleanup** (`SESSION_FILE_TTL_HOURS`, default 168 = 7 days) actually
+  *deletes* `.db` files (and their `-wal`/`-shm`/`-journal` siblings) once
+  they've sat orphaned (not currently loaded in memory) longer than that —
+  this is the mechanism that keeps `data/sessions/` from growing without
+  bound as one-off visitors accumulate. It runs every 6 hours and only in
+  PERSIST mode.
+
+**What losing `data/sessions/` means:** each file is one visitor's full
+simulation/screenplay session state (agents, locations, action log, editor
+content held server-side). Losing it loses that session's continuity —
+draft text a writer had in flight, in-progress interviews, etc. There is no
+server-side backup by default; if you need durability, back the directory up
+yourself.
+
+**Backing it up safely:** SQLite files must not be copied while a writer
+(WAL/journal) is mid-transaction, so a raw `cp -r data/sessions/ backup/` is
+only safe if you first stop the server (all handles closed) or otherwise
+know a given `<id>.db` is not currently loaded in memory. `better-sqlite3`
+(the driver this project uses — `server/engine/Stage.ts`) exposes a
+`Database.prototype.backup(destinationPath)` API that performs SQLite's own
+online backup (safe to call while the source db is open/in-use); a periodic
+backup job wanting to run without stopping the server should use that API
+per open session rather than copying files directly. No such job exists yet
+— this section documents the approach, it isn't wired up.
+
+### Session capability model
+
+See `docs/AUTH.md` for the current auth model (unguessable session ids as
+bearer capabilities — no accounts), what it does and doesn't protect
+against, and the recommended path forward.

@@ -356,7 +356,7 @@ ALICE
 We need to talk. I feel so angry.
 
 BOB
-Yes.
+I'm so worried about all of this.
 
 INT. THE WAREHOUSE - NIGHT
 

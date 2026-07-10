@@ -41,6 +41,18 @@ export function safeJsonParse<T>(text: string, fallback: T): T {
 }
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
+// All three limiters below use express-rate-limit's default keying: `req.ip`.
+// That is the per-CLIENT identity these budgets are meant to partition —
+// correct when this process receives connections directly, but WRONG behind
+// a reverse proxy/load balancer, where every request's socket address is the
+// proxy's own IP and every visitor collapses onto one shared budget. Fixing
+// that requires `app.set('trust proxy', ...)` (server/app.ts, opt-in via the
+// TRUST_PROXY env var — see that file's comment for why it must be opt-in,
+// not automatic) so Express derives `req.ip` from `X-Forwarded-For` instead.
+// Deployment requirement, not just a code note: any deployment that puts a
+// reverse proxy in front of this server MUST also set TRUST_PROXY (README's
+// Deployment section) or these limiters silently rate-limit the whole
+// deployment as a single client.
 export const gameLimiter = rateLimit({
   windowMs: 60_000,
   max: 120,
@@ -87,7 +99,19 @@ export const heavyBodyLimiter = rateLimit({
 export const SESSION_DB_DIR  = process.env.SESSION_DB_DIR ?? path.join(process.cwd(), 'data', 'sessions');
 export const PERSIST_SESSIONS = SESSION_DB_DIR !== ':memory:';
 export const MAX_SESSIONS    = Number(process.env.MAX_SESSIONS ?? 100);
-export const SESSION_TTL_MS  = 30 * 60 * 1000;
+// Idle eviction TTL: how long a session may sit untouched in memory before the
+// sweep below closes it. Deliberately generous (24h default) — a writer
+// pausing over lunch, or a tab left open overnight, must not lose in-memory
+// state on the next request; PERSIST mode re-hydrates from disk regardless,
+// but non-persist (':memory:', the test/dev default) sessions are gone for
+// good once evicted, so erring generous costs only RAM, not correctness.
+// Env-tunable per deployment via SESSION_IDLE_TTL_MINUTES (e.g. lower it on a
+// memory-constrained box). Run 16 audit: this used to be a hardcoded 30
+// minutes with no env override — too aggressive for real usage and not
+// operator-tunable; widened + parameterized, no other eviction-mechanism
+// change (the cap-based LRU eviction below already existed and already did
+// the right thing — close-only, never unlink, in PERSIST mode).
+export const SESSION_TTL_MS  = Number(process.env.SESSION_IDLE_TTL_MINUTES ?? 1440) * 60 * 1000;
 
 // ── Session store ─────────────────────────────────────────────────────────────
 export const sessions     = new Map<string, Session>();
@@ -102,6 +126,12 @@ export function getOrCreateSession(sessionId: string): Session {
   if (!session) {
     if (sessions.size >= MAX_SESSIONS) {
       // Evict the least-recently-accessed session to stay within the cap.
+      // Close-only, same as sweepIdleSessions() below — the sqlite file (in
+      // PERSIST mode) is deliberately left on disk. Whether to *also* delete
+      // long-cold PERSIST-mode files (distinct from the existing orphaned-file
+      // disk sweep further down, which already reclaims files idle 7+ days)
+      // is a data-retention decision, not a capacity-management one — filed
+      // in docs/AUTH.md / README's backup section rather than decided here.
       let oldestId = '';
       let oldestAccess = Infinity;
       for (const [id, s] of sessions) {
@@ -195,17 +225,33 @@ export function sessionId(req: express.Request): string {
 
 // ── TTL cleanup intervals (side effects — run on module load) ─────────────────
 
-// TTL cleanup: evict idle sessions from memory and release the file handle.
-// The DB file remains on disk so the session resumes on next access.
-setInterval(() => {
-  const now = Date.now();
+// Evict every session that has been idle (no access) for longer than `ttlMs`,
+// as measured from `now`. Closes the Stage (releases the sqlite file handle
+// in PERSIST mode) and drops it from the in-memory map — the DB file itself
+// is left untouched on disk, so a PERSIST-mode session resumes intact on its
+// next request (getOrCreateSession() re-opens + rehydrates). This mirrors the
+// cap-based LRU eviction in getOrCreateSession() above: eviction from memory
+// is never data loss in PERSIST mode.
+//
+// Exported (rather than only wired into the setInterval below) so tests can
+// drive eviction deterministically — inject a fixed `now` and/or a short
+// `ttlMs` instead of waiting on real wall-clock time or the 60s sweep cadence.
+// See tests/core/session-eviction.test.ts.
+export function sweepIdleSessions(now: number = Date.now(), ttlMs: number = SESSION_TTL_MS): string[] {
+  const evicted: string[] = [];
   for (const [id, s] of sessions) {
-    if (now - s.lastAccess > SESSION_TTL_MS) {
+    if (now - s.lastAccess > ttlMs) {
       s.stage.close();
       sessions.delete(id);
+      evicted.push(id);
     }
   }
-}, 60_000).unref();
+  return evicted;
+}
+
+// TTL cleanup: evict idle sessions from memory and release the file handle.
+// The DB file remains on disk so the session resumes on next access.
+setInterval(() => sweepIdleSessions(), 60_000).unref();
 
 // Disk cleanup: remove orphaned session DB files that are older than SESSION_FILE_TTL_MS
 // and are not currently loaded in memory. Runs every 6 hours.

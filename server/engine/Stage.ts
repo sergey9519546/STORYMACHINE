@@ -29,9 +29,30 @@ import type {
 import { safeJsonParse } from '../lib/json.ts';
 import type { StoryCommit } from '../nvm/state/StoryCommit.ts';
 import type { StoryOp } from '../nvm/ops/StoryOp.ts';
+import type { ActionType } from './types.ts';
 
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
+
+// ── Action audibility (types.ts "TO ADD A NEW ACTION TYPE" step 5) ─────────────
+// Single source of truth for whether an action type is perceivable by OTHER
+// agents in the same location (drives ActionLogEntry.is_audible, which in
+// turn gates Stage.getSensoryFilter — the epistemic visibility boundary every
+// agent's updateEpistemics call reads). Exported so Orchestrator.ts's own two
+// ActionLogEntry constructions (runTurn / runRoomSimulation) stay in lockstep
+// with recordAction() below instead of re-deriving the predicate by hand.
+//
+// Silent (not audible): EXAMINE and WAIT (pre-existing) plus the four
+// perceptual/investigative X1 additions — OBSERVE, LISTEN, SEARCH (all three
+// are explicitly passive/covert knowledge-gathering, not a public act) and
+// HIDE (concealment is definitionally not a public act). Every other action
+// type — including all six of the X1 relational/declarative additions
+// (REVEAL, THREATEN, BETRAY, PROTECT, FORM_ALLIANCE) and FLEE — is audible.
+const SILENT_ACTION_TYPES = new Set<ActionType>(['EXAMINE', 'WAIT', 'HIDE', 'OBSERVE', 'LISTEN', 'SEARCH']);
+
+export function isAudibleActionType(actionType: ActionType): boolean {
+  return !SILENT_ACTION_TYPES.has(actionType);
+}
 
 export class Stage {
   private db: Database.Database;
@@ -667,7 +688,7 @@ export class Stage {
       action.action_type,
       action.target ?? null,
       action.content,
-      (action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT') ? 1 : 0,
+      isAudibleActionType(action.action_type) ? 1 : 0,
     );
     return action_id;
   }
@@ -729,6 +750,8 @@ export class Stage {
       expected_turns: config.expected_turns,
       story_theme: config.story_theme,
       story_genre: config.story_genre,
+      story_tone: config.story_tone,
+      character_arc_mode: config.character_arc_mode,
     };
   }
 
@@ -753,6 +776,8 @@ export class Stage {
         expected_turns: next.expected_turns,
         story_theme: next.story_theme,
         story_genre: next.story_genre,
+        story_tone: next.story_tone,
+        character_arc_mode: next.character_arc_mode,
       };
       this.db.prepare(`
         UPDATE Illusion_State
@@ -1300,6 +1325,8 @@ export class Stage {
           expected_turns: s.expected_turns,
           story_theme: s.story_theme,
           story_genre: s.story_genre,
+          story_tone: s.story_tone,
+          character_arc_mode: s.character_arc_mode,
         };
       })(),
       beat_traces: this.getAllBeatTraces(),

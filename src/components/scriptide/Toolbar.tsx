@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Download, Loader2, Stethoscope, SpellCheck, Sparkles } from "lucide-react";
+import { BookOpen, Settings2, Layers, Layers3, Download, Loader2, Stethoscope, SpellCheck, Sparkles } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
@@ -7,6 +7,7 @@ interface ToolbarProps {
   showDirectorHUD: boolean;
   directorsLayer: boolean;
   showScriptDoctor: boolean;
+  showSlate: boolean;
   liveDiagnostics: boolean;
   wordCount: number;
   isTypewriterSound: boolean;
@@ -14,6 +15,7 @@ interface ToolbarProps {
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
   onToggleScriptDoctor: () => void;
+  onToggleSlate: () => void;
   onToggleLiveDiagnostics: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
@@ -30,6 +32,7 @@ export default function Toolbar({
   showDirectorHUD,
   directorsLayer,
   showScriptDoctor,
+  showSlate,
   liveDiagnostics,
   wordCount,
   isTypewriterSound,
@@ -37,6 +40,7 @@ export default function Toolbar({
   onToggleHUD,
   onToggleDirectorsLayer,
   onToggleScriptDoctor,
+  onToggleSlate,
   onToggleLiveDiagnostics,
   onToggleTypewriterSound,
   onExportFountain,
@@ -120,6 +124,19 @@ export default function Toolbar({
           }`}
         >
           <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
+        </button>
+        <button
+          onClick={onToggleSlate}
+          aria-label={showSlate ? "Hide Slate" : "Show Slate"}
+          aria-pressed={showSlate}
+          title="Rank multiple scripts against each other — producer-tier slate comparison"
+          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            showSlate
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <Layers3 className="w-3 h-3" aria-hidden="true" /> Slate
         </button>
         <button
           onClick={onToggleLiveDiagnostics}

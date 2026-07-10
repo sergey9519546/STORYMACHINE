@@ -579,6 +579,24 @@ import { rewritePass } from '../rewrite.ts';
 import { checkZoneCluster, checkCoOccurrenceDecoupled, checkZoneImbalance, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
 import { GENRE_MODIFIERS } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
+import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
+
+// D2-c (subtext-aware movement guard): emotionalShift is a whole-scene valence-lexicon
+// count — it sees explicit feeling-naming but is blind to arcs conveyed through subtext.
+// True when at least one subtextual channel shows movement across the record set: the
+// conversational-control holder alternates between two or more named characters,
+// control flips within any single scene, any scene surfaces a revelation, or any scene
+// carries a relationship shift. Used to rescue genuinely-moving arcs from raw-valence
+// plateau detectors; a script with NO movement on any of these channels still trips the
+// caller's plateau check.
+function hasSubtextualMovement(records: ScreenplaySceneRecord[]): boolean {
+  const powerHolders = new Set(records.map(r => r.powerHolder).filter((h): h is string => !!h));
+  if (powerHolders.size >= 2) return true;
+  if (records.some(r => r.powerFlipped)) return true;
+  if (records.some(r => r.revelation)) return true;
+  if (records.some(r => (r.relationshipShifts?.length ?? 0) > 0)) return true;
+  return false;
+}
 
 // ── Cliché phrase library ─────────────────────────────────────────────────────
 const CLICHE_PHRASES = [
@@ -908,7 +926,7 @@ export async function originalityPass(input: PassInput): Promise<PassResult> {
   // audience in exactly the same affective state. Requires 6+ records.
   if (records.length >= 6) {
     const allNeutral = records.every(r => r.emotionalShift === 'neutral');
-    if (allNeutral) {
+    if (allNeutral && !hasSubtextualMovement(records)) {
       issues.push({
         location: 'Emotional arc throughout',
         rule: 'EMOTIONAL_ARC_PLATEAU',

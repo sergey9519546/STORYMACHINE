@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
   Stethoscope,
@@ -22,6 +22,7 @@ import {
   ArrowDown,
   Minus,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import type {
   ScriptDoctorReport,
@@ -30,12 +31,15 @@ import type {
   CoverageVerdict,
   DimensionKey,
   RootCauseFinding,
+  FixVerifyResult,
 } from "../../../server/nvm/analyze/types.ts";
+import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type {
   RevisionIssue,
   PassName,
 } from "../../../server/nvm/revision/passes/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
+import { diffLines } from "../../lib/diff.ts";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -200,6 +204,212 @@ function ordinal(n: number): string {
   }
 }
 
+// ─── Story metrics (server/nvm/analyze/metrics.ts via report.metrics) ───────
+// Deterministic narrative-shape metrics, rendered only when the report
+// carries them (old cached/serialized reports predate the field and degrade
+// gracefully with no gap — same optional-field convention as report.deepRead
+// and report.rootCauses). Captions are deliberately plain screenwriter
+// language, not formula names; the numbers are descriptive shape readings,
+// not grades, so nothing here uses the green/amber/red severity palette.
+
+/** Script-level 0–100 metric rows: label + one-line plain-language caption.
+ *  Order matches the reading a writer would take: how tension moves, whether
+ *  anything stalls, whether it hangs together, how it ends, how wide it swings. */
+const SCRIPT_METRIC_ROWS: Array<{
+  key: "suspenseEntropy" | "momentumConsistency" | "narrativeCohesion" | "finalCliffhangerStrength";
+  label: string;
+  caption: string;
+}> = [
+  {
+    key: "suspenseEntropy",
+    label: "Suspense shape",
+    caption: "Rewards rise-and-fall over a flat line — a steady ramp or a flatline both score low.",
+  },
+  {
+    key: "momentumConsistency",
+    label: "Momentum",
+    caption: "How rarely the story goes dead — a long stretch where nothing moves drags this down.",
+  },
+  {
+    key: "narrativeCohesion",
+    label: "Cohesion",
+    caption: "How many scenes thread back into the rest of the script — orphan scenes lower it.",
+  },
+  {
+    key: "finalCliffhangerStrength",
+    label: "Final hook",
+    caption: "How strongly the last scene leaves threads open — near zero means a clean, closed ending.",
+  },
+];
+
+/** The four tensionMeasures readouts. Only `lexical` is NOT on a 0–100
+ *  scale — it's the signed mean suspense change per scene (metrics.ts) —
+ *  so it renders as a signed number, not a bar. */
+const TENSION_MEASURE_META: Array<{
+  key: keyof NarrativeMetricsReport["script"]["tensionMeasures"];
+  label: string;
+  caption: string;
+}> = [
+  { key: "lexical", label: "Lexical", caption: "Net suspense drift per scene (signed — above 0 rises, below 0 drains)" },
+  { key: "structural", label: "Structural", caption: "Ticking clocks and unclosed questions kept alive" },
+  { key: "rhythmic", label: "Rhythmic", caption: "Whether scenes compress as the story moves (50 = no trend)" },
+  { key: "asymmetric", label: "Dramatic irony", caption: "How much the audience knows that the story hasn't resolved" },
+];
+
+/** One labeled 0–100 stat row: name, number, neutral fill bar, caption. */
+function MetricStatRow({ label, value, caption }: { label: string; value: number; caption: string }) {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
+        <span className="text-xs font-bold text-black dark:text-white">{pct}</span>
+      </div>
+      <div
+        className="h-1.5 w-full bg-gray-200 dark:bg-zinc-700 border border-black/10 dark:border-white/10 overflow-hidden mt-1"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${label} reading`}
+      >
+        <div className="h-full bg-zinc-500 dark:bg-zinc-400" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-1">{caption}</p>
+    </div>
+  );
+}
+
+/** Per-scene sparkline strip for a 0–100 per-scene metric — pure CSS bars
+ *  (no charting lib), same flex-strip idiom as the scene heatmap so the two
+ *  read as siblings. Bar height encodes the value; the tooltip carries the
+ *  exact number and scene slug. */
+function MetricSparkline({
+  label,
+  caption,
+  points,
+}: {
+  label: string;
+  caption: string;
+  points: Array<{ sceneIdx: number; slug: string; value: number }>;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
+        <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">{caption}</span>
+      </div>
+      <div
+        className="flex items-end gap-0.5 h-10 mt-1 overflow-x-auto pb-0.5"
+        role="list"
+        aria-label={`Per-scene ${label} readings`}
+      >
+        {points.map((p) => {
+          const pct = Math.max(0, Math.min(100, Math.round(p.value)));
+          return (
+            <div
+              key={p.sceneIdx}
+              role="listitem"
+              title={`${p.slug} — ${label} ${pct}`}
+              className="flex-1 min-w-[10px] h-full flex items-end bg-gray-100 dark:bg-zinc-800 border border-black/10 dark:border-white/10"
+            >
+              <div
+                className="w-full bg-zinc-500 dark:bg-zinc-400"
+                // Full-zero scenes still show a 1px sliver so a real reading of
+                // 0 is visibly "measured as zero" rather than a missing cell.
+                style={{ height: pct === 0 ? "1px" : `${pct}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The "Story Metrics" report section — script-level stat rows, the 4-way
+ *  tension readout, emotional range, and per-scene sparklines for pivot and
+ *  cliffhanger strength. pacingFit is deliberately not rendered: on doctor
+ *  reports it is always null (no session emotional arc exists to measure
+ *  against — see doctor.ts's narrative-metrics comment), and showing a
+ *  permanent "n/a" row would be noise, not honesty. */
+function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
+  const { script, perScene } = metrics;
+  return (
+    <div>
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+        Story Metrics
+      </h3>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
+        Deterministic shape readings — how the story moves, not how good it is. Descriptive, not graded.
+      </p>
+      <div className="space-y-3">
+        {SCRIPT_METRIC_ROWS.map((row) => (
+          <MetricStatRow key={row.key} label={row.label} value={script[row.key]} caption={row.caption} />
+        ))}
+        <MetricStatRow
+          label="Emotional peak"
+          value={script.emotionalImpactRange.peak}
+          caption="The single most intense scene — whether the draft ever really hits hard."
+        />
+        <MetricStatRow
+          label="Emotional range"
+          value={script.emotionalImpactRange.spread}
+          caption="Distance between the quietest and loudest scenes — a wide dynamic range scores high."
+        />
+
+        {/* Tension, four ways — the same question read through four
+            independent signals, kept side by side so disagreements between
+            them are visible (that disagreement IS the insight). */}
+        <div>
+          <div className="flex items-baseline justify-between gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">
+              Tension, four ways
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TENSION_MEASURE_META.map((m) => {
+              const raw = script.tensionMeasures[m.key];
+              const display =
+                m.key === "lexical" ? `${raw > 0 ? "+" : ""}${raw}` : `${Math.round(raw)}`;
+              return (
+                <div
+                  key={m.key}
+                  title={m.caption}
+                  className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-2"
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                    {m.label}
+                  </p>
+                  <p className="text-lg font-bold text-black dark:text-white leading-tight">{display}</p>
+                  <p className="text-[9px] font-mono text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
+                    {m.caption}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {perScene.length > 0 && (
+          <div className="space-y-3">
+            <MetricSparkline
+              label="Turning points by scene"
+              caption="Taller = a bigger reversal in that scene"
+              points={perScene.map((s) => ({ sceneIdx: s.sceneIdx, slug: s.slug, value: s.pivotStrength }))}
+            />
+            <MetricSparkline
+              label="Scene-end hooks"
+              caption="Taller = the scene ends on a stronger open thread"
+              points={perScene.map((s) => ({ sceneIdx: s.sceneIdx, slug: s.slug, value: s.cliffhangerStrength }))}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Heatmap cell color by issue density — critical presence always wins regardless
  *  of total count, so a single critical issue reads as urgent even in a light scene. */
 function heatmapClass(scene: SceneDiagnostics): string {
@@ -223,6 +433,30 @@ const DOCTOR_HISTORY_KEY = "sm_doctor_history_v1";
 // entries first so the list always keeps the most recent drafts.
 const DOCTOR_HISTORY_MAX_ENTRIES = 50;
 const DOCTOR_HISTORY_DISPLAY_MAX = 10;
+
+// ─── Deep read toggle preference (client-side, localStorage) ────────────────
+// Just a sticky checkbox — same try/catch-degrades-to-default idiom as the
+// history helpers above, so a private-mode browser or a full quota just means
+// the toggle resets to its default next visit instead of ever breaking the
+// panel.
+const DEEP_READ_PREF_KEY = "sm_doctor_deep_read_pref_v1";
+
+function loadDeepReadPref(): boolean {
+  try {
+    return localStorage.getItem(DEEP_READ_PREF_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveDeepReadPref(enabled: boolean): void {
+  try {
+    localStorage.setItem(DEEP_READ_PREF_KEY, enabled ? "1" : "0");
+  } catch {
+    // Private-mode localStorage access, or quota exceeded — the preference
+    // just doesn't persist; the toggle still works fine for this session.
+  }
+}
 
 // The health-scoring formula's version, bumped every time server/nvm/analyze/
 // doctor.ts changes its scoring formula materially (i.e. the same script's
@@ -253,6 +487,14 @@ interface DoctorHistoryEntry {
    *  before this field existed predates it — see entryFormulaVersion below
    *  for how those are treated (v1 by definition, not by omission-as-bug). */
   formulaVersion?: number;
+  /** Which reading mode produced this entry: 'quick' (deterministic-only
+   *  signals) or 'deep' (an LLM read each scene's meaning into the same
+   *  schema via POST /api/scriptide/doctor/deep). Optional because every
+   *  entry recorded before deep read existed predates this field entirely —
+   *  a MISSING mode means 'quick' by definition (deep read didn't exist yet
+   *  when it was recorded), the same "absence is a known fact, not an
+   *  unknown" convention formulaVersion already uses above. */
+  mode?: "quick" | "deep";
 }
 
 /** An entry's effective formula version. Entries recorded before this field
@@ -261,6 +503,12 @@ interface DoctorHistoryEntry {
  *  ran without stamping a version), not "unknown"/"assume current". */
 function entryFormulaVersion(entry: DoctorHistoryEntry): number {
   return entry.formulaVersion ?? 1;
+}
+
+/** An entry's effective read mode — see DoctorHistoryEntry.mode's comment for
+ *  why a missing field means 'quick' rather than 'unknown'. */
+function entryMode(entry: DoctorHistoryEntry): "quick" | "deep" {
+  return entry.mode ?? "quick";
 }
 
 function loadDoctorHistory(): DoctorHistoryEntry[] {
@@ -303,6 +551,7 @@ function clearDoctorHistory(): void {
 function recordDoctorHistory(
   report: ScriptDoctorReport,
   title: string,
+  mode: "quick" | "deep",
 ): { history: DoctorHistoryEntry[]; previous: DoctorHistoryEntry | null } {
   const existing = loadDoctorHistory();
   const previous = existing.length > 0 ? existing[existing.length - 1] : null;
@@ -322,6 +571,7 @@ function recordDoctorHistory(
     bySeverity: report.bySeverity,
     dimensions: (report.dimensions ?? []).map((d) => ({ key: d.key, score: d.score })),
     formulaVersion: DOCTOR_HISTORY_FORMULA_VERSION,
+    mode,
   };
   const next = [...existing, entry].slice(-DOCTOR_HISTORY_MAX_ENTRIES);
   saveDoctorHistory(next);
@@ -432,30 +682,49 @@ function DraftDeltaStrip({
   );
 }
 
-/** Cross-formula-version honesty notice: rendered INSTEAD of DraftDeltaStrip
- *  whenever the previous history entry was scored under a different
- *  formulaVersion than the one running now. Every field DraftDeltaStrip
- *  subtracts (health, dimension scores) came from a differently-shaped
- *  scale in that case — a "+12" or "-38" here would be a fabricated number
- *  dressed as a fact, not an honest comparison. Verdicts (RECOMMEND/CONSIDER/
- *  PASS) are the one exception: they're words, not points on either scale, so
- *  they stay directly comparable and are still shown — same standard
- *  DraftDeltaStrip already applies to `verdictChanged`. */
+/** Cross-lineage honesty notice: rendered INSTEAD of DraftDeltaStrip whenever
+ *  the previous history entry isn't comparable to the current report on
+ *  either of the two axes that can silently invalidate a delta:
+ *   - 'formula' — scored under a different DOCTOR_HISTORY_FORMULA_VERSION.
+ *   - 'mode'    — read under a different mode ('quick' deterministic-only vs.
+ *                 'deep' LLM-sensed signals, per ScriptDoctorReport.deepRead's
+ *                 lineage contract in server/nvm/analyze/types.ts: same
+ *                 contentHash + different mode is NOT comparable draft-over-
+ *                 draft).
+ *   - 'both'    — both at once.
+ *  Every field DraftDeltaStrip subtracts (health, dimension scores) came from
+ *  a differently-shaped scale or a differently-sensed signal set in these
+ *  cases — a "+12" or "-38" here would be a fabricated number dressed as a
+ *  fact, not an honest comparison. Verdicts (RECOMMEND/CONSIDER/PASS) are the
+ *  one exception: they're words, not points on either scale, so they stay
+ *  directly comparable and are still shown — same standard DraftDeltaStrip
+ *  already applies to `verdictChanged`. */
 function CrossVersionNotice({
   previous,
   current,
+  reason,
 }: {
   previous: DoctorHistoryEntry;
   current: ScriptDoctorReport;
+  reason: "formula" | "mode" | "both";
 }) {
+  const heading =
+    reason === "mode"
+      ? "Different read modes — not directly comparable"
+      : reason === "both"
+      ? "Scoring model updated and read modes differ since your last draft"
+      : "Scoring model updated since your last draft";
+  const bodyLead =
+    reason === "mode"
+      ? "One draft was a quick (deterministic) read and the other was a deep read (AI-sensed signals) — the underlying signals came from a different process, so scores aren’t directly comparable"
+      : "Scores aren’t directly comparable";
   return (
     <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 p-3 space-y-1.5">
       <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Scoring model updated
-        since your last draft
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {heading}
       </p>
       <p className="text-xs font-mono leading-relaxed text-amber-900 dark:text-amber-200">
-        Scores aren&rsquo;t directly comparable
+        {bodyLead}
         {previous.verdict && current.verdict ? (
           <>
             {" "}
@@ -576,7 +845,16 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
  *  state (each card opens independently) — mirrors the per-pass collapsible
  *  pattern below (aria-expanded + chevron) rather than introducing a new
  *  interaction idiom. */
-function RootCauseCard({ finding }: { finding: RootCauseFinding }) {
+function RootCauseCard({
+  finding,
+  fixState,
+}: {
+  finding: RootCauseFinding;
+  /** Null when the finding has no line anchor (startLine/endLine both
+   *  undefined) — there's no honest span to send POST /api/scriptide/fix,
+   *  so no fix affordance renders at all for those findings. */
+  fixState: RootCauseFixState | null;
+}) {
   const [open, setOpen] = useState(false);
   const meta = SEVERITY_META[finding.severity];
   const Icon = meta.icon;
@@ -639,6 +917,315 @@ function RootCauseCard({ finding }: { finding: RootCauseFinding }) {
           )}
         </div>
       )}
+      {fixState && (
+        <div className="pt-2 border-t border-black/10 dark:border-white/10 space-y-2">
+          {!fixState.run && (
+            <button
+              onClick={fixState.onRunFix}
+              disabled={
+                fixState.pending ||
+                fixState.blockedByOtherPending ||
+                fixState.llmReady === false ||
+                !fixState.hasSourceText
+              }
+              title={
+                fixState.llmReady === false
+                  ? "Fix & verify needs an AI key configured — set one in Settings."
+                  : fixState.blockedByOtherPending
+                  ? "Another fix is already running — wait for it to finish."
+                  : !fixState.hasSourceText
+                  ? "No analyzable script text is available for this report."
+                  : undefined
+              }
+              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            >
+              {fixState.pending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Wrench className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              {fixState.pending ? "Fixing & verifying…" : "Fix & verify"}
+            </button>
+          )}
+          {fixState.error && (
+            <p role="alert" className="text-[10px] font-mono text-red-600 dark:text-red-400">
+              {fixState.error}
+            </p>
+          )}
+          {fixState.run && (
+            <FixReceiptCard
+              run={fixState.run}
+              isSample={fixState.isSample}
+              applied={fixState.applied}
+              diffOpen={fixState.diffOpen}
+              onToggleDiff={fixState.onToggleDiff}
+              onAccept={fixState.onAccept}
+              onDiscard={fixState.onDiscard}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Fix & verify (Run 11) ───────────────────────────────────────────────────
+// A root-cause finding's fix-and-verify lifecycle, kept alongside its
+// receipt: generation is the LLM's, verification is the deterministic
+// doctor's (see FixVerifyResult's doc comment in server/nvm/analyze/types.ts)
+// — `originalSpanText` is captured client-side at request time (the exact
+// lines of the analyzed text the request's `span` names) purely so the
+// receipt can render a real diffLines(before, after) for the span; it is
+// never sent anywhere and never substitutes for the server's own honesty
+// fields.
+interface FixRunState {
+  result: FixVerifyResult;
+  originalSpanText: string;
+}
+
+/** Everything a RootCauseCard needs to render its "Fix & verify" affordance
+ *  and, once a result lands, its receipt — computed once per finding by the
+ *  panel (which owns all of the underlying state) and handed down as a
+ *  single bundle so RootCauseCard stays a plain presentational component.
+ *  Null when the finding carries no line anchor at all (no honest span to
+ *  send the server), in which case RootCauseCard renders no fix affordance. */
+interface RootCauseFixState {
+  pending: boolean;
+  blockedByOtherPending: boolean;
+  llmReady: boolean | null;
+  hasSourceText: boolean;
+  isSample: boolean;
+  error?: string;
+  run?: FixRunState;
+  applied: boolean;
+  diffOpen: boolean;
+  onRunFix: () => void;
+  onToggleDiff: () => void;
+  onAccept: () => void;
+  onDiscard: () => void;
+}
+
+/** One side (cleared or introduced) of the receipt's issue-delta lists.
+ *  Deliberately dumb and symmetric: introduced renders with the exact same
+ *  structure and prominence as cleared (same heading weight, same list
+ *  styling, both always mounted) so a regression can never end up visually
+ *  buried relative to a win — the one honesty rule about this list that the
+ *  task is explicit about. */
+function FixDeltaList({
+  items,
+  tone,
+  emptyLabel,
+}: {
+  items: Array<RevisionIssue & { pass: PassName }>;
+  tone: "cleared" | "introduced";
+  emptyLabel: string;
+}) {
+  const isCleared = tone === "cleared";
+  return (
+    <div>
+      <p
+        className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${
+          isCleared ? "text-green-600" : "text-red-600"
+        }`}
+      >
+        {isCleared ? "Cleared" : "Introduced"} ({items.length})
+      </p>
+      {items.length === 0 ? (
+        <p className="text-[10px] font-mono text-gray-400">{emptyLabel}</p>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((issue, i) => (
+            <li
+              key={i}
+              className={`text-[10px] font-mono leading-snug ${
+                isCleared
+                  ? "text-green-700 dark:text-green-400"
+                  : "text-red-700 dark:text-red-400"
+              }`}
+            >
+              <span className="font-bold uppercase">{humanizeRule(issue.rule)}</span>
+              {" — "}
+              {issue.description}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** The fix-and-verify receipt card, rendered inline under a root-cause card
+ *  once POST /api/scriptide/fix returns. Two shapes, matching
+ *  FixVerifyResult's honesty contract exactly: a keyless/failed run
+ *  (usedLLM false, or a candidate that didn't survive validation) renders
+ *  `note` verbatim with no fabricated health/verdict numbers; a real
+ *  candidate renders the full receipt — health X → Y with a colored arrow,
+ *  a verdict change if any, the cleared/introduced lists at equal
+ *  prominence, the span diff collapsed behind "View change", and Accept/
+ *  Discard actions. */
+function FixReceiptCard({
+  run,
+  isSample,
+  applied,
+  diffOpen,
+  onToggleDiff,
+  onAccept,
+  onDiscard,
+}: {
+  run: FixRunState;
+  isSample: boolean;
+  applied: boolean;
+  diffOpen: boolean;
+  onToggleDiff: () => void;
+  onAccept: () => void;
+  onDiscard: () => void;
+}) {
+  const { result, originalSpanText } = run;
+  const hasCandidate =
+    result.usedLLM &&
+    !!result.candidateFountain &&
+    typeof result.spanReplacement === "string" &&
+    !!result.span &&
+    !!result.before &&
+    !!result.after;
+
+  // Memoized purely so re-renders triggered by sibling state (e.g. another
+  // card's fix running) don't re-run the LCS diff on an unchanged span —
+  // same idiom as RevisionPanel's PassDiffView.
+  const diff = useMemo(
+    () =>
+      hasCandidate ? diffLines(originalSpanText, result.spanReplacement as string) : [],
+    [hasCandidate, originalSpanText, result.spanReplacement]
+  );
+
+  if (!hasCandidate) {
+    return (
+      <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+            Fix &amp; verify — no candidate
+          </p>
+          <button
+            onClick={onDiscard}
+            aria-label="Dismiss"
+            className="p-1 text-gray-400 hover:text-black dark:hover:text-white transition-colors"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+        <p className="text-xs font-mono leading-relaxed text-black dark:text-gray-100">
+          {result.note ?? "No fix could be generated for this finding."}
+        </p>
+      </div>
+    );
+  }
+
+  // Narrowed by hasCandidate above — non-null assertions below are safe.
+  const before = result.before!;
+  const after = result.after!;
+  const span = result.span!;
+  const healthDelta = Math.round((after.health - before.health) * 10) / 10;
+  const verdictChanged = !!before.verdict && !!after.verdict && before.verdict !== after.verdict;
+  const cleared = result.cleared ?? [];
+  const introduced = result.introduced ?? [];
+
+  return (
+    <div className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+          Fix &amp; verify receipt
+        </p>
+        {applied && (
+          <span className="text-[9px] font-bold uppercase tracking-widest text-green-600 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Applied to editor
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap text-xs font-mono text-black dark:text-gray-100">
+        <span className="flex items-center gap-1.5">
+          Health {Math.round(before.health)} &rarr; {Math.round(after.health)}{" "}
+          <DeltaGlyph delta={healthDelta} />
+        </span>
+        {verdictChanged && (
+          <span className="uppercase font-bold flex items-center gap-1">
+            {before.verdict} &rarr; {after.verdict}
+          </span>
+        )}
+      </div>
+
+      {/* Cleared / introduced — same prominence, always both mounted (never
+          one collapsed while the other is open); only the span diff below
+          hides behind its own toggle. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FixDeltaList items={cleared} tone="cleared" emptyLabel="No issues cleared." />
+        <FixDeltaList items={introduced} tone="introduced" emptyLabel="No issues introduced." />
+      </div>
+
+      <div>
+        <button
+          onClick={onToggleDiff}
+          aria-expanded={diffOpen}
+          className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-black dark:text-white hover:underline"
+        >
+          {diffOpen ? (
+            <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+          )}
+          View change (lines {span.startLine}&ndash;{span.endLine})
+        </button>
+        {diffOpen && (
+          <div className="mt-1.5 border border-black/10 dark:border-white/10 bg-white dark:bg-zinc-900 font-mono text-[10px] overflow-x-auto">
+            {diff.map((d, i) => (
+              <div
+                key={i}
+                className={`flex px-2 ${
+                  d.type === "added"
+                    ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                    : d.type === "removed"
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                <span className="w-3 shrink-0 select-none">
+                  {d.type === "added" ? "+" : d.type === "removed" ? "-" : " "}
+                </span>
+                <span className="whitespace-pre-wrap break-all flex-1">
+                  {d.line.length > 0 ? d.line : " "}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {applied ? (
+        <p className="text-[10px] font-mono text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+          Re-run diagnosis to see the new report.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={onAccept}
+            disabled={isSample}
+            title={
+              isSample
+                ? "This is the read-only sample script — try Fix & verify on your own script to accept a change."
+                : undefined
+            }
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-black text-white hover:bg-green-600 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Accept
+          </button>
+          <button
+            onClick={onDiscard}
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white dark:bg-zinc-900 text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors flex items-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Discard
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -684,6 +1271,13 @@ export default function ScriptDoctorPanel({
   // report must never get relabeled under whatever project title happens to
   // be open, since the two have nothing to do with each other.
   const [activeReportTitle, setActiveReportTitle] = useState<string | undefined>(undefined);
+  // Whether the currently-displayed report was generated from the built-in
+  // sample script — snapshotted alongside analyzedSnapshot/activeReportTitle
+  // for the same reason: `uploadedFile` is live state that can move on (e.g.
+  // cleared) after diagnosis succeeds, so the fix-and-verify flow's "is this
+  // report a read-only demo" gate must reuse what THIS report actually was,
+  // not whatever source happens to be active right now.
+  const [analyzedIsSample, setAnalyzedIsSample] = useState(false);
 
   // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
   const [history, setHistory] = useState<DoctorHistoryEntry[]>(() => loadDoctorHistory());
@@ -700,6 +1294,61 @@ export default function ScriptDoctorPanel({
   const [exportError, setExportError] = useState<string | null>(null);
   const exportAbortRef = useRef<AbortController | null>(null);
 
+  // Run 14 — producer exports: "Breakdown CSV" (POST /api/export/breakdown)
+  // and "Pitch kit" (POST /api/export/pitchkit), each its own independent
+  // secondary in-flight action, same rationale as exportStatus above (a
+  // failure/retry on one must never disturb the displayed report or the
+  // other export). Unlike Export report (POST /api/export/coverage, which
+  // has no deep-read variant), these two routes re-run a quick deterministic
+  // pass server-side regardless of which mode produced the ON-SCREEN report
+  // — a breakdown/pitch kit doesn't carry or claim the displayed report's
+  // scoring lineage the way the coverage document does, so there is no
+  // lineage to misrepresent and no reason to gate them on `report.deepRead`.
+  const [breakdownStatus, setBreakdownStatus] = useState<ExportStatus>("idle");
+  const [breakdownError, setBreakdownError] = useState<string | null>(null);
+  const breakdownAbortRef = useRef<AbortController | null>(null);
+  const [pitchkitStatus, setPitchkitStatus] = useState<ExportStatus>("idle");
+  const [pitchkitError, setPitchkitError] = useState<string | null>(null);
+  const pitchkitAbortRef = useRef<AbortController | null>(null);
+
+  // Whether an AI key is configured server-side — gates the "Deep read"
+  // toggle only, never the quick (deterministic) diagnosis path, which is
+  // this product's always-available front door (see CLAUDE.md's gotcha on
+  // keyless boot). null until the check resolves; ScriptIDE itself already
+  // fetches /api/ai-config for its own banner, but this panel can be opened
+  // standalone (e.g. before ScriptIDE's own check resolves) so it fetches its
+  // own copy independently — same pattern InterviewPanel uses for the exact
+  // same reason.
+  const [llmReady, setLlmReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/ai-config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { llmReady?: boolean } | null) => {
+        if (!cancelled && data && typeof data.llmReady === "boolean") setLlmReady(data.llmReady);
+      })
+      .catch(() => {
+        /* non-critical — the toggle just stays disabled-by-uncertainty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // "Deep read" toggle: opt-in, sticky across sessions (localStorage). Only
+  // meaningful for fountain/fdx sources — a pdf upload always runs the quick
+  // path regardless (see runDiagnosis's `useDeepRead` computation and the
+  // pdf-route follow-up note there).
+  const [deepReadEnabled, setDeepReadEnabled] = useState<boolean>(() => loadDeepReadPref());
+  useEffect(() => {
+    saveDeepReadPref(deepReadEnabled);
+  }, [deepReadEnabled]);
+  // Which mode the IN-FLIGHT or MOST RECENT run actually targeted — drives the
+  // loading-state copy so "Reading each scene with AI…" only appears for a
+  // real deep-read request, not just because the toggle happens to be checked
+  // right now (the toggle can change after a run started).
+  const [lastRunMode, setLastRunMode] = useState<"quick" | "deep">("quick");
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -707,6 +1356,31 @@ export default function ScriptDoctorPanel({
   // clobber the state of a newer run — same guard pattern as
   // ScriptIDE.triggerAnalysis's analysisGenerationRef.
   const generationRef = useRef(0);
+
+  // ── Fix & verify (Run 11) ──────────────────────────────────────────────
+  // Keyed by RootCauseFinding.id. Only root-cause findings carry a genuine
+  // line anchor on this report shape (RootCauseFinding.startLine/endLine);
+  // topPriorities issues carry only a prose `location` string with no line
+  // numbers anywhere on ScriptDoctorReport, so there is no honest span to
+  // hang a fix button on them here — see the fix affordance's render guard
+  // in the root-causes section below.
+  const [fixPendingId, setFixPendingId] = useState<string | null>(null);
+  const [fixResults, setFixResults] = useState<Record<string, FixRunState>>({});
+  const [fixErrors, setFixErrors] = useState<Record<string, string>>({});
+  const [appliedFixIds, setAppliedFixIds] = useState<Set<string>>(new Set());
+  const [fixDiffOpenIds, setFixDiffOpenIds] = useState<Set<string>>(new Set());
+  // Transient success confirmation after Accept — same "banner + auto-clear
+  // timer" idiom as `loadedNotice` above, just its own state since it can
+  // fire independently of the .fdx/.pdf "load converted Fountain" path.
+  const [fixToast, setFixToast] = useState<string | null>(null);
+  const fixToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One in-flight fix at a time: the UI disables every OTHER finding's fix
+  // button while fixPendingId is set (see the root-causes section below),
+  // and this abort/generation pair is the backstop against a stale response
+  // landing after a newer request superseded it — same pattern as
+  // abortRef/generationRef above.
+  const fixAbortRef = useRef<AbortController | null>(null);
+  const fixGenerationRef = useRef(0);
 
   const isPdfUpload = uploadedFile?.format === "pdf";
   // The uploaded file's content, once present, IS the thing being diagnosed —
@@ -852,6 +1526,18 @@ export default function ScriptDoctorPanel({
       ? { fdx: uploadedFile!.content }
       : { fountain: effectiveText };
 
+    // Deep read targets the /doctor/deep sibling for fountain/fdx sources
+    // only. PDF stays quick-only for now: the pdf route composes
+    // conversion+doctor server-side in one handler (server/routes/scriptide.ts),
+    // and giving it a deep-read variant means either duplicating that
+    // conversion step or reshaping the route — real work, deliberately out of
+    // scope here (off-limits per this run's contract) and left as a
+    // follow-up. A sample run is always plain fountain text, so it can use
+    // deep read exactly like a real fountain source when the toggle is on.
+    const useDeepRead = deepReadEnabled && !isPdf;
+    const effectiveMode: "quick" | "deep" = useDeepRead ? "deep" : "quick";
+    setLastRunMode(effectiveMode);
+
     const request = isPdf
       ? fetch("/api/scriptide/doctor/pdf", {
           method: "POST",
@@ -859,7 +1545,7 @@ export default function ScriptDoctorPanel({
           body: uploadedFile!.pdfBytes,
           signal: controller.signal,
         })
-      : fetch("/api/scriptide/doctor", {
+      : fetch(useDeepRead ? "/api/scriptide/doctor/deep" : "/api/scriptide/doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
@@ -876,6 +1562,8 @@ export default function ScriptDoctorPanel({
             res.status === 404
               ? isPdf
                 ? "PDF diagnosis isn't live yet — the /api/scriptide/doctor/pdf route hasn't been deployed."
+                : useDeepRead
+                ? "Deep read isn't live yet — the /api/scriptide/doctor/deep route hasn't been deployed."
                 : "Script Doctor isn't live yet — the /api/scriptide/doctor route hasn't been deployed."
               : `Diagnosis failed (${res.status})`;
           throw new Error(body?.error ?? fallback);
@@ -887,6 +1575,17 @@ export default function ScriptDoctorPanel({
         setReport(data);
         setAnalyzedSnapshot(snapshotForThisRun);
         setActiveReportTitle(effectiveTitle);
+        setAnalyzedIsSample(isSampleRun);
+        // A fresh diagnosis starts a new fix-and-verify lifecycle: any prior
+        // report's receipts are keyed by root-cause finding ids that likely
+        // no longer exist (or mean something different) against the new
+        // report, so carrying them forward would risk mismatched or stale
+        // receipts under new cards.
+        setFixResults({});
+        setFixErrors({});
+        setAppliedFixIds(new Set());
+        setFixDiffOpenIds(new Set());
+        setFixPendingId(null);
         setOpenPasses({});
         setStatus("success");
         // Draft-over-draft history: a sample run is a one-click demo, not the
@@ -896,9 +1595,14 @@ export default function ScriptDoctorPanel({
         // sample runs; otherwise unchanged — record this diagnosis (unless
         // it's an exact repeat of the last one) and capture whatever was
         // newest *before* this call as the delta baseline / identical-script
-        // check.
+        // check. `effectiveMode` (not `data.deepRead`'s presence) stamps the
+        // history entry's mode: a keyless deep-read run still hit
+        // /doctor/deep and still carries `deepRead` on its report, so mode
+        // reflects which lineage the request belongs to, matching the
+        // lineage contract on ScriptDoctorReport.deepRead — not whether the
+        // LLM actually fired this particular time.
         if (!isSampleRun) {
-          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "");
+          const { history: nextHistory, previous } = recordDoctorHistory(data, effectiveTitle ?? "", effectiveMode);
           setHistory(nextHistory);
           setPreviousEntry(previous);
         }
@@ -1005,13 +1709,287 @@ export default function ScriptDoctorPanel({
       });
   };
 
+  /** Shared plumbing for the two producer-export buttons below (Breakdown
+   *  CSV / Pitch kit): both reuse the exact same snapshot-sourcing rules as
+   *  handleExportReport (never live editor/upload state — whatever the
+   *  DISPLAYED report actually analyzed), just POST to a different route and
+   *  land in a different status/error slot. `defaultFilename` is the
+   *  fallback used only when the response has no Content-Disposition header
+   *  to parse a name from. */
+  const runProducerExport = (
+    route: string,
+    defaultFilename: string,
+    setStatus2: (s: ExportStatus) => void,
+    setError2: (e: string | null) => void,
+    abortRef2: React.MutableRefObject<AbortController | null>,
+    notDeployedMessage: string,
+  ) => {
+    if (!report) return;
+
+    abortRef2.current?.abort();
+    const controller = new AbortController();
+    abortRef2.current = controller;
+
+    setStatus2("loading");
+    setError2(null);
+
+    const exportTitle = activeReportTitle ?? title;
+    let payload: { fountain?: string; fdx?: string; title?: string };
+    if (report.source?.format === "pdf") {
+      const converted = report.source.convertedFountain;
+      if (!converted) {
+        setStatus2("error");
+        setError2("This PDF-sourced report has no converted Fountain text to export.");
+        return;
+      }
+      payload = { fountain: converted, title: exportTitle };
+    } else if (analyzedSnapshot) {
+      payload = { ...analyzedSnapshot, title: exportTitle };
+    } else {
+      // Defensive fallback — unreachable in practice, same as
+      // handleExportReport's identical fallback above.
+      payload = { fountain: activeText, title: exportTitle };
+    }
+
+    fetch(route, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback = res.status === 404 ? notDeployedMessage : `Export failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        const filename =
+          parseFilenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+          defaultFilename;
+        const blob = await res.blob();
+        return { blob, filename };
+      })
+      .then(({ blob, filename }) => {
+        downloadBlob(blob, filename);
+        setStatus2("idle");
+      })
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") return; // cancelled — no error state
+        setStatus2("error");
+        setError2(err instanceof Error ? err.message : "Export failed");
+      });
+  };
+
+  const handleExportBreakdown = () => {
+    const stem = safeFilenameStem(activeReportTitle ?? title);
+    runProducerExport(
+      "/api/export/breakdown",
+      `${stem}-breakdown.csv`,
+      setBreakdownStatus,
+      setBreakdownError,
+      breakdownAbortRef,
+      "Breakdown export isn't live yet — the /api/export/breakdown route hasn't been deployed.",
+    );
+  };
+
+  const handleExportPitchkit = () => {
+    const stem = safeFilenameStem(activeReportTitle ?? title);
+    runProducerExport(
+      "/api/export/pitchkit",
+      `${stem}-pitchkit.html`,
+      setPitchkitStatus,
+      setPitchkitError,
+      pitchkitAbortRef,
+      "Pitch kit export isn't live yet — the /api/export/pitchkit route hasn't been deployed.",
+    );
+  };
+
+  /** The exact Fountain text the DISPLAYED report analyzed — same snapshot
+   *  rationale as handleExportReport's payload above (never live editor/
+   *  upload state, which may have moved on since diagnosis succeeded).
+   *  fdx/pdf-sourced reports have no plain-fountain analyzedSnapshot (their
+   *  snapshot, if any, holds the raw upload bytes/XML instead); the server
+   *  always returns the actual Fountain text it analyzed as
+   *  report.source.convertedFountain for both of those formats, so that's
+   *  what a fix request targets instead — the fix must work on the
+   *  convertedFountain text, exactly like the existing "Load converted
+   *  Fountain into editor" path already does. Null only in the defensive
+   *  edge case where neither is available (an older report shape). */
+  const fixSourceText: string | null =
+    report && (report.source?.format === "fdx" || report.source?.format === "pdf")
+      ? report.source.convertedFountain ?? null
+      : (analyzedSnapshot?.fountain ?? null);
+
+  /** Sends a root-cause finding's span + member rules to POST
+   *  /api/scriptide/fix and stores the resulting FixVerifyResult (or a
+   *  human-readable failure) keyed by the finding's id. Targets
+   *  `fixSourceText` — whatever the currently displayed report actually
+   *  analyzed — never live editor state. Only one fix runs at a time: the
+   *  root-causes section below disables every other finding's button while
+   *  `fixPendingId` is set, and the abort/generation pair here is the real
+   *  backstop against a stale response landing after a newer request
+   *  superseded it (same idiom as runDiagnosis's generationRef). */
+  const runFix = (finding: RootCauseFinding) => {
+    const startLine = finding.startLine;
+    const endLine = finding.endLine;
+    if (startLine === undefined || endLine === undefined) return;
+    if (fixPendingId) return;
+    if (!fixSourceText) return;
+
+    const lines = fixSourceText.split("\n");
+    const originalSpanText = lines.slice(startLine - 1, endLine).join("\n");
+
+    fixAbortRef.current?.abort();
+    const controller = new AbortController();
+    fixAbortRef.current = controller;
+    const myGeneration = ++fixGenerationRef.current;
+
+    // Same generous timeout as runDiagnosis's — a fix is generation (LLM)
+    // plus a full re-run of the deterministic doctor for verification.
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+    setFixPendingId(finding.id);
+    setFixErrors((prev) => {
+      if (!(finding.id in prev)) return prev;
+      const next = { ...prev };
+      delete next[finding.id];
+      return next;
+    });
+
+    // Request contract: issues is 1-10 items of { rule, description,
+    // suggestedFix? }. A RootCauseFinding only carries the bare rule
+    // identifiers that fired together (memberRules) plus one shared
+    // explanation sentence — not the original per-issue RevisionIssue
+    // objects — so each member rule becomes its own issue entry (capped at
+    // 10 per the contract), sharing the finding's explanation as the
+    // description. Falls back to the finding's own title/explanation on the
+    // (currently impossible, but defensive) chance memberRules is empty.
+    const issues =
+      finding.memberRules.length > 0
+        ? finding.memberRules.slice(0, 10).map((rule) => ({ rule, description: finding.explanation }))
+        : [{ rule: finding.title, description: finding.explanation }];
+
+    fetch("/api/scriptide/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fountain: fixSourceText,
+        span: { startLine, endLine },
+        issues,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          const fallback =
+            res.status === 404
+              ? "Fix & verify isn't live yet — the /api/scriptide/fix route hasn't been deployed."
+              : `Fix failed (${res.status})`;
+          throw new Error(body?.error ?? fallback);
+        }
+        return (await res.json()) as FixVerifyResult;
+      })
+      .then((data) => {
+        if (myGeneration !== fixGenerationRef.current) return; // superseded — ignore
+        setFixResults((prev) => ({ ...prev, [finding.id]: { result: data, originalSpanText } }));
+        setFixPendingId(null);
+      })
+      .catch((err: unknown) => {
+        if (myGeneration !== fixGenerationRef.current) return; // superseded — ignore
+        const message =
+          err instanceof DOMException && err.name === "AbortError"
+            ? "Fix timed out (120s) or was cancelled — try again."
+            : err instanceof Error
+            ? err.message
+            : "Fix failed";
+        setFixErrors((prev) => ({ ...prev, [finding.id]: message }));
+        setFixPendingId(null);
+      })
+      .finally(() => clearTimeout(timeoutId));
+  };
+
+  const toggleFixDiff = (findingId: string) => {
+    setFixDiffOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(findingId)) next.delete(findingId);
+      else next.add(findingId);
+      return next;
+    });
+  };
+
+  /** Accept applies the receipt's candidateFountain into the editor via
+   *  onLoadFountain — the exact same "load into editor" mechanism the
+   *  .fdx/.pdf conversion path already uses — then marks the card applied
+   *  and shows a transient success confirmation. Disabled outright (via the
+   *  receipt card's `isSample` prop) for a sample-sourced report; this
+   *  early-return is the defensive backstop for the same rule. Deliberately
+   *  does NOT touch draft history or trigger a re-diagnosis: the receipt is
+   *  transient proof-of-work UI, not the durable record — that's whatever
+   *  report the writer's NEXT diagnosis produces once they choose to re-run
+   *  it against the now-changed editor text, via the ordinary
+   *  recordDoctorHistory path every ordinary diagnosis already goes through.
+   *  Writing a history entry here too would double-count one edit as two
+   *  drafts: one fabricated from a receipt that was never itself measured
+   *  against the full 14-pass pipeline's OWN read of the resulting script,
+   *  one from the actual next report. */
+  const acceptFix = (findingId: string) => {
+    const entry = fixResults[findingId];
+    if (!entry?.result.candidateFountain) return;
+    if (analyzedIsSample) return; // read-only demo source — button is disabled too
+    onLoadFountain?.(entry.result.candidateFountain);
+    setAppliedFixIds((prev) => {
+      if (prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.add(findingId);
+      return next;
+    });
+    if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
+    setFixToast("Fix applied to the editor. Re-run diagnosis to see the new report.");
+    fixToastTimerRef.current = setTimeout(() => setFixToast(null), 5000);
+  };
+
+  /** Discard just removes the receipt card (and any error/applied/diff-open
+   *  state for it) — nothing was ever written anywhere else (Accept is the
+   *  only action with a side effect), so there's nothing else to undo. */
+  const discardFix = (findingId: string) => {
+    setFixResults((prev) => {
+      if (!(findingId in prev)) return prev;
+      const next = { ...prev };
+      delete next[findingId];
+      return next;
+    });
+    setFixErrors((prev) => {
+      if (!(findingId in prev)) return prev;
+      const next = { ...prev };
+      delete next[findingId];
+      return next;
+    });
+    setAppliedFixIds((prev) => {
+      if (!prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.delete(findingId);
+      return next;
+    });
+    setFixDiffOpenIds((prev) => {
+      if (!prev.has(findingId)) return prev;
+      const next = new Set(prev);
+      next.delete(findingId);
+      return next;
+    });
+  };
+
   // Abort any in-flight request when the panel unmounts (e.g. user closes it),
   // and clear the "loaded into editor" confirmation timer alongside it.
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
       exportAbortRef.current?.abort();
+      breakdownAbortRef.current?.abort();
+      pitchkitAbortRef.current?.abort();
+      fixAbortRef.current?.abort();
       if (loadedNoticeTimerRef.current) clearTimeout(loadedNoticeTimerRef.current);
+      if (fixToastTimerRef.current) clearTimeout(fixToastTimerRef.current);
     };
   }, []);
 
@@ -1074,12 +2052,26 @@ export default function ScriptDoctorPanel({
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Upload script
         </button>
+        {/* Export is disabled outright for a deep-read report, not offered
+            with a caveat. POST /api/export/coverage re-runs a QUICK read
+            server-side (it has no deep-read variant — out of scope for this
+            run, see the deliverable's off-limits list), so exporting a deep
+            report would silently swap its lineage: the writer would download
+            a document claiming to cover the draft on screen, scored by a
+            different process than the one that actually produced it.
+            Authenticity over convenience — a disabled button with an honest
+            title beats a toast nobody reads before the file's already
+            downloaded. */}
         {status === "success" && report && (
           <button
             onClick={handleExportReport}
-            disabled={exportStatus === "loading"}
+            disabled={exportStatus === "loading" || !!report.deepRead}
             aria-label="Export coverage report as an HTML document"
-            title="Export the current report as a downloadable HTML coverage document"
+            title={
+              report.deepRead
+                ? "Export re-verifies deterministically (quick read) — run a quick diagnosis to export"
+                : "Export the current report as a downloadable HTML coverage document"
+            }
             className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
           >
             {exportStatus === "loading" ? (
@@ -1088,6 +2080,43 @@ export default function ScriptDoctorPanel({
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
             )}
             Export report
+          </button>
+        )}
+        {/* Run 14 — producer exports: unlike Export report above, these two
+            always re-run a quick deterministic pass server-side regardless
+            of the on-screen report's mode, so a deep-read report is NOT
+            disabled here — only this button's own in-flight request gates
+            it (see runProducerExport's doc comment for the full rationale). */}
+        {status === "success" && report && (
+          <button
+            onClick={handleExportBreakdown}
+            disabled={breakdownStatus === "loading"}
+            aria-label="Export a scene/character breakdown as CSV"
+            title="Download a production breakdown (scenes, characters, locations) as CSV"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {breakdownStatus === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            Breakdown CSV
+          </button>
+        )}
+        {status === "success" && report && (
+          <button
+            onClick={handleExportPitchkit}
+            disabled={pitchkitStatus === "loading"}
+            aria-label="Export a standalone pitch kit as HTML"
+            title="Download a standalone, shareable pitch kit document (HTML)"
+            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {pitchkitStatus === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+            Pitch kit
           </button>
         )}
         {status === "success" && (
@@ -1175,6 +2204,52 @@ export default function ScriptDoctorPanel({
         </div>
       )}
 
+      {/* Breakdown CSV / Pitch kit export failures — same independent,
+          non-disruptive error idiom as Export report's banner above. */}
+      {breakdownStatus === "error" && breakdownError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Breakdown export failed: {breakdownError}</span>
+          <button
+            onClick={() => setBreakdownError(null)}
+            aria-label="Dismiss breakdown export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+      {pitchkitStatus === "error" && pitchkitError && (
+        <div
+          role="alert"
+          className="px-6 py-2 bg-red-50 dark:bg-red-950/40 border-b-2 border-red-300 dark:border-red-800 text-[10px] font-mono text-red-700 dark:text-red-300 shrink-0 flex items-center justify-between gap-3"
+        >
+          <span>Pitch kit export failed: {pitchkitError}</span>
+          <button
+            onClick={() => setPitchkitError(null)}
+            aria-label="Dismiss pitch kit export error"
+            className="shrink-0 hover:text-red-900 dark:hover:text-red-100"
+          >
+            <X className="w-3 h-3" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      {/* Transient success confirmation after a fix's Accept — same
+          "banner + auto-clear timer" idiom as loadedNotice, its own state
+          since it can fire independently of the .fdx/.pdf load-into-editor
+          path. */}
+      {fixToast && (
+        <div
+          role="status"
+          className="px-6 py-2 bg-green-50 dark:bg-green-950/40 border-b-2 border-green-300 dark:border-green-800 text-[10px] font-mono text-green-700 dark:text-green-300 shrink-0 flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {fixToast}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-6 font-mono text-sm">
         {/* ── Idle state ── */}
         {status === "idle" &&
@@ -1204,6 +2279,38 @@ export default function ScriptDoctorPanel({
                 scene-by-scene issue heatmap, and your top priority fixes.
                 {uploadedFile && " It will analyze the uploaded file shown above, not the editor."}
               </p>
+              {/* Deep read toggle: opt-in, labeled, and disabled (with an
+                  explanatory title) whenever it can't actually do anything —
+                  no AI key configured, or the active source is a PDF upload
+                  (quick-only for now, see runDiagnosis's useDeepRead note).
+                  The quick path below is never gated on llmReady — it's the
+                  product's always-available front door. */}
+              {(() => {
+                const disabledReason = isPdfUpload
+                  ? "Deep read isn't available for PDF uploads yet — this will run as a quick (deterministic) read."
+                  : llmReady === false
+                  ? "Deep read needs an AI key configured — set one in Settings, or leave this unchecked to run the deterministic quick read."
+                  : undefined;
+                return (
+                  <label
+                    className={`flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest select-none ${
+                      disabledReason
+                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "text-gray-700 dark:text-gray-300 cursor-pointer"
+                    }`}
+                    title={disabledReason}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={deepReadEnabled}
+                      disabled={!!disabledReason}
+                      onChange={(e) => setDeepReadEnabled(e.target.checked)}
+                      className="w-3.5 h-3.5"
+                    />
+                    Deep read (AI reads each scene&rsquo;s meaning &mdash; slower, uses your AI key)
+                  </label>
+                );
+              })()}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => runDiagnosis()}
@@ -1231,7 +2338,9 @@ export default function ScriptDoctorPanel({
           <div className="p-8 text-center border-4 border-dashed border-gray-300 dark:border-zinc-600">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-gray-500" aria-hidden="true" />
             <p className="text-xs uppercase tracking-widest text-gray-500" role="status" aria-live="polite">
-              Running 14 passes&hellip;
+              {lastRunMode === "deep"
+                ? "Reading each scene's meaning with AI, then running 14 passes…"
+                : "Running 14 passes…"}
             </p>
             <button
               disabled
@@ -1353,6 +2462,33 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
+            {/* Deep read strip — present ONLY on reports from POST
+                /api/scriptide/doctor/deep (report.deepRead; see its doc
+                comment in server/nvm/analyze/types.ts). Honest about the
+                keyless-degrade case: usedLLM:false means every scene fell
+                back to lexicon signals, so this ran as a quick read that was
+                asked to be deep — said outright rather than implying an AI
+                reading happened when it didn't. Placed on the report header,
+                right after the verdict/grade box, since it changes how to
+                read every score below it. */}
+            {report.deepRead && (
+              <div className="bg-indigo-50 dark:bg-indigo-950/30 border-2 border-indigo-300 dark:border-indigo-800 p-3 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  {report.deepRead.usedLLM
+                    ? `Deep read: ${report.deepRead.scenesRead} of ${report.deepRead.scenesTotal} scenes read by AI`
+                    : "AI unavailable — this ran as a quick read"}
+                </p>
+                {report.deepRead.fallbackScenes.length > 0 && (
+                  <p className="text-[10px] font-mono text-indigo-800 dark:text-indigo-200 leading-relaxed">
+                    Fell back to lexicon signals for scene
+                    {report.deepRead.fallbackScenes.length === 1 ? "" : "s"}{" "}
+                    {report.deepRead.fallbackScenes.map((idx) => idx + 1).join(", ")}.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Plain-language summary — a readable paragraph a writer with no
                 film-school vocabulary can act on immediately. */}
             {report.plainSummary && (
@@ -1377,9 +2513,31 @@ export default function ScriptDoctorPanel({
                   clears the most issues at once.
                 </p>
                 <div className="space-y-2">
-                  {report.rootCauses.map((finding) => (
-                    <RootCauseCard key={finding.id} finding={finding} />
-                  ))}
+                  {report.rootCauses.map((finding) => {
+                    // Only findings with a genuine line anchor get a fix
+                    // affordance at all — there's no honest span to send
+                    // POST /api/scriptide/fix otherwise (see FixRunState's
+                    // doc comment).
+                    const hasAnchor = finding.startLine !== undefined && finding.endLine !== undefined;
+                    const fixState: RootCauseFixState | null = hasAnchor
+                      ? {
+                          pending: fixPendingId === finding.id,
+                          blockedByOtherPending: fixPendingId !== null && fixPendingId !== finding.id,
+                          llmReady,
+                          hasSourceText: !!fixSourceText,
+                          isSample: analyzedIsSample,
+                          error: fixErrors[finding.id],
+                          run: fixResults[finding.id],
+                          applied: appliedFixIds.has(finding.id),
+                          diffOpen: fixDiffOpenIds.has(finding.id),
+                          onRunFix: () => runFix(finding),
+                          onToggleDiff: () => toggleFixDiff(finding.id),
+                          onAccept: () => acceptFix(finding.id),
+                          onDiscard: () => discardFix(finding.id),
+                        }
+                      : null;
+                    return <RootCauseCard key={finding.id} finding={finding} fixState={fixState} />;
+                  })}
                 </div>
               </div>
             )}
@@ -1389,23 +2547,35 @@ export default function ScriptDoctorPanel({
                 Identical contentHash to that previous entry gets the flat
                 "no changes" notice per the determinism nuance in the task
                 spec (the script itself is unchanged, regardless of which
-                formula scored it), rather than a delta strip showing
+                formula or mode scored it), rather than a delta strip showing
                 all-zero deltas. Otherwise — genuinely different content —
-                a formula-version mismatch against the CURRENT running
-                version takes priority over the ordinary delta strip: two
-                reports scored by different formulas are not comparable
-                numbers no matter how much the script changed, so this
-                branch must be checked before DraftDeltaStrip ever renders. */}
+                a formula-version mismatch and/or a read-mode mismatch (quick
+                vs. deep — see ScriptDoctorReport.deepRead's lineage contract)
+                against the CURRENT report takes priority over the ordinary
+                delta strip: reports scored by different formulas, or whose
+                signals came from different reading processes, are not
+                comparable numbers no matter how much the script changed, so
+                this branch must be checked before DraftDeltaStrip ever
+                renders. */}
             {previousEntry && report.contentHash && (
               previousEntry.contentHash === report.contentHash ? (
                 <p className="text-[11px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-3">
                   No changes since last diagnosis — identical script.
                 </p>
-              ) : entryFormulaVersion(previousEntry) !== DOCTOR_HISTORY_FORMULA_VERSION ? (
-                <CrossVersionNotice previous={previousEntry} current={report} />
-              ) : (
-                <DraftDeltaStrip previous={previousEntry} current={report} />
-              )
+              ) : (() => {
+                  const formulaDiffers = entryFormulaVersion(previousEntry) !== DOCTOR_HISTORY_FORMULA_VERSION;
+                  const modeDiffers = entryMode(previousEntry) !== (report.deepRead ? "deep" : "quick");
+                  if (!formulaDiffers && !modeDiffers) {
+                    return <DraftDeltaStrip previous={previousEntry} current={report} />;
+                  }
+                  return (
+                    <CrossVersionNotice
+                      previous={previousEntry}
+                      current={report}
+                      reason={formulaDiffers && modeDiffers ? "both" : formulaDiffers ? "formula" : "mode"}
+                    />
+                  );
+                })()
             )}
 
             {/* Craft dimensions — 14 passes rolled up into 5 writer-facing scores. */}
@@ -1558,6 +2728,13 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
+            {/* Story metrics — deterministic narrative-shape readings from
+                server/nvm/analyze/metrics.ts (report.metrics). Rendered only
+                when the report carries the field, so reports produced/cached
+                before it existed degrade gracefully with no gap — same
+                optional-field convention as report.deepRead/rootCauses. */}
+            {report.metrics && <StoryMetricsSection metrics={report.metrics} />}
+
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (
               <div>
@@ -1682,6 +2859,18 @@ export default function ScriptDoctorPanel({
                                 title="Recorded under a previous version of the health-scoring formula — not directly comparable to current scores."
                               >
                                 (older scoring model)
+                              </span>
+                            )}
+                            {/* Deep-read provenance tag — quick entries stay
+                                untagged (the common case); only a deep-read
+                                entry needs the callout, since that's the one
+                                whose signals came from a different process. */}
+                            {entryMode(entry) === "deep" && (
+                              <span
+                                className="text-[9px] italic text-indigo-500 dark:text-indigo-400 shrink-0"
+                                title="This diagnosis was a deep read — an LLM sensed each scene's meaning into the same signal schema, rather than the deterministic lexicon alone."
+                              >
+                                (deep read)
                               </span>
                             )}
                           </li>

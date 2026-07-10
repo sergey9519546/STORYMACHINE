@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test"
+    "test": "node --experimental-strip-types --test",
+    "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

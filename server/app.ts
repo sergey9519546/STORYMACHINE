@@ -30,6 +30,41 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
 
   const app = express();
   app.disable('x-powered-by'); // don't advertise the framework
+
+  // ── Reverse-proxy IP trust (opt-in only) ────────────────────────────────────
+  // gameLimiter/aiLimiter/heavyBodyLimiter (server/lib/session-store.ts) use
+  // express-rate-limit's default keying, which is `req.ip` — Express's IP,
+  // which by default is the raw socket address. Deployed behind a reverse
+  // proxy/load balancer (nginx, Cloudflare, a PaaS edge) every request arrives
+  // from the proxy's own IP, so `req.ip` is the SAME value for every visitor —
+  // the three limiters silently collapse into one shared, trivially-exhausted
+  // budget for the whole deployment rather than a per-client one. Fixing this
+  // requires Express to read the real client IP out of `X-Forwarded-For`,
+  // which only `app.set('trust proxy', ...)` enables.
+  //
+  // That trust is NOT unconditional here: `X-Forwarded-For` is an ordinary
+  // request header, so any direct (non-proxied) client can forge it to spoof
+  // an arbitrary IP and dodge/target rate limits or IP-based logging. Setting
+  // `trust proxy` unconditionally would make every deployment — including the
+  // common case of running directly on a port with no proxy in front — trust
+  // that forgeable header. Instead this is opt-in via TRUST_PROXY, which the
+  // operator sets ONLY when a reverse proxy actually terminates in front of
+  // this process (see README's Deployment section):
+  //   TRUST_PROXY=1        → trust exactly one hop (typical single reverse
+  //                          proxy / load balancer in front of this process).
+  //   TRUST_PROXY=<number> → trust that many hops (Express's numeric mode).
+  //   TRUST_PROXY=<anything else> → passed through as-is (Express also
+  //                          accepts 'loopback', a specific IP/CIDR, or a
+  //                          comma-separated list — see Express's `trust
+  //                          proxy` docs for the exact semantics).
+  // Unset (the default): no trust-proxy config is applied — `req.ip` stays
+  // socket-address-only, matching Express's own default.
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy) {
+    const hops = Number(trustProxy);
+    app.set('trust proxy', Number.isInteger(hops) ? hops : trustProxy);
+  }
+
   app.use(express.json({ limit: '1mb' }));
   // requestLogger() (server/lib/logger.ts) logs { method, path, status, ms }
   // per request, where `path` is Express's `req.path` — the parsed URL

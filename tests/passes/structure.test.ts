@@ -1005,6 +1005,169 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+  describe('Wave 1188 — structurePass (Program v2, Type 3 — genre-conditioned, second of its kind): WEAK_MIDPOINT and ACT3_SCENE_EXCESS genre thresholds', async () => {
+    const makeRec1188 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain1188 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+
+    // ── WEAK_MIDPOINT genre threshold ────────────────────────────────────────
+    // Craft argument: romance's central pivot is relationship risk, not thriller-style
+    // suspense (GENRE_MODIFIERS.romance — "tension lives in proximity, restraint, and
+    // the gap between what is wanted and what is said"), so a midpoint suspense reading
+    // of 0.7 (above romance's looser 0.4 floor but below the generic 1) is still a
+    // legitimate dramatic pivot for the genre, not a flat midpoint.
+    it("structurePass: WEAK_MIDPOINT fires generically at midpointPressure=0.7 but not under romance's looser floor", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec1188(i));
+      const baseInput = {
+        fountain: blankFountain1188(8), original: blankFountain1188(8),
+        records: records as any, structure: { midpointPressure: 0.7 } as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'WEAK_MIDPOINT'),
+        `Expected WEAK_MIDPOINT generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const romanceResult = await structurePass({ ...baseInput, storyContext: { genre: 'romance' } });
+      assert.ok(
+        !romanceResult.issues.some(i => i.rule === 'WEAK_MIDPOINT'),
+        "Should NOT fire under romance's looser 0.4 midpoint-pressure floor at 0.7",
+      );
+    });
+
+    it('structurePass: WEAK_MIDPOINT genre-absent path is byte-identical to the pre-Wave-1188 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 8 }, (_, i) => makeRec1188(i));
+      const result = await structurePass({
+        fountain: blankFountain1188(8), original: blankFountain1188(8),
+        records: records as any, structure: { midpointPressure: 0.5 } as any,
+        annotations: [], approvedSpans: [],
+      });
+      const weak = result.issues.filter(i => i.rule === 'WEAK_MIDPOINT');
+      assert.ok(weak.length >= 1, 'Should fire generically at midpointPressure=0.5');
+      assert.equal(
+        weak[0].description,
+        'Midpoint suspense pressure is flat — the story lacks a dramatic pivot',
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+
+    // ── ACT3_SCENE_EXCESS genre threshold ────────────────────────────────────
+    // Craft argument: mystery's climax is the extended solution reveal — gathering
+    // suspects, walking the clues back (GENRE_MODIFIERS.mystery — "the solution must
+    // be surprising yet inevitable in hindsight") — which legitimately runs longer than
+    // Act 1's setup, so an Act 3 that merely out-counts Act 1 by one scene (5 vs 4) is
+    // not yet the bloated resolution the generic 1x ratio flags.
+    it("structurePass: ACT3_SCENE_EXCESS fires generically at a 5-vs-4 scene split but not under mystery's looser 1.3x ratio", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      // n=17: act1SceneCount=floor(17*0.25)=4; act3SceneStart=floor(17*0.75)=12; act3SceneCount=5.
+      const records = Array.from({ length: 17 }, (_, i) => makeRec1188(i));
+      const baseInput = {
+        fountain: blankFountain1188(17), original: blankFountain1188(17),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'ACT3_SCENE_EXCESS'),
+        `Expected ACT3_SCENE_EXCESS generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const mysteryResult = await structurePass({ ...baseInput, storyContext: { genre: 'mystery' } });
+      assert.ok(
+        !mysteryResult.issues.some(i => i.rule === 'ACT3_SCENE_EXCESS'),
+        "Should NOT fire under mystery's looser 1.3x Act3-vs-Act1 ratio at a 5-vs-4 split",
+      );
+    });
+
+    it('structurePass: ACT3_SCENE_EXCESS genre-absent path is byte-identical to the pre-Wave-1188 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 17 }, (_, i) => makeRec1188(i));
+      const result = await structurePass({
+        fountain: blankFountain1188(17), original: blankFountain1188(17),
+        records: records as any, structure: {} as any,
+        annotations: [], approvedSpans: [],
+      });
+      const excess = result.issues.filter(i => i.rule === 'ACT3_SCENE_EXCESS');
+      assert.ok(excess.length >= 1, 'Should fire generically at a 5-vs-4 scene split');
+      assert.equal(
+        excess[0].description,
+        "Act 3 has 5 scenes while Act 1 has only 4 — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.",
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+  });
+
+  describe('Wave 1184 — structurePass (Program v2, Type 3 — genre-conditioned): DARK_NIGHT_ABSENT genre threshold', async () => {
+    const makeRec1184 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain1184 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const baseStructure1184 = {
+      completionPercent: 50, actPosition: 'act2a' as const,
+      midpointPressure: 2, tightestScene: 7, reversalCount: 2,
+    };
+
+    // ── DARK_NIGHT_ABSENT genre threshold ────────────────────────────────────
+    // Craft argument: comedy's low point is measured in dignity and embarrassment, not
+    // survival dread (GENRE_MODIFIERS.comedy — "let characters keep their dignity stakes
+    // even when the situation is absurd"), so a milder suspense dip (0.7, above comedy's
+    // 0.5 floor but below the generic 1) still legitimately counts as the "all is lost" beat.
+    it("structurePass: DARK_NIGHT_ABSENT fires generically at suspenseDelta=0.7 but not under comedy's looser floor", async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      // 10 scenes; dark night zone = floor(10*0.65)=6 to floor(10*0.85)=8 (scenes 6-7)
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec1184(i, { emotionalShift: i === 7 ? 'negative' : 'neutral', suspenseDelta: i === 7 ? 0.7 : 1.5 }),
+      );
+      const baseInput = {
+        fountain: blankFountain1184(10), original: blankFountain1184(10),
+        records: records as any, structure: baseStructure1184 as any,
+        annotations: [], approvedSpans: [],
+      };
+      const genericResult = await structurePass(baseInput);
+      assert.ok(
+        genericResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+        `Expected DARK_NIGHT_ABSENT generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`,
+      );
+      const comedyResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy' } });
+      assert.ok(
+        !comedyResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+        "Should NOT fire under comedy's looser 0.5 suspense floor at suspenseDelta=0.7",
+      );
+    });
+
+    it('structurePass: DARK_NIGHT_ABSENT genre-absent path is byte-identical to the pre-Wave-1184 rule', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = Array.from({ length: 10 }, (_, i) =>
+        makeRec1184(i, { emotionalShift: 'neutral', suspenseDelta: i >= 8 ? 3 : 1.5 }),
+      );
+      const result = await structurePass({
+        fountain: blankFountain1184(10), original: blankFountain1184(10),
+        records: records as any, structure: baseStructure1184 as any,
+        annotations: [], approvedSpans: [],
+      });
+      const darkNight = result.issues.filter(i => i.rule === 'DARK_NIGHT_ABSENT');
+      assert.ok(darkNight.length >= 1, 'Should fire generically on this all-neutral-zone fixture');
+      assert.equal(
+        darkNight[0].description,
+        'No scene in the pre-climax zone (60%–80%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push',
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+  });
 
   describe('Wave 1171 — structurePass: structure suspense-staging aftermath void, structure suspense-dialogue-highlight aftermath void, structure seed-emotional aftermath void', async () => {
     const runST1171 = async (records: ScreenplaySceneRecord[]) => {
@@ -6493,6 +6656,222 @@ describe('Wave 139 — structurePass: Act boundaries + inciting incident', () =>
     assert.ok(
       !result.issues.some(i => i.rule === 'ACT2_BOUNDARY_WEAK'),
       `should not fire when Act 2 boundary has high suspense`,
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wave 1191 — Sin Check detector pack: IDIOT_PLOT, UNSEEDED_TWIST.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Wave 1191 — structurePass: Sin Check detector pack', () => {
+  function makeRec1191(idx: number, slug: string, override: Partial<any> = {}): any {
+    return {
+      commitId: `c${idx}`, sceneIdx: idx, slug,
+      purpose: 'complicate', dramaticTurn: 'nothing', revelation: null,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      visualBeats: [], dialogueHighlights: [], unresolvedClues: [],
+      seededClueIds: [], payoffSetupIds: [], clockRaised: false, clockDelta: 0,
+      relationshipShifts: [], createdAt: 0,
+      ...override,
+    };
+  }
+
+  function makeInput1191(records: any[], fountain: string, storyContext: any = {}): any {
+    return {
+      fountain, original: fountain,
+      annotations: records.map(() => ({ revelation: null })),
+      structure: {} as any, records, approvedSpans: [], storyContext,
+    };
+  }
+
+  // ── IDIOT_PLOT ─────────────────────────────────────────────────────────────
+  describe('IDIOT_PLOT', () => {
+    // 6 scenes: ALICE learns "who did it" in Scene 1 (revelation + unresolvedClues).
+    // ALICE and BOB then share Scenes 2, 3, 4 while the clue stays open, with no
+    // concealment vocabulary anywhere, and it stays open through the final scene.
+    const idiotFountain = `INT. HOUSE - DAY
+
+ALICE
+Just a quiet morning.
+
+INT. STUDY - NIGHT
+
+ALICE
+I saw who did it. It was the butler.
+
+INT. KITCHEN - DAY
+
+ALICE
+Pass the salt.
+
+BOB
+Sure thing.
+
+INT. LIVING ROOM - NIGHT
+
+ALICE
+Lovely evening, isn't it?
+
+BOB
+Wonderful, yes.
+
+INT. GARDEN - DAY
+
+ALICE
+The roses are blooming.
+
+BOB
+They are.
+
+INT. FINALE - NIGHT
+
+BOB
+We should really figure out who did this.
+`;
+    const idiotSlugs = ['INT. HOUSE - DAY', 'INT. STUDY - NIGHT', 'INT. KITCHEN - DAY', 'INT. LIVING ROOM - NIGHT', 'INT. GARDEN - DAY', 'INT. FINALE - NIGHT'];
+    function idiotRecords(overrides: Record<number, Partial<any>> = {}) {
+      const base = [
+        makeRec1191(0, idiotSlugs[0]),
+        makeRec1191(1, idiotSlugs[1], { revelation: 'the killer was the butler', unresolvedClues: ['killer_id'] }),
+        makeRec1191(2, idiotSlugs[2], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(3, idiotSlugs[3], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(4, idiotSlugs[4], { unresolvedClues: ['killer_id'] }),
+        makeRec1191(5, idiotSlugs[5], { unresolvedClues: ['killer_id'] }),
+      ];
+      for (const [idx, over] of Object.entries(overrides)) Object.assign(base[Number(idx)], over);
+      return base;
+    }
+
+    it('fires when the knowing character shares 2+ later scenes while the conflict stays open', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const result = await structurePass(makeInput1191(idiotRecords(), idiotFountain));
+      const fired = result.issues.filter(i => i.rule === 'IDIOT_PLOT');
+      assert.ok(fired.length >= 1, `should fire IDIOT_PLOT; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.strictEqual(fired[0].severity, 'major');
+    });
+
+    it('does NOT fire when concealment vocabulary explains the silence', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 2: { dialogueHighlights: ['I have to keep it a secret for now.'] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'concealment vocabulary should suppress the fire');
+    });
+
+    it('does NOT fire with fewer than 2 later co-present scenes', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 3: { unresolvedClues: [] }, 4: { unresolvedClues: [] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'fewer than 2 qualifying later scenes should not fire');
+    });
+
+    it('does NOT fire when the clue neither resolves nor stays open to the end', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = idiotRecords({ 5: { unresolvedClues: [] } });
+      const result = await structurePass(makeInput1191(records, idiotFountain));
+      assert.ok(!result.issues.some(i => i.rule === 'IDIOT_PLOT'), 'a clue that silently vanishes (neither resolved nor open) should not fire');
+    });
+  });
+
+  // ── UNSEEDED_TWIST ─────────────────────────────────────────────────────────────
+  describe('UNSEEDED_TWIST', () => {
+    const plainFountain9 = Array.from({ length: 9 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
+
+    function twistRecords(finalOverride: Partial<any>) {
+      return [
+        makeRec1191(0, 'INT. SC0 - DAY'), makeRec1191(1, 'INT. SC1 - DAY'),
+        makeRec1191(2, 'INT. SC2 - DAY'), makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY'), makeRec1191(5, 'INT. SC5 - DAY'),
+        makeRec1191(6, 'INT. SC6 - DAY'), makeRec1191(7, 'INT. SC7 - DAY'),
+        makeRec1191(8, 'INT. SC8 - DAY', finalOverride),
+      ];
+    }
+
+    it('fires for a late high-magnitude reversal whose key terms appear nowhere earlier', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -4 });
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      const fired = result.issues.filter(i => i.rule === 'UNSEEDED_TWIST');
+      assert.ok(fired.length >= 1, `should fire UNSEEDED_TWIST; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when an earlier scene already mentions one of the turn\'s key terms', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -4 });
+      records[2] = { ...records[2], visualBeats: ['A dusty vault sits in the corner of the room.'] };
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      assert.ok(!result.issues.some(i => i.rule === 'UNSEEDED_TWIST'), 'earlier content overlap should suppress the fire');
+    });
+
+    it('does NOT fire when the reversal magnitude is below the threshold', async () => {
+      const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+      const records = twistRecords({ dramaticTurn: 'the vault key was hidden in the locket', suspenseDelta: -1 });
+      const result = await structurePass(makeInput1191(records, plainFountain9));
+      assert.ok(!result.issues.some(i => i.rule === 'UNSEEDED_TWIST'), 'a low-magnitude turn should not qualify');
+    });
+  });
+});
+// ── I1-a — structurePass: tone deltas compose with genre via composeThresholds ──
+
+describe('I1-a — structurePass: DARK_NIGHT_ABSENT tone-composed thresholds (composeThresholds)', () => {
+  const makeRecI1 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const blankFountainI1 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const baseStructureI1 = {
+    completionPercent: 50, actPosition: 'act2a' as const,
+    midpointPressure: 2, tightestScene: 7, reversalCount: 2,
+  };
+  // 10 scenes; dark-night zone = scenes 6-7; scene 7 dips negative at the given suspense.
+  const darkNightInputI1 = (dipSuspense: number) => ({
+    fountain: blankFountainI1(10), original: blankFountainI1(10),
+    records: Array.from({ length: 10 }, (_, i) =>
+      makeRecI1(i, { emotionalShift: i === 7 ? 'negative' : 'neutral', suspenseDelta: i === 7 ? dipSuspense : 1.5 }),
+    ) as any,
+    structure: baseStructureI1 as any, annotations: [], approvedSpans: [],
+  });
+
+  // Tone relaxes a threshold and stops a borderline fire: hopeful's
+  // darkNightSuspenseFloor delta is -0.4, composing the generic 1 down to 0.6,
+  // so a 0.7-suspense dip that fails the generic floor still counts as the
+  // "all is lost" beat under a hopeful register.
+  it('structurePass: DARK_NIGHT_ABSENT fires generically at a 0.7 dip but NOT under tone hopeful (floor relaxed to 0.6)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const baseInput = darkNightInputI1(0.7);
+    const genericResult = await structurePass(baseInput);
+    assert.ok(
+      genericResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      'Should fire generically: 0.7 does not clear the generic floor of 1',
+    );
+    const hopefulResult = await structurePass({ ...baseInput, storyContext: { tone: 'hopeful' } });
+    assert.ok(
+      !hopefulResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      "Should NOT fire under hopeful's relaxed 0.6 floor — the milder dip is the register's low point",
+    );
+  });
+
+  // Genre and tone compose: comedy 0.5 + dread_driven +0.4 = 0.9. A 0.7 dip
+  // satisfies comedy alone but not the composed floor, and the note names both.
+  it('structurePass: DARK_NIGHT_ABSENT composes comedy genre + dread_driven tone and names both axes in the note', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const baseInput = darkNightInputI1(0.7);
+    const comedyResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy' } });
+    assert.ok(
+      !comedyResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      "comedy alone must accept the 0.7 dip (floor 0.5) — no fire",
+    );
+    const composedResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy', tone: 'dread_driven' } });
+    const darkNight = composedResult.issues.filter(i => i.rule === 'DARK_NIGHT_ABSENT');
+    assert.ok(darkNight.length >= 1, `Expected DARK_NIGHT_ABSENT under comedy+dread_driven; got: ${composedResult.issues.map(i => i.rule).join(', ')}`);
+    assert.ok(
+      darkNight[0].description.includes('(threshold adjusted for comedy + dread_driven)'),
+      `note must name both axes; got: ${darkNight[0].description}`,
     );
   });
 });

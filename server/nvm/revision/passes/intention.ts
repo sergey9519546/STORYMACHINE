@@ -547,6 +547,22 @@
 // minCount 3) are matched to this file's own zone-cluster precedent for each channel (Waves 717,
 // 745, 759); ratioThreshold 0.70 matches the file's existing half-partition family (PROACTIVE_*,
 // PAYOFF_BACK_LOADED all use >70%).
+//
+// Discrimination-harness guard pass (D2-b): the harness in
+// calibration/discrimination-pairs.ts + tests/core/discrimination.test.ts pairs
+// well- and poorly-crafted scripts on one isolated craft axis each (same
+// premise, same length) and asserts good.health > bad.health. Five rules in
+// this file inverted that ordering — they fired MORE on the well-crafted half
+// than the poorly-crafted half of a pair, because they are all "X is absent"
+// checks whose only evidence channels are the loud, lexicon-triggered signals
+// (explicit emotion words, ops-derived relationship shifts, suspense spikes)
+// that quiet/subtextual/procedural writing deliberately avoids tripping. Fixed
+// by widening each rule's evidence to existing-but-previously-unread channels
+// (payoffSetupIds, revelation, curiosityDelta) or existing-but-too-narrow
+// windows/gates (PASSIVE_ESCALATION's structure.reversalCount, which only
+// counts suspense-drop reversals) rather than by loosening thresholds — see
+// the guard comment at each of ZERO_ENTROPY_SCENE, ENTROPY_CLUSTER,
+// PASSIVE_ESCALATION, GOAL_INVERSION_ABSENT, and AGENCY_WITHOUT_CONSEQUENCE.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -599,14 +615,32 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Escalation without character agency ───────────────────────────────────
+  // Discrimination-harness guard: structure.reversalCount only counts scenes
+  // where suspenseDelta < -1 (screenplay/structure.ts) — a narrow, SUSPENSE-DROP
+  // definition of "reversal" that misses a story whose stakes rise through
+  // explicit character-driven clock raises or clue plants (proactive beats) even
+  // when the on-page tension never dips. Before this guard, a tight, well-built
+  // escalation (a bomb tech who breaks protocol and cuts the battery instead of
+  // the wires — a genuine deliberate reversal) fired this rule anyway, because
+  // that reversal is a tactical pivot, not a suspense dip, and reversalCount
+  // stayed 0. The rule's actual claim is "no character causes ANYTHING in this
+  // escalation" — so only fire when the story has zero proactive beats
+  // (clockRaised or a seeded clue) anywhere, the same "proactive scene" signal
+  // this file already uses everywhere else (GOAL_INVERSION_ABSENT,
+  // AGENCY_WITHOUT_CONSEQUENCE, PASSIVE_ACT3_INTENTION, etc.). A single
+  // proactive beat is direct evidence a character DID cause part of the rise,
+  // which the coarse reversalCount metric alone cannot see.
   if (structure.escalating && structure.reversalCount === 0) {
-    issues.push({
-      location: 'Overall intention layer',
-      rule: 'PASSIVE_ESCALATION',
-      description: 'Story escalates but no character causes a reversal — escalation feels external/accidental',
-      severity: 'major',
-      suggestedFix: 'Make a character\'s deliberate choice the engine of the next escalation',
-    });
+    const hasAnyProactiveBeat = records.some(r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0);
+    if (!hasAnyProactiveBeat) {
+      issues.push({
+        location: 'Overall intention layer',
+        rule: 'PASSIVE_ESCALATION',
+        description: 'Story escalates but no character causes a reversal — escalation feels external/accidental',
+        severity: 'major',
+        suggestedFix: 'Make a character\'s deliberate choice the engine of the next escalation',
+      });
+    }
   }
 
   // ── Repeated scene purpose (3+ consecutive same-purpose scenes) ──────────
@@ -669,6 +703,20 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // ZERO_ENTROPY_SCENE: A scene with no emotional shift, no relationship change,
   // no clues planted, and no clock raised — the scene changes nothing. These are
   // narrative dead zones that kill momentum.
+  //
+  // Discrimination-harness guard: the original five channels are all "a NEW
+  // thing starts here" signals (a feeling shifts, a bond moves, a clue is
+  // planted, a clock ticks). They ignore the two channels for "an EARLIER
+  // thing lands here": payoffSetupIds (a planted clue finally paying off) and
+  // revelation (an audience-facing disclosure surfacing). A payoff or a
+  // revelation is definitionally the opposite of "the scene changes nothing" —
+  // it is the moment a prior setup cashes in — yet a scene that ONLY does that
+  // (no fresh clue, no clock, flat suspense) was scored as zero-entropy before
+  // this fix. That gap disproportionately hits compact, disciplined scripts
+  // whose payoff/revelation beats are quiet and dialogue-only (no melodrama
+  // needed to land a callback), while a same-length script padded with loud
+  // but empty emotional narration still tripped hasEmotionalShift and skated
+  // by. Adding both closes the gap without touching the other five channels.
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const hasEmotionalShift = r.emotionalShift !== 'neutral';
@@ -676,8 +724,10 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     const hasPlantedClues = (r.seededClueIds?.length ?? 0) > 0;
     const hasClockPressure = r.clockRaised || r.clockDelta > 1;
     const isHighDrama = r.suspenseDelta > 2;
+    const hasPayoff = (r.payoffSetupIds?.length ?? 0) > 0;
+    const hasRevelation = r.revelation !== null;
 
-    const hasAnyMomentum = hasEmotionalShift || hasRelationshipShift || hasPlantedClues || hasClockPressure || isHighDrama;
+    const hasAnyMomentum = hasEmotionalShift || hasRelationshipShift || hasPlantedClues || hasClockPressure || isHighDrama || hasPayoff || hasRevelation;
 
     if (!hasAnyMomentum && records.length >= 6) {
       // Only flag if this is a middle scene (not opening setup, not closing epilogue)
@@ -696,11 +746,23 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
 
   // ENTROPY_CLUSTER: Three consecutive scenes with low momentum (suspense delta < 1).
   // This indicates a pacing dead zone where the story stalls.
+  //
+  // Discrimination-harness guard: same gap as ZERO_ENTROPY_SCENE above — a
+  // scene that pays off an earlier setup or delivers a revelation is not
+  // "low momentum" even when suspenseDelta stays flat and no fresh clue is
+  // seeded that scene. Without this, three consecutive quiet-but-earning
+  // scenes (a payoff scene sandwiched between two restrained character beats)
+  // read as a pacing dead zone purely because the payoff/revelation channels
+  // were never checked.
   let lowMomentumCount = 0;
   let clusterStart = -1;
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
-    const isLowMomentum = r.suspenseDelta < 1 && (r.relationshipShifts?.length ?? 0) === 0 && (r.seededClueIds?.length ?? 0) === 0;
+    const isLowMomentum = r.suspenseDelta < 1
+      && (r.relationshipShifts?.length ?? 0) === 0
+      && (r.seededClueIds?.length ?? 0) === 0
+      && (r.payoffSetupIds?.length ?? 0) === 0
+      && r.revelation === null;
 
     if (isLowMomentum) {
       if (lowMomentumCount === 0) clusterStart = i;
@@ -821,25 +883,46 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // Dramatic irony of pursuit: at no point does the protagonist's active
   // pursuit (a proactive scene — clock raised or clue planted) directly
   // produce the opposite of its intended effect (a negative emotional shift
-  // or a relationship loss in that same scene). When every proactive scene
-  // pays off cleanly, the protagonist's drive never backfires — there is no
-  // dramatic irony baked into the pursuit itself, and the story feels too
-  // frictionless. Requires 6+ scenes and at least 2 proactive scenes.
+  // or a relationship loss in that scene or its immediate aftermath, or a
+  // suspense drop within the proactive scene itself). When every proactive
+  // scene pays off cleanly, the protagonist's drive never backfires — there
+  // is no dramatic irony baked into the pursuit itself, and the story feels
+  // too frictionless. Requires 6+ scenes and at least 2 proactive scenes.
+  //
+  // Discrimination-harness guard, two changes from the original same-scene-only
+  // check: (1) the emotion/relationship backfire check now looks at the
+  // proactive scene AND its next two (mirroring AGENCY_WITHOUT_CONSEQUENCE's
+  // established downstream window below) — compact scripts often land the
+  // cost of a pursuit one beat later rather than in the same breath as the
+  // action; (2) suspenseDelta < 0 in the proactive scene ITSELF now also
+  // counts as backfire — a pursuit that measurably deflates tension while it
+  // is happening is friction even when no line of dialogue names a feeling.
+  // suspenseDelta is deliberately checked same-scene-only, not windowed: a
+  // later scene's negative suspenseDelta is at least as likely to be an
+  // unrelated relief/resolution beat as a consequence of THIS pursuit, and
+  // windowing it produced a false negative on a fixture where the "backfire"
+  // it found was really an orphaned setup's unrelated flat beat, not irony.
   if (n >= 6) {
-    const proactiveScenes = records.filter(
-      r => r.clockRaised || (r.seededClueIds?.length ?? 0) > 0,
-    );
-    if (proactiveScenes.length >= 2) {
-      const hasInversion = proactiveScenes.some(r => {
-        const negEmotion = r.emotionalShift === 'negative';
-        const hasNegRelShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.3);
-        return negEmotion || hasNegRelShift;
+    const proactiveIdx171: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (records[i].clockRaised || (records[i].seededClueIds?.length ?? 0) > 0) proactiveIdx171.push(i);
+    }
+    if (proactiveIdx171.length >= 2) {
+      const hasInversion = proactiveIdx171.some(i => {
+        const hasSuspenseDrop = records[i].suspenseDelta < 0;
+        const window = records.slice(i, i + 3); // the proactive scene itself + its next two
+        const hasEmotionalOrRelationalBackfire = window.some(r => {
+          const negEmotion = r.emotionalShift === 'negative';
+          const hasNegRelShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.3);
+          return negEmotion || hasNegRelShift;
+        });
+        return hasSuspenseDrop || hasEmotionalOrRelationalBackfire;
       });
       if (!hasInversion) {
         issues.push({
           location: 'Character intention layer',
           rule: 'GOAL_INVERSION_ABSENT',
-          description: `The protagonist has ${proactiveScenes.length} proactive scenes but none of them backfire — pursuing the goal never produces a negative emotional shift or a relationship loss. The pursuit is frictionless, with no dramatic irony built into the wanting itself`,
+          description: `The protagonist has ${proactiveIdx171.length} proactive scenes but none of them — or their immediate aftermath — backfire: pursuing the goal never produces a negative emotional shift, a relationship loss, or a suspense drop. The pursuit is frictionless, with no dramatic irony built into the wanting itself`,
           severity: 'major',
           suggestedFix: 'Add a scene where the protagonist actively pursues their goal and the pursuit itself makes things worse — they win the battle but lose an ally, or get what they asked for and regret it. The goal should bite back',
         });
@@ -1137,8 +1220,18 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // AGENCY_WITHOUT_CONSEQUENCE (major): the protagonist is proactive in 3+ scenes
   // (raises a clock or plants a clue) but 75%+ of those efforts are inert — the seeded
   // clue is never paid off AND the next two scenes register no suspense rise, no
-  // relationship shift, and no revelation. Proactivity that the story never answers is
-  // busy-work; agency only reads as agency when the world visibly responds to it.
+  // relationship shift, no revelation, and no curiosity rise. Proactivity that the
+  // story never answers is busy-work; agency only reads as agency when the world
+  // visibly responds to it.
+  //
+  // Discrimination-harness guard: curiosityDelta > 0 joins suspenseDelta/
+  // relationshipShifts/revelation as a fourth downstream-consequence channel,
+  // matching this file's own established "aftermath" convention (curiosityDelta
+  // is already the standard consequence check in ~40 AFTERMATH_VOID rules
+  // elsewhere in this file). A controlled, procedural pursuit — the audience's
+  // curiosity rising scene to scene as evidence accumulates — is real forward
+  // consequence even when the suspense lexicon and relationship-shift ops never
+  // fire on the restrained prose that carries it.
   if (n >= 6) {
     const proactiveIdx216: number[] = [];
     for (let i = 0; i < n; i++) {
@@ -1152,7 +1245,7 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         const seedPaidOff216 = (records[i].seededClueIds ?? []).some(s => allPayoffs216.has(s));
         const window216 = records.slice(i + 1, i + 3);
         const downstream216 = window216.some(r =>
-          r.suspenseDelta > 1 || (r.relationshipShifts?.length ?? 0) > 0 || r.revelation !== null,
+          r.suspenseDelta > 1 || (r.relationshipShifts?.length ?? 0) > 0 || r.revelation !== null || (r.curiosityDelta ?? 0) > 0,
         );
         if (!seedPaidOff216 && !downstream216) inert216++;
       }

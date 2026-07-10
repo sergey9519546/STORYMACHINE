@@ -622,6 +622,78 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       );
     });
 
+    // ── GOAL_INVERSION_ABSENT (D2-b discrimination guard) ───────────────────
+    it('intentionPass does NOT fire GOAL_INVERSION_ABSENT when the backfire lands one beat after a compact proactive scene', async () => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      // Well-crafted-compact pattern: scenes 1 and 3 are proactive; scene 1's
+      // pursuit costs nothing in the same breath, but two scenes later (scene 3)
+      // a relationship snaps — the aftermath window (scene i..i+2) catches it
+      // even though the same-scene check would have missed it.
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 1
+          ? makeRec(i, { clockRaised: true, emotionalShift: 'positive' })
+          : i === 3
+          ? makeRec(i, { clockRaised: true })
+          : i === 5
+          ? makeRec(i, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }] })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GOAL_INVERSION_ABSENT'),
+        'Should NOT fire when the relationship loss lands within the proactive scene\'s two-scene aftermath window',
+      );
+    });
+
+    it('intentionPass does NOT fire GOAL_INVERSION_ABSENT when a proactive scene itself deflates tension', async () => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      // Restrained/procedural pattern: no dialogue names a feeling and no
+      // relationship shifts, but the proactive scene's own suspenseDelta drops —
+      // measurable friction without a lexicon hit.
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 1
+          ? makeRec(i, { clockRaised: true, suspenseDelta: -1 })
+          : i === 3
+          ? makeRec(i, { clockRaised: true })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GOAL_INVERSION_ABSENT'),
+        'Should NOT fire when a proactive scene\'s own suspenseDelta drops below zero',
+      );
+    });
+
+    it('intentionPass still fires GOAL_INVERSION_ABSENT when a negative shift precedes the proactive scene but never follows it', async () => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      // Genuinely-frictionless pattern: scene 0's relationship loss happens
+      // BEFORE the proactive scenes (1 and 3) — outside their aftermath window —
+      // so it must not count as backfire for either. The pursuit really is
+      // frictionless from scene 1 onward.
+      const records = Array.from({ length: 6 }, (_, i) =>
+        i === 0
+          ? makeRec(i, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.6 }] })
+          : i === 1 || i === 3
+          ? makeRec(i, { clockRaised: true, emotionalShift: 'positive' })
+          : makeRec(i),
+      );
+      const result = await intentionPass({
+        fountain: blankFountain(6), original: blankFountain(6),
+        records: records as any, structure: {} as any,
+        annotations: noAnnotations(6), approvedSpans: [],
+      });
+      const inv = result.issues.filter(i => i.rule === 'GOAL_INVERSION_ABSENT');
+      assert.ok(inv.length >= 1, `Should still fire when the only negative shift precedes every proactive scene; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
     // ── PASSIVE_ACT3_INTENTION ────────────────────────────────────────────────
     it('intentionPass detects PASSIVE_ACT3_INTENTION when protagonist initiates nothing in Act 3', async () => {
       const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
@@ -6538,6 +6610,26 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       );
     });
 
+    it('AGENCY_WITHOUT_CONSEQUENCE does not fire when a proactive beat is answered only by a rise in curiosity (D2-b discrimination guard)', async () => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      // Controlled/procedural pattern: 3 proactive beats, none paid off, no
+      // suspense rise, no relationship shift, no revelation — the only signal
+      // that the world responds is curiosityDelta rising in the aftermath
+      // window. Before the guard this was scored as 3/3 inert (100% >= 75%).
+      const records = Array.from({ length: 10 }, (_, i) => makeRec216(i));
+      records[1].seededClueIds = ['a'];
+      records[3].seededClueIds = ['b'];
+      records[5].seededClueIds = ['c'];
+      records[2].curiosityDelta = 1;
+      records[4].curiosityDelta = 1;
+      records[6].curiosityDelta = 1;
+      const result = await intentionPass(makeInput216(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'AGENCY_WITHOUT_CONSEQUENCE'),
+        'Should NOT fire when every proactive beat\'s aftermath window shows a curiosity rise',
+      );
+    });
+
     it('COMMITMENT_RAMP_INVERSION fires when proactive density decays toward the climax', async () => {
       const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
       // n=12, thirds=4; opening third 3 proactive (density 0.75), final third 1 (density 0.25)
@@ -6853,4 +6945,140 @@ describe('Wave 130 — Intention pass expanded boring purposes', () => {
     );
   });
 
+});
+
+
+describe('D2-b — intentionPass discrimination-harness guards: PASSIVE_ESCALATION, ZERO_ENTROPY_SCENE, ENTROPY_CLUSTER', async () => {
+  const makeRecD2b = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const blankFountainD2b = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const noAnnotationsD2b = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+
+  // ── PASSIVE_ESCALATION ──────────────────────────────────────────────────
+  it('intentionPass fires PASSIVE_ESCALATION when the escalation has zero proactive beats anywhere', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // Genuinely-defective pattern: story escalates (structure.escalating) with no
+    // reversal-suspense-drop (reversalCount 0) AND no character ever raises a
+    // clock or plants a clue — the rise really is external/accidental.
+    const records = Array.from({ length: 6 }, (_, i) => makeRecD2b(i));
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any,
+      structure: { escalating: true, reversalCount: 0 } as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      result.issues.some(i => i.rule === 'PASSIVE_ESCALATION'),
+      `Should detect PASSIVE_ESCALATION when no scene is proactive; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('intentionPass does NOT fire PASSIVE_ESCALATION when a single proactive beat drives the rise (well-crafted-compact pattern)', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // A bomb-tech-style tactical pivot: a character deliberately raises the
+    // clock. reversalCount stays 0 (it's a tactical pivot, not a suspense
+    // dip) but the escalation is plainly character-driven.
+    const records = Array.from({ length: 6 }, (_, i) =>
+      i === 3 ? makeRecD2b(i, { clockRaised: true }) : makeRecD2b(i),
+    );
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any,
+      structure: { escalating: true, reversalCount: 0 } as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'PASSIVE_ESCALATION'),
+      'Should NOT fire when at least one scene is proactive (clock raised or clue planted)',
+    );
+  });
+
+  // ── ZERO_ENTROPY_SCENE ───────────────────────────────────────────────────
+  it('intentionPass fires ZERO_ENTROPY_SCENE for a middle scene with no emotional/relational/clue/clock/payoff/revelation signal', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // Genuinely-defective pattern: every scene except the target middle scene
+    // is proactive (clockRaised), so only the target scene can trip the rule.
+    // Scene 3 has no momentum signal at all — a true narrative dead zone.
+    const records = Array.from({ length: 6 }, (_, i) =>
+      i === 3 ? makeRecD2b(i) : makeRecD2b(i, { clockRaised: true }),
+    );
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any, structure: {} as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 3')),
+      `Should detect ZERO_ENTROPY_SCENE at scene 3; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('intentionPass does NOT fire ZERO_ENTROPY_SCENE on a scene whose only movement is a quiet payoff or revelation (well-crafted-compact pattern)', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // Same layout as above, but scene 3 lands a quiet callback — a planted
+    // clue finally pays off — with no fresh clue, no clock, no emotion
+    // lexicon hit, and flat suspense. That is not "changes nothing".
+    const records = Array.from({ length: 6 }, (_, i) =>
+      i === 3 ? makeRecD2b(i, { payoffSetupIds: ['earlier_setup'] }) : makeRecD2b(i, { clockRaised: true }),
+    );
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any, structure: {} as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ZERO_ENTROPY_SCENE' && i.location.includes('Scene 3')),
+      'Should NOT fire on scene 3 when it lands a payoff even with every other channel flat',
+    );
+  });
+
+  // ── ENTROPY_CLUSTER ──────────────────────────────────────────────────────
+  it('intentionPass fires ENTROPY_CLUSTER for three consecutive scenes with no suspense/relationship/clue/payoff/revelation movement', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // Genuinely-defective pattern: scenes 1-3 all have suspenseDelta 0 and no
+    // other movement channel — a true three-scene pacing dead zone. Scenes
+    // 0, 4, 5 keep the default suspenseDelta of 1 (not "< 1"), so they don't
+    // extend or pre-empt the cluster.
+    const records = Array.from({ length: 6 }, (_, i) =>
+      (i === 1 || i === 2 || i === 3) ? makeRecD2b(i, { suspenseDelta: 0 }) : makeRecD2b(i),
+    );
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any, structure: {} as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      result.issues.some(i => i.rule === 'ENTROPY_CLUSTER'),
+      `Should detect ENTROPY_CLUSTER across scenes 1-3; got: ${result.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('intentionPass does NOT fire ENTROPY_CLUSTER when the middle of a low-suspense run lands a revelation (well-crafted-compact pattern)', async () => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    // Same low-suspense run (scenes 1-3), but scene 2 — the middle of the
+    // run — delivers a revelation. That breaks the "no movement" run even
+    // though suspenseDelta itself never rises, so the 3-consecutive count
+    // resets and never reaches a cluster.
+    const records = Array.from({ length: 6 }, (_, i) => {
+      if (i === 2) return makeRecD2b(i, { suspenseDelta: 0, revelation: 'a truth surfaces quietly' });
+      if (i === 1 || i === 3) return makeRecD2b(i, { suspenseDelta: 0 });
+      return makeRecD2b(i);
+    });
+    const result = await intentionPass({
+      fountain: blankFountainD2b(6), original: blankFountainD2b(6),
+      records: records as any, structure: {} as any,
+      annotations: noAnnotationsD2b(6), approvedSpans: [],
+    });
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ENTROPY_CLUSTER'),
+      'Should NOT fire when a revelation interrupts the low-suspense run',
+    );
+  });
 });

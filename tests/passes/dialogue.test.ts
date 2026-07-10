@@ -8390,11 +8390,14 @@ describe('Wave 123 — dialoguePass: ON_THE_NOSE_RE false-positive fix + TRAIT_L
     assert.equal(onNose, undefined, 'ON_THE_NOSE must not fire for physical "I feel" without emotion word');
   });
 
-  it('ON_THE_NOSE fires correctly for "I feel so angry"', async () => {
-    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel so angry right now.\n';
+  it('ON_THE_NOSE fires correctly for "I feel so angry" when density is present (Wave 18α gate)', async () => {
+    // Wave 18α gates ON_THE_NOSE on ≥2 matches per scene (see below) — a lone match is normal
+    // dramatic writing. This regression test keeps the original word-list match alive by
+    // pairing it with a second on-the-nose line in the same scene.
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel so angry right now.\n\nBOB\nI am so anxious about this too.\n';
     const result = await dialoguePass(makePassInput(fountain));
     const onNose = result.issues.find(i => i.rule === 'ON_THE_NOSE');
-    assert.ok(onNose, 'ON_THE_NOSE fires for direct emotion statement');
+    assert.ok(onNose, 'ON_THE_NOSE fires for direct emotion statement once density guard is satisfied');
   });
 
   it('TRAIT_LABELING fires when character labels another character', async () => {
@@ -8402,6 +8405,160 @@ describe('Wave 123 — dialoguePass: ON_THE_NOSE_RE false-positive fix + TRAIT_L
     const result = await dialoguePass(makePassInput(fountain));
     const traitIssue = result.issues.find(i => i.rule === 'TRAIT_LABELING');
     assert.ok(traitIssue, 'TRAIT_LABELING fires for explicit trait labeling in dialogue');
+  });
+});
+
+
+// ── Run 18-α: adversarial review fix — ON_THE_NOSE lexicon/template blind spots (with a
+//    density guard against overfire) + NON_RESPONSIVE_EXCHANGE false-positiving on oblique-
+//    but-engaged professional dialogue ─────────────────────────────────────────────────────
+describe('Run 18-α — dialoguePass: ON_THE_NOSE lexicon/template broadening + density guard', () => {
+  it('FIRE: fires on the reviewer\'s exact missed textbook on-the-nose lines (stressed/worried, density 2)', async () => {
+    // Reproduces the adversarial review's miss: pure feeling-narration using colloquial words
+    // ("stressed", "worried") that were absent from the old fixed emotion list.
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ALICE',
+      'I am so stressed about this quarterly review. My job might be at risk.',
+      '',
+      'BOB',
+      "I'm worried I'm going to lose my job today. It's really scary.",
+      '',
+    ].join('\n');
+    const result = await dialoguePass(makePassInput(fountain));
+    const hits = result.issues.filter(i => i.rule === 'ON_THE_NOSE');
+    assert.ok(hits.length >= 1, 'ON_THE_NOSE must fire on textbook feeling-narration using the broadened lexicon');
+  });
+
+  it('FIRE: new lexicon words fire in isolation once a second on-the-nose line is present (density)', async () => {
+    const fountain = [
+      'INT. KITCHEN - NIGHT',
+      '',
+      'ALICE',
+      "I've been so exhausted lately, I can barely think straight.",
+      '',
+      'BOB',
+      'That makes me furious, honestly.',
+      '',
+    ].join('\n');
+    const result = await dialoguePass(makePassInput(fountain));
+    const hits = result.issues.filter(i => i.rule === 'ON_THE_NOSE');
+    assert.ok(hits.length >= 1, 'New templates ("I\'ve been X", "That makes me X") should fire once density is met');
+  });
+
+  it('NO-FIRE (density guard): a single isolated feeling line in an otherwise normal scene does not fire', async () => {
+    // The reviewer's finding is explicit: a lone feeling-narration line is ordinary dramatic
+    // writing. Only DENSITY (2+ lines in one scene) marks the defect.
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ALICE',
+      'I am so stressed about this quarterly review.',
+      '',
+      'BOB',
+      'The Henderson account closed an hour ago.',
+      '',
+    ].join('\n');
+    const result = await dialoguePass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ON_THE_NOSE'),
+      'ON_THE_NOSE must NOT fire for a single isolated feeling-narration line',
+    );
+  });
+
+  it('NO-FIRE: "it\'s scary" situational template does not fire without a first-person voice on the line', async () => {
+    const fountain = 'INT. LAB - NIGHT\n\nALICE\nThe outbreak spreads fast. It\'s really scary out there.\n\nBOB\nThe containment team arrives tomorrow.\n';
+    const result = await dialoguePass(makePassInput(fountain));
+    // "It's really scary" has no first-person marker on the line, so it should not register as
+    // an on-the-nose match at all (independent of density).
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ON_THE_NOSE'),
+      'Situational "it\'s scary" without a first-person voice on the line must not count as on-the-nose narration',
+    );
+  });
+
+  it('REGRESSION: still ignores physical, non-emotion "I feel" even with density of unrelated lines', async () => {
+    const fountain = 'INT. OFFICE - DAY\n\nALICE\nI feel the cold wind on my skin.\n\nBOB\nI feel the rough bark of the tree.\n';
+    const result = await dialoguePass(makePassInput(fountain));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'ON_THE_NOSE'),
+      'ON_THE_NOSE must not fire for physical "I feel" without an emotion word, regardless of density',
+    );
+  });
+});
+
+describe('Run 18-α — dialoguePass: NON_RESPONSIVE_EXCHANGE responsiveness-signal guard', () => {
+  const buildTurns18a = (turns: Array<[string, string]>) =>
+    'INT. ROOM - DAY\n\n' + turns.map(([s, l]) => `${s}\n${l}\n`).join('\n');
+  const makeInput18a = (turns: Array<[string, string]>) => {
+    const fountain = buildTurns18a(turns);
+    return {
+      fountain, original: fountain,
+      records: [] as any, structure: {} as any,
+      storyContext: {} as any, annotations: [] as any,
+      approvedSpans: [],
+    };
+  };
+
+  it('NO-FIRE: elliptical-but-engaged exchange (reviewer\'s Richard/Mara scenario) no longer false-fires', async () => {
+    // Reproduces the adversarial review's false positive: zero literal content-word overlap
+    // across 5 consecutive cross-speaker turns, but every reply plainly engages the line before
+    // it via pronoun/deixis reference ("you", "that", "it", "this") or an agreement marker
+    // ("Fine.") — exactly the oblique-but-responsive professional dialogue the rule should
+    // leave alone. Under the pre-Wave-18α literal-overlap-only rule this run of 5 would fire.
+    const turns: Array<[string, string]> = [
+      ['RICHARD', 'This isn\'t what I asked for.'],
+      ['MARA', 'You wanted results, not excuses.'],
+      ['RICHARD', 'That\'s not the same thing.'],
+      ['MARA', 'It never is, is it?'],
+      ['RICHARD', 'Don\'t turn this back on me.'],
+      ['MARA', 'Fine. I\'ll fix it myself.'],
+    ];
+    const result = await dialoguePass(makeInput18a(turns));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'NON_RESPONSIVE_EXCHANGE'),
+      'Should NOT fire on oblique-but-engaged professional dialogue (pronoun/deixis and agreement signals present)',
+    );
+  });
+
+  it('REGRESSION (FIRE): still fires on a genuinely disconnected two-monologues-past-each-other scene', async () => {
+    // Same fixture the pre-existing Wave 215 fire test uses (10 lines / 9 fully unrelated
+    // turns, no shared vocabulary and no responsiveness signal anywhere) — must still fire
+    // after the signal-aware rewrite and the raised run threshold (4 -> 5).
+    const turns: Array<[string, string]> = [
+      ['ALICE', 'Mountains towered above frozen northern valleys.'],
+      ['BOB', 'Quarterly accountants filed annual taxes yesterday.'],
+      ['ALICE', 'Penguins migrated across southern frozen oceans.'],
+      ['BOB', 'Carburetors require expensive replacement gaskets soon.'],
+      ['ALICE', 'Shakespeare authored numerous celebrated tragedies.'],
+      ['BOB', 'Volcanoes disrupted busy airline departure schedules.'],
+      ['ALICE', 'Bakers kneaded fresh sourdough overnight downstairs.'],
+      ['BOB', 'Telescopes magnified extremely distant spiral galaxies.'],
+      ['ALICE', 'Gardeners pruned wildly overgrown suburban hedges.'],
+      ['BOB', 'Investors panicked during sudden market downturns.'],
+    ];
+    const result = await dialoguePass(makeInput18a(turns));
+    assert.ok(
+      result.issues.some((i: any) => i.rule === 'NON_RESPONSIVE_EXCHANGE'),
+      'Should still fire on a genuinely disconnected exchange with no shared vocabulary and no responsiveness signal',
+    );
+  });
+
+  it('NO-FIRE: question -> any-answer adjacency counts as engaged even without word overlap', async () => {
+    const turns: Array<[string, string]> = [
+      ['ALICE', 'Mountains towered above frozen northern valleys?'],
+      ['BOB', 'Quarterly accountants filed annual taxes yesterday.'],
+      ['ALICE', 'Penguins migrated across southern frozen oceans?'],
+      ['BOB', 'Carburetors require expensive replacement gaskets soon.'],
+      ['ALICE', 'Shakespeare authored numerous celebrated tragedies?'],
+      ['BOB', 'Volcanoes disrupted busy airline departure schedules.'],
+    ];
+    const result = await dialoguePass(makeInput18a(turns));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'NON_RESPONSIVE_EXCHANGE'),
+      'A question immediately followed by any reply should count as an engaged exchange',
+    );
   });
 });
 

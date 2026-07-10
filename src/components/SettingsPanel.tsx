@@ -1,4 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  GENRE_OPTIONS,
+  TONE_OPTIONS,
+  STRUCTURE_OPTIONS,
+  EMOTIONAL_ARC_OPTIONS,
+  DIRECTOR_STYLE_OPTIONS,
+  CHARACTER_ARC_MODE_OPTIONS,
+  type AxisOption,
+} from "../lib/story-axes";
 
 type AiProviderName  = "gemini" | "openai-compat";
 type AiMediaProvider = "gemini" | "openai-compat" | "none";
@@ -33,14 +42,30 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type Tab = "llm" | "image" | "tts" | "embeddings";
+type Tab = "llm" | "image" | "tts" | "embeddings" | "story";
 
 const TAB_LABELS: Record<Tab, string> = {
   llm:        "Text LLM",
   image:      "Image",
   tts:        "TTS",
   embeddings: "Embeddings",
+  story:      "Story",
 };
+
+// ── Story-axis config (server-persisted, saves immediately per control) ──────
+// Mirrors GET /api/story-config's response shape (server/routes/config.ts).
+// character_arc_mode is optional: the /api/character-arc-mode route (mirroring
+// /api/emotional-arc) lands alongside this UI, so an older server response may
+// simply omit the field — the selector then starts unset, which is correct.
+interface StoryConfig {
+  structure: string | null;
+  emotional_arc: string | null;
+  director_style: string | null;
+  expected_turns: number;
+  story_genre: string | null;
+  story_tone: string | null;
+  character_arc_mode?: string | null;
+}
 
 // ── Reusable field components ─────────────────────────────────────────────────
 
@@ -259,6 +284,250 @@ function MediaTab({
   );
 }
 
+// ── Story tab ─────────────────────────────────────────────────────────────────
+// Exposes the full server-side story axes: 47 genres, 24 tones, 22 structures,
+// 10 emotional arcs, 28 director styles, 12 character-arc modes. Option lists
+// are imported from src/lib/story-axes (which reads the server's own name
+// tables), so they can never drift from what the routes accept. Unlike the AI
+// tabs, every control here saves immediately on change — the same convention
+// DirectorPanel's story-architecture controls use — so the footer Save button
+// is hidden on this tab.
+
+function AxisSelect({
+  label,
+  value,
+  options,
+  none,
+  onChange,
+  status,
+  hint,
+}: {
+  label: string;
+  value: string;
+  options: AxisOption[];
+  /** Label for the empty option ("— None —" style). */
+  none: string;
+  onChange: (v: string) => void;
+  status?: { ok: boolean; msg: string } | null;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          {label} <span className="text-gray-400 normal-case tracking-normal">({options.length})</span>
+        </label>
+        {status && (
+          <span className={`text-[10px] font-bold ${status.ok ? "text-green-700" : "text-red-600"}`}>
+            {status.msg}
+          </span>
+        )}
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border-2 border-black px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black w-full bg-white"
+      >
+        <option value="">{none}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value} title={opt.description}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      {hint && <p className="text-[10px] text-gray-400 font-mono">{hint}</p>}
+    </div>
+  );
+}
+
+type AxisKey = "genre" | "tone" | "structure" | "arc" | "style" | "mode";
+
+function StoryTab() {
+  const [story, setStory]     = useState<StoryConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed]   = useState(false);
+  const [expectedTurns, setExpectedTurns] = useState(20);
+  const [applying, setApplying] = useState(false);
+  const [statuses, setStatuses] = useState<Partial<Record<AxisKey, { ok: boolean; msg: string }>>>({});
+  const timersRef = useRef<Partial<Record<AxisKey, ReturnType<typeof setTimeout>>>>({});
+
+  useEffect(() => {
+    fetch("/api/story-config")
+      .then((r) => (r.ok ? (r.json() as Promise<StoryConfig>) : Promise.reject(new Error(r.statusText))))
+      .then((data) => {
+        setStory(data);
+        if (data.expected_turns) setExpectedTurns(data.expected_turns);
+        setLoading(false);
+      })
+      .catch(() => { setFailed(true); setLoading(false); });
+    const timers = timersRef.current;
+    return () => { for (const t of Object.values(timers)) if (t) clearTimeout(t); };
+  }, []);
+
+  const setStatus = (key: AxisKey, status: { ok: boolean; msg: string } | null) => {
+    setStatuses((prev) => ({ ...prev, [key]: status ?? undefined }));
+    if (timersRef.current[key]) clearTimeout(timersRef.current[key]);
+    if (status?.ok) {
+      timersRef.current[key] = setTimeout(() => {
+        setStatuses((prev) => ({ ...prev, [key]: undefined }));
+      }, 2000);
+    }
+  };
+
+  // Shared immediate-save POST: optimistic local patch, server 400s (invalid
+  // value) and network failures surface inline next to the control.
+  const save = async (
+    key: AxisKey,
+    endpoint: string,
+    body: Record<string, unknown>,
+    patch: Partial<StoryConfig>,
+  ) => {
+    setStory((prev) => (prev ? { ...prev, ...patch } : prev));
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
+        setStatus(key, { ok: false, msg: err.error ?? "Save failed" });
+        return;
+      }
+      setStatus(key, { ok: true, msg: "Saved ✓" });
+    } catch (e) {
+      setStatus(key, { ok: false, msg: (e as Error).message });
+    }
+  };
+
+  const applyStructure = async (structure: string) => {
+    if (!structure) return;
+    setApplying(true);
+    await save(
+      "structure",
+      "/api/outline/apply-preset",
+      { structure, expectedTurns },
+      { structure, expected_turns: expectedTurns },
+    );
+    setApplying(false);
+  };
+
+  if (loading) {
+    return <div className="p-4 text-sm font-mono text-gray-500">Loading story config…</div>;
+  }
+  if (failed || !story) {
+    return <div className="p-4 text-sm font-mono text-red-600">Failed to load story config.</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+        Story axes are deterministic engine config — no AI key required. Every
+        change saves immediately to the current session.
+      </p>
+
+      <AxisSelect
+        label="Genre"
+        value={story.story_genre ?? ""}
+        options={GENRE_OPTIONS}
+        none="— None —"
+        status={statuses.genre}
+        onChange={(genre) => {
+          if (!genre) return;
+          void save("genre", "/api/story-genre", { genre }, { story_genre: genre });
+        }}
+        hint="Sets tone register, structural contract, and genre-specific clichés to avoid."
+      />
+
+      <AxisSelect
+        label="Tone"
+        value={story.story_tone ?? ""}
+        options={TONE_OPTIONS}
+        none="— None —"
+        status={statuses.tone}
+        onChange={(tone) => {
+          if (!tone) return;
+          void save("tone", "/api/story-tone", { tone }, { story_tone: tone });
+        }}
+        hint="Mood register, orthogonal to genre — composes with it in every prompt."
+      />
+
+      <AxisSelect
+        label="Character Arc Mode"
+        value={story.character_arc_mode ?? ""}
+        options={CHARACTER_ARC_MODE_OPTIONS}
+        none="— None —"
+        status={statuses.mode}
+        onChange={(mode) => {
+          if (!mode) return;
+          void save("mode", "/api/character-arc-mode", { mode }, { character_arc_mode: mode });
+        }}
+        hint="The moral/psychological direction the protagonist travels — pairs freely with any tension curve."
+      />
+
+      <AxisSelect
+        label="Emotional Arc"
+        value={story.emotional_arc ?? ""}
+        options={EMOTIONAL_ARC_OPTIONS}
+        none="— None (no tension curve) —"
+        status={statuses.arc}
+        onChange={(arc) => {
+          if (!arc) return;
+          void save("arc", "/api/emotional-arc", { arc }, { emotional_arc: arc });
+        }}
+        hint="The engine steers tension pressure toward this curve's shape."
+      />
+
+      <AxisSelect
+        label="Cinematic Style"
+        value={story.director_style ?? ""}
+        options={DIRECTOR_STYLE_OPTIONS}
+        none="— None —"
+        status={statuses.style}
+        onChange={(style) => {
+          if (!style) return;
+          void save("style", "/api/director-style", { style }, { director_style: style });
+        }}
+        hint="Injected into every agent prompt and modulates Director pressure tone."
+      />
+
+      <div className="flex flex-col gap-2 border-t-2 border-black pt-4">
+        <AxisSelect
+          label="Narrative Structure"
+          value={story.structure ?? ""}
+          options={STRUCTURE_OPTIONS}
+          none="— None —"
+          status={statuses.structure}
+          onChange={(structure) => void applyStructure(structure)}
+          hint="Applying a structure regenerates the outline beat sheet, scaled to the expected turn count below."
+        />
+        <div className="flex items-end gap-2">
+          <div className="flex flex-col gap-1 flex-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              Expected Total Turns
+            </label>
+            <input
+              type="number"
+              min={4}
+              max={200}
+              value={expectedTurns}
+              onChange={(e) => setExpectedTurns(Math.max(4, Math.min(200, Number(e.target.value) || 4)))}
+              className="border-2 border-black px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-black w-full"
+            />
+          </div>
+          <button
+            onClick={() => story.structure && void applyStructure(story.structure)}
+            disabled={applying || !story.structure}
+            className="px-4 py-2 font-bold uppercase tracking-wider text-xs bg-black text-white border-2 border-black hover:bg-[#FF4444] transition-colors disabled:opacity-40"
+          >
+            {applying ? "Applying…" : "Re-apply"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
@@ -349,7 +618,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       <div className="bg-white brutal-border brutal-shadow w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b-4 border-black">
-          <h2 className="text-lg font-bold uppercase tracking-widest">AI Provider Settings</h2>
+          <h2 className="text-lg font-bold uppercase tracking-widest">Settings</h2>
           <button
             onClick={onClose}
             className="text-xl font-bold leading-none hover:opacity-60"
@@ -449,9 +718,12 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   defaultUrl="https://api.openai.com/v1"
                 />
               )}
+              {activeTab === "story" && <StoryTab />}
             </div>
 
-            {/* Footer */}
+            {/* Footer — AI-config actions only; the Story tab saves each
+                control immediately, so Test/Save would be misleading there. */}
+            {activeTab !== "story" && (
             <div className="px-6 py-4 border-t-4 border-black flex flex-col gap-2">
               {/* Status messages */}
               <div className="flex items-center min-h-[20px]">
@@ -487,6 +759,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 </button>
               </div>
             </div>
+            )}
           </>
         )}
       </div>

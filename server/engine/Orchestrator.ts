@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
-import { Stage } from './Stage.ts';
+import { Stage, isAudibleActionType } from './Stage.ts';
 import { Agent } from './Agent.ts';
-import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction, TheoryOfMind, EmotionState } from './types.ts';
+import type { CharacterSheet, Location, EpistemicUpdate, NarrativeAction, TheoryOfMind, EmotionState, ActionType, Belief } from './types.ts';
 import { DirectorNode } from './DirectorNode.ts';
 import { CausalSpine } from './CausalSpine.ts';
 import { AppraisalEngine } from './AppraisalEngine.ts';
@@ -45,6 +45,26 @@ const TOM_TO_RELATIONSHIP_DIM: ReadonlyArray<{
   { tomKey: 'affinity',    dimension: 'love',        label: 'affinity' },
   { tomKey: 'debt',        dimension: 'obligation',  label: 'felt obligation' },
 ];
+
+// X1 — blueprint action-vocabulary expansion: fixed trust/affinity/debt
+// deltas applied directly to the TARGET's TheoryOfMind entry ABOUT THE ACTOR,
+// modeling how directly experiencing being threatened, betrayed, protected,
+// or allied-with immediately shifts how the recipient sees the actor —
+// independent of, and prior to, whatever their own next updateEpistemics
+// call additionally infers from tone (deterministic.ts's lexicon already
+// includes "threat"/"betrayed" in its accusatory/negative-tone word lists,
+// so that probabilistic layer reinforces rather than duplicates this direct
+// one). trust_level always has a documented neutral default (0.5 —
+// types.ts's TheoryOfMind doc comment), so it is always adjusted; affinity
+// and debt follow the SAME no-fabricated-baseline rule diffTheoryOfMind
+// already enforces below (only nudged when a prior value exists — a
+// first-ever encounter never invents a baseline).
+const RELATIONSHIP_ACTION_DELTA: Partial<Record<ActionType, { trust: number; affinity: number; debt: number }>> = {
+  THREATEN:      { trust: -0.18, affinity: -0.08, debt:  0.00 },
+  BETRAY:        { trust: -0.35, affinity: -0.20, debt: -0.10 },
+  PROTECT:       { trust:  0.15, affinity:  0.10, debt:  0.08 },
+  FORM_ALLIANCE: { trust:  0.22, affinity:  0.15, debt:  0.12 },
+};
 
 // Pure diff: TheoryOfMind before/after (both snapshotted at the Orchestrator
 // call site, where the observing agent's own belief/emotion update is in
@@ -238,11 +258,21 @@ export class Orchestrator {
     const currentNodeId = _stageAgent.current_location_id;
     const action = await agent.takeTurn();
 
-    if (action.action_type === 'RELOCATE' && action.target) {
+    // RELOCATE (personality-driven exit) and FLEE (cascade fear-driven exit —
+    // see agent/deterministic.ts's tier 1 vs tier 6 split) share the same
+    // adjacency-guarded resolution; they differ only in framing and in what a
+    // blocked attempt degrades to.
+    if ((action.action_type === 'RELOCATE' || action.action_type === 'FLEE') && action.target) {
       const targetLoc = this._resolveRelocation(agentId, action.target);
       if (targetLoc) {
-        action.content = `→ ${targetLoc.name}`;
+        action.content = action.action_type === 'FLEE' ? `→ ${targetLoc.name} (flees)` : `→ ${targetLoc.name}`;
         this.stage.updateAgentLocation(agentId, targetLoc.location_id);
+      } else if (action.action_type === 'FLEE') {
+        // A blocked flight reads as cornered, not merely as changing plans —
+        // WAIT (not SPEAK) is the honest downgrade for a failed fear-response.
+        action.action_type = 'WAIT';
+        action.content = action.content || `(there's nowhere to run)`;
+        action.target = null;
       } else {
         action.action_type = 'SPEAK';
         action.content = action.content || '(decides to stay put)';
@@ -262,7 +292,7 @@ export class Orchestrator {
       action_type: action.action_type,
       target_char_id: action.target ?? null,
       content: action.content,
-      is_audible: action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT',
+      is_audible: isAudibleActionType(action.action_type),
     } as import('./types.ts').ActionLogEntry;
     if (action.action_type !== 'WAIT') {
       this.spine.processEvent(actionEntry, turnIndex);
@@ -291,6 +321,28 @@ export class Orchestrator {
       }
     }
 
+    // X1: SEARCH — the room-wide counterpart of EXAMINE (see _applySearchReveal).
+    if (action.action_type === 'SEARCH') {
+      const searchUpdate = this._applySearchReveal(agentId, currentNodeId, action_id);
+      if (searchUpdate) {
+        try {
+          this._runSpineForUpdate(searchUpdate, action_id, currentNodeId);
+          this.appraiser.appraise(searchUpdate);
+        } catch (err) {
+          logger.warn('spine_search_failed', { agentId, error: (err as Error).message });
+        }
+      }
+    }
+
+    // X1: HIDE / OBSERVE / LISTEN / REVEAL / THREATEN / BETRAY / PROTECT /
+    // FORM_ALLIANCE — see _applyImmediateActionEffects for the per-type mechanics.
+    let immediateRelationshipDeltas: RelationshipDeltaInput[] = [];
+    try {
+      immediateRelationshipDeltas = this._applyImmediateActionEffects(agentId, action, currentNodeId, action_id, turnIndex);
+    } catch (err) {
+      logger.warn('immediate_action_effect_error', { agentId, actionType: action.action_type, error: (err as Error).message });
+    }
+
     // Update the acting agent's epistemic state and run spine
     // Fix A: snapshot theory-of-mind BEFORE updateEpistemics — it's the only
     // place ToM mutates (Agent.ts's "Update theory of mind" block) — so we can
@@ -305,7 +357,10 @@ export class Orchestrator {
     } catch (err) {
       logger.warn('spine_epistemic_failed', { agentId, error: (err as Error).message });
     }
-    const relationshipDeltas = diffTheoryOfMind(agentId, tomBefore, this._snapshotTom(agentId), turnIndex);
+    const relationshipDeltas = [
+      ...immediateRelationshipDeltas,
+      ...diffTheoryOfMind(agentId, tomBefore, this._snapshotTom(agentId), turnIndex),
+    ];
     const emotionAppraisals: EmotionAppraisalInput[] = [];
     const primaryEmotionDelta = diffEmotion(agentId, emotionBeforePrimary, this._snapshotEmotion(agentId));
     if (primaryEmotionDelta) emotionAppraisals.push(primaryEmotionDelta);
@@ -402,6 +457,11 @@ export class Orchestrator {
       round++;
       let lastActionId = '';
       let didRelocate = false;
+      // X1: relationship deltas produced by THREATEN/BETRAY/PROTECT/FORM_ALLIANCE
+      // are computed immediately per-action (direct ToM mutation on the
+      // TARGET), not via the round-end diffTheoryOfMind batch below — collect
+      // them here so they still reach this round's StoryCommit.
+      const roundExtraRelationshipDeltas: RelationshipDeltaInput[] = [];
 
       for (const agentSheet of agentsInRoom) {
         const agent = this.agents.get(agentSheet.char_id);
@@ -422,17 +482,27 @@ export class Orchestrator {
         }
         onProgress?.({ type: 'agent_action', agentId: agentSheet.char_id, agentName: currentSheet.name, action, turnIndex: this.stage.getTurnCount() });
 
-        if (action.action_type === 'RELOCATE' && action.target) {
+        // RELOCATE (personality-driven) and FLEE (cascade-driven — see
+        // agent/deterministic.ts's tier 1 vs tier 6 split) share the same
+        // adjacency-guarded resolution and both end the round early on success
+        // (the room's composition just changed). They differ only in framing
+        // and in what a blocked attempt degrades to.
+        if ((action.action_type === 'RELOCATE' || action.action_type === 'FLEE') && action.target) {
           const targetLoc = this._resolveRelocation(agentSheet.char_id, action.target);
           if (targetLoc) {
-            action.content = `→ ${targetLoc.name}`;
+            action.content = action.action_type === 'FLEE' ? `→ ${targetLoc.name} (flees)` : `→ ${targetLoc.name}`;
             this.stage.updateAgentLocation(agentSheet.char_id, targetLoc.location_id);
             const action_id = this.stage.recordAction(agentSheet.char_id, action, location_id);
             lastActionId = action_id;
-            logger.info('agent_relocated', { agent: currentSheet.name, to: targetLoc.name });
+            logger.info('agent_relocated', { agent: currentSheet.name, to: targetLoc.name, fled: action.action_type === 'FLEE' });
             didRelocate = true;
             turnCount++;
             break;
+          } else if (action.action_type === 'FLEE') {
+            // A blocked flight reads as cornered, not merely as changing plans.
+            action.action_type = 'WAIT';
+            action.content = action.content || `(there's nowhere to run)`;
+            action.target = null;
           } else {
             // Non-adjacent move — downgrade to SPEAK so the turn isn't wasted
             action.action_type = 'SPEAK';
@@ -453,7 +523,7 @@ export class Orchestrator {
           action_type: action.action_type,
           target_char_id: action.target ?? null,
           content: action.content,
-          is_audible: action.action_type !== 'EXAMINE' && action.action_type !== 'WAIT',
+          is_audible: isAudibleActionType(action.action_type),
         } as import('./types.ts').ActionLogEntry;
         if (action.action_type !== 'WAIT') {
           this.spine.processEvent(actionEntry, turnIndex);
@@ -497,6 +567,31 @@ export class Orchestrator {
           }
         }
 
+        // ── X1: SEARCH — the room-wide counterpart of EXAMINE ──
+        if (action.action_type === 'SEARCH') {
+          const searchUpdate = this._applySearchReveal(agentSheet.char_id, location_id, action_id);
+          if (searchUpdate) {
+            try {
+              this._runSpineForUpdate(searchUpdate, action_id, location_id);
+              this.appraiser.appraise(searchUpdate);
+            } catch (err) {
+              logger.warn('spine_search_failed', { agentId: agentSheet.char_id, error: (err as Error).message });
+            }
+          }
+        }
+
+        // ── X1: HIDE / OBSERVE / LISTEN / REVEAL / THREATEN / BETRAY / PROTECT /
+        // FORM_ALLIANCE — see _applyImmediateActionEffects. Deltas are
+        // collected per-round (not diffed at round end, since these mutate
+        // the TARGET's ToM directly, not the acting agent's own).
+        try {
+          roundExtraRelationshipDeltas.push(
+            ...this._applyImmediateActionEffects(agentSheet.char_id, action, location_id, action_id, turnIndex),
+          );
+        } catch (err) {
+          logger.warn('immediate_action_effect_error', { agentId: agentSheet.char_id, actionType: action.action_type, error: (err as Error).message });
+        }
+
         turnCount++;
         if (turnCount >= maxTurns) break;
       }
@@ -528,7 +623,11 @@ export class Orchestrator {
           }
         }
         const roundTurnIndexForDeltas = this.stage.getTurnCount();
-        const roundRelationshipDeltas: RelationshipDeltaInput[] = [];
+        // X1: THREATEN/BETRAY/PROTECT/FORM_ALLIANCE deltas gathered per-action
+        // above, ahead of the round-end diff (which only ever sees each
+        // agent's OWN ToM, not the direct target-side mutation these four
+        // actions make).
+        const roundRelationshipDeltas: RelationshipDeltaInput[] = [...roundExtraRelationshipDeltas];
         for (const sheet of agentsInRoom) {
           const before = tomSnapshots.get(sheet.char_id) ?? {};
           roundRelationshipDeltas.push(
@@ -740,6 +839,261 @@ export class Orchestrator {
       ...(droppedSoFar ? { droppedCommits: droppedSoFar } : {}),
     });
     return { totalTurns, roundsRun, locationIds };
+  }
+
+  // ── X1 — new action-type side effects ───────────────────────────────────────
+  // Honest, deterministic mechanics for the ten blueprint additions that have
+  // real state to act on (see types.ts's header comment for the five that were
+  // excluded and why). Dispatched from both runTurn and runRoomSimulation
+  // right after the action is recorded, mirroring the pre-existing EXAMINE
+  // special-case's placement and try/catch discipline.
+
+  private static readonly HIDE_SUSPICION_RELIEF = 4;
+  private static readonly OBSERVE_EMOTION_THRESHOLD = 20;
+  private static readonly REVEAL_CONFIDENCE = 0.85;
+  private static readonly LISTEN_CONFIDENCE = 0.6;
+
+  // HIDE: a real, bounded suspicion-management lever (reuses the existing
+  // suspicion_score field — the same one deterministic.ts's ACCUSATION/
+  // DEFENSE bumps and decision.ts's computeDefenseLevel already read). No
+  // "invisible until turn N" flag is introduced — that would need new
+  // persisted state this run does not add; HIDE's honest, scoped effect is
+  // successfully NOT drawing attention this turn, not literal invisibility.
+  private _applyHide(agentId: string): void {
+    const sheet = this.stage.getAgent(agentId);
+    if (!sheet) return;
+    const relieved = Math.max(0, (sheet.suspicion_score ?? 0) - Orchestrator.HIDE_SUSPICION_RELIEF);
+    if (relieved !== sheet.suspicion_score) this.stage.updateAgentSuspicion(agentId, relieved);
+  }
+
+  // OBSERVE: surfaces a real, already-tracked but not-yet-known signal — the
+  // TARGET's current EmotionState — as a witnessed belief for the observer.
+  // Only fires when the target's emotion is both non-neutral and significant
+  // (mirrors the bridge's EMOTION_SIGNIFICANCE_THRESHOLD-style gating), and
+  // is deduplicated against the observer's existing beliefs.
+  private _applyObserve(observerId: string, targetId: string, actionId: string, turnIndex: number): void {
+    if (observerId === targetId) return;
+    const observer = this.stage.getAgent(observerId);
+    const target = this.stage.getAgent(targetId);
+    if (!observer || !target) return;
+    const es = target.emotionState;
+    if (!es || es.dominant === 'neutral' || es.intensity < Orchestrator.OBSERVE_EMOTION_THRESHOLD) return;
+    const proposition = `${target.name} seems ${es.dominant} — something in their manner gives it away.`;
+    const existing = observer.beliefs ?? [];
+    if (existing.some(b => b.proposition.toLowerCase() === proposition.toLowerCase())) return;
+    const belief: Belief = {
+      id: randomUUID(),
+      proposition,
+      confidence: 0.9,
+      source: 'witnessed',
+      source_agent_id: targetId,
+      source_event_id: actionId,
+      acquired_at: turnIndex,
+    };
+    this.stage.updateAgentBeliefs(observerId, [...existing, belief]);
+  }
+
+  // LISTEN: surfaces a real, already-tracked signal — the TARGET's own
+  // TheoryOfMind read of a THIRD party — as an inferred belief for the
+  // listener (eavesdropping on a private assessment, not a public claim).
+  // Picks the target's most emotionally "live" relationship using the SAME
+  // trust-deviation ordering deterministic.ts's pickAddressee already uses,
+  // so the eavesdropped content is the most narratively significant thing
+  // available, not an arbitrary pick.
+  private _applyListen(listenerId: string, targetId: string, actionId: string, turnIndex: number): void {
+    if (listenerId === targetId) return;
+    const listener = this.stage.getAgent(listenerId);
+    const target = this.stage.getAgent(targetId);
+    if (!listener || !target?.theoryOfMind) return;
+    const candidates = Object.values(target.theoryOfMind).filter(t => t.subject_id !== listenerId);
+    if (candidates.length === 0) return;
+    const about = candidates.slice().sort((a, b) =>
+      Math.abs((b.trust_level ?? 0.5) - 0.5) - Math.abs((a.trust_level ?? 0.5) - 0.5),
+    )[0];
+    const aboutName = this.stage.getAgent(about.subject_id)?.name ?? about.subject_id;
+    const proposition = `${target.name} privately believes ${aboutName}'s motive is: ${about.believed_motive}`;
+    const existing = listener.beliefs ?? [];
+    if (existing.some(b => b.proposition.toLowerCase() === proposition.toLowerCase())) return;
+    const belief: Belief = {
+      id: randomUUID(),
+      proposition,
+      confidence: Orchestrator.LISTEN_CONFIDENCE, // inferred by eavesdropping, not directly witnessed
+      source: 'inferred',
+      source_agent_id: targetId,
+      source_event_id: actionId,
+      acquired_at: turnIndex,
+    };
+    this.stage.updateAgentBeliefs(listenerId, [...existing, belief]);
+  }
+
+  // SEARCH: the room-wide counterpart of EXAMINE — sweeps every co-present
+  // agent (not just one target) through the SAME deterministic
+  // CausalSpine.processExamine unexposed-lie check EXAMINE already uses, and
+  // — like EXAMINE — returns an EpistemicUpdate-shaped result the caller runs
+  // through the normal _runSpineForUpdate/appraiser pipeline. Returns null
+  // (no update at all) when nothing was found, exactly like EXAMINE's own
+  // `revealedBeliefs.length > 0` gate.
+  private _applySearchReveal(searcherId: string, locationId: string, actionId: string): EpistemicUpdate | null {
+    const others = this.stage.getAgentsInLocation(locationId).filter(a => a.char_id !== searcherId);
+    const revealedBeliefs: Belief[] = [];
+    for (const other of others) {
+      revealedBeliefs.push(...this.spine.processExamine(searcherId, other.char_id, locationId, actionId));
+    }
+    if (revealedBeliefs.length === 0) return null;
+    return {
+      char_id: searcherId,
+      new_beliefs: revealedBeliefs,
+      contradiction_detected: true,
+      contradicted_propositions: revealedBeliefs.map(b => b.proposition),
+      source_event_id: actionId,
+    };
+  }
+
+  // REVEAL: a GUARANTEED, direct epistemic transfer — unlike SPEAK/LIE (whose
+  // content only becomes a belief once the listener's own, probabilistic
+  // updateEpistemics call interprets it), REVEAL writes straight into the
+  // target's belief ledger at a higher confidence (0.85 vs SPEAK/LIE's 0.7
+  // "claim" confidence — see action-to-ops.ts's header comment), because it
+  // is framed as an intentional, direct confiding act, not overheard chatter.
+  private _applyReveal(actorId: string, targetId: string, content: string, actionId: string, turnIndex: number): void {
+    if (actorId === targetId || !content.trim()) return;
+    const target = this.stage.getAgent(targetId);
+    if (!target) return;
+    const proposition = content.trim();
+    const existing = target.beliefs ?? [];
+    if (existing.some(b => b.proposition.toLowerCase() === proposition.toLowerCase())) return;
+    const belief: Belief = {
+      id: randomUUID(),
+      proposition,
+      confidence: Orchestrator.REVEAL_CONFIDENCE,
+      source: 'told',
+      source_agent_id: actorId,
+      source_event_id: actionId,
+      acquired_at: turnIndex,
+    };
+    this.stage.updateAgentBeliefs(targetId, [...existing, belief]);
+  }
+
+  // THREATEN / BETRAY / PROTECT / FORM_ALLIANCE: direct, guaranteed
+  // TheoryOfMind mutation on the TARGET's read of the ACTOR (see
+  // RELATIONSHIP_ACTION_DELTA's header comment for the honesty rules this
+  // follows), fed through the SAME diffTheoryOfMind() helper the acting
+  // agent's own ToM changes already use so the resulting RelationshipDeltaInput[]
+  // flows through the identical SHIFT_RELATIONSHIP bridge path (Fix A).
+  private _applyDirectRelationshipEffect(
+    actorId: string,
+    targetId: string,
+    actionType: ActionType,
+    turnIndex: number,
+  ): RelationshipDeltaInput[] {
+    const d = RELATIONSHIP_ACTION_DELTA[actionType];
+    if (!d || actorId === targetId) return [];
+    const target = this.stage.getAgent(targetId);
+    const actor = this.stage.getAgent(actorId);
+    if (!target || !actor) return [];
+    const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+    const before = { ...(target.theoryOfMind ?? {}) };
+    const existing = before[actorId];
+    const updated: TheoryOfMind = {
+      subject_id: actorId,
+      believed_motive: existing?.believed_motive ?? actor.public_mask.slice(0, 200),
+      believed_knowledge: existing?.believed_knowledge ?? [],
+      trust_level: clamp01((existing?.trust_level ?? 0.5) + d.trust),
+      affinity: existing?.affinity !== undefined ? clamp01(existing.affinity + d.affinity) : existing?.affinity,
+      power_balance: existing?.power_balance,
+      debt: existing?.debt !== undefined ? clamp01(existing.debt + d.debt) : existing?.debt,
+      shared_history: existing?.shared_history,
+    };
+    const after = { ...before, [actorId]: updated };
+    this.stage.updateTheoryOfMind(targetId, after);
+    return diffTheoryOfMind(targetId, before, after, turnIndex);
+  }
+
+  // THREATEN / BETRAY: connects the new action to the defense CASCADE (this
+  // run's item 3) by adding a real DramaticPressure on the TARGET, exactly
+  // like processContradiction's own confrontation_imminent pressure does.
+  // deriveCascadeInputs (psychology.ts) reads this pressure's intensity as
+  // `suddenness` and its source_char_id as the `socialThreat` signal on the
+  // target's VERY NEXT turn — so a threatened/betrayed character's own
+  // cascade genuinely reads FREEZE/FIGHT/FAWN (biasing toward HIDE/WAIT per
+  // cascadeActionBias) rather than this being cosmetic.
+  private _addRelationalPressure(
+    targetId: string,
+    sourceId: string,
+    actionId: string,
+    turnIndex: number,
+    kind: 'THREATEN' | 'BETRAY',
+  ): void {
+    const sourceName = this.stage.getAgent(sourceId)?.name ?? sourceId;
+    const bias_hint = kind === 'THREATEN'
+      ? `${sourceName} just threatened you directly. You feel the danger — you may need to prepare a defense, deflect, or find a way out.`
+      : `${sourceName} just betrayed you in front of others. The shock of it is still landing.`;
+    try {
+      this.stage.addDramaticPressure({
+        pressure_id: randomUUID(),
+        target_char_id: targetId,
+        source_char_id: sourceId,
+        trigger_event_id: actionId,
+        pressure_type: 'ESCALATE',
+        intensity: kind === 'BETRAY' ? 75 : 60,
+        bias_hint,
+        expires_at_turn: turnIndex + 3,
+        applied: false,
+      });
+    } catch (err) {
+      logger.warn('relational_pressure_error', { targetId, sourceId, kind, error: (err as Error).message });
+    }
+  }
+
+  // Single dispatch point for the seven X1 action types whose entire effect
+  // is either a one-shot state write (HIDE/OBSERVE/LISTEN/REVEAL) or a
+  // relationship delta (THREATEN/BETRAY/PROTECT/FORM_ALLIANCE). SEARCH is
+  // deliberately NOT here — its EpistemicUpdate-shaped result needs the
+  // caller's own _runSpineForUpdate/appraiser wiring, so it stays a
+  // standalone call at each call site (mirroring EXAMINE's placement).
+  private _applyImmediateActionEffects(
+    agentId: string,
+    action: NarrativeAction,
+    locationId: string,
+    actionId: string,
+    turnIndex: number,
+  ): RelationshipDeltaInput[] {
+    const deltas: RelationshipDeltaInput[] = [];
+    switch (action.action_type) {
+      case 'HIDE':
+        this._applyHide(agentId);
+        break;
+      case 'OBSERVE':
+        if (action.target) this._applyObserve(agentId, action.target, actionId, turnIndex);
+        break;
+      case 'LISTEN':
+        if (action.target) this._applyListen(agentId, action.target, actionId, turnIndex);
+        break;
+      case 'REVEAL':
+        if (action.target) this._applyReveal(agentId, action.target, action.content, actionId, turnIndex);
+        break;
+      case 'THREATEN':
+        if (action.target) {
+          deltas.push(...this._applyDirectRelationshipEffect(agentId, action.target, 'THREATEN', turnIndex));
+          this._addRelationalPressure(action.target, agentId, actionId, turnIndex, 'THREATEN');
+        }
+        break;
+      case 'BETRAY':
+        if (action.target) {
+          deltas.push(...this._applyDirectRelationshipEffect(agentId, action.target, 'BETRAY', turnIndex));
+          this._addRelationalPressure(action.target, agentId, actionId, turnIndex, 'BETRAY');
+        }
+        break;
+      case 'PROTECT':
+        if (action.target) deltas.push(...this._applyDirectRelationshipEffect(agentId, action.target, 'PROTECT', turnIndex));
+        break;
+      case 'FORM_ALLIANCE':
+        if (action.target) deltas.push(...this._applyDirectRelationshipEffect(agentId, action.target, 'FORM_ALLIANCE', turnIndex));
+        break;
+      default:
+        break; // SPEAK / LIE / EXAMINE / RELOCATE / WAIT / SEARCH / FLEE: handled elsewhere or need no immediate effect here.
+    }
+    return deltas;
   }
 
   // ── Spine wiring helper ─────────────────────────────────────────────────────

@@ -1136,6 +1136,76 @@ Running now, she turns the corner.
   });
 
 
+  describe('Wave 1190 — rhythmPass: rhythm solo-voice drought run, rhythm solo-voice zone cluster, rhythm monologue-revelation decoupled', async () => {
+    const runR1190 = async (records: ScreenplaySceneRecord[]) => {
+      const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');
+      return rhythmPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: {} as any, annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    // Drought-run geometry n=10, runThreshold=5: solo beats (speakingCharacterCount<=1) at 0,1
+    // only, then every remaining scene (2..9, 8 in a row) is a multi-voice exchange (count=2) →
+    // longest exchange run = 8 ≥ 5 → fires. NO-FIRE: add a third solo beat at index 5, splitting
+    // the exchange run into 2..4 (3) and 6..9 (4) — both below threshold 5 → does not fire.
+    it('RHYTHM_SOLO_VOICE_DROUGHT_RUN fires when every scene past the opening is a multi-voice exchange for 5+ scenes running', async () => {
+      const recs1190a = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 1].includes(i) ? { speakingCharacterCount: 1 } : { speakingCharacterCount: 2 }));
+      const res = await runR1190(recs1190a);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SOLO_VOICE_DROUGHT_RUN'), `Expected RHYTHM_SOLO_VOICE_DROUGHT_RUN, got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('RHYTHM_SOLO_VOICE_DROUGHT_RUN does not fire when a solo beat breaks up the exchange run before it reaches 5', async () => {
+      const recs1190an = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 1, 5].includes(i) ? { speakingCharacterCount: 1 } : { speakingCharacterCount: 2 }));
+      const res = await runR1190(recs1190an);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SOLO_VOICE_DROUGHT_RUN'), 'Should NOT fire when no exchange run reaches 5 consecutive scenes');
+    });
+
+    // Zone-cluster geometry n=10 (zones: idx 0-3, 4-6, 7-9): 3 solo beats all in the opening zone
+    // (0,1,2) → ratio 3/3 = 1.0 > 0.6 → fires. NO-FIRE: same 3 solo beats spread one per zone
+    // (0, 4, 8) → max zone ratio 1/3 ≈ 0.33 ≤ 0.6 → does not fire.
+    it('RHYTHM_SOLO_VOICE_ZONE_CLUSTER fires when over 60% of solo beats fall in a single structural third', async () => {
+      const recs1190b = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 1, 2].includes(i) ? { speakingCharacterCount: 1 } : { speakingCharacterCount: 2 }));
+      const res = await runR1190(recs1190b);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_SOLO_VOICE_ZONE_CLUSTER'), `Expected RHYTHM_SOLO_VOICE_ZONE_CLUSTER, got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('RHYTHM_SOLO_VOICE_ZONE_CLUSTER does not fire when solo beats are spread across the three structural thirds', async () => {
+      const recs1190bn = Array.from({ length: 10 }, (_, i) =>
+        makeSharedRecord(i, [0, 4, 8].includes(i) ? { speakingCharacterCount: 1 } : { speakingCharacterCount: 2 }));
+      const res = await runR1190(recs1190bn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_SOLO_VOICE_ZONE_CLUSTER'), 'Should NOT fire when solo beats are spread across all three thirds');
+    });
+
+    // Co-occurrence geometry: 3 monologue scenes (speakingCharacterCount===1, at 0,1,2) and 2
+    // revelation scenes (at 5,6) with zero overlap → fires. NO-FIRE: one revelation scene (idx 0)
+    // coincides with a monologue scene → overlap exists → does not fire.
+    it('RHYTHM_MONOLOGUE_REVELATION_DECOUPLED fires when monologue scenes and revelation scenes never coincide', async () => {
+      const recs1190c = Array.from({ length: 10 }, (_, i) => {
+        if ([0, 1, 2].includes(i)) return makeSharedRecord(i, { speakingCharacterCount: 1 });
+        if ([5, 6].includes(i)) return makeSharedRecord(i, { revelation: 'the truth comes out' });
+        return makeSharedRecord(i);
+      });
+      const res = await runR1190(recs1190c);
+      assert.ok(res.issues.some((i: any) => i.rule === 'RHYTHM_MONOLOGUE_REVELATION_DECOUPLED'), `Expected RHYTHM_MONOLOGUE_REVELATION_DECOUPLED, got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('RHYTHM_MONOLOGUE_REVELATION_DECOUPLED does not fire when a monologue scene carries a revelation', async () => {
+      const recs1190cn = Array.from({ length: 10 }, (_, i) => {
+        if (i === 0) return makeSharedRecord(i, { speakingCharacterCount: 1, revelation: 'the truth comes out' });
+        if ([1, 2].includes(i)) return makeSharedRecord(i, { speakingCharacterCount: 1 });
+        if (i === 6) return makeSharedRecord(i, { revelation: 'a second truth' });
+        return makeSharedRecord(i);
+      });
+      const res = await runR1190(recs1190cn);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RHYTHM_MONOLOGUE_REVELATION_DECOUPLED'), 'Should NOT fire when a monologue scene coincides with a revelation scene');
+    });
+  });
+
   describe('Wave 1170 — rhythmPass: rhythm clock-dialogue-highlight aftermath void, rhythm clock-staging aftermath void, rhythm suspense-curiosity aftermath void', async () => {
     const runR1170 = async (records: ScreenplaySceneRecord[]) => {
       const { rhythmPass } = await import('../../server/nvm/revision/passes/rhythm.ts');

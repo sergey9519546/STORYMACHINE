@@ -93,20 +93,26 @@ function severityChip(sev: RevisionIssue['severity']): string {
 
 // ── Section builders ──────────────────────────────────────────────────────────
 
-function buildHeaderSection(report: ScriptDoctorReport, safeTitle: string): string {
+function buildHeaderSection(
+  report: ScriptDoctorReport, safeTitle: string, safeAuthor: string | null, safeLogline: string | null,
+): string {
   const analyzedAt = typeof report.analyzedAt === 'number' ? report.analyzedAt : Date.now();
   const verdictStyle = report.verdict ? VERDICT_STYLE[report.verdict] : UNKNOWN_VERDICT_STYLE;
+  const byline = safeAuthor ? `<div class="byline">Written by ${safeAuthor}</div>` : '';
+  const loglineLine = safeLogline ? `<div class="logline-line">${safeLogline}</div>` : '';
 
   return `
   <header class="report-header">
     <div class="header-main">
       <div class="masthead">SCRIPT COVERAGE &mdash; STORYMACHINE</div>
       <h1 class="title">${safeTitle}</h1>
+      ${byline}
       <div class="meta-line">
         ${formatDate(analyzedAt)} &middot;
         ${formatNumber(report.sceneCount)} scene${report.sceneCount === 1 ? '' : 's'} &middot;
         ${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}
       </div>
+      ${loglineLine}
     </div>
     <div class="stamp-wrap">
       <div class="stamp" style="background:${verdictStyle.bg}; border-color:${verdictStyle.border}; color:${verdictStyle.text};">
@@ -364,10 +370,22 @@ const STYLES = `
       margin: 0 0 8px;
       word-break: break-word;
     }
+    .byline {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12.5px;
+      color: #52525b;
+      margin: 0 0 6px;
+    }
     .meta-line {
       font-family: 'Courier New', Courier, monospace;
       font-size: 12.5px;
       color: #3f3f46;
+    }
+    .logline-line {
+      font-size: 14px;
+      font-style: italic;
+      color: #27272a;
+      margin-top: 8px;
     }
     .stamp-wrap {
       flex: 0 0 auto;
@@ -585,21 +603,47 @@ const STYLES = `
     }
 `;
 
+export interface CoverageHtmlOptions {
+  /** Title parsed from the Fountain title page (server/lib/logline.ts's
+   *  extractTitlePage), if any. Used ONLY when `title` is empty or the
+   *  literal 'Untitled' placeholder — an explicit title always wins. */
+  titlePageTitle?: string | null;
+  /** Author parsed from the Fountain title page, if any. Purely additive
+   *  (rendered as a byline under the title) — never a fallback for title. */
+  titlePageAuthor?: string | null;
+  /** Logline built by server/lib/logline.ts's buildLogline, if any — the
+   *  one-line pitch the coverage report's header carries alongside the
+   *  title. null when the builder degraded (no speaking character etc.). */
+  logline?: string | null;
+}
+
 /**
  * Render a ScriptDoctorReport into a complete, standalone, print-quality
  * HTML document — the shareable coverage report writers download, print to
  * PDF, and hand to producers. Pure function: inline CSS only, zero external
  * requests, no JS required to view. Every value that could conceivably
- * contain screenplay-derived text (title, scene slugs, issue text,
- * summaries, strengths) is escaped via escapeHtml() before interpolation.
+ * contain screenplay-derived text (title, author, logline, scene slugs,
+ * issue text, summaries, strengths) is escaped via escapeHtml() before
+ * interpolation.
  */
-export function renderCoverageHtml(report: ScriptDoctorReport, title: string): string {
-  const safeTitle = escapeHtml(title.trim() || 'Untitled');
+export function renderCoverageHtml(report: ScriptDoctorReport, title: string, opts: CoverageHtmlOptions = {}): string {
+  // Title fallback chain: explicit title > parsed title page > 'Untitled'.
+  // An explicit 'Untitled' (the client's own default when no title field was
+  // posted — see server/routes/export.ts) is treated the same as empty, so
+  // a script with a real Title: page never displays the literal word
+  // "Untitled" just because the caller didn't bother passing a title.
+  const explicitTitle = title.trim();
+  const resolvedTitle = (explicitTitle && explicitTitle !== 'Untitled')
+    ? explicitTitle
+    : (opts.titlePageTitle?.trim() || explicitTitle || 'Untitled');
+  const safeTitle = escapeHtml(resolvedTitle);
+  const safeAuthor = opts.titlePageAuthor?.trim() ? escapeHtml(opts.titlePageAuthor.trim()) : null;
+  const safeLogline = opts.logline?.trim() ? escapeHtml(opts.logline.trim()) : null;
   const dimensions = report.dimensions ?? [];
   const strengths = report.strengths ?? [];
 
   const body = [
-    buildHeaderSection(report, safeTitle),
+    buildHeaderSection(report, safeTitle, safeAuthor, safeLogline),
     buildHealthSection(report),
     buildDimensionsSection(dimensions),
     buildStrengthsSection(strengths),

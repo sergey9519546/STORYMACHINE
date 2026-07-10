@@ -7,11 +7,16 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
+  computeDimensionScore, computeDimensionRawScore, aggregateReport, clearDoctorCache,
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
-import type { DimensionKey, DimensionScore } from '../../server/nvm/analyze/types.ts';
+import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
+import type { DimensionKey, DimensionScore, FountainAnalysis } from '../../server/nvm/analyze/types.ts';
 import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
+import type { ScreenplaySceneRecord } from '../../server/nvm/screenplay/memory.ts';
+import type { RevisionResult } from '../../server/nvm/revision/pipeline.ts';
+import type { PassResult, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 
 const PASS_ORDER = [
   'structure', 'causality', 'intention', 'belief', 'conflict', 'character-arc', 'dialogue',
@@ -418,6 +423,386 @@ describe('buildStrengths — earned, never-padded bullets', () => {
   });
 });
 
+// ── Wave 1183 (Program v2, Type 2 — excellence detectors) ────────────────────
+// Three new buildStrengths guards, added additively via StrengthsInput.records
+// (see doctor.ts's Wave 1183 header comment for placement/distinctness
+// rationale): sustained stakes (clockRaised in both halves), relationship
+// dynamism (a rupture-then-repair for the same character pair), and emotional
+// range (both valence directions present, landing deliberately positive).
+
+/** Substrings unique to each Wave 1183 strength template — used only to
+ *  detect WHICH guard fired without depending on exact scene numbers/wording,
+ *  so corpus-level assertions below stay robust to phrasing tweaks. */
+const WAVE_1183_MARKERS = [
+  "isn't set once and forgotten",       // buildStakesContinuityStrength
+  'living thread, not a flat one',      // buildRelationshipDynamismStrength
+  'earns its ending rather than coasting', // buildEmotionalRangeStrength
+] as const;
+
+/** Minimal ScreenplaySceneRecord fixture factory — every field defaulted to
+ *  "nothing happened this scene" so a test only needs to override the one or
+ *  two fields its guard actually reads, matching this file's existing
+ *  baseStructureState/buildDimensionFixtures precedent. */
+function buildSceneRecord(sceneIdx: number, overrides: Partial<ScreenplaySceneRecord> = {}): ScreenplaySceneRecord {
+  return {
+    commitId: `fixture-scene-${sceneIdx}`,
+    sceneIdx,
+    slug: `INT. FIXTURE - SCENE ${sceneIdx + 1}`,
+    purpose: 'complicate',
+    dramaticTurn: '',
+    revelation: null,
+    emotionalShift: 'neutral',
+    visualBeats: [],
+    dialogueHighlights: [],
+    unresolvedClues: [],
+    seededClueIds: [],
+    payoffSetupIds: [],
+    clockRaised: false,
+    clockDelta: 0,
+    suspenseDelta: 0,
+    curiosityDelta: 0,
+    relationshipShifts: [],
+    createdAt: sceneIdx,
+    ...overrides,
+  };
+}
+
+function buildSceneRecords(
+  sceneCount: number, overridesByIdx: Record<number, Partial<ScreenplaySceneRecord>> = {},
+): ScreenplaySceneRecord[] {
+  return Array.from({ length: sceneCount }, (_, i) => buildSceneRecord(i, overridesByIdx[i]));
+}
+
+/** buildStrengths input shared by every Wave 1183 fixture test below: no
+ *  other guard has genuine evidence, so a fired strength can only be one of
+ *  the three new ones under test — isolates each assertion the same way the
+ *  pre-existing "no-fire case" fixture above does. */
+function baseStrengthsInputFor(records: ScreenplaySceneRecord[]) {
+  return {
+    structure: baseStructureState({ escalating: false, openClues: 3 }),
+    anyClueSeeded: false,
+    sceneCount: records.length,
+    bySeverity: { critical: 1, major: 0, minor: 0 },
+    dimensions: buildDimensionFixtures([1, 1, 1, 1, 1]),
+    records,
+  };
+}
+
+describe('buildStrengths — Wave 1183 excellence detectors (hand-built fixtures)', () => {
+  it('stakes continuity FIRE: clock raised in both halves names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      1: { clockRaised: true },
+      6: { clockRaised: true },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s => s.includes("isn't set once and forgotten") && s.includes('Scene 1') && s.includes('Scene 6')),
+      `expected the stakes-continuity strength naming Scene 1 and Scene 6, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('stakes continuity NO-FIRE: a competent-but-unremarkable clock raised only once never fires', () => {
+    // Mirrors the corpus's own 'competent'/'weak' pattern: the deadline is
+    // stated once and never returned to — real craft elsewhere, just not
+    // sustained stakes. Not broken, just unremarkable on this one axis.
+    const records = buildSceneRecords(8, { 1: { clockRaised: true } });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes("isn't set once and forgotten")),
+      `stakes-continuity must not fire on a single first-half-only clock mention, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('relationship dynamism FIRE: a rupture followed 6 scenes later by a repair names both scenes and the pair', () => {
+    const records = buildSceneRecords(8, {
+      1: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: -3 }] },
+      7: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: 2 }] },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('living thread, not a flat one') && s.includes('ALEX/JORDAN') &&
+        s.includes('Scene 1') && s.includes('Scene 7')),
+      `expected the relationship-dynamism strength naming ALEX/JORDAN, Scene 1 and Scene 7, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('relationship dynamism NO-FIRE: a rupture with no later repair for the same pair never fires', () => {
+    // Mirrors the corpus's 'competent' design note: a real rupture, but the
+    // Act 3 beat is a thin acknowledgment that never actually reverses it —
+    // competent-but-unremarkable, not a broken relationship-arc pass.
+    const records = buildSceneRecords(8, {
+      1: { relationshipShifts: [{ pairKey: 'ALEX|JORDAN', dimension: 'trust', amount: -3 }] },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('living thread, not a flat one')),
+      `relationship-dynamism must not fire on a rupture with no qualifying repair, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('emotional range FIRE: a negative scene followed by a positive final scene names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      2: { emotionalShift: 'negative' },
+      7: { emotionalShift: 'positive' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('earns its ending rather than coasting') && s.includes('Scene 2') && s.includes('Scene 7')),
+      `expected the emotional-range strength naming Scene 2 and Scene 7, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('emotional range NO-FIRE: a negative scene with no positive scene anywhere never fires', () => {
+    // Mirrors the corpus's 'competent' pattern (Reasonable Doubt, Thanksgiving,
+    // Maybe): real negative-valence craft, but the draft never earns a
+    // genuine positive swing anywhere, including at the close.
+    const records = buildSceneRecords(8, { 2: { emotionalShift: 'negative' } });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('earns its ending rather than coasting')),
+      `emotional-range must not fire on a negative-only draft with no positive scene anywhere, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+});
+
+describe('runScriptDoctor — Wave 1183 excellence detectors against the real reference corpus', () => {
+  it('at least one new detector fires somewhere across the 5 strong-band samples', async () => {
+    const strongReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'strong').map(s => runScriptDoctor(s.fountain)),
+    );
+    const anyFired = strongReports.some(r => (r.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m))));
+    assert.ok(
+      anyFired,
+      `expected at least one Wave 1183 strength somewhere in the strong band, got: ` +
+        `${JSON.stringify(strongReports.map(r => r.strengths))}`,
+    );
+  });
+
+  it('never-padded proof: no Wave 1183 detector fires on any competent-band sample', async () => {
+    const competentReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'competent').map(async s => ({
+        label: s.label, report: await runScriptDoctor(s.fountain),
+      })),
+    );
+    for (const { label, report } of competentReports) {
+      const fired = WAVE_1183_MARKERS.filter(m => (report.strengths ?? []).some(s => s.includes(m)));
+      assert.deepEqual(
+        fired, [],
+        `Wave 1183 detector(s) [${fired.join(', ')}] false-fired on competent-band sample "${label}" — ` +
+          `the competent band is deliberately competent-but-unremarkable, never broken; a fire here means the ` +
+          `guard is padded.`,
+      );
+    }
+  });
+});
+
+describe('Wave 1183 — calibration-drift guard (strengths must never leak into scoring)', () => {
+  it('health stays a pure function of bySeverity/sceneCount/wordCount across the whole corpus, regardless of which (if any) Wave 1183 strengths fired', async () => {
+    let sawAWave1183Strength = false;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      if ((report.strengths ?? []).some(s => WAVE_1183_MARKERS.some(m => s.includes(m)))) sawAWave1183Strength = true;
+
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths (a separate, downstream field) must never be able to move it`,
+      );
+    }
+    assert.ok(
+      sawAWave1183Strength,
+      'expected at least one corpus sample to carry a Wave 1183 strength — otherwise this guard would be vacuous',
+    );
+  });
+});
+
+// ── Wave 1187 (Program v2, Type 2 — excellence detectors, opening cycle 2) ──
+// Three more buildStrengths guards, added additively over the same
+// StrengthsInput.records seam Wave 1183 introduced (see doctor.ts's Wave 1187
+// header comment for placement/distinctness/rejection rationale): scene-
+// purpose variety (>=6 distinct ScenePurpose values, no single one >50%),
+// suspense shaping (a genuine closing-quarter suspense peak that tops every
+// earlier quarter's average, off a real opening baseline), and dramatic-turn
+// density (>=2 named dramaticTurn scenes in BOTH the front and back half).
+
+/** Substrings unique to each Wave 1187 strength template — same
+ *  phrasing-independent detection convention as WAVE_1183_MARKERS above. */
+const WAVE_1187_MARKERS = [
+  "doesn't lean on one narrative gear", // buildScenePurposeVarietyStrength
+  'genuine peak late in the draft',     // buildSuspenseShapingStrength
+  'keeps generating real turns',        // buildDramaticTurnDensityStrength
+] as const;
+
+describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures)', () => {
+  it('scene-purpose variety FIRE: 8 distinct purposes with no dominant one names the count and the top purpose', () => {
+    const records = buildSceneRecords(8, {
+      0: { purpose: 'establish_world' },
+      1: { purpose: 'introduce_conflict' },
+      2: { purpose: 'complicate' },
+      3: { purpose: 'raise_stakes' },
+      4: { purpose: 'revelation' },
+      5: { purpose: 'turning_point' },
+      6: { purpose: 'climax' },
+      7: { purpose: 'resolution' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes("doesn't lean on one narrative gear") && s.includes('8 distinct scene functions') &&
+        s.includes('establish world')),
+      `expected the scene-purpose-variety strength naming 8 distinct functions and the top purpose, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('scene-purpose variety NO-FIRE: 6 distinct purposes but one dominating over half the scenes never fires', () => {
+    // Mirrors the corpus's 'competent'/'weak' pattern: real variety on paper
+    // (6 distinct purposes present), but a single purpose (complicate) still
+    // runs the show at 7/12 = 58% of scenes — not a genuinely varied draft.
+    const records = buildSceneRecords(12, {
+      0: { purpose: 'establish_world' },
+      1: { purpose: 'raise_stakes' },
+      2: { purpose: 'revelation' },
+      3: { purpose: 'climax' },
+      4: { purpose: 'resolution' },
+      // idx 5-11 (7 scenes) keep the buildSceneRecord default purpose 'complicate'.
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes("doesn't lean on one narrative gear")),
+      `scene-purpose-variety must not fire when one purpose dominates over half the scenes, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('suspense shaping FIRE: a closing-quarter peak that tops every earlier quarter average names both scenes', () => {
+    const records = buildSceneRecords(8, {
+      0: { suspenseDelta: 1 },
+      1: { suspenseDelta: 1 },
+      // idx 2-5 (quarters two and three) stay at the default suspenseDelta 0.
+      6: { suspenseDelta: 2 },
+      7: { suspenseDelta: 0 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('genuine peak late in the draft') && s.includes('Scene 6') && s.includes('Scene 0')),
+      `expected the suspense-shaping strength naming Scene 6 (the peak) and Scene 0 (the baseline), got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('suspense shaping NO-FIRE: a closing-quarter peak that only TIES the opening baseline never fires', () => {
+    // Mirrors the corpus's designed flaw: the ending isn't actually stronger
+    // than the opening, just even with it — not a genuine build.
+    const records = buildSceneRecords(8, {
+      0: { suspenseDelta: 1 },
+      1: { suspenseDelta: 1 },
+      6: { suspenseDelta: 1 },
+      7: { suspenseDelta: 0 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('genuine peak late in the draft')),
+      `suspense-shaping must not fire when the closing peak merely ties (not tops) an earlier quarter's average, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('dramatic-turn density FIRE: 2 turns in the front half and 2 in the back half names all four scenes', () => {
+    const records = buildSceneRecords(8, {
+      1: { dramaticTurn: 'She finally confronts him.' },
+      2: { dramaticTurn: 'The alibi falls apart.' },
+      5: { dramaticTurn: 'The truth comes out.' },
+      6: { dramaticTurn: 'He chooses to stay.' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      strengths.some(s =>
+        s.includes('keeps generating real turns') && s.includes('Scenes 1, 2') && s.includes('Scenes 5, 6')),
+      `expected the dramatic-turn-density strength naming Scenes 1, 2 and Scenes 5, 6, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+
+  it('dramatic-turn density NO-FIRE: 2 turns in the front half but only 1 in the back half never fires', () => {
+    // Mirrors the corpus's 'competent' near-miss (Thanksgiving, Maybe): real
+    // turns up front, but the back half only manages a single, thinner turn.
+    const records = buildSceneRecords(8, {
+      1: { dramaticTurn: 'She finally confronts him.' },
+      2: { dramaticTurn: 'The alibi falls apart.' },
+      6: { dramaticTurn: 'He chooses to stay.' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+
+    assert.ok(
+      !strengths.some(s => s.includes('keeps generating real turns')),
+      `dramatic-turn-density must not fire when only one half clears the 2-turn floor, got: ${JSON.stringify(strengths)}`,
+    );
+  });
+});
+
+describe('runScriptDoctor — Wave 1187 excellence detectors against the real reference corpus', () => {
+  it('at least one new detector fires somewhere across the 5 strong-band samples', async () => {
+    const strongReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'strong').map(s => runScriptDoctor(s.fountain)),
+    );
+    const anyFired = strongReports.some(r => (r.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m))));
+    assert.ok(
+      anyFired,
+      `expected at least one Wave 1187 strength somewhere in the strong band, got: ` +
+        `${JSON.stringify(strongReports.map(r => r.strengths))}`,
+    );
+  });
+
+  it('never-padded proof: no Wave 1187 detector fires on any competent-band sample', async () => {
+    const competentReports = await Promise.all(
+      REFERENCE_CORPUS.filter(s => s.band === 'competent').map(async s => ({
+        label: s.label, report: await runScriptDoctor(s.fountain),
+      })),
+    );
+    for (const { label, report } of competentReports) {
+      const fired = WAVE_1187_MARKERS.filter(m => (report.strengths ?? []).some(s => s.includes(m)));
+      assert.deepEqual(
+        fired, [],
+        `Wave 1187 detector(s) [${fired.join(', ')}] false-fired on competent-band sample "${label}" — ` +
+          `the competent band is deliberately competent-but-unremarkable, never broken; a fire here means the ` +
+          `guard is padded.`,
+      );
+    }
+  });
+});
+
+describe('Wave 1187 — calibration-drift guard (strengths must never leak into scoring)', () => {
+  it('health stays a pure function of bySeverity/sceneCount/wordCount across the whole corpus, extending the Wave 1183 mechanism check to at least one Wave 1187 strength', async () => {
+    let sawAWave1187Strength = false;
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      if ((report.strengths ?? []).some(s => WAVE_1187_MARKERS.some(m => s.includes(m)))) sawAWave1187Strength = true;
+
+      const expectedHealth = computeHealthScore(report.bySeverity, report.sceneCount, report.wordCount);
+      assert.equal(
+        report.health, expectedHealth,
+        `${sample.label}: health must equal computeHealthScore(bySeverity, sceneCount, wordCount) exactly — ` +
+          `strengths (a separate, downstream field) must never be able to move it, Wave 1187's included`,
+      );
+    }
+    assert.ok(
+      sawAWave1187Strength,
+      'expected at least one corpus sample to carry a Wave 1187 strength — otherwise this guard would be vacuous',
+    );
+  });
+});
+
 describe('runScriptDoctor — plainSummary', () => {
   it('is non-empty, names the verdict, and never leaks a raw ALL_CAPS rule token', async () => {
     const report = await runScriptDoctor(buildMultiSceneFountain());
@@ -567,5 +952,294 @@ describe('runScriptDoctor — calibration percentiles', () => {
       assert.equal(first.dimensions![i].percentile, second.dimensions![i].percentile);
       assert.equal(first.dimensions![i].percentileDescriptor, second.dimensions![i].percentileDescriptor);
     }
+  });
+});
+
+// ── Wave 18-β: dimension-collapse fix (short-script dimension scores) ───────
+// FINDING this wave fixes: on a short script (608 words, 9 scenes), all 5
+// DimensionScore.score values rendered identical (84.4 x5) despite issue
+// counts per dimension differing 4-5x (35/40/14/34/8). Root cause: buildDimensions
+// (doctor.ts) fed every dimension through computeHealthScore's FULL formula,
+// including scarcityPenalty (140/sceneCount) — a term that reads only the
+// WHOLE script's sceneCount, identical across all 5 dimension calls, and
+// dominates at low word counts, swamping the tiny per-dimension density
+// differences. Fix: the displayed dimension score (computeDimensionScore) now
+// omits the scarcity term entirely and uses its own, separately-tuned density
+// curve (dimensionDensityPenalty) — see doctor.ts's own Wave 18-β design
+// comment for the full rationale and the measurement that ruled out reusing
+// craftPenalty's curve outright (it collapses dimensions toward the 100
+// ceiling instead of separating them). DimensionBuild.rawScore (calibration
+// percentile ranking) is untouched — see doctor.ts for why.
+
+describe('computeDimensionScore / computeDimensionRawScore — formula spot-check (Wave 18-β)', () => {
+  it('separates 5 skewed dimension issue-mixes at the bug repro word/scene count, ordered by issue density', () => {
+    // Mirrors the bug's own repro shape: 608 words, 9 scenes, per-dimension
+    // weightedIssues 35/40/14/34/8 (minor-only counts of 70/80/28/68/16, since
+    // weightedIssues = 0.5*minorCount). Expected values below are this wave's
+    // own measured output (see doctor.ts's Wave 18-β comment) — computeDimensionScore
+    // itself is the single source of truth for the formula, same convention as
+    // computeHealthScore's own spot-check block above.
+    const wordCount = 608;
+    const sceneCount = 9;
+    const minorCounts = [70, 80, 28, 68, 16]; // -> weightedIssues 35, 40, 14, 34, 8
+    const scores = minorCounts.map(minor => computeDimensionScore({ critical: 0, major: 0, minor }, wordCount, sceneCount));
+
+    assert.deepEqual(scores, [75.3, 69.8, 93.7, 76.3, 97.3]);
+
+    // The historical bug: all 5 rendered IDENTICAL (84.4 x5). Direct regression
+    // guard — this must never collapse back to a single repeated value.
+    assert.equal(new Set(scores).size, 5, `expected 5 distinct scores, got ${JSON.stringify(scores)}`);
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range > 15, `expected a visible spread (>15pts) tracking issue density, got range ${range.toFixed(1)} (${scores.join(', ')})`);
+
+    // Ordering must match issue severity/density: more weighted issues -> lower
+    // score. minorCounts[1]=80 is the heaviest (score[1] must be the lowest);
+    // minorCounts[4]=16 is the lightest (score[4] must be the highest).
+    assert.equal(Math.min(...scores), scores[1], 'the heaviest-issue dimension must score lowest');
+    assert.equal(Math.max(...scores), scores[4], 'the lightest-issue dimension must score highest');
+  });
+
+  it('stays within [0, 100] even for a heavily-flagged dimension at a tiny word count', () => {
+    const score = computeDimensionScore({ critical: 50, major: 0, minor: 0 }, 20, 10);
+    assert.equal(score, 0);
+    const raw = computeDimensionRawScore({ critical: 50, major: 0, minor: 0 }, 20);
+    assert.ok(raw < 0, `expected the unclamped raw score to go negative, got ${raw}`);
+  });
+
+  it('is exactly 100 for a zero-issue dimension regardless of sceneCount — no scarcity floor unlike the overall score', () => {
+    // Contrast with computeHealthScore's OWN zero-issue behavior (this file's
+    // "does NOT return 100 for zero issues at a tiny scene/word count" test
+    // above): the overall score keeps a scarcity surcharge even at zero
+    // issues, but a dimension's displayed score has no such term by design
+    // (Wave 18-β) — a genuinely clean dimension reads as a clean 100.
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 80, 4), 100);
+    assert.equal(computeDimensionScore({ critical: 0, major: 0, minor: 0 }, 2000, 25), 100);
+  });
+
+  it('honesty guard: rounds to the nearest whole point (not a tenth) below 3 scenes', () => {
+    const bySeverity = { critical: 0, major: 0, minor: 70 }; // weightedIssues 35
+    const wordCount = 608;
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 1), 75, 'sceneCount=1 must round to a whole point');
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 2), 75, 'sceneCount=2 must round to a whole point');
+    // sceneCount=3 clears the low-confidence floor (< 3, not <= 3) and keeps
+    // the normal tenths-place precision.
+    assert.equal(computeDimensionScore(bySeverity, wordCount, 3), 75.3, 'sceneCount=3 must keep tenths precision');
+  });
+});
+
+/** Fixture PassResult with all issues attached to a single named pass (each
+ *  dimension's own first mapped pass, per DIMENSION_PASS_MAP above) — enough
+ *  for buildDimensions'/aggregateReport's per-dimension rollup, which only
+ *  cares which DIMENSION a pass belongs to, not which of its 2-4 member
+ *  passes carried the issues. */
+function buildDimensionSkewedResult(
+  weightedByDimension: Array<{ critical?: number; major?: number; minor?: number }>,
+): RevisionResult {
+  const passResults: PassResult[] = PASS_ORDER.map(pass => ({
+    pass: pass as PassResult['pass'],
+    issues: [] as RevisionIssue[],
+    revisedFountain: '',
+    changed: false,
+    summary: '',
+  }));
+
+  DIMENSION_CONTRACT_ORDER.forEach((def, i) => {
+    const mix = weightedByDimension[i];
+    const targetPass = DIMENSION_PASS_MAP[def.key][0];
+    const pr = passResults.find(p => p.pass === targetPass)!;
+    const push = (severity: RevisionIssue['severity'], count: number) => {
+      for (let j = 0; j < count; j++) {
+        pr.issues.push({
+          location: 'Scene 0', rule: `TEST_RULE_${def.key.toUpperCase()}`,
+          description: `synthetic ${def.key} test issue`, severity,
+        });
+      }
+    };
+    push('critical', mix.critical ?? 0);
+    push('major', mix.major ?? 0);
+    push('minor', mix.minor ?? 0);
+  });
+
+  return {
+    passResults,
+    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, completedAt: 0,
+  };
+}
+
+function buildAnalysisFixture(sceneCount: number, wordCount: number): FountainAnalysis {
+  return {
+    records: [], annotations: [], structure: baseStructureState(),
+    characters: [], sceneCount, dialogueLineCount: 0, actionLineCount: 0, wordCount,
+  };
+}
+
+describe('runScriptDoctor report shape — dimension-collapse fix, end to end (Wave 18-β)', () => {
+  it('FIRE: a short (9-scene, 608-word) script with skewed per-dimension issue counts produces non-identical dimension scores, ordered by issue density', () => {
+    // Same repro shape as the formula spot-check above, but exercised through
+    // the actual public aggregation path (aggregateReport) rather than the
+    // bare formula, proving the fix reaches the real report shape a caller
+    // receives — not just the underlying function.
+    const analysis = buildAnalysisFixture(9, 608);
+    const result = buildDimensionSkewedResult([
+      { minor: 70 }, // structure-pacing: weightedIssues 35
+      { minor: 80 }, // character: weightedIssues 40
+      { minor: 28 }, // dialogue-voice: weightedIssues 14
+      { minor: 68 }, // plot-logic: weightedIssues 34
+      { minor: 16 }, // theme-originality: weightedIssues 8
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — dimension collapse fire case');
+
+    const scores = report.dimensions!.map(d => d.score);
+    assert.equal(new Set(scores).size, 5, `expected 5 distinct dimension scores, got ${JSON.stringify(scores)} — this is the exact historical bug (84.4 x5)`);
+
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range > 15, `expected visible spread across dimensions, got range ${range.toFixed(1)} (${JSON.stringify(scores)})`);
+
+    // character (index 1, weightedIssues 40, the heaviest) must score lowest;
+    // theme-originality (index 4, weightedIssues 8, the lightest) must score
+    // highest — ordering matches issue severity/density exactly.
+    const byKey = Object.fromEntries(report.dimensions!.map(d => [d.key, d.score]));
+    assert.equal(byKey['character'], Math.min(...scores), 'the heaviest-issue dimension must score lowest');
+    assert.equal(byKey['theme-originality'], Math.max(...scores), 'the lightest-issue dimension must score highest');
+
+    for (const score of scores) assert.ok(score >= 0 && score <= 100, `dimension score out of range: ${score}`);
+  });
+
+  it('NO-FIRE / control: a short script with a BALANCED issue mix across dimensions produces near-equal scores', () => {
+    // Control for the fire case above: when the underlying issue mix genuinely
+    // IS balanced across dimensions (not skewed), the fix must not manufacture
+    // spread that isn't there — dimensions should land close together, same as
+    // they did (for the wrong reason) before this fix.
+    const analysis = buildAnalysisFixture(9, 608);
+    const result = buildDimensionSkewedResult([
+      { minor: 40 }, { minor: 42 }, { minor: 38 }, { minor: 41 }, { minor: 39 },
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — balanced control case');
+
+    const scores = report.dimensions!.map(d => d.score);
+    const range = Math.max(...scores) - Math.min(...scores);
+    assert.ok(range < 10, `expected near-equal dimension scores for a balanced issue mix, got range ${range.toFixed(1)} (${JSON.stringify(scores)})`);
+  });
+
+  it('identical bySeverity mixes across all 5 dimensions produce byte-identical scores (determinism sanity)', () => {
+    const analysis = buildAnalysisFixture(10, 320);
+    const result = buildDimensionSkewedResult([
+      { minor: 20 }, { minor: 20 }, { minor: 20 }, { minor: 20 }, { minor: 20 },
+    ]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — identical mixes');
+
+    const scores = report.dimensions!.map(d => d.score);
+    assert.ok(scores.every(s => s === scores[0]), `expected all 5 identical scores for identical issue mixes, got ${JSON.stringify(scores)}`);
+  });
+
+  it('honesty guard reaches the real report: dimension scores round to a whole point below 3 scenes', () => {
+    const analysis = buildAnalysisFixture(2, 608);
+    const result = buildDimensionSkewedResult([{ minor: 70 }, {}, {}, {}, {}]);
+    const report = aggregateReport(result, analysis, 'fixture fountain — low-confidence rounding');
+
+    const structureDim = report.dimensions!.find(d => d.key === 'structure-pacing')!;
+    assert.equal(structureDim.score, Math.round(structureDim.score), `expected a whole-point score below 3 scenes, got ${structureDim.score}`);
+  });
+
+  it('length-invariance is NOT expected of the dimension formula the same way as overall health — sanity: dimension scores stay in [0, 100] across a 1x/2x/3x-issue sweep', () => {
+    // Not a strict invariance claim (the overall health length-invariance test
+    // in calibration.test.ts is the binding one, and it is untouched by this
+    // wave — see doctor.ts's craftPenalty comment). This is a basic sanity
+    // bound: whatever the dimension curve does as issue volume scales up, it
+    // must never leave the documented [0, 100] contract.
+    const analysis = buildAnalysisFixture(9, 608);
+    for (const multiplier of [1, 2, 3]) {
+      const result = buildDimensionSkewedResult([
+        { minor: 70 * multiplier }, { minor: 80 * multiplier }, { minor: 28 * multiplier },
+        { minor: 68 * multiplier }, { minor: 16 * multiplier },
+      ]);
+      const report = aggregateReport(result, analysis, `fixture fountain — issue sweep x${multiplier}`);
+      for (const dim of report.dimensions!) {
+        assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} out of range at x${multiplier}: ${dim.score}`);
+      }
+    }
+  });
+});
+
+// ── Narrative metrics (I1-c) ─────────────────────────────────────────────────
+// ScriptDoctorReport.metrics — analyze/metrics.ts's NarrativeMetricsReport,
+// computed by aggregateReport from the same analyzer records every other
+// layer reads, and attached on every non-degenerate run. pacingFit is null
+// throughout by construction: the doctor has no session emotional_arc to pass
+// (StoryContext carries no arc field), and metrics.ts reports that absence
+// honestly instead of fabricating a neutral score.
+describe('runScriptDoctor — narrative metrics (report.metrics)', () => {
+  it('is present on a normal run, with one per-scene entry per scene in sceneIdx order', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+
+    assert.ok(report.metrics, 'metrics must be populated on a non-degenerate report');
+    const metrics = report.metrics!;
+    assert.equal(metrics.perScene.length, report.sceneCount,
+      'perScene must carry exactly one entry per analyzed scene');
+    assert.equal(metrics.script.sceneCount, report.sceneCount);
+    metrics.perScene.forEach((scene, i) => {
+      assert.equal(scene.sceneIdx, i, 'perScene must be sceneIdx-ascending with no gaps');
+      assert.ok(scene.slug.length > 0, 'every per-scene entry must carry its slug');
+    });
+  });
+
+  it('every score is within its documented range', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+
+    for (const scene of metrics.perScene) {
+      for (const key of ['pivotStrength', 'cliffhangerStrength', 'twistImpact', 'surpriseProxy', 'informationAsymmetryStrength'] as const) {
+        const v = scene[key];
+        assert.ok(Number.isFinite(v) && v >= 0 && v <= 100, `scene ${scene.sceneIdx} ${key} out of [0,100]: ${v}`);
+      }
+    }
+
+    const s = metrics.script;
+    for (const key of ['suspenseEntropy', 'momentumConsistency', 'finalCliffhangerStrength', 'narrativeCohesion'] as const) {
+      assert.ok(s[key] >= 0 && s[key] <= 100, `script.${key} out of [0,100]: ${s[key]}`);
+    }
+    assert.ok(s.emotionalImpactRange.peak >= 0 && s.emotionalImpactRange.peak <= 100);
+    assert.ok(s.emotionalImpactRange.spread >= 0 && s.emotionalImpactRange.spread <= 100);
+    // tensionMeasures: lexical is SIGNED and unbounded by contract (finite is
+    // the only guarantee); the other three are 0-100.
+    assert.ok(Number.isFinite(s.tensionMeasures.lexical));
+    for (const key of ['structural', 'rhythmic', 'asymmetric'] as const) {
+      const v = s.tensionMeasures[key];
+      assert.ok(v >= 0 && v <= 100, `tensionMeasures.${key} out of [0,100]: ${v}`);
+    }
+  });
+
+  it('pacingFit is honestly null everywhere — the doctor has no session emotional arc to measure against', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+    assert.equal(metrics.script.pacingFit, null, 'script-level pacingFit must be null with no arc configured');
+    for (const scene of metrics.perScene) {
+      assert.equal(scene.pacingFit, null, `scene ${scene.sceneIdx} pacingFit must be null with no arc configured`);
+    }
+  });
+
+  it('is deterministic: two genuinely fresh runs (cache cleared between) produce deep-equal metrics', async () => {
+    const fountain = buildMultiSceneFountain();
+    clearDoctorCache();
+    const first = await runScriptDoctor(fountain);
+    clearDoctorCache(); // make the second run a real recompute, not a cache hit
+    const second = await runScriptDoctor(fountain);
+    assert.deepEqual(first.metrics, second.metrics,
+      'metrics must be byte-identical across independent runs on the same input');
+  });
+
+  it('final hook reconciles: script.finalCliffhangerStrength equals the last scene\'s cliffhangerStrength', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+    assert.equal(
+      metrics.script.finalCliffhangerStrength,
+      metrics.perScene[metrics.perScene.length - 1].cliffhangerStrength,
+    );
+  });
+
+  it('is absent from the degenerate zero-scene report — a missing field, not a fabricated all-zero one', async () => {
+    const report = await runScriptDoctor('   \n\n  \t  ');
+    assert.equal(report.metrics, undefined,
+      'the zero-scene report skips the pipeline entirely and must not carry metrics');
   });
 });

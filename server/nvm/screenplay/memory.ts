@@ -11,6 +11,20 @@ import type { StoryCommit } from '../state/StoryCommit.ts';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// Wave E1-b: 9 → 16. The 7 new values below 'character_moment' split further
+// along two axes: some (setup_planting, relationship_beat, echo_coda,
+// breather) are inferable from a SINGLE commit's ops alone, so derivePurpose
+// below can assign them deterministically on the ops-derived path. The other
+// three (subplot_complication, false_victory, dark_night) genuinely require
+// context derivePurpose does not have — knowing what counts as "the main
+// plot" vs. a subplot, or whether a later scene reverses this one's apparent
+// win, or this scene's POSITION relative to the story's low point — none of
+// which a single StoryCommit's ops can honestly support. Those three are
+// LLM-ONLY: only server/nvm/analyze/deep-read.ts's model-based reader (whose
+// batched prompt gives the model several neighboring scenes' text at once,
+// unlike derivePurpose's single-commit view) can plausibly assign them; the
+// ops-derived path never emits them, and callers must not assume every
+// ScenePurpose value is reachable from annotateCommit.
 export type ScenePurpose =
   | 'establish_world'
   | 'introduce_conflict'
@@ -20,7 +34,31 @@ export type ScenePurpose =
   | 'turning_point'
   | 'climax'
   | 'resolution'
-  | 'character_moment';
+  | 'character_moment'
+  /** Ops-derived-reachable: 2+ SEED_CLUE ops in the same scene (planting
+   *  dominates the scene, distinct from a single clue woven into an
+   *  introduce_conflict scene — see derivePurpose). */
+  | 'setup_planting'
+  /** Ops-derived-reachable: a SHIFT_RELATIONSHIP op is present — a more
+   *  precise label than the old catch-all `character_moment` for a scene
+   *  whose main business is moving a bond between two characters. */
+  | 'relationship_beat'
+  /** Ops-derived-reachable: an ADVANCE_THEME_ARGUMENT op whose move is
+   *  'echo' — the theme argument literally restates an earlier claim through
+   *  a new voice, which is what an "echo coda" beat structurally is. */
+  | 'echo_coda'
+  /** Ops-derived-reachable: the true fallback — no clue/clock/relationship/
+   *  theme/emotion signal at all. A quiet, low-key scene between beats. */
+  | 'breather'
+  /** LLM-ONLY (see file-header note above): a subplot complicates rather
+   *  than the A-plot — requires knowing which thread is the main one. */
+  | 'subplot_complication'
+  /** LLM-ONLY: an apparent win the audience should not yet trust, because a
+   *  later scene reverses it — requires reading past this scene. */
+  | 'false_victory'
+  /** LLM-ONLY: the protagonist's lowest point — requires knowing this
+   *  scene's position relative to the story's overall shape. */
+  | 'dark_night';
 
 export interface ScreenplaySceneRecord {
   commitId: string;
@@ -73,6 +111,87 @@ export interface ScreenplaySceneRecord {
   questionsResolved?: number;
   questionsResolvedSameScene?: number;
   questionsUnresolved?: number;
+  /** Power-balance shifts within scenes (Wave 1186 — Program v2 Type 1 signal
+   *  channel, closing cycle 1). Which of the scene's two most-speaking
+   *  characters holds conversational control, derived purely from dialogue
+   *  (imperatives, questions asked, em-dash interruptions, turn-length
+   *  dominance, second-person accusatory phrasing — see fountain-analyzer.ts's
+   *  detectPowerBalance, the only builder that currently populates these).
+   *  powerHolder is the controlling character's name, or null when fewer than
+   *  two characters speak, too little dialogue exists to judge, or the
+   *  balance falls inside the deadband around zero (no clear holder).
+   *  powerBalance is signed -1..1 toward whichever of the two dyad members
+   *  speaks FIRST in the scene (not toward whoever talks most) — deliberately
+   *  independent of the memory.ts precedent's usual "positive means good"
+   *  framing, since power is a fact about control, not valence. powerFlipped
+   *  is true only when the first half and second half of the dyad's exchange
+   *  resolve to two different, non-null holders. Optional only so legacy/test
+   *  fixtures and the ops-derived path (StoryOps carry no raw dialogue text to
+   *  score for imperatives/interruptions/accusatory phrasing) still typecheck;
+   *  consumers should treat absence as null/0/false, matching the
+   *  questionsRaised precedent immediately above. */
+  powerHolder?: string | null;
+  powerBalance?: number;
+  powerFlipped?: boolean;
+  /** Speaking-character count within the scene (Wave 1190 — Program v2 Type 1
+   *  signal channel #3, closing cycle 2). Count of distinct characters with at
+   *  least one dialogue line in this scene: 0 = no dialogue at all, 1 = a
+   *  monologue/solo beat (one character holds the floor, nobody answers),
+   *  2+ = a genuine multi-voice exchange (see fountain-analyzer.ts's
+   *  detectSpeakingCharacterCount, the only builder that currently populates
+   *  this). Distinct from powerHolder/powerBalance/powerFlipped (Wave 1186):
+   *  those are null/0 for three different, unrelated reasons (fewer than two
+   *  speakers, an ambiguous near-zero balance, or too few dyad lines to
+   *  judge) and cannot by themselves distinguish a true solo scene from a
+   *  close two-hander — speakingCharacterCount reports the raw voice count at
+   *  any value, independent of control or dialogue volume. Optional only so
+   *  legacy/test fixtures and the ops-derived path (StoryOps carry no raw
+   *  dialogue text or speaker attribution to count against) still typecheck;
+   *  consumers should treat absence as 0, matching the questionsRaised/
+   *  powerHolder precedent above. */
+  speakingCharacterCount?: number;
+  /** Betrayal/loyalty axis (Wave 1192 — Program v2 Type 1 signal channel,
+   *  cycle 3). Net betrayal-minus-loyalty signal for the scene: positive =
+   *  betrayal-dominant, negative = loyalty-affirming, zero = neither present
+   *  or balanced. TEXT PATH: fountain-analyzer.ts's computeBetrayalSignals —
+   *  integer net lexicon-hit count (BETRAYAL_WORDS minus LOYALTY_WORDS) over
+   *  the scene's full text. OPS PATH: derived from SHIFT_RELATIONSHIP ops on
+   *  the trust/loyalty-adjacent dimensions — a 'trust' shift contributes
+   *  -amount (trust falling = betrayal-ward, trust rising = loyalty-ward) and
+   *  a 'jealousy'/'rivalry' shift contributes +amount (those strains rising
+   *  = betrayal-adjacent, falling = reconciliation-ward) — so the ops value
+   *  is a float in the -1..1-per-shift range, NOT the text path's integer
+   *  word count. The two are comparable by SIGN only (see
+   *  record-parity.test.ts's measured tier). Optional only so legacy/test
+   *  fixtures predating the field still typecheck; both builders always
+   *  populate it — consumers treat absence as 0. */
+  betrayalSignal?: number;
+  /** Power-dynamics intensity (Wave 1192). How control-charged the scene is,
+   *  as a magnitude (never negative), independent of WHO holds control —
+   *  deliberately distinct from powerHolder/powerBalance (Wave 1186), which
+   *  identify a specific controlling character and need a two-speaker dyad;
+   *  this registers control-charged material even in action-only scenes.
+   *  TEXT PATH: computePowerDynamicsIntensity — dominance/submission verb
+   *  hit count over the scene text. OPS PATH: sum of |amount| over
+   *  SHIFT_RELATIONSHIP ops on the control-adjacent dimensions ('respect',
+   *  'rivalry', 'dependency', 'obligation' — the four axes that move who
+   *  defers to / owes / needs / contests whom; affection axes like love/
+   *  trust deliberately excluded, matching the text lexicon's control-not-
+   *  affection boundary). Float vs integer as above: comparable by PRESENCE
+   *  (nonzero vs zero) only. Optional for legacy fixtures; both builders
+   *  populate; absence reads as 0. */
+  powerDynamicsIntensity?: number;
+  /** Verbal-irony marker count (Wave 1192). TEXT PATH ONLY:
+   *  computeIronyMarkerCount — stock irony-flag phrase hits ("of course",
+   *  "what could go wrong", …) over the scene text. OPS PATH: never
+   *  populated (KNOWN_ASYMMETRY, same family as questionsRaised/powerHolder/
+   *  speakingCharacterCount above) — StoryOps carry no tonal stance: a
+   *  belief proposition records WHAT a character believes, not whether the
+   *  line delivering it is sincere or sarcastic, and scanning proposition
+   *  text for irony stock phrases here would just be a worse duplicate of
+   *  the text path, not an independent ops-derived signal. Consumers treat
+   *  absence as 0. */
+  ironyMarkerCount?: number;
   /** createdAt timestamp */
   createdAt: number;
 }
@@ -150,6 +269,22 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     relationshipShifts.push({ pairKey, dimension, amount });
   }
 
+  // ── Betrayal signal + power-dynamics intensity (Wave 1192) ────────────────
+  // Both derived from the SHIFT_RELATIONSHIP entries just collected — see the
+  // ScreenplaySceneRecord field comments above for the dimension mapping and
+  // why ironyMarkerCount has no honest ops-path counterpart. Derived from the
+  // sanitized `relationshipShifts` array (not raw ops) so malformed pairs /
+  // non-finite amounts are already guarded once, in one place.
+  let betrayalSignal = 0;
+  let powerDynamicsIntensity = 0;
+  for (const s of relationshipShifts) {
+    if (s.dimension === 'trust') betrayalSignal -= s.amount;
+    else if (s.dimension === 'jealousy' || s.dimension === 'rivalry') betrayalSignal += s.amount;
+    if (s.dimension === 'respect' || s.dimension === 'rivalry' || s.dimension === 'dependency' || s.dimension === 'obligation') {
+      powerDynamicsIntensity += Math.abs(s.amount);
+    }
+  }
+
   // ── Clock detection ───────────────────────────────────────────────────────
   const clockOpsLocal = ops.filter(o => o.op === 'RAISE_CLOCK');
   const clockRaised = clockOpsLocal.length > 0;
@@ -184,6 +319,10 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     suspenseDelta,
     curiosityDelta,
     relationshipShifts,
+    betrayalSignal,
+    powerDynamicsIntensity,
+    // ironyMarkerCount deliberately omitted — KNOWN_ASYMMETRY_TEXT_ONLY, see
+    // the field comment above.
     createdAt: commit.createdAt,
   };
 }
@@ -217,7 +356,17 @@ export function buildScreenplayMemory(commits: StoryCommit[]): ScreenplaySceneRe
 function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
   if (sceneIdx === 0) return 'establish_world';
   if (ops.some(o => o.op === 'PAYOFF_SETUP')) return 'revelation';
-  if (ops.some(o => o.op === 'SEED_CLUE')) return 'introduce_conflict';
+
+  // Wave E1-b: a scene devoted to planting MULTIPLE clues at once reads as a
+  // dedicated setup beat rather than a scene that merely introduces conflict
+  // in passing (the original, still-correct meaning for a single seed) — see
+  // the ScenePurpose doc comment above for why this split is honestly
+  // derivable from one commit's ops alone (a plain count, no cross-scene
+  // knowledge required).
+  const seedClueOps = ops.filter(o => o.op === 'SEED_CLUE');
+  if (seedClueOps.length >= 2) return 'setup_planting';
+  if (seedClueOps.length === 1) return 'introduce_conflict';
+
   const clockOps = ops.filter(o => o.op === 'RAISE_CLOCK');
   if (clockOps.length > 0) {
     const totalAmount = clockOps.reduce((s, o) => { const a = (o as Extract<StoryOp, {op:'RAISE_CLOCK'}>).amount; return s + (isFinite(a) ? a : 0); }, 0);
@@ -225,9 +374,30 @@ function derivePurpose(ops: StoryOp[], sceneIdx: number): ScenePurpose {
     if (totalAmount >= 2) return 'raise_stakes';
     return 'complicate';
   }
-  if (ops.some(o => o.op === 'SHIFT_RELATIONSHIP')) return 'character_moment';
-  if (ops.some(o => o.op === 'ADVANCE_THEME_ARGUMENT')) return 'turning_point';
-  return 'character_moment';
+
+  // Wave E1-b: SHIFT_RELATIONSHIP now gets its own, more precise purpose
+  // (relationship_beat) instead of falling into the generic character_moment
+  // catch-all below.
+  if (ops.some(o => o.op === 'SHIFT_RELATIONSHIP')) return 'relationship_beat';
+
+  const themeOps = ops.filter(o => o.op === 'ADVANCE_THEME_ARGUMENT');
+  if (themeOps.length > 0) {
+    // Wave E1-b: an 'echo' theme move IS structurally an echo-coda beat (the
+    // argument restates an earlier claim through a new voice) — the one
+    // ThemeMove value with a direct, honest ScenePurpose counterpart.
+    const hasEcho = themeOps.some(o => (o as Extract<StoryOp, {op:'ADVANCE_THEME_ARGUMENT'}>).move === 'echo');
+    if (hasEcho) return 'echo_coda';
+    return 'turning_point';
+  }
+
+  // Wave E1-b: split the old blanket character_moment fallback in two — a
+  // scene that actually appraises a character's emotion keeps that label
+  // (it IS a character-focused beat); a scene with no signal channel at all
+  // (no clue/clock/relationship/theme/emotion) is more honestly a breather —
+  // a quiet beat between louder ones — than a "character moment" it never
+  // earned.
+  if (ops.some(o => o.op === 'APPRAISE_EMOTION')) return 'character_moment';
+  return 'breather';
 }
 
 function deriveDramaticTurn(ops: StoryOp[], purpose: ScenePurpose): string {

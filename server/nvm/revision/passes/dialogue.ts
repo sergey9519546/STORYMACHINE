@@ -605,8 +605,38 @@ function extractDialogue(fountain: string): Array<{ speaker: string; line: strin
   return dialogue;
 }
 
-/** Detect on-the-nose emotion statements — requires explicit emotion word after "I feel/am" */
-const ON_THE_NOSE_RE = /\b(I (feel|am) (so |very )?(angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable)|I'm (so |very )?(angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable))\b/i;
+/** Detect on-the-nose emotion statements — requires explicit emotion word after a first-person
+ *  feeling template. Wave 18α: broadened the lexicon substantially (common colloquial feeling
+ *  words such as stressed/worried/frustrated/exhausted/overwhelmed, not just primary emotions)
+ *  and added template variants beyond "I feel/I'm X" — "I am so X", "I've been X", "That makes
+ *  me X". "X about/that ..." constructions fall out of this for free: the regex only needs the
+ *  feeling word to follow the first-person opener, so trailing "...about the review" doesn't
+ *  need its own alternative. A companion regex (ON_THE_NOSE_SITUATION_RE, below) catches
+ *  "It's really scary/stressful" describing the SITUATION rather than the speaker directly;
+ *  it is only counted when the same line also carries a first-person voice (checked at the call
+ *  site), otherwise "it's terrifying" about someone else's problem is ordinary description, not
+ *  self-narrated feeling. */
+const ON_THE_NOSE_EMOTIONS =
+  'angry|sad|happy|scared|afraid|excited|devastated|thrilled|heartbroken|furious|terrified|' +
+  'depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable|stressed|worried|' +
+  'frustrated|exhausted|overwhelmed|upset|embarrassed|confused|lonely|insecure|panicked|' +
+  'disappointed|annoyed|irritated|humiliated|betrayed|hopeful|grateful|stunned|shocked|numb|' +
+  'broken|trapped|threatened|worthless|relieved|ecstatic|heartsick';
+const ON_THE_NOSE_RE = new RegExp(
+  '\\b(' +
+    `I(?:'m| am) (?:really |so |very |extremely |incredibly )?(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|I feel (?:really |so |very )?(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|I(?:'ve| have) been (?:really |so |very |feeling )?(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|that makes me (?:really |so |very )?(?:${ON_THE_NOSE_EMOTIONS})` +
+  ')\\b',
+  'i',
+);
+/** See header comment above — situational feeling-adjective template, gated on first-person
+ *  voice at the call site rather than folded into ON_THE_NOSE_RE itself. */
+const ON_THE_NOSE_SITUATION_RE = /\bit'?s (?:really |so |very )?(scary|stressful|worrying|depressing|frustrating|exhausting|overwhelming|upsetting|terrifying|devastating)\b/i;
+/** First-person marker required alongside ON_THE_NOSE_SITUATION_RE — a bare "it's terrifying"
+ *  isn't necessarily the speaker narrating their own feeling. */
+const ON_THE_NOSE_FIRST_PERSON_RE = /\b(I|I'm|I've|I'll|my|me)\b/i;
 
 /** Detect explicit character trait labeling instead of showing */
 const TRAIT_LABELING_RE = /\b(you are|he is|she is|they are|you're|he's|she's|they're)\s+(so |very |such a |a )?(brave|smart|stupid|coward|liar|hero|weak|strong|fool|genius|monster|saint|evil|kind|cruel|honest|dishonest|reckless|ruthless|manipulative|selfish|selfless)\b/i;
@@ -658,6 +688,46 @@ function dialogueContentWords(line: string): string[] {
     .map(w => w.toLowerCase());
 }
 
+/** Wave 18α: responsiveness SIGNALS beyond literal content-word overlap. NON_RESPONSIVE_EXCHANGE
+ *  originally treated zero content-word overlap as proof of disengagement, which false-fired on
+ *  professional elliptical dialogue ("This isn't what I asked for." / "You wanted results, not
+ *  excuses.") — oblique but plainly responsive. A reply that references back with a pronoun/
+ *  deictic, answers a question, agrees or refuses, echoes a proper noun/number, or is itself a
+ *  short reactive fragment is engaging with the prior line even without shared vocabulary. */
+const PRONOUN_DEIXIS_RE = /\b(this|that|it|you|your)\b/i;
+const AGREEMENT_REFUSAL_RE = /\b(yes|no|never|fine|exactly|wrong|right|okay|ok|sure|absolutely|nope|yeah|nah)\b/i;
+
+/** Capitalized, non-sentence-initial words (proper nouns) and bare numbers — a token shared
+ *  between two consecutive lines is a same-topic signal that content-word overlap can miss when
+ *  the reply refers back via pronoun or synonym instead of repeating the noun. */
+function extractProperNounsAndNumbers(line: string): string[] {
+  const words = line.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const out: string[] = [];
+  words.forEach((w, idx) => {
+    if (/^\d+$/.test(w)) { out.push(w); return; }
+    if (idx > 0 && /^[A-Z][a-z]+$/.test(w)) out.push(w.toLowerCase());
+  });
+  return out;
+}
+
+/** Does `replyLine` engage `priorLine`? Content-word overlap (original signal) OR any of the
+ *  additional responsiveness signals above. */
+function dialogueLineEngages(priorLine: string, replyLine: string, priorWords: Set<string>, replyWords: string[]): boolean {
+  if (replyWords.some(w => priorWords.has(w))) return true;
+  if (/\?\s*$/.test(priorLine.trim())) return true; // question -> any reply counts as engaged
+  if (AGREEMENT_REFUSAL_RE.test(replyLine)) return true;
+  if (PRONOUN_DEIXIS_RE.test(replyLine)) return true;
+  const priorTokens = extractProperNounsAndNumbers(priorLine);
+  if (priorTokens.length > 0) {
+    const replyTokens = new Set(extractProperNounsAndNumbers(replyLine));
+    if (priorTokens.some(t => replyTokens.has(t))) return true;
+  }
+  // A short reactive fragment (under 4 raw words) is a reaction, not a topic change.
+  const replyRawWordCount = replyLine.trim().split(/\s+/).filter(w => w.length > 0).length;
+  if (replyRawWordCount < 4) return true;
+  return false;
+}
+
 /** Map each fountain line number (0-based) to a 0-based scene index via sluglines */
 function buildLineToSceneMap(fountain: string): number[] {
   const lines = fountain.split('\n');
@@ -677,15 +747,33 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   const dialogue = extractDialogue(fountain);
 
   // ── On-the-nose emotion statements ───────────────────────────────────────
-  for (const d of dialogue) {
-    if (ON_THE_NOSE_RE.test(d.line)) {
-      issues.push({
-        location: `Line ${d.lineNum} (${d.speaker})`,
-        rule: 'ON_THE_NOSE',
-        description: `${d.speaker} states their emotion directly: "${d.line.slice(0, 60)}${d.line.length > 60 ? '...' : ''}"`,
-        severity: 'major',
-        suggestedFix: 'Replace with a physical action or indirect remark that implies the emotion',
-      });
+  // Wave 18α: DENSITY-gated. A single isolated feeling line in a scene is normal, often
+  // dramatically justified, dialogue — the defect this rule targets is DENSITY (multiple
+  // characters, or repeated lines, narrating feelings instead of showing them). Only fires
+  // once a scene has 2+ on-the-nose matches; a lone match anywhere is left alone.
+  {
+    const lineToSceneNose = buildLineToSceneMap(fountain);
+    const noseMatches: Array<{ speaker: string; line: string; lineNum: number; sceneIdx: number }> = [];
+    for (const d of dialogue) {
+      const situational = ON_THE_NOSE_SITUATION_RE.test(d.line) && ON_THE_NOSE_FIRST_PERSON_RE.test(d.line);
+      if (ON_THE_NOSE_RE.test(d.line) || situational) {
+        noseMatches.push({ ...d, sceneIdx: lineToSceneNose[d.lineNum - 1] ?? 0 });
+      }
+    }
+    const noseCountByScene = new Map<number, number>();
+    for (const m of noseMatches) {
+      noseCountByScene.set(m.sceneIdx, (noseCountByScene.get(m.sceneIdx) ?? 0) + 1);
+    }
+    for (const m of noseMatches) {
+      if ((noseCountByScene.get(m.sceneIdx) ?? 0) >= 2) {
+        issues.push({
+          location: `Line ${m.lineNum} (${m.speaker})`,
+          rule: 'ON_THE_NOSE',
+          description: `${m.speaker} states their emotion directly: "${m.line.slice(0, 60)}${m.line.length > 60 ? '...' : ''}"`,
+          severity: 'major',
+          suggestedFix: 'Replace with a physical action or indirect remark that implies the emotion',
+        });
+      }
     }
   }
 
@@ -1330,11 +1418,17 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   //    of independent surface features: do turns engage each other, is the vocabulary
   //    rich, and does the line-length rhythm vary. ──
 
-  // NON_RESPONSIVE_EXCHANGE (major): a run of 4+ consecutive cross-speaker turns where
-  // each line shares zero content words with the line it answers. Both speakers say
-  // something substantive, but about unrelated things — the scene is a set of parallel
-  // monologues, not a conversation. Generalises QUESTION_DODGE (which is question-only)
-  // to the entire exchange and requires sustained, not isolated, non-responsiveness.
+  // NON_RESPONSIVE_EXCHANGE (major): a run of 5+ consecutive cross-speaker turns where each
+  // reply carries NONE of the responsiveness signals (dialogueLineEngages, above) relative to
+  // the line it answers. Both speakers say something substantive, but about unrelated things —
+  // the scene is a set of parallel monologues, not a conversation. Generalises QUESTION_DODGE
+  // (which is question-only) to the entire exchange and requires sustained, not isolated,
+  // non-responsiveness. Wave 18α: raised the run threshold from 4 to 5 and replaced the
+  // literal-overlap-only check with dialogueLineEngages (word overlap OR pronoun/deixis
+  // reference, question->answer adjacency, agreement/refusal marker, shared proper noun/number,
+  // or a short reactive fragment) so oblique-but-engaged professional dialogue ("This isn't what
+  // I asked for." / "You wanted results, not excuses.") no longer false-fires, while a scene of
+  // genuinely disconnected turns (no shared vocabulary AND no such signal) still does.
   if (dialogue.length >= 10) {
     let nonRespRun215 = 0, maxNonResp215 = 0, runStartLine215 = 0, maxRunStartLine215 = 0;
     for (let i = 1; i < dialogue.length; i++) {
@@ -1343,7 +1437,7 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
       const replyWords215 = dialogueContentWords(dialogue[i].line);
       // Only judge turns where both speakers said something substantive.
       if (priorWords215.size === 0 || replyWords215.length === 0) { nonRespRun215 = 0; continue; }
-      const engages215 = replyWords215.some(w => priorWords215.has(w));
+      const engages215 = dialogueLineEngages(dialogue[i - 1].line, dialogue[i].line, priorWords215, replyWords215);
       if (!engages215) {
         if (nonRespRun215 === 0) runStartLine215 = dialogue[i - 1].lineNum;
         nonRespRun215++;
@@ -1352,12 +1446,12 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         nonRespRun215 = 0;
       }
     }
-    if (maxNonResp215 >= 4) {
+    if (maxNonResp215 >= 5) {
       issues.push({
         location: `Dialogue from line ${maxRunStartLine215}`,
         rule: 'NON_RESPONSIVE_EXCHANGE',
         severity: 'major',
-        description: `${maxNonResp215} consecutive speaker exchanges share no content words — each character answers with something substantive but unrelated to what was just said. The dialogue is a set of parallel monologues; nobody is listening to anybody.`,
+        description: `${maxNonResp215} consecutive speaker exchanges share no content words or responsiveness signal — each character answers with something substantive but unrelated to what was just said. The dialogue is a set of parallel monologues; nobody is listening to anybody.`,
         suggestedFix: 'Make each line engage the previous one: pick up a word, a claim, or an image the other character just used and push against it. Even a deliberate non-sequitur should be visibly ignoring something specific, not floating free of the exchange.',
       });
     }

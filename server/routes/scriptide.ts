@@ -12,7 +12,12 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import { validate, DoctorBodySchema, DiagnoseBodySchema } from '../lib/validation.ts';
+import {
+  validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
+  ScriptideSaveBodySchema, PersonaBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
+  AnalyzeTensionBodySchema, CleanActionBodySchema, CharacterProfileBodySchema, AnalyzeScriptBodySchema,
+  CharactersExportBodySchema, CharactersImportBodySchema,
+} from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
@@ -194,7 +199,7 @@ const router = express.Router();
 export default router;
 
 // ── ScriptIDE persistence routes (H2) ────────────────────────────────────────
-router.post('/api/scriptide/save', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const body = req.body as {
     scriptText?: unknown;
@@ -293,6 +298,84 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // every existing field untouched (including any percentile fields a
   // parallel agent adds to `dimensions`), so this can never regress an
   // existing consumer of the report shape.
+  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+  const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+  res.json({ ...report, rootCauses, source });
+}));
+
+// POST /api/scriptide/doctor/deep — opt-in "deep read" sibling of /doctor
+// above. Same two-format body contract (DeepDoctorBodySchema is presently a
+// plain alias of DoctorBodySchema — see validation.ts) and the same fdx→
+// Fountain conversion path, reused exactly as /doctor does it. The ONE thing
+// that changes is what runScriptDoctor is told to do with each scene's
+// signals: deep read is generative SENSING, not generative JUDGING — an LLM
+// reads each scene's meaning (subtext, stakes, motivation, irony) into the
+// same record-signal schema the 1,300 deterministic rules already judge, but
+// every verdict the response carries (health, passes, dimensions, verdict…)
+// still comes from those same rules running over whatever signals it read.
+// See the deepRead field's doc comment on ScriptDoctorReport
+// (server/nvm/analyze/types.ts) for the full lineage contract this route's
+// response must honor: a quick report never carries `deepRead`, a deep
+// report always does (even when keyless — see below), and two reports with
+// the same contentHash but different modes are NOT comparable draft-over-
+// draft, because the signals underneath came from a different process.
+//
+// aiLimiter, NOT gameLimiter — the opposite tier from /doctor, and
+// deliberately so: /doctor's whole reason for sitting on gameLimiter is that
+// runDiagnoseOnly() makes the revision pipeline provably unable to reach an
+// LLM. Deep read is the one deliberate exception to that guarantee — it
+// fans out up to ~10 LLM calls (one per scene, up to the core's per-request
+// scene cap) before the deterministic passes ever run, so it belongs on the
+// same stricter, LLM-aware budget every other generative route in this file
+// uses, not the higher-throughput CPU-only budget /doctor and /diagnose share.
+//
+// Keyless behavior is a 200, never a 500: with no AI key configured,
+// runScriptDoctor's deep-read path falls back to the lexicon signals for
+// every scene (report.deepRead.usedLLM === false, fallbackScenes covers the
+// whole script) and still returns a complete report — the same
+// "boots without a key, degrades honestly" posture server.ts holds for the
+// rest of the product (see CLAUDE.md's gotcha on this). Deep read never
+// throws for lack of a key; it just quietly becomes a quick read that was
+// asked to be deep.
+//
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage.
+router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySchema), asyncHandler(async (req, res) => {
+  const { fountain: fountainBody, fdx } = req.body as { fountain?: string; fdx?: string; title?: string };
+
+  let fountain: string;
+  let source: DoctorSource;
+
+  if (fdx !== undefined) {
+    let converted: { fountain: string; warnings: string[] };
+    try {
+      converted = fdxToFountain(fdx);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+      return;
+    }
+    if (converted.fountain.trim() === '') {
+      res.status(400).json({ error: 'The Final Draft file converted to an empty script — nothing to analyze.' });
+      return;
+    }
+    fountain = converted.fountain;
+    source = {
+      format: 'fdx',
+      convertedFountain: converted.fountain,
+      ...(converted.warnings.length > 0 ? { warnings: converted.warnings } : {}),
+    };
+  } else {
+    fountain = fountainBody as string;
+    source = { format: 'fountain' };
+  }
+
+  // Dynamic import — same lazy-load convention as /doctor above.
+  const { runScriptDoctor } = await import('../nvm/analyze/doctor.ts');
+  const report = await runScriptDoctor(fountain, undefined, { deepRead: true });
+
+  // Root-cause clustering, attached here for the exact same reason /doctor
+  // attaches it at the route rather than inside doctor.ts — see that route's
+  // comment above. Deep read changes how SIGNALS were sensed, not the shape
+  // of the resulting issues, so this step is identical either way.
   const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
   res.json({ ...report, rootCauses, source });
@@ -450,6 +533,49 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
   res.json(diagnosis);
 }));
 
+// ── Fix & Verify (Run 11, bridge half 5) ────────────────────────────────────
+// POST /api/scriptide/fix — the feature no competitor can claim: a targeted
+// rewrite whose improvement is PROVEN by the deterministic doctor re-running
+// on the whole candidate document, not merely promised by the model that
+// wrote it. Generation (the LLM rewrite of the caller's span) is opt-in and
+// clearly labeled via `usedLLM`; VERIFICATION — the health/verdict delta and
+// the cleared/introduced issue lists — is entirely deterministic, computed by
+// re-running runScriptDoctor exactly as /doctor does. Both `before` and
+// `after` carry their own contentHash (server/nvm/analyze/doctor.ts's
+// computeContentHash), so the receipt is reproducible: anyone can re-POST
+// either the original or candidate text to /doctor and get byte-identical
+// numbers back.
+//
+// aiLimiter, not gameLimiter — unlike /doctor and /diagnose, this route DOES
+// reach the LLM (fix.ts's one generation call), so it belongs on the same
+// stricter, LLM-aware budget every other generative route in this file uses.
+//
+// Stateless, like /doctor: no sessionId, no getOrCreateSession/Stage — the
+// route only needs the fountain text, the target span, and the issues to fix,
+// exactly what FixBodySchema (validation.ts) validates.
+//
+// Keyless / model-failure behavior is a 200, never a 500 — fixAndVerify
+// (server/nvm/analyze/fix.ts) degrades to { usedLLM: false, note } for a
+// missing key, a network failure, or any of its four validation-guard
+// rejections (empty output, out-of-range length ratio, a slugline-count
+// mismatch, or an unchanged rewrite), matching the keyless-honesty posture
+// every other AI-backed route in this file already holds.
+router.post('/api/scriptide/fix', aiLimiter, validate(FixBodySchema), asyncHandler(async (req, res) => {
+  const { fountain, span, issues } = req.body as {
+    fountain: string;
+    span: { startLine: number; endLine: number };
+    issues: Array<{ rule: string; description: string; suggestedFix?: string }>;
+  };
+
+  // Dynamic import — same lazy-load convention as the doctor routes above:
+  // fix.ts pulls in the full analyzer + all 14 revision passes via
+  // runScriptDoctor, so routes that never call it don't pay the cost at
+  // startup.
+  const { fixAndVerify } = await import('../nvm/analyze/fix.ts');
+  const result = await fixAndVerify(fountain, span, issues);
+  res.json(result);
+}));
+
 // ── P1: Inline AI copilot — FIM completion stream ──────────────────────────
 router.get('/api/scriptide/complete', aiLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -568,7 +694,7 @@ router.get('/api/scriptide/personas', gameLimiter, asyncHandler(async (_req, res
 
 // POST /api/scriptide/personas — register a custom (user-uploaded) persona.
 // Body: a CopilotPersona JSON object. Returns the normalized persona, or 400.
-router.post('/api/scriptide/personas', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/personas', gameLimiter, validate(PersonaBodySchema), asyncHandler(async (req, res) => {
   const persona = registerUserPersona(req.body);
   if (!persona) {
     res.status(400).json({ error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' });
@@ -615,7 +741,7 @@ const sessionStyleGenreBlock = (req: import('express').Request): string => {
   return block ? `\n${block}\n` : '';
 };
 
-router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySchema), asyncHandler(async (req, res) => {
   const beat = requireString(req.body?.beat, 'beat');
   const scriptContext = scriptContextOf(req.body);
   const contextBlock = scriptContext
@@ -640,7 +766,7 @@ router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, re
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogueBodySchema), asyncHandler(async (req, res) => {
   const dialogue = requireString(req.body?.dialogue, 'dialogue');
 
   // Validate profiles array — each element sanitized and capped
@@ -686,7 +812,7 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTensionBodySchema), asyncHandler(async (req, res) => {
   const scene = requireString(req.body?.scene, 'scene');
   const tnContext = scriptContextOf(req.body);
   const tnContextBlock = tnContext
@@ -711,7 +837,7 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySchema), asyncHandler(async (req, res) => {
   const text = requireString(req.body?.text, 'text');
   // P8: use full composed modifier (synergy override when available) instead of a simple genre hint string.
   const genreHint = sessionStyleGenreBlock(req);
@@ -725,12 +851,8 @@ router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, r
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (req, res) => {
-  const profile = req.body?.profile;
-  if (!profile || typeof profile !== 'object') {
-    res.status(400).json({ error: 'profile is required' });
-    return;
-  }
+router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterProfileBodySchema), asyncHandler(async (req, res) => {
+  const profile = req.body.profile;
   const name  = sanitizeForPrompt(requireString(profile.name,  'profile.name', 256), 256);
   const ghost = sanitizeForPrompt(requireString(profile.ghost, 'profile.ghost'), 1000);
   const lie   = sanitizeForPrompt(requireString(profile.lie,   'profile.lie'), 1000);
@@ -758,7 +880,7 @@ router.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (r
 }));
 
 // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──
-router.post('/api/analyze-script', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/analyze-script', aiLimiter, validate(AnalyzeScriptBodySchema), asyncHandler(async (req, res) => {
   const scriptText = requireString(req.body?.scriptText, 'scriptText');
   const engineState = req.body?.engineState ?? {};
   const storyConfig = engineState?.config as Record<string, unknown> ?? {};
@@ -874,13 +996,9 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
 }));
 
 // ── Character memory export / import (P6) ─────────────────────────────────────
-router.post('/api/characters/export', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/characters/export', gameLimiter, validate(CharactersExportBodySchema), asyncHandler(async (req, res) => {
   const { exportCharacter } = await import('../engine/character-memory.ts');
-  const charId = req.body?.charId;
-  if (typeof charId !== 'string' || !charId.trim()) {
-    res.status(400).json({ error: 'body.charId (string) is required' });
-    return;
-  }
+  const charId = (req.body as { charId: string }).charId;
   const sid = sessionId(req);
   const { stage } = getOrCreateSession(sid);
   const bundle = exportCharacter(stage, charId, sid);
@@ -891,7 +1009,7 @@ router.post('/api/characters/export', gameLimiter, asyncHandler(async (req, res)
   res.json(bundle);
 }));
 
-router.post('/api/characters/import', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/characters/import', gameLimiter, validate(CharactersImportBodySchema), asyncHandler(async (req, res) => {
   const { importCharacter, isCharacterMemoryBundle } = await import('../engine/character-memory.ts');
   const bundle = req.body?.bundle;
   if (!isCharacterMemoryBundle(bundle)) {

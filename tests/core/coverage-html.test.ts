@@ -245,6 +245,65 @@ describe('renderCoverageHtml — full document shape', () => {
     assert.ok(!consider.includes('(decline)'));
   });
 
+  it('uses the parsed title-page title over "Untitled" when no explicit title was posted', () => {
+    const report = buildReport();
+    // title === 'Untitled' is the route's own sentinel for "no title field
+    // was posted" (server/routes/export.ts defaults an absent body.title to
+    // the literal string 'Untitled') — the renderer treats that the same as
+    // empty and falls back to the parsed title page.
+    const html = renderCoverageHtml(report, 'Untitled', { titlePageTitle: 'The Long Wait' });
+
+    assert.match(html, /<title>The Long Wait &mdash; Script Coverage<\/title>/);
+    assert.match(html, /<h1 class="title">The Long Wait<\/h1>/);
+    assert.ok(!html.includes('<h1 class="title">Untitled</h1>'), 'the literal word "Untitled" must not win over a real title page');
+  });
+
+  it('an explicit title always wins over the parsed title page', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Real Title', { titlePageTitle: 'Some Other Title' });
+
+    assert.match(html, /<h1 class="title">The Real Title<\/h1>/);
+    assert.ok(!html.includes('Some Other Title'));
+  });
+
+  it('falls back to "Untitled" when there is no explicit title AND no title page', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'Untitled', {});
+    assert.match(html, /<h1 class="title">Untitled<\/h1>/);
+  });
+
+  it('renders a byline when a title-page author is present, and escapes it', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', { titlePageAuthor: '<script>alert(1)</script>' });
+
+    assert.match(html, /class="byline">Written by/);
+    assert.ok(!/<script>alert\(1\)<\/script>/.test(html));
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  });
+
+  it('omits the byline entirely when no title-page author is present', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.ok(!html.includes('class="byline"'));
+  });
+
+  it('renders the logline section when a logline is provided, escaped', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait', {
+      logline: 'When <script>alert(1)</script> strikes, ALICE must contend with the truth.',
+    });
+
+    assert.match(html, /class="logline-line">/);
+    assert.match(html, /ALICE must contend with the truth\./);
+    assert.ok(!/<script>alert\(1\)<\/script>/.test(html));
+  });
+
+  it('omits the logline line entirely when no logline is provided', () => {
+    const report = buildReport();
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.ok(!html.includes('class="logline-line"'));
+  });
+
   it('gracefully handles a degenerate zero-scene report (no dimensions/strengths/heatmap crash)', () => {
     const report = buildReport({
       health: 0,

@@ -539,15 +539,66 @@
 // STRUCTURE_SUSPENSE_STAGING_AFTERMATH_VOID and STRUCTURE_SUSPENSE_DIALOGUE_HIGHLIGHT_AFTERMATH_
 // VOID give suspenseDelta its fourth and fifth channels (visualBeats, dialogueHighlights);
 // STRUCTURE_SEED_EMOTIONAL_AFTERMATH_VOID gives seededClueIds its second channel (emotionalShift).
+// Wave 1184 additions (Program v2, Type 3 — genre-conditioned): DARK_NIGHT_ABSENT is one of
+// the highest-firing generic rules in the calibration corpus (20/20 samples — see the wave's
+// measurement pass). Its suspenseDelta floor for what counts as the "all is lost" beat now
+// consults GENRE_RULE_MODIFIERS (server/lib/genre-router.ts), generic value as the default:
+// comedy's low point is measured in dignity/embarrassment rather than survival dread, so a
+// milder dip still legitimately counts (floor loosens); horror's low point must carry genuine
+// dread, so a passing dip should not count (floor tightens). storyContext absent, genre
+// absent, or genre unset in the table -> identical constant and identical issue text to
+// pre-Wave-1184 behavior.
+// Wave 1191 additions — Sin Check detector pack (blueprint's named classic-story-sin list;
+// see WAVE_QUALITY_GUARANTEE.md and the ROADMAP blueprint docs): IDIOT_PLOT (a revelation or
+// resolved question is known by a specific character in an early scene, that character shares
+// 2+ later scenes with another character while the same clue/conflict stays open, and nothing
+// on the page — no secret/deception vocabulary — explains the silence; distinct from every
+// existing revelation check in this file, none of which track co-presence between a specific
+// knowing character and an affected character across multiple later scenes), and UNSEEDED_TWIST
+// (hardens the turn-without-cause coverage already in this file (DRAMATIC_TURN_CAUSELESS) and
+// in payoff.ts's dramatic-turn co-occurrence/aftermath family — read read-only first — with an
+// actual TEXT-CONTENT check those never perform: DRAMATIC_TURN_CAUSELESS asks whether a NUMERIC
+// signal preceded a turn; this asks whether the turn's own key noun phrase was ever mentioned in
+// ANY earlier scene at all, independent of numeric signals. Single-peak isolation x content-
+// overlap mode x final-third position — a genuinely new (channel, mode) cell). Both share the
+// file-local composite-text + cue-based speaker infrastructure duplicated from causality.ts's
+// Wave 1191 block (per the project's per-pass-file duplication convention — see tests/passes/
+// helpers.ts header and theme.ts's buildSceneText, Wave 130).
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
+import type { StoryGenre } from '../../../engine/types.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
   const { fountain, structure, records, annotations, approvedSpans } = input;
   const issues: RevisionIssue[] = [];
   const n = records.length;
+
+  // Wave 1184: resolved once per pass, consumed by DARK_NIGHT_ABSENT below.
+  // Wave 1188: also consumed by WEAK_MIDPOINT and ACT3_SCENE_EXCESS below. Undefined
+  // when storyContext/genre is absent or the genre has no live rule modifier — every
+  // consumer falls through to its own generic constant in that case.
+  const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
+  const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1184 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1184 = tone1184 ? TONE_REGISTERS[tone1184]?.thresholdDeltas : undefined;
+  const composed1184 = composeThresholds(genre1184, tone1184);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("comedy", "bleak", or "comedy + bleak").
+  const thresholdNote1184 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1184?.[field] !== undefined) parts.push(String(genre1184));
+    if (toneDeltas1184?.[field] !== undefined) parts.push(String(tone1184));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   // ── Act balance checks ────────────────────────────────────────────────────
   if (structure.completionPercent < 80 && structure.actPosition === 'act3') {
@@ -573,11 +624,17 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Midpoint pressure ─────────────────────────────────────────────────────
-  if (n >= 6 && structure.midpointPressure < 1) {
+  // Wave 1188: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 1 constant.
+  const weakMidpointFloor1188 = composed1184.weakMidpointPressureFloor ?? 1;
+  if (n >= 6 && structure.midpointPressure < weakMidpointFloor1188) {
+    const genreNote1188 = thresholdNote1184('weakMidpointPressureFloor');
     issues.push({
       location: `Scene ${Math.floor(n / 2)} (midpoint)`,
       rule: 'WEAK_MIDPOINT',
-      description: 'Midpoint suspense pressure is flat — the story lacks a dramatic pivot',
+      description: `Midpoint suspense pressure is flat — the story lacks a dramatic pivot${genreNote1188}`,
       severity: 'major',
       suggestedFix: 'Insert a surprise revelation or reversal at the midpoint scene',
     });
@@ -782,14 +839,20 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const darkNightEnd = Math.floor(n * 0.85);
     const darkZone = records.slice(darkNightStart, darkNightEnd);
     if (darkZone.length >= 2) {
+      // Wave 1184: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS; I1-a:
+      // tone deltas compose on top via composeThresholds (see the file-header
+      // comment). Absent/unknown genre AND tone fall through to the pre-wave
+      // constant of 1.
+      const darkNightSuspenseFloor1184 = composed1184.darkNightSuspenseFloor ?? 1;
       const hasDarkNight = darkZone.some(r =>
-        r.emotionalShift === 'negative' && r.suspenseDelta > 1,
+        r.emotionalShift === 'negative' && r.suspenseDelta > darkNightSuspenseFloor1184,
       );
       if (!hasDarkNight) {
+        const genreNote1184 = thresholdNote1184('darkNightSuspenseFloor');
         issues.push({
           location: `Scenes ${darkNightStart}–${darkNightEnd} (pre-climax zone)`,
           rule: 'DARK_NIGHT_ABSENT',
-          description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push`,
+          description: `No scene in the pre-climax zone (${Math.round(darkNightStart / n * 100)}%–${Math.round(darkNightEnd / n * 100)}%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push${genreNote1184}`,
           severity: 'major',
           suggestedFix: 'Insert an "all is lost" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken.',
         });
@@ -970,11 +1033,17 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act1SceneCount = Math.floor(n * 0.25);
     const act3SceneStart = Math.floor(n * 0.75);
     const act3SceneCount = n - act3SceneStart;
-    if (act3SceneCount > act1SceneCount) {
+    // Wave 1188: generic ratio 1 (Act 3 merely has to out-count Act 1), genre-shifted
+    // per GENRE_RULE_MODIFIERS; I1-a: tone deltas compose on top via composeThresholds
+    // (see the file-header comment). Absent/unknown genre AND tone fall through to
+    // the pre-wave ratio of 1.
+    const act3ExcessRatio1188 = composed1184.act3ExcessRatio ?? 1;
+    if (act3SceneCount > act1SceneCount * act3ExcessRatio1188) {
+      const genreNote1188b = thresholdNote1184('act3ExcessRatio');
       issues.push({
         location: `Act 1 (${act1SceneCount} scenes) vs Act 3 (${act3SceneCount} scenes)`,
         rule: 'ACT3_SCENE_EXCESS',
-        description: `Act 3 has ${act3SceneCount} scenes while Act 1 has only ${act1SceneCount} — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.`,
+        description: `Act 3 has ${act3SceneCount} scenes while Act 1 has only ${act1SceneCount} — the resolution takes longer than the setup. Extended resolutions undercut the climax's finality by making the aftermath longer than the premise.${genreNote1188b}`,
         severity: 'minor',
         suggestedFix: 'Trim Act 3 to match or be shorter than Act 1. The denouement should be crisp: show the new equilibrium, land the emotional note, and leave. Resolution scenes that outlast the setup are usually filling silence, not delivering story.',
       });
@@ -6632,6 +6701,133 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         description: `Every one of the story's ${r1171c.triggerCount} scenes that plant a clue is followed by two scenes with no emotional shift, even though ${r1171c.aftermathCount} such shifts occur elsewhere. A planted clue that never registers on any character's felt state right after it lands leaves the structure's setups reading as pure bookkeeping rather than moments that carry any felt weight until their eventual payoff.`,
         suggestedFix: `In the two scenes following at least one seed, let the planting land on a character's emotional register — unease, hope, suspicion — so the setup carries felt weight, not just structural function.`,
       });
+    }
+  }
+
+  // ── Wave 1191: Sin Check detector pack — infrastructure ────────────────────────
+  // Local, file-scoped composite-text + speaker infrastructure feeding the two checks
+  // below. See the file header for the full distinctness rationale of each check.
+  {
+    const headingRe1191 = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i;
+    const fountainLines1191 = fountain.split('\n');
+    const headingLineIdx1191: number[] = [];
+    fountainLines1191.forEach((l, li) => { if (headingRe1191.test(l.trim())) headingLineIdx1191.push(li); });
+    const headingsAligned1191 = headingLineIdx1191.length === records.length;
+
+    // Per-scene composite text — see causality.ts's identical Wave 1191 block for the
+    // full rationale (duplicated per the project's per-pass-file convention).
+    const sceneTextRaw1191: string[] = records.map((r, ri) => {
+      const parts: string[] = [r.slug, ...(r.dialogueHighlights ?? []), r.revelation ?? '', ...(r.visualBeats ?? [])];
+      if (headingsAligned1191) {
+        const start = headingLineIdx1191[ri];
+        const end = ri + 1 < headingLineIdx1191.length ? headingLineIdx1191[ri + 1] : fountainLines1191.length;
+        parts.push(fountainLines1191.slice(start, end).join(' '));
+      }
+      return parts.join(' ');
+    });
+    const sceneTextLower1191 = sceneTextRaw1191.map(t => t.toLowerCase());
+
+    // Character-cue speakers, mapped to scene index by nearest preceding heading line.
+    const cueRe1191 = /^[A-Z][A-Z0-9\s\-'.]{1,30}$/;
+    const cueExcludeRe1191 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
+    const speakerCounts1191 = new Map<string, number>();
+    const speakersByScene1191: Array<Set<string>> = records.map(() => new Set<string>());
+    if (headingsAligned1191) {
+      for (let li = 0; li < fountainLines1191.length; li++) {
+        const line = fountainLines1191[li].trim();
+        if (!line || !cueRe1191.test(line) || cueExcludeRe1191.test(line)) continue;
+        const speaker = line.split('(')[0].trim();
+        if (!speaker) continue;
+        let sceneIdx = 0;
+        for (let k = 0; k < headingLineIdx1191.length; k++) {
+          if (headingLineIdx1191[k] <= li) sceneIdx = k; else break;
+        }
+        speakerCounts1191.set(speaker, (speakerCounts1191.get(speaker) ?? 0) + 1);
+        speakersByScene1191[sceneIdx].add(speaker);
+      }
+    }
+
+    // ── IDIOT_PLOT ─────────────────────────────────────────────────────────────────
+    // A revelation/resolved question is known in an early scene; the character who
+    // knows it (the scene's dominant speaker) shares 2+ later scenes with another
+    // character while the same clue/conflict (unresolvedClues) stays open; no
+    // concealment vocabulary explains the silence. See file header for distinctness.
+    if (n >= 6) {
+      const concealRe1191 = /\b(secret\w*|conceal\w*|hid(?:e|ing|den)|hides|lie[sd]?|lying|cover-?up\w*|deceiv\w*|deception|withhold\w*|keep\w* (?:it |this )?(?:secret|quiet)|don'?t tell|doesn'?t tell|mustn'?t (?:tell|know)|can'?t (?:tell|know))\b/;
+      const half1191 = Math.max(1, Math.floor(n * 0.5));
+
+      for (let k = 0; k < half1191; k++) {
+        const r = records[k];
+        const hasKnowledge1191 = r.revelation !== null || (r.questionsResolved ?? 0) > 0;
+        const clueIds1191 = r.unresolvedClues ?? [];
+        if (!hasKnowledge1191 || clueIds1191.length === 0) continue;
+
+        const knower1191 = [...speakersByScene1191[k]].sort((a, b) =>
+          (speakerCounts1191.get(b) ?? 0) - (speakerCounts1191.get(a) ?? 0),
+        )[0];
+        if (!knower1191) continue;
+
+        const laterQualifying1191: number[] = [];
+        for (let j = k + 1; j < n; j++) {
+          const stillOpen1191 = (records[j].unresolvedClues ?? []).some(c => clueIds1191.includes(c));
+          if (!stillOpen1191) continue;
+          const knowerPresent1191 = speakersByScene1191[j].has(knower1191);
+          const othersPresent1191 = [...speakersByScene1191[j]].some(s => s !== knower1191);
+          if (knowerPresent1191 && othersPresent1191) laterQualifying1191.push(j);
+        }
+        if (laterQualifying1191.length < 2) continue;
+
+        const lastQualifying1191 = laterQualifying1191[laterQualifying1191.length - 1];
+        const concealed1191 = sceneTextLower1191.slice(k, lastQualifying1191 + 1).some(t => concealRe1191.test(t));
+        if (concealed1191) continue;
+
+        const eventuallyPaidOff1191 = records.slice(lastQualifying1191 + 1).some(r2 => (r2.payoffSetupIds ?? []).some(pid => clueIds1191.includes(pid)));
+        const staysOpenToEnd1191 = (records[n - 1].unresolvedClues ?? []).some(c => clueIds1191.includes(c));
+        if (!eventuallyPaidOff1191 && !staysOpenToEnd1191) continue;
+
+        issues.push({
+          location: `Scenes ${laterQualifying1191.join(', ')} (knower: ${knower1191}, since Scene ${k})`,
+          rule: 'IDIOT_PLOT',
+          description: `${knower1191} has known "${clueIds1191[0]}" since Scene ${k} and shares Scenes ${laterQualifying1191.join(', ')} with other characters while the conflict stays open — nobody on the page ever says the one thing that would end it, and there's no concealment motive (no secret/lie vocabulary) to explain the silence.`,
+          severity: 'major',
+          suggestedFix: `Either give ${knower1191} an explicit, motivated reason to withhold "${clueIds1191[0]}" (fear, loyalty, a secret worth keeping), or have them share it — and build the next complication from what sharing it changes.`,
+        });
+        break; // one flag per pass — the first qualifying knowledge scene is enough to name the pattern
+      }
+    }
+
+    // ── UNSEEDED_TWIST ─────────────────────────────────────────────────────────────
+    // The single highest-magnitude dramatic turn in the final third has a key noun
+    // phrase with zero content-word overlap with any earlier scene. See file header
+    // for the full distinctness rationale against DRAMATIC_TURN_CAUSELESS and
+    // payoff.ts's dramatic-turn family.
+    if (n >= 8) {
+      const lateThird1191 = Math.floor(n * (2 / 3));
+      const turnScenes1191 = records
+        .map((r, i) => ({ r, i }))
+        .filter(({ r, i }) => i >= lateThird1191 && (r.dramaticTurn ?? 'nothing') !== 'nothing' && Math.abs(r.suspenseDelta ?? 0) > 2);
+
+      if (turnScenes1191.length > 0) {
+        const peak1191 = turnScenes1191.reduce((best, cur) =>
+          Math.abs(cur.r.suspenseDelta) > Math.abs(best.r.suspenseDelta) ? cur : best,
+        );
+        const stop1191 = new Set(['the', 'and', 'that', 'with', 'from', 'this', 'they', 'have', 'were', 'their', 'into', 'about', 'when', 'then', 'what', 'which', 'there', 'over', 'after', 'before', 'because']);
+        const keyWords1191 = (peak1191.r.dramaticTurn.toLowerCase().match(/[a-z']{4,}/g) ?? []).filter(w => !stop1191.has(w));
+
+        if (keyWords1191.length > 0) {
+          const earlierText1191 = sceneTextLower1191.slice(0, peak1191.i).join(' ');
+          const anyOverlap1191 = keyWords1191.some(w => earlierText1191.includes(w));
+          if (!anyOverlap1191) {
+            issues.push({
+              location: `Scene ${peak1191.i} (${peak1191.r.slug})`,
+              rule: 'UNSEEDED_TWIST',
+              description: `Scene ${peak1191.i}'s late reversal ("${peak1191.r.dramaticTurn}") shares zero content words with any earlier scene — none of its key terms (${keyWords1191.slice(0, 4).join(', ')}) appear anywhere before it. The audience has no lexical foothold for this turn; it lands as information invented for the twist, not the payoff of anything planted.`,
+              severity: 'major',
+              suggestedFix: `Plant at least one of this turn's key terms in an earlier scene — a passing mention, an object glimpsed, a name spoken once — so an attentive rewatch finds the seed even if the first watch doesn't.`,
+            });
+          }
+        }
+      }
     }
   }
 

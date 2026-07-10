@@ -205,6 +205,135 @@ export function transcriptToFountain(
         lines.push('');
         break;
       }
+
+      // ── X1 additions ──────────────────────────────────────────────────
+      // Silent-set verbs (HIDE/OBSERVE/LISTEN/SEARCH — mirrors the
+      // SILENT_ACTION_TYPES set in action-to-ops.ts) always render as an
+      // action line, never dialogue, since nothing is spoken aloud.
+      case 'HIDE': {
+        const locName = location?.name ?? 'the room';
+        lines.push(`${agent?.name ?? agentName} goes still, concealed within ${locName}.`);
+        if (entry.content) lines.push(entry.content);
+        lines.push('');
+        break;
+      }
+
+      case 'OBSERVE': {
+        const target = entry.target_char_id
+          ? (agentMap.get(entry.target_char_id)?.name ?? entry.target_char_id)
+          : 'the room';
+        lines.push(`${agent?.name ?? agentName} watches ${target}, careful not to be seen.`);
+        if (entry.content) lines.push(entry.content);
+        lines.push('');
+        break;
+      }
+
+      case 'LISTEN': {
+        const target = entry.target_char_id
+          ? (agentMap.get(entry.target_char_id)?.name ?? entry.target_char_id)
+          : 'the room';
+        lines.push(`${agent?.name ?? agentName} listens closely, tracking every word from ${target}.`);
+        if (entry.content) lines.push(entry.content);
+        lines.push('');
+        break;
+      }
+
+      case 'SEARCH': {
+        const locName = location?.name ?? 'the room';
+        lines.push(`${agent?.name ?? agentName} searches ${locName}, methodical and quiet.`);
+        if (entry.content) lines.push(entry.content);
+        lines.push('');
+        break;
+      }
+
+      // Audible-set verbs (REVEAL/THREATEN/BETRAY/PROTECT/FORM_ALLIANCE/FLEE
+      // — outside SILENT_ACTION_TYPES). REVEAL/THREATEN are guaranteed,
+      // intentional disclosures and always render as dialogue, mirroring
+      // SPEAK. BETRAY/PROTECT/FORM_ALLIANCE render as dialogue when the
+      // action carries spoken content and as an action beat when it doesn't
+      // (a silent betrayal, a wordless act of protection, an alliance
+      // sealed with a look rather than a line).
+      case 'REVEAL': {
+        lines.push(agentName);
+        if (entry.target_char_id) {
+          const target = agentMap.get(entry.target_char_id);
+          if (target) lines.push(`(to ${target.name})`);
+        }
+        lines.push(entry.content || 'There\'s something you need to know.');
+        lines.push('');
+        break;
+      }
+
+      case 'THREATEN': {
+        lines.push(agentName);
+        const target = entry.target_char_id ? agentMap.get(entry.target_char_id)?.name : null;
+        lines.push(target ? `(to ${target}, low and dangerous)` : '(low and dangerous)');
+        lines.push(entry.content || "Don't test me.");
+        lines.push('');
+        break;
+      }
+
+      case 'BETRAY': {
+        const target = entry.target_char_id
+          ? (agentMap.get(entry.target_char_id)?.name ?? entry.target_char_id)
+          : 'them';
+        if (entry.content) {
+          lines.push(agentName);
+          if (entry.target_char_id) {
+            const targetAgent = agentMap.get(entry.target_char_id);
+            if (targetAgent) lines.push(`(to ${targetAgent.name})`);
+          }
+          lines.push(entry.content);
+          lines.push('');
+        } else {
+          lines.push(`${agent?.name ?? agentName} turns on ${target}.`);
+          lines.push('');
+        }
+        break;
+      }
+
+      case 'PROTECT': {
+        const target = entry.target_char_id
+          ? (agentMap.get(entry.target_char_id)?.name ?? entry.target_char_id)
+          : null;
+        if (entry.content) {
+          lines.push(agentName);
+          if (target) lines.push(`(to ${target})`);
+          lines.push(entry.content);
+          lines.push('');
+        } else {
+          lines.push(`${agent?.name ?? agentName} moves to shield ${target ?? 'them'}.`);
+          lines.push('');
+        }
+        break;
+      }
+
+      case 'FORM_ALLIANCE': {
+        const target = entry.target_char_id
+          ? (agentMap.get(entry.target_char_id)?.name ?? entry.target_char_id)
+          : null;
+        if (entry.content) {
+          lines.push(agentName);
+          if (target) lines.push(`(to ${target})`);
+          lines.push(entry.content);
+          lines.push('');
+        } else {
+          lines.push(`${agent?.name ?? agentName} and ${target ?? 'the other'} strike an unspoken alliance.`);
+          lines.push('');
+        }
+        break;
+      }
+
+      case 'FLEE': {
+        // content is recorded as "→ LocationName" (mirrors RELOCATE), with an
+        // optional "(flees)" suffix stripped by the bridge layer's own logic.
+        const destination = entry.content.startsWith('→ ')
+          ? entry.content.slice(2).replace(/\s*\(flees\)\s*$/, '')
+          : entry.content || 'out';
+        lines.push(`${agent?.name ?? agentName} bolts, fleeing toward ${destination}.`);
+        lines.push('');
+        break;
+      }
     }
   }
 

@@ -9,7 +9,7 @@ import http from 'node:http';
 import { safeJsonParse } from '../../src/lib/json.ts';
 import { withTimeout, generateContent, generateContentStream, setLLMProvider, resetLLMProvider, setEmbeddingProvider, setImageProvider, setTTSProvider, getEmbeddingProvider, getImageProvider, getTTSProvider, resetAllProviders, noopImageProvider, noopTTSProvider, noopEmbeddingProvider, getModel, modelForTask } from '../../server/engine/ai.ts';
 import { analyzeSubtext } from '../../server/lib/subtext-meter.ts';
-import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES } from '../../server/lib/genre-router.ts';
+import { genrePromptBlock, GENRE_MODIFIERS, GENRE_NAMES, GENRE_RULE_MODIFIERS } from '../../server/lib/genre-router.ts';
 import { scoreBelief, retrieveBeliefs, consolidateBeliefs, decayBeliefConfidence } from '../../server/lib/memory.ts';
 import { metrics } from '../../server/lib/metrics.ts';
 import { actionBiasWeights, defenseActionBias, effectiveScore, attachmentActionBias } from '../../server/lib/personality.ts';
@@ -1123,6 +1123,183 @@ describe('Fountain export — BeatTrace integration', () => {
 });
 
 
+describe('Fountain export — X1 action vocabulary', () => {
+  const agents: CharacterSheet[] = [
+    {
+      char_id: 'alice', name: 'Alice', public_mask: '', hidden_motive: '',
+      knowledge_vector: [], current_location_id: 'room1', suspicion_score: 0, is_alive: true,
+    },
+    {
+      char_id: 'bob', name: 'Bob', public_mask: '', hidden_motive: '',
+      knowledge_vector: [], current_location_id: 'room1', suspicion_score: 0, is_alive: true,
+    },
+  ];
+  const locations: Location[] = [
+    { location_id: 'room1', name: 'The Study', description: '', adjacent_locations: [] },
+  ];
+
+  function makeLog(overrides: Partial<ActionLogEntry>): ActionLogEntry[] {
+    return [{
+      action_id: 'e1', timestamp: 1000, char_id: 'alice', location_id: 'room1',
+      action_type: 'HIDE', target_char_id: null, content: '', is_audible: false,
+      ...overrides,
+    }];
+  }
+
+  // Silent-set verbs: always an action line, never a dialogue block.
+  const silentCases: Array<{ type: ActionLogEntry['action_type']; content: string; target: string | null }> = [
+    { type: 'HIDE', content: '(goes still)', target: null },
+    { type: 'OBSERVE', content: '(watches)', target: 'bob' },
+    { type: 'LISTEN', content: '(listens)', target: 'bob' },
+    { type: 'SEARCH', content: '(searches the desk)', target: null },
+  ];
+
+  for (const { type, content, target } of silentCases) {
+    it(`${type} renders a non-empty action line naming Alice`, () => {
+      const log = makeLog({ action_type: type, content, target_char_id: target });
+      const output = transcriptToFountain(log, agents, locations);
+      assert.ok(output.includes('Alice'), `${type} output should mention the actor`);
+      assert.ok(!output.includes(`[${type}]`), 'should never render raw debug tags');
+      const blocks = parseFountain(output);
+      assert.doesNotThrow(() => parseFountain(output));
+      // The rendered beat should show up as an action block, not a dialogue block.
+      const actionBlock = blocks.find(b => b.type === 'action' && b.text.includes('Alice'));
+      assert.ok(actionBlock, `${type} should render as an action block`);
+    });
+
+    it(`${type} handles a null target / empty content gracefully`, () => {
+      const log = makeLog({ action_type: type, content: '', target_char_id: null });
+      const output = transcriptToFountain(log, agents, locations);
+      assert.ok(output.trim().length > 0);
+      assert.ok(output.includes('Alice'));
+      assert.doesNotThrow(() => parseFountain(output));
+    });
+  }
+
+  it('REVEAL renders as dialogue addressed to the target, mirroring SPEAK', () => {
+    const log = makeLog({
+      action_type: 'REVEAL', content: 'The vault code is 4479.', target_char_id: 'bob', is_audible: true,
+    });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('ALICE'));
+    assert.ok(output.includes('(to Bob)'));
+    assert.ok(output.includes('The vault code is 4479.'));
+    const blocks = parseFountain(output);
+    assert.ok(blocks.some(b => b.type === 'dialogue' && b.text.includes('vault code')));
+  });
+
+  it('REVEAL with empty content still renders spoken dialogue, not blank text', () => {
+    const log = makeLog({ action_type: 'REVEAL', content: '', target_char_id: null, is_audible: true });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('ALICE'));
+    assert.ok(!/ALICE\n\n/.test(output), 'dialogue block should not be left empty');
+    assert.doesNotThrow(() => parseFountain(output));
+  });
+
+  it('THREATEN renders as dialogue with a hard-edged parenthetical', () => {
+    const log = makeLog({
+      action_type: 'THREATEN', content: 'Say that again and see what happens.', target_char_id: 'bob', is_audible: true,
+    });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('ALICE'));
+    assert.ok(output.includes('low and dangerous'));
+    assert.ok(output.includes('Say that again and see what happens.'));
+    const blocks = parseFountain(output);
+    assert.ok(blocks.some(b => b.type === 'dialogue'));
+  });
+
+  it('THREATEN with null target and empty content still renders non-empty dialogue', () => {
+    const log = makeLog({ action_type: 'THREATEN', content: '', target_char_id: null, is_audible: true });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('(low and dangerous)'));
+    assert.doesNotThrow(() => parseFountain(output));
+  });
+
+  it('BETRAY with content renders as dialogue', () => {
+    const log = makeLog({
+      action_type: 'BETRAY', content: "I told them everything. I had to.", target_char_id: 'bob', is_audible: true,
+    });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('I told them everything'));
+    const blocks = parseFountain(output);
+    assert.ok(blocks.some(b => b.type === 'dialogue' && b.text.includes('I told them everything')));
+  });
+
+  it('BETRAY with no content falls back to an action beat naming the target', () => {
+    const log = makeLog({ action_type: 'BETRAY', content: '', target_char_id: 'bob', is_audible: true });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('Alice'));
+    assert.ok(output.includes('Bob'));
+    const blocks = parseFountain(output);
+    assert.ok(blocks.some(b => b.type === 'action' && b.text.includes('Bob')));
+  });
+
+  it('PROTECT with content renders as dialogue; with no content renders an action beat', () => {
+    const withContent = transcriptToFountain(
+      makeLog({ action_type: 'PROTECT', content: "Stay behind me.", target_char_id: 'bob', is_audible: true }),
+      agents, locations,
+    );
+    assert.ok(withContent.includes('Stay behind me.'));
+    assert.ok(parseFountain(withContent).some(b => b.type === 'dialogue'));
+
+    const noContent = transcriptToFountain(
+      makeLog({ action_type: 'PROTECT', content: '', target_char_id: 'bob', is_audible: true }),
+      agents, locations,
+    );
+    assert.ok(noContent.includes('Alice'));
+    assert.ok(noContent.includes('Bob'));
+    assert.doesNotThrow(() => parseFountain(noContent));
+  });
+
+  it('FORM_ALLIANCE with content renders as dialogue; with no content renders an action beat', () => {
+    const withContent = transcriptToFountain(
+      makeLog({ action_type: 'FORM_ALLIANCE', content: "We do this together.", target_char_id: 'bob', is_audible: true }),
+      agents, locations,
+    );
+    assert.ok(withContent.includes('We do this together.'));
+    assert.ok(parseFountain(withContent).some(b => b.type === 'dialogue'));
+
+    const noContent = transcriptToFountain(
+      makeLog({ action_type: 'FORM_ALLIANCE', content: '', target_char_id: null, is_audible: true }),
+      agents, locations,
+    );
+    assert.ok(noContent.trim().length > 0);
+    assert.doesNotThrow(() => parseFountain(noContent));
+  });
+
+  it('FLEE renders an urgent exit action line using the recorded destination', () => {
+    const log = makeLog({
+      action_type: 'FLEE', content: '→ the courtyard', target_char_id: null, is_audible: true,
+    });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('Alice'));
+    assert.ok(output.includes('the courtyard'));
+    assert.ok(!output.includes('→'), 'the arrow marker should be stripped from prose');
+    const blocks = parseFountain(output);
+    assert.ok(blocks.some(b => b.type === 'action' && b.text.includes('courtyard')));
+  });
+
+  it('FLEE with empty content still renders a non-empty action line', () => {
+    const log = makeLog({ action_type: 'FLEE', content: '', target_char_id: null, is_audible: true });
+    const output = transcriptToFountain(log, agents, locations);
+    assert.ok(output.includes('Alice'));
+    assert.doesNotThrow(() => parseFountain(output));
+  });
+
+  it('every new X1 verb produces non-empty output that round-trips through parseFountain without throwing', () => {
+    const allTypes: ActionLogEntry['action_type'][] = [
+      'HIDE', 'OBSERVE', 'LISTEN', 'SEARCH', 'REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE', 'FLEE',
+    ];
+    for (const type of allTypes) {
+      const log = makeLog({ action_type: type, content: 'Some content.', target_char_id: 'bob', is_audible: true });
+      const output = transcriptToFountain(log, agents, locations);
+      assert.ok(output.trim().length > 0, `${type} should not render as nothing`);
+      assert.doesNotThrow(() => parseFountain(output), `${type} output should parse without throwing`);
+    }
+  });
+});
+
+
 describe('Stage — spine table isolation', () => {
   it('belief edges are empty on a fresh stage', () => {
     const stage = makeStage();
@@ -1926,6 +2103,51 @@ describe('genre-router — genrePromptBlock', () => {
     for (const [genre, mod] of Object.entries(GENRE_MODIFIERS)) {
       assert.ok(mod.forbiddenCliches.length >= 3, `${genre} should have ≥3 clichés`);
     }
+  });
+
+  // Wave 1184 additions (Program v2, Type 3 — genre-conditioned): shape tests for the
+  // new numeric-modifiers table. GENRE_RULE_MODIFIERS is Partial<Record<StoryGenre, ...>>
+  // by design (a rule-modifier home for a genre is opt-in, not mandatory) — these tests
+  // pin the invariants pacing.ts/structure.ts rely on rather than testing every value.
+  it('GENRE_RULE_MODIFIERS only keys on known genres from GENRE_NAMES', () => {
+    const knownGenres = new Set(Object.keys(GENRE_NAMES));
+    for (const genre of Object.keys(GENRE_RULE_MODIFIERS)) {
+      assert.ok(knownGenres.has(genre), `${genre} in GENRE_RULE_MODIFIERS must be a known StoryGenre`);
+    }
+  });
+
+  it('every populated GENRE_RULE_MODIFIERS field is a finite, positive number', () => {
+    for (const [genre, mod] of Object.entries(GENRE_RULE_MODIFIERS)) {
+      assert.ok(mod && Object.keys(mod).length > 0, `${genre} entry should not be empty if present`);
+      for (const [field, value] of Object.entries(mod!)) {
+        assert.equal(typeof value, 'number', `${genre}.${field} should be a number`);
+        assert.ok(Number.isFinite(value), `${genre}.${field} should be finite`);
+        assert.ok((value as number) > 0, `${genre}.${field} should be positive`);
+      }
+    }
+  });
+
+  it('every original genre now has a live rule modifier (noir closed by B1-a)', () => {
+    // Coverage-honesty pin for future Type 3 waves: this asserts the CURRENT set of
+    // genres with no rule-threshold modifier, not a permanent restriction — a future
+    // wave that adds one should update this list, not delete the test. Wave 1188 closed
+    // the romance/sci_fi/mystery gaps; the B1-a genre expansion closed noir
+    // (pacingPlateauRatio relaxed for slow-burn, expositionDumpStreak tightened
+    // for hard-boiled economy), so no original genre remains without one.
+    const genresWithoutModifier: Array<keyof typeof GENRE_NAMES> = [];
+    for (const genre of genresWithoutModifier) {
+      assert.equal(GENRE_RULE_MODIFIERS[genre], undefined, `${genre} should not yet have a live rule modifier`);
+    }
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.noir ?? {}).sort(),
+      ['expositionDumpStreak', 'pacingPlateauRatio']);
+  });
+
+  // Wave 1188 additions (Program v2, Type 3 — genre-conditioned, second of its kind):
+  // pin the three new genres' modifier shapes now that romance/sci_fi/mystery are live.
+  it('romance, sci_fi, and mystery each have exactly the one field Wave 1188 gave them', () => {
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.romance ?? {}), ['weakMidpointPressureFloor']);
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.sci_fi ?? {}), ['expositionDumpStreak']);
+    assert.deepEqual(Object.keys(GENRE_RULE_MODIFIERS.mystery ?? {}), ['act3ExcessRatio']);
   });
 });
 

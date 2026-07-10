@@ -612,6 +612,46 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       assert.ok(monotone.length === 0, 'Should NOT fire when emotional register varies');
     });
 
+    // D2-c fix — subtext-aware movement guard: emotionalShift is a whole-scene
+    // valence-lexicon count, blind to arcs conveyed through subtext (professional
+    // shorthand, a shifting balance of control) rather than explicit feeling-naming.
+    it('characterArcPass does NOT fire ARC_EMOTIONAL_MONOTONE when raw valence is monotone but conversational control shifts between characters', async () => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      // All 8 scenes read as emotionally neutral on the raw valence lexicon — exactly
+      // the monotone shape this rule tests for — but conversational control visibly
+      // passes from ALICE to BOB partway through: a subtextual arc a valence lexicon
+      // cannot see, distinct from the register-varies no-fire test above (which varies
+      // emotionalShift itself, not power).
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        emotionalShift: 'neutral',
+        powerHolder: i < 4 ? 'ALICE' : 'BOB',
+      }));
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const monotone = result.issues.filter(i => i.rule === 'ARC_EMOTIONAL_MONOTONE');
+      assert.ok(monotone.length === 0, 'Should NOT fire when conversational control shifts between two named characters even though raw valence is monotone');
+    });
+
+    it('characterArcPass still fires ARC_EMOTIONAL_MONOTONE when every movement channel is flat, not just emotionalShift', async () => {
+      const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
+      // Monotone emotionalShift AND no power-holder diversity, no within-scene flip, no
+      // revelation, no relationship shift anywhere — genuinely nothing moves on any
+      // channel. The rescue guard must not over-fire and swallow a script this flat.
+      const records = Array.from({ length: 8 }, (_, i) => makeRec(i, {
+        emotionalShift: 'neutral', powerHolder: null, powerFlipped: false, revelation: null, relationshipShifts: [],
+      }));
+      const fountain = Array.from({ length: 8 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await characterArcPass({
+        fountain, original: fountain,
+        records: records as any, structure: baseStructure as any, annotations: [], approvedSpans: [],
+      });
+      const monotone = result.issues.filter(i => i.rule === 'ARC_EMOTIONAL_MONOTONE');
+      assert.ok(monotone.length >= 1, 'Should still fire when no channel — valence, power, revelation, or relationship — shows any movement at all');
+    });
+
     it('characterArcPass detects CHARACTER_LATE_INTRODUCTION for major char past midpoint', async () => {
       const { characterArcPass } = await import('../../server/nvm/revision/passes/character-arc.ts');
       // 10 scenes (midpoint=5). LATECOMER appears 5 times, only from Scene 6 onward.

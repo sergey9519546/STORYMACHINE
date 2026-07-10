@@ -779,6 +779,54 @@ He sits at his desk.
         'Should NOT fire when at least one scene has a non-neutral emotional shift',
       );
     });
+
+    // D2-c fix — subtext-aware movement guard: emotionalShift is a whole-scene
+    // valence-lexicon count, blind to arcs conveyed through subtext (elliptical
+    // dialogue, truths surfacing without a character narrating them) rather than
+    // explicit feeling-naming.
+    it('originalityPass does NOT fire EMOTIONAL_ARC_PLATEAU when every scene is neutral but two separate revelations surface', async () => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      // All 7 scenes are emotionally neutral on the raw valence lexicon — exactly the
+      // plateau shape this rule tests for — but the audience learns two separate truths
+      // along the way: the story's understanding is visibly moving even though no
+      // character ever narrates a feeling about it.
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, {
+          emotionalShift: 'neutral',
+          purpose: 'dialogue',
+          revelation: (i === 2 || i === 5) ? 'The ledger was never destroyed.' : null,
+        }),
+      );
+      const fountain = Array.from({ length: 7 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(7), approvedSpans: [],
+      });
+      assert.ok(
+        !result.issues.some(i => i.rule === 'EMOTIONAL_ARC_PLATEAU'),
+        'Should NOT fire when two separate revelations surface even though raw valence stays neutral throughout',
+      );
+    });
+
+    it('originalityPass still fires EMOTIONAL_ARC_PLATEAU when every movement channel is flat, not just emotionalShift', async () => {
+      const { originalityPass } = await import('../../server/nvm/revision/passes/originality.ts');
+      // All-neutral emotionalShift AND no power-holder diversity, no within-scene flip,
+      // at most one revelation, and no relationship shift anywhere — genuinely nothing
+      // moves. The rescue guard must not over-fire and swallow a script this flat.
+      const records = Array.from({ length: 7 }, (_, i) =>
+        makeRec(i, {
+          emotionalShift: 'neutral', purpose: 'dialogue',
+          powerHolder: null, powerFlipped: false, revelation: null, relationshipShifts: [],
+        }),
+      );
+      const fountain = Array.from({ length: 7 }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+      const result = await originalityPass({
+        fountain, original: fountain, records: records as any,
+        structure: {} as any, annotations: noAnnotations(7), approvedSpans: [],
+      });
+      const plateau = result.issues.filter(i => i.rule === 'EMOTIONAL_ARC_PLATEAU');
+      assert.ok(plateau.length >= 1, 'Should still fire when no channel — valence, power, revelation, or relationship — shows any movement at all');
+    });
   });
 
 

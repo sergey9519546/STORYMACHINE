@@ -545,10 +545,44 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
+import type { StoryGenre } from '../../../engine/types.ts';
+
+// Wave 1188 additions (Program v2, Type 3 — genre-conditioned): EXPOSITION_DUMP is one
+// of the highest-firing generic rules in the calibration corpus (53 fires across 20/20
+// samples — see the wave's measurement pass). Its consecutive-told-only-scene streak
+// length now consults GENRE_RULE_MODIFIERS (server/lib/genre-router.ts), generic value
+// as the default: sci-fi legitimately spends more early scenes establishing its premise
+// in dialogue (GENRE_MODIFIERS.sci_fi), so the streak tolerated before flagging inert
+// exposition loosens. storyContext absent, genre absent, or genre unset in the table ->
+// identical constant and identical issue text to pre-Wave-1188 behavior.
 
 export async function beliefPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
   const issues: RevisionIssue[] = [];
+
+  // Wave 1188: resolved once per pass, consumed by EXPOSITION_DUMP below. Undefined
+  // when storyContext/genre is absent or the genre has no live rule modifier — the
+  // consumer falls through to its own generic constant in that case.
+  const genre1188 = input.storyContext?.genre as StoryGenre | undefined;
+  const genreMod1188 = genre1188 ? GENRE_RULE_MODIFIERS[genre1188] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1188 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1188 = tone1188 ? TONE_REGISTERS[tone1188]?.thresholdDeltas : undefined;
+  const composed1188 = composeThresholds(genre1188, tone1188);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("sci_fi", "cerebral", or "sci_fi + cerebral").
+  const thresholdNote1188 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1188?.[field] !== undefined) parts.push(String(genre1188));
+    if (toneDeltas1188?.[field] !== undefined) parts.push(String(tone1188));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   // ── Track belief propositions and their sources ────────────────────────────
   const toldBeliefs: Array<{ sceneIdx: number; proposition: string; slug: string }> = [];
@@ -609,7 +643,13 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Consecutive told-beliefs with no witness ───────────────────────────────
-  // More than 3 told beliefs in a row without any witnessed belief = exposition dump
+  // More than 3 told beliefs in a row without any witnessed belief = exposition dump.
+  // Wave 1188: generic streak 3, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 3 constant.
+  const expositionDumpStreak1188 = composed1188.expositionDumpStreak ?? 3;
+  const genreNote1188 = thresholdNote1188('expositionDumpStreak');
   let consecutiveTold = 0;
   let expositionStartScene = -1;
   for (const r of records) {
@@ -619,11 +659,11 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
     } else {
       consecutiveTold = 0;
     }
-    if (consecutiveTold >= 3) {
+    if (consecutiveTold >= expositionDumpStreak1188) {
       issues.push({
         location: `Scenes ${expositionStartScene}–${r.sceneIdx}`,
         rule: 'EXPOSITION_DUMP',
-        description: `Scenes ${expositionStartScene}–${r.sceneIdx}: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert`,
+        description: `Scenes ${expositionStartScene}–${r.sceneIdx}: ${expositionDumpStreak1188}+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert${genreNote1188}`,
         severity: 'major',
         suggestedFix: 'Break the exposition streak with a scene that shows rather than tells the key information',
       });

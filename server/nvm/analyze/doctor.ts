@@ -31,13 +31,17 @@
 
 import crypto from 'node:crypto';
 import type { StoryContext, PassName, RevisionIssue } from '../revision/passes/types.ts';
-import type { CompiledScreenplay } from '../screenplay/compile.ts';
+import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile.ts';
+import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { StructureState } from '../screenplay/structure.ts';
+import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
+import { deepReadRecords } from './deep-read.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
+import { computeNarrativeMetrics } from './metrics.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
   CoverageVerdict, DimensionKey, DimensionScore,
@@ -75,6 +79,18 @@ export function computeContentHash(fountain: string): string {
 // StoryContext fields (not just theme/genre) so a future pass that starts
 // reading directorStyle/characters in its diagnostics can't silently go
 // stale against this cache.
+//
+// Key ALSO includes a 'q'/'d' mode discriminator (quick vs deep read):
+// deep-read.ts's LLM sensor makes a deep report's signals genuinely different
+// from a quick report's for the identical (contentHash, storyContext) pair —
+// types.ts's deepRead doc comment is explicit that the two are NOT the same
+// lineage and must never be compared draft-over-draft. Without the
+// discriminator, whichever mode ran FIRST for a given input would silently
+// serve its report to a caller asking for the other mode — a `q` result
+// masquerading as `d` (missing the deepRead field entirely) or vice versa.
+// The discriminator prefixes the key (rather than appending) purely so it's
+// visually obvious at a glance in a debugger/log dump which lineage a given
+// cache entry belongs to.
 const DOCTOR_CACHE_CAPACITY = 64;
 /** Plain Map, no deps: insertion order is the recency order because every
  *  hit deletes-then-re-sets its key (bumping it to "most recent"), and every
@@ -106,8 +122,8 @@ function storyContextCacheKey(storyContext?: StoryContext): string {
   return fields.map(f => `${f.length}:${f}`).join('');
 }
 
-function doctorCacheKey(contentHash: string, storyContext?: StoryContext): string {
-  return `${contentHash}${storyContextCacheKey(storyContext)}`;
+function doctorCacheKey(contentHash: string, storyContext?: StoryContext, deepRead = false): string {
+  return `${deepRead ? 'd' : 'q'}${contentHash}${storyContextCacheKey(storyContext)}`;
 }
 
 function doctorCacheGet(key: string): Omit<ScriptDoctorReport, 'analyzedAt'> | undefined {
@@ -213,6 +229,134 @@ export function clearDoctorCache(): void {
 // NOT fully correct (an individual very-short-but-genuinely-clean script
 // still can't reach the top of the range — that's scarcityPenalty working
 // as designed, not a bug).
+// ── Wave (health-formula sensitivity): sub-1.0-density discrimination fix ──
+// FINDING this wave fixes: three discrimination pairs (calibration/
+// discrimination-pairs.ts's subtext-vs-on-the-nose, active-vs-passive-
+// protagonist, dramatized-vs-told-exposition) landed EXACTLY TIED at
+// displayed health 79.8, despite the bad half firing measurably more
+// weighted issues on two of the three (subtext: 33 vs 36; dramatized: 35 vs
+// 38.5 — see tests/core/discrimination.test.ts). Root cause, MEASURED (see
+// this wave's own scratchpad, not checked into the repo): these are all
+// 7-scene, ~400-470-word fixtures, which land at density = weightedIssues /
+// wordCount^0.7 in the 0.47-0.76 range — a completely different regime from
+// the reference corpus's 10-scene, ~290-340-word samples, which land at
+// density 1.48-2.39 (every corpus sample, every band; see corpus.ts). The
+// ORIGINAL density^3.75 curve was tuned entirely against that >= 1.4 regime;
+// raising a sub-1.0 density to the 3.75 power crushes it near-zero (0.472^
+// 3.75 = 0.067, penalty = 2.5 * 0.067 = 0.15), so a 3-issue difference in
+// that regime moves the penalty by ~0.03 — a fraction of the 0.1-point
+// rounding granularity computeHealthScore displays at. This is the OVERALL-
+// score mirror of Wave 18-β's dimension-collapse finding (see that wave's
+// comment above computeDimensionScore): same "sub-1.0 density crushed by a
+// power tuned for density >= 1" defect, at the OVERALL level instead of the
+// per-dimension level.
+//
+// Fix chosen, MEASURED not guessed (see this wave's own scratchpad — one
+// script ran all 6 discrimination pairs + all 20 corpus samples + the 2x/3x
+// length variants through the real pipeline to get the actual density
+// distributions above; another swept a logistic-curve parameter grid against
+// those exact numbers): densityPenalty is now a PIECEWISE function of
+// density, split at density = 1.0 — below that, subDensityPenalty (below)
+// entirely REPLACES the density^3.75 curve; at/above it, the ORIGINAL
+// density^3.75 curve is byte-identical to before this wave (same constants,
+// same expression) — so every reference-corpus sample and both length
+// variants (all measured at density 1.48-2.39, comfortably above the split)
+// see EXACTLY the same penalty as before, not just "within ~0.5pt": the
+// `density >= 1` branch below is untouched code. Candidate (i) from this
+// wave's brief ("piecewise... keep behavior at corpus-typical densities
+// identical") is what this ships; candidates that instead lowered
+// DENSITY_POWER globally, or added an issue-count-linear term active at all
+// densities, were rejected because both necessarily perturb the >= 1.4
+// regime the current formula (and calibration/reference.ts's live-computed,
+// non-baked distribution) is already tuned against — no reason to touch a
+// regime with no measured defect.
+//
+// subDensityPenalty is a logistic (sigmoid) curve, not a second power law:
+// a bounded-scale power law continuous with the >= 1 branch (i.e. forced to
+// pass through the same DENSITY_SCALE=2.5 at density=1) was tried first and
+// measured to fail — ANY monotonic curve bounded by that continuity
+// constraint tops out at 2.5 across the whole [0, 1) domain, and the
+// discrimination pairs' density GAPS within a pair are tiny (0.013-0.024)
+// relative to that domain, so even the steepest such curve produced at most
+// a ~0.4-point gap (measured) — nowhere near enough separation. Dropping the
+// continuity requirement (this function's own scale is independent of the
+// >= 1 branch's) is what unlocks real sensitivity: a logistic centered at
+// SUB_DENSITY_MIDPOINT=0.52 (the middle of the discrimination pairs' 0.47-
+// 0.76 cluster) with SUB_DENSITY_STEEPNESS=50 stays near-zero below ~0.4
+// density (so a genuinely clean short script, e.g. the formula spot-check
+// fixture at density 0.157, is barely touched — measured penalty <0.001)
+// and saturates near SUB_DENSITY_SCALE=10 above ~0.65 (so the already-
+// passing escalation/setup-payoff/composite pairs, whose "bad" halves sit at
+// 0.64-0.76 density, get MORE separation, not less). Measured per-pair
+// densityPenalty deltas (bad minus good, direction that must be positive for
+// good > bad to hold, scarcity term identical within a pair so cancels):
+// subtext +1.49, dramatized +1.40, escalation +6.09, setup-payoff +4.59,
+// composite +2.23 (was +0.32 before this wave) — active-vs-passive-
+// protagonist measures -1.87 (WORSENS; see this wave's own report for why:
+// that pair's "good" half already fires MORE weighted issues than its "bad"
+// half under the current rule set — 38 vs 35 — so no density-curve change
+// can fix it; it is a missing-detector gap, not a compression gap, and stays
+// a discrimination.test.ts todo).
+//
+// Accepted, documented tradeoff: subDensityPenalty saturates near
+// SUB_DENSITY_SCALE=10 for density roughly >= 0.65, while the >= 1 branch
+// starts at DENSITY_SCALE=2.5 at density=1 — a discontinuity of ~7.5 points
+// exists across the density=1 seam, and the whole [0.65, 1.0) sub-band scores
+// a flat ~10-point penalty rather than density^3.75's continuously-rising
+// curve. No corpus sample, discrimination pair, or 2x/3x length variant this
+// wave measured against lands in [0.65, 1.0) — that band is short scripts
+// (roughly 400-900 words at typical weighted-issue counts) sitting almost
+// exactly at the boundary between "too little material for structural rules
+// to fire" and "enough material to read as a normal script," which is
+// inherently a low-confidence zone for this formula (see
+// DIMENSION_LOW_CONFIDENCE_SCENES above for the same honesty concern at the
+// per-dimension level). Noted here rather than silently smoothed over, in
+// case a future wave's fixture ever lands there and the seam needs revisiting.
+/** The word-density half of craftPenalty, factored out on its own (Wave
+ *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
+ *  computeDimensionScore's comment for why the per-dimension scores need
+ *  exactly that. Byte-identical arithmetic to what craftPenalty always
+ *  computed for this half at density >= 1.0; see the design comment above
+ *  for the density < 1.0 branch this wave added.
+ *
+ *  The tuned constants are declared LOCALLY (inside this function body)
+ *  rather than at module scope, for the same TemporalDeadZone reason
+ *  documented on craftPenalty below — this function is on the same
+ *  doctor.ts <-> calibration/reference.ts import cycle (reference.ts's
+ *  scoreSample reaches it transitively through computeRawCraftScore), so a
+ *  module-level `const` here would carry the identical hazard. */
+function densityPenalty(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  const WORD_COUNT_EXPONENT = 0.7;
+  const DENSITY_POWER = 3.75;
+  const DENSITY_SCALE = 2.5;
+  // Sub-1.0-density branch (see design comment above) — a logistic, not a
+  // power law, so its scale is independent of DENSITY_SCALE above.
+  const SUB_DENSITY_SCALE = 10;
+  const SUB_DENSITY_MIDPOINT = 0.52;
+  const SUB_DENSITY_STEEPNESS = 50;
+
+  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
+  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const density = weightedIssues / opportunityWords;
+
+  if (density < 1) {
+    return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
+  }
+  return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
+}
+
+/** The scene-scarcity half of craftPenalty, factored out on its own (Wave
+ *  18-β) for the same reason as densityPenalty above — see that function's
+ *  comment. SCARCITY_SCALE stays function-local for the identical TDZ
+ *  reason. */
+function scarcityPenalty(sceneCount: number): number {
+  const SCARCITY_SCALE = 140;
+  return SCARCITY_SCALE / Math.max(sceneCount, 1);
+}
+
 /** Shared penalty expression behind both computeRawCraftScore and
  *  computeHealthScore — factored out so the two can never drift apart. See
  *  the design comment above for the full rationale; in short:
@@ -221,39 +365,25 @@ export function clearDoctorCache(): void {
  *  where weightedIssues = 4·critical + 1.5·major + 0.5·minor (unchanged from
  *  the prior formula — only the normalization changed).
  *
- *  The four tuned constants are declared LOCALLY (inside this function body)
- *  rather than at module scope — deliberately, not for style. doctor.ts and
- *  calibration/reference.ts import each other (reference.ts's header
- *  explains why: it reuses this exact formula to build its distribution,
- *  without ever calling back into aggregateReport/runScriptDoctor). Whichever
- *  of the two modules a process happens to load FIRST becomes the entry
- *  point of that cycle; if it were doctor.ts, reference.ts's top-level
- *  `await buildDistribution()` would call into this function while doctor.ts
- *  was still mid-evaluation — before any module-scope `const` declared here
- *  had run its initializer. That's a genuine TemporalDeadZone ReferenceError
- *  (verified while building this fix), silently swallowed by reference.ts's
- *  own top-level try/catch into an empty distribution — every report would
- *  then quietly lose healthPercentile for the rest of the process, with
- *  nothing crashing to reveal why. Function PARAMETERS and function-local
- *  `const`s have no such hazard: they're initialized fresh on every call,
- *  independent of module evaluation order, so the cycle above can never
- *  observe them uninitialized. */
+ *  Now a thin sum of densityPenalty + scarcityPenalty above (Wave 18-β
+ *  factoring) — the OVERALL health formula this function backs is completely
+ *  unchanged by that refactor: same two terms, same constants, same sum, so
+ *  every existing computeHealthScore/computeRawCraftScore caller (including
+ *  calibration/reference.ts's scoreSample, which this file must not touch —
+ *  see Wave 18-β's own report) sees byte-identical output before and after.
+ *  Only computeDimensionScore below is new, and it deliberately calls
+ *  densityPenalty alone, never this function.
+ *
+ *  Constants stay pushed down into densityPenalty/scarcityPenalty rather
+ *  than re-declared here — same TDZ hazard as those two functions'
+ *  comments explain; this function never declares a module-level const of
+ *  its own either. */
 function craftPenalty(
   bySeverity: { critical: number; major: number; minor: number },
   sceneCount: number,
   wordCount: number,
 ): number {
-  const WORD_COUNT_EXPONENT = 0.7;
-  const DENSITY_POWER = 3.75;
-  const DENSITY_SCALE = 2.5;
-  const SCARCITY_SCALE = 140;
-
-  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
-  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
-  const density = weightedIssues / opportunityWords;
-  const densityPenalty = DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
-  const scarcityPenalty = SCARCITY_SCALE / Math.max(sceneCount, 1);
-  return densityPenalty + scarcityPenalty;
+  return densityPenalty(bySeverity, wordCount) + scarcityPenalty(sceneCount);
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
@@ -290,6 +420,156 @@ export function computeHealthScore(
 ): number {
   const clamped = Math.max(0, Math.min(100, computeRawCraftScore(bySeverity, sceneCount, wordCount)));
   return Math.round(clamped * 10) / 10;
+}
+
+// ── Wave 18-β: per-dimension score, scarcity-free (dimension-collapse fix) ──
+// FINDING this wave fixes: on a short script (measured case: 608 words, 9
+// scenes), all 5 DimensionScore.score values rendered identical (84.4 x5)
+// despite issue counts per dimension differing by 4-5x (35/40/14/34/8). Root
+// cause, isolated by direct measurement: buildDimensions (below) fed every
+// dimension's own bySeverity mix through the SAME computeHealthScore used for
+// the overall score — i.e. through the FULL craftPenalty, densityPenalty +
+// scarcityPenalty. scarcityPenalty (140/sceneCount) does not vary by
+// dimension at all (it only reads sceneCount, which is the whole script's,
+// identical across all 5 calls), and at low word counts it dominates: for a
+// 9-scene/~600-word script, scarcityPenalty ≈ 140/9 ≈ 15.6, while
+// densityPenalty for a REALISTIC per-dimension weightedIssues at that word
+// count is well under 1 point. Health = 100 - penalty then rounds every
+// dimension to the same displayed number: the identical ~15.6-point scarcity
+// term swamps a sub-1-point density signal, five times over. This is exactly
+// the scarcity term's own design intent working correctly for the OVERALL
+// score (see craftPenalty's design comment above: "a tiny script can no
+// longer read as clean purely because it was too short to accumulate
+// issues") — it was simply never meant to be reapplied identically across 5
+// sibling dimensions, where its only visible effect is to erase the one
+// signal a dimension score exists to show: RELATIVE issue density between a
+// script's own craft families.
+//
+// Fix chosen, MEASURED not guessed (see this wave's own scratchpad
+// measurement scripts, not checked into the repo — one ran the real 20-
+// sample reference corpus through the real pipeline to get actual
+// per-dimension weightedIssues distributions, one tried candidate constants
+// against that data plus synthetic skewed short scripts): apply
+// scarcityPenalty to OVERALL health only — a dimension's DISPLAYED score
+// uses a density term alone. But reusing craftPenalty's EXACT densityPenalty
+// curve for that (candidate (a) taken literally) was tried first and
+// measured to fail: densityPenalty's constants (DENSITY_POWER=3.75,
+// DENSITY_SCALE=2.5) were tuned against the OVERALL script's total
+// weightedIssues (summed across all 14 passes, typically >= wordCount^0.7,
+// i.e. density >= 1). A single dimension's weightedIssues is a SHARE of that
+// total (2-3 passes' worth, not 14) — typically well under wordCount^0.7,
+// i.e. density < 1 — and raising a sub-1 density to the 3.75 power crushes
+// it disproportionately (measured: realistic per-dimension weightedIssues in
+// the 5-40 range at 250-600 word counts produced densityPenalty well under
+// 1 point for EVERY dimension), collapsing all 5 dimensions toward the 100
+// ceiling instead of toward one shared mid-value — the identical bug in the
+// other direction, not a fix.
+//
+// So this wave ships a SEPARATE, independently-tuned dimension density curve
+// (dimensionDensityPenalty below: DENSITY_POWER_DIM=1.5, DENSITY_SCALE_DIM=
+// 100, same WORD_COUNT_EXPONENT=0.7 opportunity unit) rather than reusing
+// craftPenalty's curve outright. Verified against the real 20-sample
+// corpus: every one of the 5 dimensions shows non-degenerate spread (no
+// dimension pins to a single clamped value across the corpus) at this
+// curve, and the bug's own repro shape (9 scenes, ~600 words, per-dimension
+// weighted issues roughly 35/40/14/34/8) separates to roughly 75/70/94/76/97
+// — a ~27-point spread that orders exactly by issue density, instead of one
+// repeated number.
+//
+// Known, accepted residual: per-dimension band-average ordering (strong vs.
+// troubled) is not strictly monotonic for every one of the 5 dimensions in
+// the CURRENT reference corpus (e.g. the 'structure-pacing' family happens
+// to carry slightly MORE weighted issues, on average, in the 'troubled' band
+// than in 'weak'/'competent' — a property of which craft family each band's
+// samples were designed to be weak in, not a formula artifact). This is
+// PRE-EXISTING: it was already true of the OLD per-dimension formula too
+// (scarcityPenalty was a constant additive term for same-sceneCount corpus
+// samples, so it never could have changed relative per-dimension ordering
+// either), and no test in this file's own test suite (nor calibration.test.ts)
+// asserts per-dimension band monotonicity — only OVERALL health/healthPercentile
+// band ordering is asserted, and that is completely untouched by this wave
+// (see below). Not in this wave's scope to fix; noted for the record rather
+// than silently glossed over.
+//
+// What this deliberately does NOT touch: computeHealthScore/
+// computeRawCraftScore/craftPenalty (the OVERALL formula) are byte-identical
+// before and after this wave — see craftPenalty's own comment. Nor does it
+// touch DimensionBuild.rawScore (buildDimensions below): that field feeds
+// ONLY the calibration percentile ranking against calibration/reference.ts's
+// distribution, and reference.ts's own scoreSample computes its per-dimension
+// reference statistic via computeRawCraftScore too (scarcity included, same
+// as before) — reference.ts is outside this wave's file-ownership scope, so
+// rawScore keeps calling computeRawCraftScore unchanged, ranking on the exact
+// same statistic basis the reference distribution was built from. Only the
+// DISPLAYED dimension `score` (types.ts's DimensionScore.score, the number a
+// writer actually reads) changes formula.
+//
+// Honesty guard: below DIMENSION_LOW_CONFIDENCE_SCENES scenes, a dimension's
+// own issue family has barely had room to differentiate at all (most of a
+// dimension's passes need several scenes' worth of material before their
+// rules can meaningfully fire) — rounding to a whole point rather than a
+// tenth avoids implying a precision the signal doesn't support. types.ts is
+// read-only for this wave (per its own file-ownership constraint) and has no
+// existing low-confidence marker field to populate instead; a
+// `DimensionScore.lowConfidence?: boolean` field would be the natural next
+// step if the report contract is ever reopened — noted here rather than
+// added.
+const DIMENSION_LOW_CONFIDENCE_SCENES = 3;
+
+/** Dimension-scoped density penalty — deliberately NOT craftPenalty's
+ *  densityPenalty (see the design comment above for why reusing that curve
+ *  measured out to a ceiling-collapse instead of a fix). Same word-based
+ *  opportunity unit (WORD_COUNT_EXPONENT=0.7, unchanged from the overall
+ *  formula — the sub-linear issues-per-word falloff that motivated it there
+ *  applies equally to a dimension's own issue family), but its own power/
+ *  scale, tuned against the real corpus's per-dimension weightedIssues range
+ *  (see this wave's own report for the measurement). Constants stay
+ *  function-local for the same TDZ reason as densityPenalty/scarcityPenalty
+ *  above — this function sits on the identical doctor.ts <-> reference.ts
+ *  import cycle transitively (reachable from computeDimensionRawScore,
+ *  called by buildDimensions, called from aggregateReport). */
+function dimensionDensityPenalty(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  const WORD_COUNT_EXPONENT = 0.7;
+  const DENSITY_POWER_DIM = 1.5;
+  const DENSITY_SCALE_DIM = 100;
+
+  const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
+  const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
+  const density = weightedIssues / opportunityWords;
+  return DENSITY_SCALE_DIM * Math.pow(density, DENSITY_POWER_DIM);
+}
+
+/** Unclamped dimension craft statistic: 100 − dimensionDensityPenalty(...),
+ *  no scarcity term. Exported for the same spot-check reason as
+ *  computeRawCraftScore — independently checkable against a known issue mix
+ *  without running the pipeline. Not used for calibration ranking (that's
+ *  DimensionBuild.rawScore, computeRawCraftScore, unchanged — see the design
+ *  comment above); this is purely the basis for the DISPLAYED per-dimension
+ *  score below. */
+export function computeDimensionRawScore(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+): number {
+  return 100 - dimensionDensityPenalty(bySeverity, wordCount);
+}
+
+/** DISPLAYED per-dimension score: computeDimensionRawScore, clamped to
+ *  [0, 100], honesty-guard-rounded (see DIMENSION_LOW_CONFIDENCE_SCENES
+ *  above). sceneCount is used ONLY for that rounding-precision decision here
+ *  — never fed into a scarcity term, which is the whole point of this wave's
+ *  fix; see the design comment above computeDimensionRawScore. */
+export function computeDimensionScore(
+  bySeverity: { critical: number; major: number; minor: number },
+  wordCount: number,
+  sceneCount: number,
+): number {
+  const clamped = Math.max(0, Math.min(100, computeDimensionRawScore(bySeverity, wordCount)));
+  return sceneCount < DIMENSION_LOW_CONFIDENCE_SCENES
+    ? Math.round(clamped)
+    : Math.round(clamped * 10) / 10;
 }
 
 /** health >= 90 excellent, >= 75 strong, >= 55 solid, >= 35 uneven, else troubled. */
@@ -418,10 +698,18 @@ function buildDimensionSummary(
 interface DimensionBuild {
   score: DimensionScore;
   mix: DimensionIssueMix | null;
-  /** computeRawCraftScore for this dimension's own issue mix — unclamped,
-   *  used only for calibration ranking (aggregateReport below), never
-   *  displayed. See computeRawCraftScore's comment for why ranking needs the
-   *  unclamped statistic. */
+  /** computeRawCraftScore (the FULL formula, scarcity term included) for
+   *  this dimension's own issue mix — unclamped, used ONLY for calibration
+   *  ranking against calibration/reference.ts's distribution (aggregateReport
+   *  below). Deliberately NOT computeDimensionRawScore (the scarcity-free
+   *  statistic the displayed `score` below is now built from, Wave 18-β):
+   *  reference.ts's own scoreSample builds its per-dimension reference
+   *  numbers via computeRawCraftScore too (unchanged — reference.ts is
+   *  outside this wave's file-ownership scope), so ranking must stay on that
+   *  same statistic basis or a report's dimension percentile would compare
+   *  apples (scarcity-free) to the reference set's oranges (scarcity-
+   *  included). See computeRawCraftScore's comment for why ranking needs the
+   *  unclamped statistic in the first place. */
   rawScore: number;
 }
 
@@ -434,10 +722,17 @@ interface DimensionBuild {
  *  wordCount is the WHOLE script's word count, shared across all 5
  *  dimensions — there's no per-dimension word count to measure (a dimension
  *  is a regrouping of issues by PASS, not a distinct slice of the prose), so
- *  each dimension's own opportunity-based penalty (craftPenalty in
- *  computeHealthScore/computeRawCraftScore) is scaled against the same
+ *  each dimension's own density penalty is scaled against the same
  *  script-wide word count as the overall health score, exactly as sceneCount
- *  already was before this fix. */
+ *  already was before this fix.
+ *
+ *  The DISPLAYED `score` (Wave 18-β) is computeDimensionScore — density only,
+ *  no scarcity term — so 5 dimensions built from the same sceneCount no
+ *  longer collapse to one identical number at low scene/word counts; see
+ *  computeDimensionScore's own design comment above for the full finding and
+ *  rationale. `rawScore` stays on the OLD (scarcity-included)
+ *  computeRawCraftScore statistic — see DimensionBuild's own comment for why
+ *  that field specifically must not change. */
 function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCount: number): DimensionBuild[] {
   return DIMENSION_DEFS.map(def => {
     const passSet = new Set<PassName>(def.passes);
@@ -446,7 +741,7 @@ function buildDimensions(passes: DoctorPassSummary[], sceneCount: number, wordCo
       (acc, i) => { acc[i.severity]++; return acc; },
       { critical: 0, major: 0, minor: 0 },
     );
-    const score = computeHealthScore(bySeverity, sceneCount, wordCount);
+    const score = computeDimensionScore(bySeverity, wordCount, sceneCount);
     const rawScore = computeRawCraftScore(bySeverity, sceneCount, wordCount);
     const mix = analyzeDimensionIssues(issues);
     return {
@@ -490,6 +785,431 @@ export interface StrengthsInput {
   sceneCount: number;
   bySeverity: { critical: number; major: number; minor: number };
   dimensions: DimensionScore[];
+  /** Wave 1183 (Program v2, Type 2 — excellence): the per-scene records the
+   *  three new detectors below read (clockRaised, relationshipShifts,
+   *  emotionalShift). Optional — defaults to [] inside buildStrengths — so
+   *  every fixture/test written before this wave still typechecks and still
+   *  produces byte-identical output (an empty/absent records array can never
+   *  satisfy any of the three new guards' minimum-population conditions).
+   *  Matches the file's existing optional-field precedent (memory.ts's
+   *  relationshipShifts/questionsRaised: "treat absence as []/0"). Wave 1187
+   *  reuses this same array for three more channels already present on
+   *  every record — purpose, suspenseDelta, dramaticTurn — no schema change
+   *  needed. */
+  records?: ScreenplaySceneRecord[];
+}
+
+// ── Wave 1183 additions (Program v2, Type 2 — excellence) ──────────────────
+// Placement rationale (per the wave's own charter): a revision PASS's whole
+// contract (revision/passes/types.ts) is to emit RevisionIssues — defects to
+// fix. These three checks produce the opposite artifact, an earned STRENGTH
+// string, and their only consumer is buildStrengths' own `strengths: string[]`
+// output — there is no RevisionIssue-shaped wrapper to produce, so a pass file
+// would have to manufacture one just to throw it away. buildStrengths is
+// already this file's fixture-testable seam for exactly this kind of check
+// (a pure function over already-computed report data, independent of which of
+// the ~1300 accumulated pass rules fired) — Program v2 Type 2 extends that
+// seam rather than inventing a second one.
+//
+// Never-padded discipline (WAVE_QUALITY_GUARANTEE.md's binding Type 2 clause,
+// and CLAUDE.md's "an excellence rule that fires on mediocre input is a
+// FAILING rule"): all three guards below were measured against
+// calibration/corpus.ts's 20 controlled-richness-designed samples
+// before being accepted. Each guard's own comment cites the exact scene-level
+// evidence that separates it from the 'competent' band — which the corpus is
+// deliberately designed to be competent-but-unremarkable, never broken — so a
+// guard that would fire on 'competent' input was rejected at design time, not
+// discovered later by a failing test. Two candidate axes from the wave's own
+// candidate list were evaluated and REJECTED for lack of corpus support
+// (documented at the wave's own report, not restated here to avoid this
+// comment going stale): payoff-latency distance (the corpus's own payoff
+// detection never actually fires on ANY of the 20 samples, strong included —
+// a script-doctor.ts-level detector built on it would never fire on real
+// input) and question-answer latency (the aggregate per-scene counts
+// currently exposed by fountain-analyzer.ts cannot distinguish a genuinely
+// "held" question from an accidental one — measured directly, it fires
+// equally on a 'troubled' corpus sample as on a 'strong' one, which fails the
+// never-padded bar outright).
+
+/** Minimum scenes for any Wave 1183 excellence check below: each one needs a
+ *  genuine two-position comparison (front half vs back half, or two scenes
+ *  separated by a real gap) which a fragment under 6 scenes hasn't got room
+ *  to demonstrate honestly. One scene higher than the existing no-fatal-flaws
+ *  guard's sceneCount >= 5 floor, because these checks need TWO separated
+ *  positions to compare, not merely "enough scenes to have accumulated one
+ *  fact." */
+const EXCELLENCE_MIN_SCENES = 6;
+
+/** Guard: deadline/clock pressure is raised in BOTH halves of the document,
+ *  not planted once and abandoned. Distinct from the pre-existing
+ *  `escalating` guard above: that one reads suspenseDelta's AVERAGE trend
+ *  (tension intensity is rising), this reads clockRaised's discrete PRESENCE
+ *  by position (the stakes themselves are still being invoked) — a script
+ *  can hold a flat suspense average while still re-raising its clock twice,
+ *  or escalate in danger-lexicon language without ever mentioning the
+ *  deadline again after Act One; fountain-analyzer.ts treats these as
+ *  independent lexicons for exactly this reason. Verified against
+ *  calibration/corpus.ts: 2 of 5 'strong' samples (Nine Minutes, Sunlight
+ *  Clause) re-raise the clock in both halves; 0 of the other 15 samples
+ *  (across 'competent', 'weak', and 'troubled') do — every non-strong sample
+ *  states its deadline once, or not at all, and never returns to it, which is
+ *  precisely the corpus's designed flaw for those bands ("the clock is
+ *  stated once and never followed up on"). */
+function buildStakesContinuityStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const midN = Math.floor(sceneCount / 2);
+  const firstHalfClock = records.slice(0, midN).filter(r => r.clockRaised);
+  const secondHalfClock = records.slice(midN).filter(r => r.clockRaised);
+  if (firstHalfClock.length === 0 || secondHalfClock.length === 0) return null;
+
+  const firstScene = firstHalfClock[0].sceneIdx;
+  const lastScene = secondHalfClock[secondHalfClock.length - 1].sceneIdx;
+  return (
+    `The clock isn't set once and forgotten — deadline pressure resurfaces in both halves of the draft ` +
+    `(first raised in Scene ${firstScene}, still live as late as Scene ${lastScene}), keeping the stakes genuinely alive throughout.`
+  );
+}
+
+/** Minimum scene gap between a relationship rupture and its later repair for
+ *  the repair to read as an earned arc rather than a same-beat flip-flop —
+ *  one scene stricter than detectClueLifecycle's own payoff gap (>= 2) since
+ *  a relationship repair is a bigger dramatic claim than a prop re-mention. */
+const RELATIONSHIP_ARC_MIN_GAP = 3;
+/** Minimum |amount| a shift must carry to count as a genuine rupture/repair.
+ *  Restates fountain-analyzer.ts's own RELATIONSHIP_SHIFT_THRESHOLD (2)
+ *  defensively rather than trusting every caller's `records` to already
+ *  respect it — StrengthsInput.records is a public-ish seam (any future
+ *  caller could hand-build fixtures), so the guard checks its own input
+ *  rather than relying on an upstream invariant it can't see. */
+const RELATIONSHIP_ARC_MIN_MAGNITUDE = 2;
+
+interface RelationshipMovement { sceneIdx: number; amount: number }
+
+/** Guard: a specific character pair whose relationship genuinely moves in
+ *  BOTH directions — a rupture (negative shift) followed, at least
+ *  RELATIONSHIP_ARC_MIN_GAP scenes later, by a repair (positive shift) for
+ *  the SAME pair. Distinct from every pre-existing guard (none of the four
+ *  above ever read relationshipShifts) and from buildStakesContinuityStrength
+ *  above (a different channel entirely: relationshipShifts, not
+ *  clockRaised). Verified against calibration/corpus.ts: exactly 1 of the 20
+ *  samples (The Long Game, 'strong') shows a rupture-then-repair for the same
+ *  pair — CASS|ODELL ruptures at Scene 3 (amount -2) and repairs at Scene 9
+ *  (amount +3), a 6-scene gap. Zero of the 5 'competent' samples register a
+ *  single POSITIVE relationship shift anywhere in the document — their Act 3
+ *  beat is, per the corpus's own design note, "a thin, shorter
+ *  acknowledgment" that never clears fountain-analyzer.ts's
+ *  RELATIONSHIP_SHIFT_THRESHOLD — so this guard cannot mistake a
+ *  merely-present relationship arc for a genuinely repaired one; there is
+ *  nothing in the 'competent' band for it to false-fire on. */
+function buildRelationshipDynamismStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const byPair = new Map<string, RelationshipMovement[]>();
+  for (const r of records) {
+    for (const shift of r.relationshipShifts ?? []) {
+      if (Math.abs(shift.amount) < RELATIONSHIP_ARC_MIN_MAGNITUDE) continue;
+      const movement = { sceneIdx: r.sceneIdx, amount: shift.amount };
+      const arr = byPair.get(shift.pairKey);
+      if (arr) arr.push(movement);
+      else byPair.set(shift.pairKey, [movement]);
+    }
+  }
+
+  // Strongest qualifying pair wins (largest combined swing); ties resolve to
+  // whichever pair was encountered first in scene order — same determinism
+  // convention as analyzeDimensionIssues' rule-frequency tie-break above.
+  let best: { pairKey: string; rupture: RelationshipMovement; repair: RelationshipMovement } | null = null;
+  let bestSwing = -Infinity;
+  for (const [pairKey, movements] of byPair) {
+    movements.sort((a, b) => a.sceneIdx - b.sceneIdx);
+    const ruptures = movements.filter(m => m.amount < 0);
+    const repairs = movements.filter(m => m.amount > 0);
+    for (const rupture of ruptures) {
+      const repair = repairs.find(r => r.sceneIdx - rupture.sceneIdx >= RELATIONSHIP_ARC_MIN_GAP);
+      if (!repair) continue;
+      const swing = Math.abs(rupture.amount) + repair.amount;
+      if (swing > bestSwing) {
+        bestSwing = swing;
+        best = { pairKey, rupture, repair };
+      }
+      break; // earliest qualifying rupture for this pair is enough evidence
+    }
+  }
+
+  if (!best) return null;
+  const [charA, charB] = best.pairKey.split('|');
+  return (
+    `The ${charA}/${charB} relationship is a living thread, not a flat one — it ruptures in Scene ${best.rupture.sceneIdx} ` +
+    `(trust swings ${best.rupture.amount}) and genuinely repairs ${best.repair.sceneIdx - best.rupture.sceneIdx} scenes later ` +
+    `in Scene ${best.repair.sceneIdx} (trust swings +${best.repair.amount}), not left as a one-note thread.`
+  );
+}
+
+/** Guard: the draft is willing to swing NEGATIVE at least once and POSITIVE
+ *  at least once — not merely upbeat throughout — and lands deliberately on a
+ *  positive final scene rather than trailing off neutral. Distinct from
+ *  buildStakesContinuityStrength and buildRelationshipDynamismStrength above
+ *  (a third, independent channel: emotionalShift, not clockRaised or
+ *  relationshipShifts) and from the pre-existing `escalating` guard
+ *  (suspense TREND, not emotional valence — fountain-analyzer.ts's own header
+ *  is explicit these are different axes: "a scene can be tense without being
+ *  mysterious," and equally, without being emotionally negative). Requiring
+ *  BOTH directions present — not just a positive ending — is what keeps this
+ *  from firing on a script that is simply upbeat throughout and never earns
+ *  the swing: verified against calibration/corpus.ts's 'troubled' band, where
+ *  one sample (The Grift) ends on a lexically positive final scene (repeated
+ *  "I feel so happy" dialogue) but never registers a single negative-valence
+ *  scene anywhere in the document — this guard correctly does not fire for
+ *  it. Exactly 1 of the 20 corpus samples (The Long Game, 'strong') clears
+ *  all three conditions; 0 of the 5 'competent' samples do (each has either
+ *  no positive-valence scene anywhere, or no negative-valence scene anywhere). */
+function buildEmotionalRangeStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+  if (records.length === 0) return null;
+
+  const negativeScenes = records.filter(r => r.emotionalShift === 'negative');
+  const positiveScenes = records.filter(r => r.emotionalShift === 'positive');
+  const finalRecord = records[records.length - 1];
+  if (negativeScenes.length === 0 || positiveScenes.length === 0) return null;
+  if (finalRecord.emotionalShift !== 'positive') return null;
+
+  return (
+    `This draft earns its ending rather than coasting to it — real emotional difficulty surfaces ` +
+    `(Scene ${negativeScenes[0].sceneIdx} turns negative) before the story lands deliberately positive at the close (Scene ${finalRecord.sceneIdx}).`
+  );
+}
+
+// ── Wave 1187 additions (Program v2, Type 2 — excellence) ──────────────────
+// Three more never-padded buildStrengths guards, each over a signal channel
+// this file has never read before (`purpose`, zone-quartile `suspenseDelta`,
+// and distributional `dramaticTurn`) — distinct from the four originals
+// above and from all three Wave 1183 guards (clockRaised, relationshipShifts,
+// emotionalShift). Same authoring discipline as Wave 1183: every guard below
+// was measured against calibration/corpus.ts's 20 controlled-richness samples
+// through the real analyzer (analyzeFountainText) before being accepted, and
+// three candidate axes from the wave's own candidate list were evaluated and
+// REJECTED for lack of corpus support:
+//
+// REJECTED — question discipline (raises AND resolves with nonzero
+// cross-scene latency), re-measured with the discriminating guard the
+// charter asked for (a minimum raised-count + resolution-rate window +
+// latency floor) after Wave 1183 rejected a weaker version: across all 20
+// corpus samples only two ever carry a nonzero cross-scene resolution
+// (questionsResolved - questionsResolvedSameScene > 0) at all — Sunlight
+// Clause ('strong') and The Grift ('troubled') — and they are tied on every
+// axis a guard could threshold (both raise exactly 1 question, resolve
+// exactly 1, resolutionRate 1.0). Worse, The Grift's raise-to-resolve gap
+// (Scene 5 to Scene 9, a 4-scene latency) is LONGER than Sunlight Clause's
+// (Scene 7 to Scene 9, a 2-scene latency) — so a latency FLOOR does not
+// merely fail to discriminate, it actively inverts (a stricter floor keeps
+// the troubled sample and drops the strong one). No raised-count/
+// resolution-rate/latency threshold separates strong from troubled at this
+// corpus's population (n=2 nonzero samples total). REJECTED again,
+// definitively — confirmed unsupportable, not merely under-guarded.
+//
+// REJECTED — power contest presence (a scene where powerFlipped is true):
+// measured directly, powerFlipped is false on all 20 corpus samples, strong
+// band included — exactly Wave 1186's own finding when it shipped the
+// signal. Fixture-only axes are explicitly disallowed by the charter
+// (never-padded requires corpus-real fire in the strong band); there is
+// nothing here to build a rule on.
+//
+// REJECTED — curiosity seeding (positive curiosityDelta in the opening zone
+// sustained by later positive scenes): measured directly, ZERO of the 20
+// corpus samples carry a positive-curiosity opening-quarter scene followed
+// by a later positive-curiosity scene. Every sample has at most one nonzero-
+// curiosity scene in the whole document EXCEPT Zero Day ('competent'), which
+// has three (Scenes 2, 3, 6) — Zero Day would be the ONLY sample to
+// false-fire under any loosened version of this axis (e.g. "any positive
+// scene in the first half, any later one"). The axis never fires where it
+// should (strong) and would fire exactly where it must not (competent)
+// under the only relaxation available — REJECTED.
+//
+// The three SHIPPED below were each measured to fire on at least one
+// 'strong' sample and zero of the other 19 non-strong samples across EVERY
+// band (not merely 'competent') — stronger evidence than the never-padded
+// bar requires.
+
+/** Minimum distinct ScenePurpose values (of the 9 possible) for genuine
+ *  narrative-function variety, and the ceiling share any single purpose may
+ *  hold without the "variety" claim just describing one dominant purpose
+ *  with a couple of garnish scenes. Distinct from every pre-existing guard
+ *  and from all three Wave 1183 guards — a fourth, independent channel
+ *  (`purpose`) buildStrengths has never read before — and from
+ *  buildSuspenseShapingStrength/buildDramaticTurnDensityStrength below (a
+ *  DISTRIBUTION-of-VALUES mode, how many distinct categories appear and how
+ *  evenly, rather than either of those two's zone/half TIMING mode). Verified
+ *  against calibration/corpus.ts: exactly 3 of 5 'strong' samples (Nine
+ *  Minutes: 7 distinct purposes, 20% dominance; Second Wind: 6 distinct, 50%
+ *  dominance; Sunlight Clause: 6 distinct, 40% dominance) clear both
+ *  thresholds; 0 of the other 15 samples across 'competent', 'weak', and
+ *  'troubled' reach 6 distinct purposes at all (the closest non-strong
+ *  showing is Thanksgiving, Maybe's 5) — every non-strong sample draws its
+ *  scene purposes from a narrower registry, precisely the corpus's designed
+ *  competent-but-unremarkable flaw of leaning on 2-3 functions
+ *  (`complicate`/`character_moment` dominate the weak and troubled bands). */
+const SCENE_PURPOSE_VARIETY_MIN_DISTINCT = 6;
+/** See SCENE_PURPOSE_VARIETY_MIN_DISTINCT above for the corpus evidence this
+ *  ceiling was measured against. */
+const SCENE_PURPOSE_VARIETY_MAX_DOMINANCE = 0.5;
+
+/** Guard: the draft moves through a genuinely varied set of scene purposes
+ *  rather than repeating the same 2-3 narrative functions — SCENE_PURPOSE_
+ *  VARIETY_MIN_DISTINCT-or-more distinct ScenePurpose values represented,
+ *  with no single one exceeding SCENE_PURPOSE_VARIETY_MAX_DOMINANCE share of
+ *  all scenes (so "one dominant purpose plus a sprinkling of one-off
+ *  purposes" cannot masquerade as variety). See the constant comment above
+ *  for corpus evidence and distinctness rationale. */
+function buildScenePurposeVarietyStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+  if (records.length === 0) return null;
+
+  // First-encountered-wins tie-break for both the distinct-value ordering
+  // (readable, scene-order-stable output) and the dominant-purpose pick —
+  // same determinism convention as buildRelationshipDynamismStrength's pair
+  // selection above.
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  for (const r of records) {
+    if (!counts.has(r.purpose)) order.push(r.purpose);
+    counts.set(r.purpose, (counts.get(r.purpose) ?? 0) + 1);
+  }
+  const distinct = counts.size;
+  if (distinct < SCENE_PURPOSE_VARIETY_MIN_DISTINCT) return null;
+
+  let topPurpose = order[0];
+  let topCount = counts.get(topPurpose)!;
+  for (const p of order) {
+    const c = counts.get(p)!;
+    if (c > topCount) { topPurpose = p; topCount = c; }
+  }
+  const dominance = topCount / records.length;
+  if (dominance > SCENE_PURPOSE_VARIETY_MAX_DOMINANCE) return null;
+
+  const humanized = order.map(p => p.replace(/_/g, ' '));
+  return (
+    `This draft doesn't lean on one narrative gear — it moves through ${distinct} distinct scene functions ` +
+    `(${humanized.join(', ')}) without any single one taking over (the most common, "${topPurpose.replace(/_/g, ' ')}", ` +
+    `is only ${Math.round(dominance * 100)}% of scenes).`
+  );
+}
+
+/** Minimum scenes for the suspense-shaping guard specifically — stricter
+ *  than EXCELLENCE_MIN_SCENES because this guard partitions the document
+ *  into FOUR quarters (not two halves like the guards above and below), and a
+ *  quarter under real population can't carry a meaningful average; one scene
+ *  below the corpus's own smallest sample size (9) so no corpus sample is
+ *  excluded from measurement by construction. */
+const SUSPENSE_SHAPING_MIN_SCENES = 8;
+const SUSPENSE_SHAPING_ZONES = 4;
+
+/** Guard: suspense doesn't merely trend upward on average (that's the
+ *  pre-existing `structure.escalating` guard above, a two-HALF average
+ *  trend) — it builds all the way to a genuine PEAK scene in the closing
+ *  quarter that outright tops every earlier quarter's own average, off a
+ *  real (nonzero) opening-quarter baseline. Distinct from `structure.
+ *  escalating` on both analytical mode (peak vs. average) and position
+ *  granularity (quarters vs. halves): a script can escalate on a first-half/
+ *  second-half average while its actual closing peak is unremarkable, or
+ *  vice versa — this reads the sharper, more specific claim directly, per
+ *  WAVE_QUALITY_GUARANTEE.md's own "no stronger sibling skipped" clause.
+ *  Distinct from every Wave 1183 guard (a different channel — suspenseDelta
+ *  zone-peak, not clockRaised/relationshipShifts/emotionalShift) and from
+ *  buildScenePurposeVarietyStrength above (a distribution-of-VALUES check,
+ *  not a positional peak-vs-average one). Verified against
+ *  calibration/corpus.ts: exactly 1 of 5 'strong' samples (Second Wind)
+ *  clears it — suspense opens at a real baseline (Scene 0, suspense delta 1;
+ *  quarter-one average 0.67), goes flat through quarters two and three
+ *  (average 0 each), then peaks at Scene 8 (suspense delta 1), topping every
+ *  earlier quarter's average. 0 of the other 19 samples (every other band,
+ *  not merely 'competent') clear it — each either never establishes a
+ *  nonzero opening baseline at all, or its closing quarter never exceeds an
+ *  earlier quarter's average. */
+function buildSuspenseShapingStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < SUSPENSE_SHAPING_MIN_SCENES) return null;
+
+  const zones: ScreenplaySceneRecord[][] = Array.from({ length: SUSPENSE_SHAPING_ZONES }, () => []);
+  records.forEach((r, i) => {
+    const zone = Math.min(SUSPENSE_SHAPING_ZONES - 1, Math.floor((i / sceneCount) * SUSPENSE_SHAPING_ZONES));
+    zones[zone].push(r);
+  });
+  // Every quarter must have real population — an empty quarter's "average"
+  // is a meaningless 0 that could trivially satisfy either side of the
+  // comparison below.
+  if (zones.some(z => z.length === 0)) return null;
+
+  const zoneAvg = zones.map(z => z.reduce((s, r) => s + r.suspenseDelta, 0) / z.length);
+  const earlyBaseline = zoneAvg[0];
+  if (earlyBaseline === 0) return null;
+
+  const finalZone = zones[SUSPENSE_SHAPING_ZONES - 1];
+  const peakRecord = finalZone.reduce((best, r) => (r.suspenseDelta > best.suspenseDelta ? r : best), finalZone[0]);
+  if (peakRecord.suspenseDelta <= 0) return null;
+
+  const earlierAvgs = zoneAvg.slice(0, SUSPENSE_SHAPING_ZONES - 1);
+  if (!earlierAvgs.every(avg => peakRecord.suspenseDelta > avg)) return null;
+
+  const baselineRecord = zones[0].find(r => r.suspenseDelta !== 0) ?? zones[0][0];
+  return (
+    `Suspense doesn't stay flat and hope for the best — it builds to a genuine peak late in the draft ` +
+    `(Scene ${peakRecord.sceneIdx}, suspense delta ${peakRecord.suspenseDelta}) that tops every earlier quarter's average tension, ` +
+    `off a real baseline established as early as Scene ${baselineRecord.sceneIdx}.`
+  );
+}
+
+/** Minimum dramatic turns required in EACH half for the density claim below
+ *  — one scene's worth of "the draft names a turn" per half would already be
+ *  covered in spirit by buildStakesContinuityStrength's own >=1-per-half
+ *  pattern (a different channel), so this guard requires DENSITY (>=2 per
+ *  half) to earn a distinct, stronger claim on this noisier, free-text
+ *  channel. */
+const DRAMATIC_TURN_DENSITY_MIN_PER_HALF = 2;
+
+/** Guard: a named dramatic turn (dramaticTurn non-empty) lands at least
+ *  DRAMATIC_TURN_DENSITY_MIN_PER_HALF times in BOTH the front and back half
+ *  of the document — the story keeps generating real narrative turns
+ *  throughout, not just once near the top and once at the very end. Distinct
+ *  from buildStakesContinuityStrength (Wave 1183: clockRaised, a boolean
+ *  presence channel) despite the shared both-halves POSITION — this reads
+ *  `dramaticTurn`, a free-text per-scene channel buildStrengths has never
+ *  consumed, and requires DENSITY (>=2, not merely >=1) per half. Distinct
+ *  from buildScenePurposeVarietyStrength and buildSuspenseShapingStrength
+ *  above (a third, independent channel, and a plain half-split position
+ *  rather than either of those two's value-distribution or quarter-zone
+ *  mode). Verified against calibration/corpus.ts: exactly 1 of 5 'strong'
+ *  samples (Low Tide) clears >=2 turns in both halves (front: Scenes 2, 3;
+ *  back: Scenes 8, 9). 0 of the other 19 samples (every band) reach 2 turns
+ *  in even one half, let alone both — Thanksgiving, Maybe ('competent')
+ *  comes closest with 2 turns in its front half but only 1 in its back half,
+ *  which correctly does not clear this guard. */
+function buildDramaticTurnDensityStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < EXCELLENCE_MIN_SCENES) return null;
+
+  const midN = Math.floor(sceneCount / 2);
+  const firstHalfTurns = records.slice(0, midN).filter(r => r.dramaticTurn.length > 0);
+  const secondHalfTurns = records.slice(midN).filter(r => r.dramaticTurn.length > 0);
+  if (firstHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
+  if (secondHalfTurns.length < DRAMATIC_TURN_DENSITY_MIN_PER_HALF) return null;
+
+  const frontScenes = firstHalfTurns.map(r => r.sceneIdx).join(', ');
+  const backScenes = secondHalfTurns.map(r => r.sceneIdx).join(', ');
+  return (
+    `This draft keeps generating real turns, not just one per act — dramatic turning points land repeatedly in ` +
+    `both the front half (Scenes ${frontScenes}) and the back half (Scenes ${backScenes}) of the document.`
+  );
 }
 
 /**
@@ -501,7 +1221,7 @@ export interface StrengthsInput {
  * rules happen to fire for a given fountain string.
  */
 export function buildStrengths(input: StrengthsInput): string[] {
-  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions } = input;
+  const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions, records = [] } = input;
   const strengths: string[] = [];
 
   // Guard: a genuinely zero-issue dimension is real, checked evidence —
@@ -535,6 +1255,35 @@ export function buildStrengths(input: StrengthsInput): string[] {
   if (bySeverity.critical === 0 && sceneCount >= 5) {
     strengths.push(`No fatal flaws surfaced across ${sceneCount} scenes — nothing here would sink the draft outright.`);
   }
+
+  // Wave 1183 additions (Program v2, Type 2 — excellence): three new,
+  // never-padded guards over signals buildStrengths didn't previously read
+  // at all (clockRaised, relationshipShifts, emotionalShift). See each
+  // helper's own comment above for its guard conditions, corpus evidence, and
+  // distinctness rationale versus the four guards above and each other.
+  const stakesContinuity = buildStakesContinuityStrength(records, sceneCount);
+  if (stakesContinuity) strengths.push(stakesContinuity);
+
+  const relationshipDynamism = buildRelationshipDynamismStrength(records, sceneCount);
+  if (relationshipDynamism) strengths.push(relationshipDynamism);
+
+  const emotionalRange = buildEmotionalRangeStrength(records, sceneCount);
+  if (emotionalRange) strengths.push(emotionalRange);
+
+  // Wave 1187 additions (Program v2, Type 2 — excellence): three more
+  // never-padded guards over signal channels buildStrengths didn't
+  // previously read (purpose, zone-quartile suspenseDelta, distributional
+  // dramaticTurn). See each helper's own comment above for its guard
+  // conditions, corpus evidence, and distinctness rationale versus the four
+  // original guards and Wave 1183's three.
+  const scenePurposeVariety = buildScenePurposeVarietyStrength(records, sceneCount);
+  if (scenePurposeVariety) strengths.push(scenePurposeVariety);
+
+  const suspenseShaping = buildSuspenseShapingStrength(records, sceneCount);
+  if (suspenseShaping) strengths.push(suspenseShaping);
+
+  const dramaticTurnDensity = buildDramaticTurnDensityStrength(records, sceneCount);
+  if (dramaticTurnDensity) strengths.push(dramaticTurnDensity);
 
   return strengths;
 }
@@ -688,8 +1437,35 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     sceneCount: analysis.sceneCount,
     bySeverity,
     dimensions,
+    records: analysis.records,
   });
   const plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
+
+  // ── Narrative metrics layer (I1-c) ──────────────────────────────────────
+  // Deterministic per-scene/whole-script narrative-shape metrics from
+  // analyze/metrics.ts (blueprint §27), computed from the SAME analyzer
+  // records every other layer above already reads (analysis.records —
+  // post-deep-read-merge when deepReadMode ran, since aggregateReport is
+  // always called with mergedAnalysis, never the pre-merge original — see
+  // runScriptDoctor). No emotionalArc is passed: the doctor has no session
+  // arc configuration to read (StoryContext carries theme/genre/
+  // directorStyle/characters only, no emotional_arc field — see
+  // revision/passes/types.ts), so every pacingFit value below is honestly
+  // `null` throughout, exactly as metrics.ts's computePacingFit documents
+  // for the no-arc case, never a fabricated neutral score. computeNarrativeMetrics
+  // never throws (guarded to safe all-zero/neutral defaults even for an
+  // empty records array — see its own header), so this needs no defensive
+  // try/catch the way the calibration layer below does.
+  //
+  // Cache note: this adds NO new cache-key dimension. metrics is a pure,
+  // deterministic function of analysis.records alone (no LLM, no
+  // Math.random/Date.now — metrics.ts's own header), and records are fully
+  // determined by (trimmed fountain, quick/deep mode) — both already folded
+  // into doctorCacheKey (contentHash + the 'q'/'d' discriminator).
+  // storyContext never influences records (it only gates which pass issues
+  // fire), so the existing key remains exactly sufficient for the metrics
+  // field too.
+  const metrics = computeNarrativeMetrics(analysis.records);
 
   // ── Calibration layer ─────────────────────────────────────────────────────
   // Rank this report's health and each dimension's score against
@@ -759,7 +1535,31 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     plainSummary,
     contentHash: computeContentHash(fountain),
     healthPercentile,
+    metrics,
   };
+}
+
+/** Rebuild SceneAnnotation[] from records — the same field-for-field mapping
+ *  compile.ts's compileScreenplay and fountain-analyzer.ts's
+ *  analyzeFountainText both inline (neither exports it, and this module is
+ *  constrained to touch only itself + deep-read.ts + its own test, so it's
+ *  re-derived here rather than imported). Needed after a deep read merges new
+ *  purpose/dramaticTurn/revelation/emotionalShift values into `records`:
+ *  annotations are a pure projection of those same four fields (plus
+ *  clockRaised/openClues, which deep read never touches) — deep-read's
+ *  overridden signals only reach the revision pipeline if annotations are
+ *  rebuilt from the MERGED records rather than reused from the original
+ *  lexicon-only analysis. */
+function buildAnnotationsFromRecords(records: FountainAnalysis['records']): SceneAnnotation[] {
+  return records.map(r => ({
+    sceneIdx: r.sceneIdx,
+    purpose: r.purpose,
+    dramaticTurn: r.dramaticTurn,
+    revelation: r.revelation,
+    emotionalShift: r.emotionalShift,
+    clockRaised: r.clockRaised,
+    openClues: r.unresolvedClues.length,
+  }));
 }
 
 /**
@@ -767,14 +1567,33 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
  * scene records (no LLM, no I/O), then run all 14 revision passes in
  * diagnose-only mode (issues collected, no rewrite ever attempted), then
  * aggregate into a single report.
+ *
+ * opts.deepRead (additive, default off — the quick path below is byte-
+ * identical to before this option existed, a deliberate regression gate):
+ * when true, runs deep-read.ts's LLM scene sensor over the SAME lexicon
+ * records analyzeFountainText produced, merges its (validated-only, per-
+ * scene) signals in, and rebuilds structure/annotations from the merged
+ * records before they reach the 14-pass pipeline — see deep-read.ts's own
+ * header for the full non-determinism/injection/cache story. Keyless or
+ * total-failure degrades to the quick signals with report.deepRead.usedLLM
+ * === false; it never throws for lack of a key (see deep-read.ts).
  */
-export async function runScriptDoctor(fountain: string, storyContext?: StoryContext): Promise<ScriptDoctorReport> {
+export async function runScriptDoctor(
+  fountain: string,
+  storyContext?: StoryContext,
+  opts?: { deepRead?: boolean },
+): Promise<ScriptDoctorReport> {
+  const deepReadMode = opts?.deepRead === true;
+
   // ── Cache check ────────────────────────────────────────────────────────
   // contentHash is cheap (one sha256 over the trimmed text) relative to the
   // 14-pass pipeline, so it's always worth computing up front and checking
-  // the cache before touching the analyzer at all.
+  // the cache before touching the analyzer at all. The cache key folds in
+  // deepReadMode (see doctorCacheKey's comment) so quick and deep lineages
+  // for the same (contentHash, storyContext) never collide or serve each
+  // other's report.
   const contentHash = computeContentHash(fountain);
-  const cacheKey = doctorCacheKey(contentHash, storyContext);
+  const cacheKey = doctorCacheKey(contentHash, storyContext, deepReadMode);
   const cached = doctorCacheGet(cacheKey);
   if (cached) {
     // Shallow copy: callers get their own top-level object (safe to
@@ -799,7 +1618,7 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
   // spend one of the 64 LRU slots on a report that costs next to nothing to
   // rebuild — a strictly worse trade than caching a real pipeline run.
   if (analysis.sceneCount === 0) {
-    return {
+    const degenerate: ScriptDoctorReport = {
       health: 0,
       grade: 'troubled',
       totalIssues: 0,
@@ -820,21 +1639,51 @@ export async function runScriptDoctor(fountain: string, storyContext?: StoryCont
         'Add at least one scene of screenplay content and resubmit for a real assessment.',
       contentHash,
     };
+    // A deep-read request against an empty submission is still a "deep"
+    // lineage report — types.ts's deepRead field is populated on every
+    // non-degenerate deep run, so an all-zero one here (nothing to read)
+    // keeps that promise rather than silently omitting the field.
+    if (deepReadMode) {
+      degenerate.deepRead = { scenesRead: 0, scenesTotal: 0, usedLLM: false, fallbackScenes: [] };
+    }
+    return degenerate;
+  }
+
+  // ── Deep read (additive) ──────────────────────────────────────────────
+  // Quick path (deepReadMode === false) never touches analysis beyond this
+  // point unmodified — byte-identical to pre-deep-read behavior.
+  let mergedAnalysis: FountainAnalysis = analysis;
+  let deepReadField: ScriptDoctorReport['deepRead'] | undefined;
+
+  if (deepReadMode) {
+    const { records, deepRead } = await deepReadRecords(fountain, analysis.records);
+    // Rebuild, don't reuse: structure.ts's analyzeStructure and this file's
+    // buildAnnotationsFromRecords both derive purely from record signals
+    // (suspenseDelta/revelation/clockRaised/unresolvedClues for structure;
+    // purpose/dramaticTurn/revelation/emotionalShift/clockRaised/
+    // unresolvedClues for annotations) — reusing analysis.structure/
+    // analysis.annotations here would silently discard every signal deep
+    // read just overrode.
+    const structure = analyzeStructure(records, []);
+    const annotations = buildAnnotationsFromRecords(records);
+    mergedAnalysis = { ...analysis, records, structure, annotations };
+    deepReadField = deepRead;
   }
 
   const compiled: CompiledScreenplay = {
     fountain,
-    annotations: analysis.annotations,
-    structureSummary: buildStructureSummaryLine(analysis),
-    wordCount: analysis.wordCount,
+    annotations: mergedAnalysis.annotations,
+    structureSummary: buildStructureSummaryLine(mergedAnalysis),
+    wordCount: mergedAnalysis.wordCount,
     compiledAt: Date.now(),
   };
 
   const result = await runDiagnoseOnly(() =>
-    runRevisionPipeline(compiled, analysis.records, analysis.structure, [], undefined, storyContext),
+    runRevisionPipeline(compiled, mergedAnalysis.records, mergedAnalysis.structure, [], undefined, storyContext),
   );
 
-  const report = aggregateReport(result, analysis, fountain);
+  const report = aggregateReport(result, mergedAnalysis, fountain);
+  if (deepReadField) report.deepRead = deepReadField;
 
   // Store a shallow copy (not the object about to be returned) so nothing
   // the caller later does to their own report — e.g. reassigning a

@@ -1204,6 +1204,62 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1188 — beliefPass (Program v2, Type 3 — genre-conditioned, second of its kind): EXPOSITION_DUMP genre threshold', async () => {
+    const makeRec1188 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain1188 = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    // 3 consecutive told-only scenes (2,3,4) surrounded by scenes with no dialogue
+    // assertions — a streak of exactly 3, the generic EXPOSITION_DUMP floor.
+    const streakOf3_1188 = () => Array.from({ length: 6 }, (_, i) =>
+      (i >= 2 && i <= 4)
+        ? makeRec1188(i, { dialogueHighlights: [`alice: fact ${i}`] })
+        : makeRec1188(i),
+    );
+    const beliefInput1188 = (records: any[], n: number) => ({
+      fountain: blankFountain1188(n), original: blankFountain1188(n),
+      records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+    });
+
+    // Craft argument: sci-fi legitimately spends more early scenes establishing its
+    // one rigorously-applied premise (GENRE_MODIFIERS.sci_fi — "follow it to its honest
+    // consequences"), so a 3-scene told-only streak (the generic inert-exposition floor)
+    // is still normal premise-building under sci-fi's looser 4-scene tolerance.
+    it("beliefPass: EXPOSITION_DUMP fires generically at a 3-scene told streak but not under sci_fi's looser 4-scene floor", async () => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      const records = streakOf3_1188();
+      const baseInput = beliefInput1188(records, 6);
+      const genericResult = await beliefPass(baseInput);
+      const dump = genericResult.issues.filter(i => i.rule === 'EXPOSITION_DUMP');
+      assert.ok(dump.length >= 1, `Expected EXPOSITION_DUMP generically; got: ${genericResult.issues.map(i => i.rule).join(', ')}`);
+      const sciFiResult = await beliefPass({ ...baseInput, storyContext: { genre: 'sci_fi' } });
+      assert.ok(
+        !sciFiResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+        "Should NOT fire under sci_fi's looser 4-scene streak floor at a 3-scene streak",
+      );
+    });
+
+    it('beliefPass: EXPOSITION_DUMP genre-absent path is byte-identical to the pre-Wave-1188 rule', async () => {
+      const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+      const records = streakOf3_1188();
+      const result = await beliefPass(beliefInput1188(records, 6));
+      const dump = result.issues.filter(i => i.rule === 'EXPOSITION_DUMP');
+      assert.ok(dump.length >= 1, 'Should fire generically on the 3-scene told-only streak');
+      assert.equal(
+        dump[0].description,
+        'Scenes 2–4: 3+ consecutive scenes deliver told beliefs with no witnessed confirmation — exposition feels inert',
+        'Genre-absent description must match the pre-wave literal exactly, with no genre note appended',
+      );
+    });
+  });
+
+
   describe('Wave 1174 — beliefPass: belief suspense-curiosity aftermath void, belief suspense-emotional aftermath void, belief emotion-curiosity aftermath void', async () => {
     const runBF1174 = async (records: ScreenplaySceneRecord[]) => {
       const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
@@ -6544,3 +6600,79 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       );
     });
   });
+// ── I1-a — beliefPass: tone deltas compose with genre via composeThresholds ──
+
+describe('I1-a — beliefPass: EXPOSITION_DUMP tone-composed thresholds (composeThresholds)', () => {
+  const makeRecI1 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const blankFountainI1 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  // Told-only streak of `len` scenes starting at scene 1, inside 6 records.
+  const streakRecordsI1 = (len: number) => Array.from({ length: 6 }, (_, i) =>
+    (i >= 1 && i < 1 + len)
+      ? makeRecI1(i, { dialogueHighlights: [`alice: fact ${i}`] })
+      : makeRecI1(i),
+  );
+  const beliefInputI1 = (records: any[]) => ({
+    fountain: blankFountainI1(6), original: blankFountainI1(6),
+    records: records as any, structure: {} as any, annotations: [], approvedSpans: [],
+  });
+
+  // Tone relaxes a threshold and stops a borderline fire: cerebral's
+  // expositionDumpStreak delta is +1, composing the generic 3 up to 4 — a
+  // 3-scene told-only streak is legitimate idea-building under it.
+  it('beliefPass: EXPOSITION_DUMP fires generically at a 3-scene told streak but NOT under tone cerebral (streak relaxed to 4)', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const baseInput = beliefInputI1(streakRecordsI1(3));
+    const genericResult = await beliefPass(baseInput);
+    assert.ok(
+      genericResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+      'Should fire generically at the 3-scene streak floor',
+    );
+    const cerebralResult = await beliefPass({ ...baseInput, storyContext: { tone: 'cerebral' } });
+    assert.ok(
+      !cerebralResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+      "Should NOT fire under cerebral's relaxed 4-scene tolerance",
+    );
+  });
+
+  // Tone tightens: uncanny's delta is -1 (streak 2) — showing wrongness rather
+  // than stating it breaks down faster, so a 2-scene streak that is fine
+  // generically fires under uncanny, with a tone note explaining why.
+  it('beliefPass: EXPOSITION_DUMP does not fire generically at a 2-scene streak but fires under tone uncanny with a tone note', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const baseInput = beliefInputI1(streakRecordsI1(2));
+    const genericResult = await beliefPass(baseInput);
+    assert.ok(
+      !genericResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+      'Should NOT fire generically at a 2-scene streak (below the generic 3 floor)',
+    );
+    const uncannyResult = await beliefPass({ ...baseInput, storyContext: { tone: 'uncanny' } });
+    const dump = uncannyResult.issues.filter(i => i.rule === 'EXPOSITION_DUMP');
+    assert.ok(dump.length >= 1, `Expected EXPOSITION_DUMP under uncanny; got: ${uncannyResult.issues.map(i => i.rule).join(', ')}`);
+    assert.ok(dump[0].description.includes('(threshold adjusted for uncanny)'), 'tone-shifted issue must explain why');
+  });
+
+  // Genre and tone compose: sci_fi 4 + cerebral +1 = 5 — a 4-scene streak that
+  // fires under sci_fi alone is tolerated under the composed threshold.
+  it('beliefPass: EXPOSITION_DUMP composes sci_fi genre + cerebral tone (4-scene streak fires under sci_fi alone, not composed)', async () => {
+    const { beliefPass } = await import('../../server/nvm/revision/passes/belief.ts');
+    const baseInput = beliefInputI1(streakRecordsI1(4));
+    const sciFiResult = await beliefPass({ ...baseInput, storyContext: { genre: 'sci_fi' } });
+    assert.ok(
+      sciFiResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+      "sci_fi alone must fire at its own 4-scene floor",
+    );
+    const composedResult = await beliefPass({ ...baseInput, storyContext: { genre: 'sci_fi', tone: 'cerebral' } });
+    assert.ok(
+      !composedResult.issues.some(i => i.rule === 'EXPOSITION_DUMP'),
+      'sci_fi + cerebral composes to a 5-scene tolerance — the 4-scene streak must pass',
+    );
+  });
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import type {
   CharacterSheet,
   Location,
@@ -13,35 +13,73 @@ import type {
   DramaticPressure,
 } from "../../server/engine/types";
 import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users } from "lucide-react";
-import ScenarioBuilder from "./storymachine/ScenarioBuilder";
-import SettingsPanel from "./SettingsPanel";
-import WhatIfPanel from "./WhatIfPanel";
-import EpistemicMap from "./EpistemicMap";
-import DirectorCutPanel from "./DirectorCutPanel";
+// HarvestPanel/CorpusPanel/ArcTimelinePanel stay eager: each is under 8KB
+// source, no heavy deps, and not worth their own network round trip.
 import { HarvestPanel } from "./HarvestPanel";
-import { ConvergePanel } from "./ConvergePanel";
 import { CorpusPanel } from "./CorpusPanel";
 import { ArcTimelinePanel } from "./ArcTimelinePanel";
-import { ArcPlannerPanel } from "./ArcPlannerPanel";
-import { ProjectionGalleryPanel } from "./ProjectionGalleryPanel";
-import { NarrativeAnalyticsPanel } from "./NarrativeAnalyticsPanel";
-import { CausalTwinPanel } from "./CausalTwinPanel";
-import { FixedPointsPanel } from "./FixedPointsPanel";
 import { withSession } from "../lib/session.ts";
-import { SelfPlayPanel } from "./SelfPlayPanel";
-import { ProofInspectorPanel } from "./ProofInspectorPanel";
-import { QualityEnginesPanel } from "./QualityEnginesPanel";
-import { EpistemicMapPanel } from "./EpistemicMapPanel";
-import { ArcCompletionPanel } from "./ArcCompletionPanel";
-import { StoryHealthPanel } from "./StoryHealthPanel";
-import { CharacterArcPanel } from "./CharacterArcPanel";
-import { RegressionPanel } from "./RegressionPanel";
-import { MomentumPanel } from "./MomentumPanel";
-import { VoiceDNAPanel } from "./VoiceDNAPanel";
-import { LivePlayPanel } from "./LivePlayPanel";
-import { RevisionPanel } from "./RevisionPanel";
-import InterviewPanel from "./InterviewPanel";
-import { RoomPanel } from "./RoomPanel";
+
+// Lazily loaded — every one of these is a conditionally-rendered overlay
+// behind a showX boolean, never needed on first paint. This is what pushed
+// the StoryMachine chunk to 340KB+: 25 panels' combined weight sitting in the
+// critical path for a screen that, on first load, renders none of them.
+// Splitting them here means opening e.g. "Revise" fetches RevisionPanel.tsx
+// on demand instead of everyone paying for it up front.
+const ScenarioBuilder = lazy(() => import("./storymachine/ScenarioBuilder"));
+const SettingsPanel = lazy(() => import("./SettingsPanel"));
+const WhatIfPanel = lazy(() => import("./WhatIfPanel"));
+const EpistemicMap = lazy(() => import("./EpistemicMap"));
+const DirectorCutPanel = lazy(() => import("./DirectorCutPanel"));
+const ConvergePanel = lazy(() => import("./ConvergePanel").then(m => ({ default: m.ConvergePanel })));
+const ArcPlannerPanel = lazy(() => import("./ArcPlannerPanel").then(m => ({ default: m.ArcPlannerPanel })));
+const ProjectionGalleryPanel = lazy(() => import("./ProjectionGalleryPanel").then(m => ({ default: m.ProjectionGalleryPanel })));
+const NarrativeAnalyticsPanel = lazy(() => import("./NarrativeAnalyticsPanel").then(m => ({ default: m.NarrativeAnalyticsPanel })));
+const CausalTwinPanel = lazy(() => import("./CausalTwinPanel").then(m => ({ default: m.CausalTwinPanel })));
+const FixedPointsPanel = lazy(() => import("./FixedPointsPanel").then(m => ({ default: m.FixedPointsPanel })));
+const SelfPlayPanel = lazy(() => import("./SelfPlayPanel").then(m => ({ default: m.SelfPlayPanel })));
+const ProofInspectorPanel = lazy(() => import("./ProofInspectorPanel").then(m => ({ default: m.ProofInspectorPanel })));
+const QualityEnginesPanel = lazy(() => import("./QualityEnginesPanel").then(m => ({ default: m.QualityEnginesPanel })));
+const EpistemicMapPanel = lazy(() => import("./EpistemicMapPanel").then(m => ({ default: m.EpistemicMapPanel })));
+const ArcCompletionPanel = lazy(() => import("./ArcCompletionPanel").then(m => ({ default: m.ArcCompletionPanel })));
+const StoryHealthPanel = lazy(() => import("./StoryHealthPanel").then(m => ({ default: m.StoryHealthPanel })));
+const CharacterArcPanel = lazy(() => import("./CharacterArcPanel").then(m => ({ default: m.CharacterArcPanel })));
+const RegressionPanel = lazy(() => import("./RegressionPanel").then(m => ({ default: m.RegressionPanel })));
+const MomentumPanel = lazy(() => import("./MomentumPanel").then(m => ({ default: m.MomentumPanel })));
+const VoiceDNAPanel = lazy(() => import("./VoiceDNAPanel").then(m => ({ default: m.VoiceDNAPanel })));
+const LivePlayPanel = lazy(() => import("./LivePlayPanel").then(m => ({ default: m.LivePlayPanel })));
+const RevisionPanel = lazy(() => import("./RevisionPanel").then(m => ({ default: m.RevisionPanel })));
+const InterviewPanel = lazy(() => import("./InterviewPanel"));
+const RoomPanel = lazy(() => import("./RoomPanel").then(m => ({ default: m.RoomPanel })));
+
+// ── Lazy panel loading fallbacks ─────────────────────────────────────────────
+// Two variants matching the two overlay idioms these panels already use:
+// (1) panels that render their own full-screen dimmed backdrop (WhatIfPanel,
+// EpistemicMap, DirectorCutPanel, ScenarioBuilder, SettingsPanel,
+// RevisionPanel, InterviewPanel — each is `fixed inset-0 bg-black/80 z-50` at
+// its own root) get a matching backdrop+box fallback so there's no flash of
+// nothing between the button click and paint; (2) panels rendered inside the
+// `position: fixed` centering wrapper divs below (no backdrop of their own,
+// dark-HUD styling) get a small dark card matching that idiom instead.
+const PanelLoadingOverlay = () => (
+  <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+    <div className="bg-white text-black px-6 py-4 brutal-border-thick brutal-shadow font-mono text-xs font-bold uppercase tracking-widest animate-pulse">
+      Loading…
+    </div>
+  </div>
+);
+
+const PanelLoadingInline = () => (
+  <div
+    style={{
+      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
+      padding: 20, fontFamily: 'monospace', fontSize: 13,
+      border: '1px solid #334155',
+    }}
+  >
+    Loading…
+  </div>
+);
 
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
@@ -76,6 +114,33 @@ const BEAT_COLORS: Record<string, string> = {
   revelation:               'bg-yellow-500',
   turning_point:            'bg-green-600',
 };
+
+// ── Script Ledger action-type display (X1 vocabulary) ───────────────────────
+// Badge color per action_type. Falls back to the original bg-black/white
+// treatment for any type not listed here (SPEAK, EXAMINE, RELOCATE, WAIT).
+const ACTION_TYPE_BADGE: Partial<Record<ActionLogEntry['action_type'], string>> = {
+  LIE:           'bg-[#FF4444] text-white',
+  THREATEN:      'bg-[#FF4444] text-white',
+  BETRAY:        'bg-[#FF4444] text-white',
+  REVEAL:        'bg-blue-600 text-white',
+  PROTECT:       'bg-green-600 text-white',
+  FORM_ALLIANCE: 'bg-green-600 text-white',
+  FLEE:          'bg-orange-500 text-white',
+  HIDE:          'bg-gray-600 text-white',
+  OBSERVE:       'bg-gray-600 text-white',
+  LISTEN:        'bg-gray-600 text-white',
+  SEARCH:        'bg-gray-600 text-white',
+};
+
+// Covert set — mirrors SILENT_ACTION_TYPES in server/nvm/bridge/action-to-ops.ts.
+// Nothing is spoken aloud for these, so the ledger row reads as concealment
+// rather than open conflict (dashed border, muted background, EYE tag).
+const COVERT_ACTION_TYPES = new Set<ActionLogEntry['action_type']>(['HIDE', 'OBSERVE', 'LISTEN', 'SEARCH']);
+
+// Action types whose target_char_id is meaningful to surface as a "to X" label.
+const TARGETED_ACTION_TYPES = new Set<ActionLogEntry['action_type']>([
+  'SPEAK', 'LIE', 'OBSERVE', 'LISTEN', 'REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE',
+]);
 
 const INFO_POS_LABEL: Record<string, string> = {
   superior: 'AUD > CHARS',
@@ -1199,17 +1264,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                 const agent = agents.find(a => a.char_id === entry.char_id);
                 const node = nodes.find(n => n.location_id === entry.location_id);
                 const isLie = entry.action_type === "LIE";
+                const isThreatOrBetray = entry.action_type === "THREATEN" || entry.action_type === "BETRAY";
+                const isCovert = COVERT_ACTION_TYPES.has(entry.action_type);
+                const badgeClass = ACTION_TYPE_BADGE[entry.action_type] ?? "bg-black text-white";
+                const rowClass = isLie || isThreatOrBetray
+                  ? "border-[#FF4444] bg-red-50"
+                  : isCovert
+                    ? "border-dashed border-gray-400 bg-gray-100"
+                    : "border-black bg-gray-50";
                 return (
                   <div
                     key={entry.action_id}
-                    className={`border-l-4 pl-4 py-2 ${isLie ? "border-[#FF4444] bg-red-50" : "border-black bg-gray-50"}`}
+                    className={`border-l-4 pl-4 py-2 ${rowClass}`}
                   >
                     <div className="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-bold">
                       [{new Date(entry.timestamp).toLocaleTimeString()}] @ {node?.name || entry.location_id}
                     </div>
                     <div className="flex items-start gap-2 mb-2 flex-wrap">
                       <span className="font-bold text-black uppercase">{agent?.name || entry.char_id}</span>
-                      <span className={`text-[10px] px-2 py-0.5 uppercase font-bold tracking-widest ${isLie ? "bg-[#FF4444] text-white" : "bg-black text-white"}`}>
+                      <span className={`text-[10px] px-2 py-0.5 uppercase font-bold tracking-widest ${badgeClass}`}>
                         {entry.action_type}
                       </span>
                       {isLie && (
@@ -1217,7 +1290,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           <AlertTriangle className="w-3 h-3" /> LIE
                         </span>
                       )}
-                      {entry.target_char_id && (entry.action_type === "SPEAK" || entry.action_type === "LIE") && (
+                      {isThreatOrBetray && (
+                        <span className="text-[10px] flex items-center gap-1 text-[#FF4444] font-bold">
+                          <AlertTriangle className="w-3 h-3" /> {entry.action_type === "THREATEN" ? "THREAT" : "BETRAYAL"}
+                        </span>
+                      )}
+                      {isCovert && (
+                        <span className="text-[10px] flex items-center gap-1 text-gray-500 font-bold">
+                          <Eye className="w-3 h-3" /> COVERT
+                        </span>
+                      )}
+                      {entry.target_char_id && TARGETED_ACTION_TYPES.has(entry.action_type) && (
                         <span className="text-[#FF4444] font-bold uppercase text-xs">
                           to {agents.find(a => a.char_id === entry.target_char_id)?.name || entry.target_char_id}
                         </span>
@@ -1339,28 +1422,38 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       )}
 
       {showBuilder && (
-        <ScenarioBuilder
-          onSubmit={submitScenario}
-          onLoadExample={loadExample}
-          onClose={() => setShowBuilder(false)}
-          busy={loading}
-        />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <ScenarioBuilder
+            onSubmit={submitScenario}
+            onLoadExample={loadExample}
+            onClose={() => setShowBuilder(false)}
+            busy={loading}
+          />
+        </Suspense>
       )}
 
       {showSettings && (
-        <SettingsPanel onClose={() => setShowSettings(false)} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </Suspense>
       )}
 
       {showDirectorCut && (
-        <DirectorCutPanel onClose={() => setShowDirectorCut(false)} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <DirectorCutPanel onClose={() => setShowDirectorCut(false)} />
+        </Suspense>
       )}
 
       {showWhatIf && (
-        <WhatIfPanel onClose={() => setShowWhatIf(false)} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <WhatIfPanel onClose={() => setShowWhatIf(false)} />
+        </Suspense>
       )}
 
       {showEpistemic && (
-        <EpistemicMap onClose={() => setShowEpistemic(false)} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <EpistemicMap onClose={() => setShowEpistemic(false)} />
+        </Suspense>
       )}
 
       {showHarvest && (
@@ -1371,7 +1464,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showConverge && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <ConvergePanel onClose={() => setShowConverge(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <ConvergePanel onClose={() => setShowConverge(false)} />
+          </Suspense>
         </div>
       )}
 
@@ -1389,111 +1484,149 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
       {showArcPlanner && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <ArcPlannerPanel onClose={() => setShowArcPlanner(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <ArcPlannerPanel onClose={() => setShowArcPlanner(false)} />
+          </Suspense>
         </div>
       )}
 
       {showProjection && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <ProjectionGalleryPanel onClose={() => setShowProjection(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <ProjectionGalleryPanel onClose={() => setShowProjection(false)} />
+          </Suspense>
         </div>
       )}
 
       {showCausalTwin && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <CausalTwinPanel onClose={() => setShowCausalTwin(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <CausalTwinPanel onClose={() => setShowCausalTwin(false)} />
+          </Suspense>
         </div>
       )}
 
       {showFixedPoints && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <FixedPointsPanel onClose={() => setShowFixedPoints(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <FixedPointsPanel onClose={() => setShowFixedPoints(false)} />
+          </Suspense>
         </div>
       )}
 
       {showSelfPlay && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <SelfPlayPanel onClose={() => setShowSelfPlay(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <SelfPlayPanel onClose={() => setShowSelfPlay(false)} />
+          </Suspense>
         </div>
       )}
 
       {showProofInspector && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <ProofInspectorPanel onClose={() => setShowProofInspector(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <ProofInspectorPanel onClose={() => setShowProofInspector(false)} />
+          </Suspense>
         </div>
       )}
 
       {showQualityEngines && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <QualityEnginesPanel onClose={() => setShowQualityEngines(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <QualityEnginesPanel onClose={() => setShowQualityEngines(false)} />
+          </Suspense>
         </div>
       )}
 
       {showEpistemicMap && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <EpistemicMapPanel onClose={() => setShowEpistemicMap(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <EpistemicMapPanel onClose={() => setShowEpistemicMap(false)} />
+          </Suspense>
         </div>
       )}
 
       {showArcCompletion && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <ArcCompletionPanel onClose={() => setShowArcCompletion(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <ArcCompletionPanel onClose={() => setShowArcCompletion(false)} />
+          </Suspense>
         </div>
       )}
 
       {showStoryHealth && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <StoryHealthPanel onClose={() => setShowStoryHealth(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <StoryHealthPanel onClose={() => setShowStoryHealth(false)} />
+          </Suspense>
         </div>
       )}
 
       {showCharacterArc && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <CharacterArcPanel onClose={() => setShowCharacterArc(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <CharacterArcPanel onClose={() => setShowCharacterArc(false)} />
+          </Suspense>
         </div>
       )}
 
       {showRegression && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <RegressionPanel onClose={() => setShowRegression(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <RegressionPanel onClose={() => setShowRegression(false)} />
+          </Suspense>
         </div>
       )}
 
       {showAnalytics && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <NarrativeAnalyticsPanel onClose={() => setShowAnalytics(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <NarrativeAnalyticsPanel onClose={() => setShowAnalytics(false)} />
+          </Suspense>
         </div>
       )}
 
       {showMomentum && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <MomentumPanel onClose={() => setShowMomentum(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <MomentumPanel onClose={() => setShowMomentum(false)} />
+          </Suspense>
         </div>
       )}
 
       {showVoiceDNA && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <VoiceDNAPanel onClose={() => setShowVoiceDNA(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <VoiceDNAPanel onClose={() => setShowVoiceDNA(false)} />
+          </Suspense>
         </div>
       )}
 
       {showLivePlay && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <LivePlayPanel onClose={() => setShowLivePlay(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <LivePlayPanel onClose={() => setShowLivePlay(false)} />
+          </Suspense>
         </div>
       )}
 
       {showRevision && (
-        <RevisionPanel onClose={() => setShowRevision(false)} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <RevisionPanel onClose={() => setShowRevision(false)} />
+        </Suspense>
       )}
 
       {showInterview && (
-        <InterviewPanel onClose={() => setShowInterview(false)} agents={agents} />
+        <Suspense fallback={<PanelLoadingOverlay />}>
+          <InterviewPanel onClose={() => setShowInterview(false)} agents={agents} />
+        </Suspense>
       )}
 
       {showRoom && (
         <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 70 }}>
-          <RoomPanel onClose={() => setShowRoom(false)} />
+          <Suspense fallback={<PanelLoadingInline />}>
+            <RoomPanel onClose={() => setShowRoom(false)} />
+          </Suspense>
         </div>
       )}
     </div>

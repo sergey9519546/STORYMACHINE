@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getTemperature } from '../ai.ts';
 import { composePromptModifiers } from '../../lib/genre-router.ts';
+import { CHARACTER_ARC_MODES } from '../../lib/structure-presets.ts';
 import { effectiveScore } from '../../lib/personality.ts';
 import { ACTION_TYPES } from '../types.ts';
 import type {
@@ -32,7 +33,36 @@ import {
   PERSUASION_HINT,
   selectPersuasionStrategy,
   getReadyGoals,
+  deriveCascadeInputs,
+  computeDefenseCascadeState,
+  cascadeBehaviorProfile,
+  cascadeActionBias,
+  arbitrateTrinity,
+  describeTrinityGuidance,
+  trinityActionBias,
 } from './psychology.ts';
+
+// X1 — blueprint action-vocabulary expansion. The LLM schema enum grows
+// automatically with ACTION_TYPES (see selectBestAction's responseSchema
+// below), but an enum member with no explanation is a name the model can't
+// use well — this glossary is the one place their semantics are spelled out
+// for generation. Kept short (one line each) and static (no per-turn state),
+// so it costs nothing to build and never desyncs from ACTION_TYPES' own
+// ordering. SPEAK/EXAMINE/LIE/RELOCATE/WAIT are deliberately NOT re-explained
+// here — the surrounding prompt already establishes their use contextually
+// (RELOCATE via AVAILABLE EXITS, LIE via the psychology blocks, etc.) and
+// this run must not touch that byte-stable baseline.
+const NEW_ACTION_GLOSSARY = `NEW ACTIONS AVAILABLE THIS TURN (in addition to SPEAK/EXAMINE/LIE/RELOCATE/WAIT):
+  - HIDE: conceal yourself; a silent, unseen action — lowers how much attention you're drawing.
+  - OBSERVE (target): silently watch someone; you may pick up on a tell in their emotional state.
+  - LISTEN (target): silently eavesdrop near someone; you may catch what they privately think of a third party.
+  - SEARCH: silently investigate this room; can expose anyone present who has an unconfronted lie on record.
+  - REVEAL (target, content): deliberately and TRUTHFULLY disclose something to someone — guaranteed to land as real knowledge for them, unlike SPEAK.
+  - THREATEN (target, content): coerce someone with an explicit threat — damages how much they trust you, and puts them on guard.
+  - BETRAY (target, content): break a trust or commitment against someone, visibly — sharply damages how they see you.
+  - PROTECT (target, content): shield or vouch for someone — strengthens how much they trust you.
+  - FORM_ALLIANCE (target, content): commit to working together with someone — strengthens trust and mutual obligation.
+  - FLEE (target = an exit name): a fear-driven, urgent escape — use this instead of RELOCATE when you are running from danger, not just repositioning.`;
 
 // ── buildPrompt ───────────────────────────────────────────────────────────────
 
@@ -143,12 +173,25 @@ export function buildPrompt(
   })();
 
   // ── Outline + cinematic style + genre (P8 synergy compositor) ──
+  // I1-a: tone (mood register) is layered after genre/style, and the genre's
+  // structural promise block (genrePromiseBlock — required behaviors,
+  // forbidden shortcuts) is opted in so the genre contract reaches generation
+  // rather than just its vocabulary. The character-arc mode's
+  // promptInstruction lands on the same path STYLE_MODIFIERS' agentInstruction
+  // does — appended to this composed block. All four axes are optional; with
+  // none set the block is empty exactly as before.
   const illusionState = stage.getIllusionState();
   const illusionPhase = illusionState.phase;
-  const { block: styleGenreBlock } = composePromptModifiers(
+  const { block: composedModifierBlock } = composePromptModifiers(
     illusionState.story_genre,
     illusionState.director_style,
+    illusionState.story_tone,
+    true, // include genrePromiseBlock (I1-a)
   );
+  const arcModeInstruction = illusionState.character_arc_mode
+    ? CHARACTER_ARC_MODES[illusionState.character_arc_mode]?.promptInstruction ?? ''
+    : '';
+  const styleGenreBlock = [composedModifierBlock, arcModeInstruction].filter(Boolean).join('\n\n');
   const activeBeat = illusionState.outline?.find(b =>
     b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
   );
@@ -184,6 +227,20 @@ export function buildPrompt(
   const activeDefense = selectActiveDefense(sheet.defenseMechanisms, sheet.emotionState);
   const defenseStr = activeDefense ? `ACTIVE DEFENSE: ${DEFENSE_DESCRIPTIONS[activeDefense]}` : '';
 
+  // ── Threat-response cascade (arousal/freeze/flight/fight/fawn/collapse) ──
+  // Distinct from the defense mechanism above (see psychology.ts's header
+  // comment): this is the somatic threat response, not the psyche's cognitive
+  // distortion. Drives both the prompt's behavioral guidance AND (in
+  // selectBestAction below) a scoring bias so a frozen character's candidates
+  // are actually penalized, not merely narrated as frozen.
+  const cascade = computeDefenseCascadeState(deriveCascadeInputs(sheet, stage, node, otherAgents));
+  const cascadeProfile = cascadeBehaviorProfile(cascade.state);
+  const cascadeStr = `THREAT-RESPONSE STATE: ${cascade.state.toUpperCase()} (intensity ${cascade.intensity}/100, choice space: ${cascadeProfile.choiceSpace}). ${cascadeProfile.dialogueStyle} ${cascadeProfile.promptInstruction}`;
+
+  // ── Trinity (Id/Ego/Superego) decision arbitration ──
+  const trinity = arbitrateTrinity(sheet);
+  const trinityStr = `DECISION ARBITRATION: ${describeTrinityGuidance(trinity)} (id=${trinity.idProposal} ego=${trinity.egoAssessment} superego=${trinity.superegoPressure})`;
+
   // ── ToM trust gate ──
   const lowTrustNames = otherAgents.flatMap(a => {
     const tom = sheet.theoryOfMind?.[a.char_id];
@@ -203,6 +260,8 @@ ${describeAttachment(sheet.attachmentStyle)}
 ${defenseStr}
 CURRENT DEFENSE LEVEL: ${defenseLevel}
 ${speechPattern ? `SPEECH PATTERN: ${speechPattern}` : ''}
+${cascadeStr}
+${trinityStr}
 
 YOUR CURRENT GOALS:
 ${goalStr}
@@ -236,7 +295,10 @@ ${beatHint}
 
 PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
-${styleGenreBlock ? `\n${styleGenreBlock}\n` : ''}Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
+${styleGenreBlock ? `\n${styleGenreBlock}\n` : ''}
+${NEW_ACTION_GLOSSARY}
+
+Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
 
   const consumedPressureIds = activePressures.map(p => p.pressure_id);
   return { prompt, pendingStrategies, consumedPressureIds };
@@ -315,6 +377,25 @@ export async function selectBestAction(
   const activeDefense = selectActiveDefense(sheet.defenseMechanisms, sheet.emotionState);
   const attachStyle = sheet.attachmentStyle;
 
+  // Threat-response cascade + Trinity arbitration bias the CHOICE among
+  // candidates, not just the prompt that generated them — otherwise a
+  // frozen/collapsing character could still have its highest-goal-score
+  // (bold, confrontational) candidate picked despite the prompt telling it
+  // not to generate one. Recomputed here (rather than threaded from
+  // buildPrompt) because selectBestAction only receives (sheet, stage,
+  // prompt); both derivations are pure reads of the SAME live stage state
+  // buildPrompt itself just used, so they agree turn-for-turn.
+  const currentNode = stage.getLocation(sheet.current_location_id);
+  const roomAgents = currentNode
+    ? stage.getAgentsInLocation(sheet.current_location_id).filter(a => a.char_id !== sheet.char_id)
+    : [];
+  const cascadeState = currentNode
+    ? computeDefenseCascadeState(deriveCascadeInputs(sheet, stage, currentNode, roomAgents)).state
+    : 'arousal';
+  const cascadeBias = cascadeActionBias(cascadeState);
+  const trinity = arbitrateTrinity(sheet);
+  const trinityBias = trinityActionBias(trinity.winner, trinity.colorer);
+
   // Record defense activation as a beat trace
   if (activeDefense) {
     const lastAction = stage.getLastActionForAgent(sheet.char_id);
@@ -337,8 +418,10 @@ export async function selectBestAction(
     (top, c) => {
       const cType = VALID_ACTIONS.has(c.action_type) ? c.action_type as ActionType : 'SPEAK';
       const tType = VALID_ACTIONS.has(top.action_type) ? top.action_type as ActionType : 'SPEAK';
-      const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle);
-      const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle);
+      const cScore = effectiveScore(finiteGoalScore(c.goal_score), cType, dt, bf, activeDefense, attachStyle)
+        * (cascadeBias[cType] ?? 1.0) * (trinityBias[cType] ?? 1.0);
+      const tScore = effectiveScore(finiteGoalScore(top.goal_score), tType, dt, bf, activeDefense, attachStyle)
+        * (cascadeBias[tType] ?? 1.0) * (trinityBias[tType] ?? 1.0);
       return cScore > tScore ? c : top;
     },
     (raw.candidates ?? [])[0] ?? { action_type: 'SPEAK', content: '', target: null },

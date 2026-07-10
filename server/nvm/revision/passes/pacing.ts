@@ -544,11 +544,23 @@
 // PACING_HIGHLIGHT_BACK_LOADED. Thresholds (minRecords 9, minCount 3) match this file's own
 // zone-cluster precedent for each channel; ratioThreshold 0.70 matches the half-partition
 // convention established across the other four passes touched by this pivot.
+// Wave 1184 additions (Program v2, Type 3 — genre-conditioned): ENERGY_MONOTONE and
+// PACING_PLATEAU are two of the highest-firing generic rules in the calibration corpus
+// (20/20 samples each — see the wave's measurement pass). Both now consult
+// GENRE_RULE_MODIFIERS (server/lib/genre-router.ts) for a genre-aware threshold, generic
+// value as the default: a thriller's mandatory forward momentum makes even moderate
+// scene-length uniformity a defect (both thresholds tighten), while a slow-burn drama's
+// register of restraint legitimately sustains a flatter, more uniform cadence (both
+// thresholds loosen). storyContext absent, genre absent, or genre unset in the table ->
+// identical constants and identical issue text to pre-Wave-1184 behavior.
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
+import type { StoryGenre } from '../../../engine/types.ts';
 
 /**
  * Compute weighted line counts per scene.
@@ -598,6 +610,28 @@ function sceneLineCount(fountain: string): Map<number, number> {
 export async function pacingPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, structure, approvedSpans } = input;
   const issues: RevisionIssue[] = [];
+
+  // Wave 1184: resolved once per pass, reused by ENERGY_MONOTONE and PACING_PLATEAU below.
+  // Undefined when storyContext/genre is absent or the genre has no live rule modifier —
+  // every consumer falls through to its own generic constant in that case.
+  const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
+  const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1184 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1184 = tone1184 ? TONE_REGISTERS[tone1184]?.thresholdDeltas : undefined;
+  const composed1184 = composeThresholds(genre1184, tone1184);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("thriller", "bleak", or "thriller + bleak").
+  const thresholdNote1184 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1184?.[field] !== undefined) parts.push(String(genre1184));
+    if (toneDeltas1184?.[field] !== undefined) parts.push(String(tone1184));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   const sceneLengths = sceneLineCount(fountain);
   if (sceneLengths.size === 0) {
@@ -694,12 +728,19 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   const stdDev = Math.sqrt(lineCountVariance);
   const coefficientOfVariation = stdDev / avgLength;
 
-  if (coefficientOfVariation < 0.35 && records.length >= 8) {
-    // Low variation (<35%) means scenes are all similar length
+  // Wave 1184: generic cutoff 0.35, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 0.35 constant.
+  const energyMonotoneCoV1184 = composed1184.energyMonotoneCoV ?? 0.35;
+
+  if (coefficientOfVariation < energyMonotoneCoV1184 && records.length >= 8) {
+    // Low variation (< the resolved cutoff) means scenes are all similar length
+    const genreNote1184 = thresholdNote1184('energyMonotoneCoV');
     issues.push({
       location: 'Overall pacing',
       rule: 'ENERGY_MONOTONE',
-      description: `Scene lengths are monotone: all scenes are ${Math.round(avgLength)} ±${Math.round(stdDev)} lines. There's no rhythm — no short punchy scenes, no long contemplative ones.`,
+      description: `Scene lengths are monotone: all scenes are ${Math.round(avgLength)} ±${Math.round(stdDev)} lines. There's no rhythm — no short punchy scenes, no long contemplative ones.${genreNote1184}`,
       severity: 'major',
       suggestedFix: 'Vary scene length dramatically: follow a 2-page scene with a 30-second beat, then a 5-page confrontation. Create pacing texture.',
     });
@@ -827,16 +868,25 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   // ENERGY_MONOTONE stays quiet), a flat local stretch reads as a sag — four
   // scenes in a row at the same cadence with no acceleration or contraction.
   if (records.length >= 8) {
+    // Wave 1184: generic ratio 1.2 (±20%), genre-shifted per GENRE_RULE_MODIFIERS;
+    // I1-a: tone deltas compose on top via composeThresholds (see the file-header
+    // comment). Absent/unknown genre AND tone fall through to the pre-wave 1.2
+    // constant, and the displayed percentage is derived from the same ratio so the two
+    // never drift apart.
+    const pacingPlateauRatio1184 = composed1184.pacingPlateauRatio ?? 1.2;
+    const pacingPlateauPct1184 = Math.round((pacingPlateauRatio1184 - 1) * 100);
+    const genreNote1184Plateau = thresholdNote1184('pacingPlateauRatio');
+
     const orderedLengths = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
     for (let i = 0; i + 4 <= orderedLengths.length; i++) {
       const window = orderedLengths.slice(i, i + 4);
       const minLen = Math.min(...window);
       const maxLen = Math.max(...window);
-      if (minLen > 0 && maxLen <= minLen * 1.2) {
+      if (minLen > 0 && maxLen <= minLen * pacingPlateauRatio1184) {
         issues.push({
           location: `Scenes ${i}–${i + 3}`,
           rule: 'PACING_PLATEAU',
-          description: `Scenes ${i}–${i + 3} all run within ±20% of the same length (${minLen}–${maxLen} lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.`,
+          description: `Scenes ${i}–${i + 3} all run within ±${pacingPlateauPct1184}% of the same length (${minLen}–${maxLen} lines) — a flat stretch with no acceleration or contraction. The cadence plateaus for four scenes in a row.${genreNote1184Plateau}`,
           severity: 'minor',
           suggestedFix: 'Break the plateau: hard-cut one of these scenes to a single beat, or expand another into a full set-piece. A run of same-length scenes reads as a monotone even when the rest of the script breathes.',
         });
