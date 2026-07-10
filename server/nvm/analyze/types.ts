@@ -27,6 +27,15 @@ export interface FountainAnalysis {
   dialogueLineCount: number;
   actionLineCount: number;
   wordCount: number;
+  /** DoS guard (S1-b): set only when the script exceeded
+   *  fountain-analyzer.ts's ANALYZER_SCENE_CEILING and was analyzed on its
+   *  first `sceneCount` scenes only. Absent (not `false`) for every script at
+   *  or under the ceiling — see analyzeFountainText's return for why. */
+  truncatedForAnalysis?: boolean;
+  /** The script's TRUE total scene count, only present alongside
+   *  truncatedForAnalysis === true (sceneCount above is the smaller,
+   *  actually-analyzed count in that case). */
+  totalSceneCount?: number;
 }
 
 /** Per-pass rollup: the issues one pass found, with severity counts. */
@@ -300,4 +309,13 @@ export interface ScriptDoctorReport {
    *  rather than fabricating a neutral score — see computePacingFit's header
    *  in metrics.ts. */
   metrics?: NarrativeMetricsReport;
+  /** DoS guard (S1-b): mirrors FountainAnalysis.truncatedForAnalysis — set
+   *  only when the submitted script exceeded the analyzer's scene ceiling and
+   *  this report covers its first `sceneCount` scenes only. Absent for every
+   *  normal-sized script. plainSummary is prefixed with a matching
+   *  plain-language notice whenever this is true (see doctor.ts). */
+  truncatedForAnalysis?: boolean;
+  /** The script's TRUE total scene count, present only alongside
+   *  truncatedForAnalysis === true. */
+  totalSceneCount?: number;
 }

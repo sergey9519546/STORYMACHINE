@@ -1439,7 +1439,18 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     dimensions,
     records: analysis.records,
   });
-  const plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
+  let plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
+  // DoS guard (S1-b) notice: analysis.sceneCount is already the
+  // ceiling-truncated count (every formula above — health, dimensions,
+  // verdict, strengths — is computed against it consistently), so surface
+  // the gap honestly rather than silently reporting on a fraction of the
+  // submission with no indication anything was cut.
+  if (analysis.truncatedForAnalysis && analysis.totalSceneCount !== undefined) {
+    plainSummary =
+      `NOTE: this script has ${analysis.totalSceneCount} scenes, which exceeds the analyzer's ` +
+      `${analysis.sceneCount}-scene limit — only the first ${analysis.sceneCount} scenes were analyzed. ` +
+      plainSummary;
+  }
 
   // ── Narrative metrics layer (I1-c) ──────────────────────────────────────
   // Deterministic per-scene/whole-script narrative-shape metrics from
@@ -1536,6 +1547,9 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     contentHash: computeContentHash(fountain),
     healthPercentile,
     metrics,
+    ...(analysis.truncatedForAnalysis
+      ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
+      : {}),
   };
 }
 
