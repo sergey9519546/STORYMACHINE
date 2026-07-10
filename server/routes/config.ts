@@ -1,10 +1,12 @@
 import express from 'express';
+import crypto from 'crypto';
 import { generateContent, getModel } from '../engine/ai.ts';
 import { validate, AiConfigSchema, StoryToneSchema } from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
 import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
+import { version as buildVersion, commit as buildCommit } from '../lib/build-info.ts';
 import {
   validate as validateOutline, OutlineBodySchema, ImportBodySchema,
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
@@ -22,12 +24,77 @@ const router = express.Router();
 export default router;
 
 // Health check — no rate limit, no auth, responds even when Gemini is down.
+// version/commit identify what's actually running in a deployed instance so
+// ops can tell what's live and pick a known-good image to roll back to (see
+// README.md "Releases"). Both are additive/byte-compatible with the prior
+// shape: version comes from package.json (falls back to "unknown"), commit
+// comes from a build-time GIT_SHA baked in by the Dockerfile (falls back to
+// "dev") — see server/lib/build-info.ts. Neither can throw, so this endpoint
+// keeps responding even when Gemini/keys/everything else is down.
 router.get('/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: Math.round(process.uptime()), sessions: sessions.size });
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    sessions: sessions.size,
+    version: buildVersion,
+    commit: buildCommit,
+  });
 });
 
-// Metrics — Gemini call volume, latency, retries and failures per category.
-router.get('/metrics', (_req, res) => {
+// Metrics — Gemini call volume, latency, retries and failures per category
+// (audit finding S1-a-2, BLOCKER). token usage / est_cost_usd / session
+// counts are operationally sensitive — this used to be wide open to anyone
+// who could reach the port.
+//
+// Default (METRICS_TOKEN unset): loopback-only. This keeps the endpoint
+// working exactly as before for local dev / same-host monitoring / this
+// repo's own tests (all of which hit the server via 127.0.0.1), while
+// closing the "any anonymous internet visitor can read it" exposure without
+// requiring any new configuration — the least-surprising secure default for
+// a deployment that hasn't opted into anything yet. A reverse-proxied
+// deployment that puts a scraper on a DIFFERENT host must set METRICS_TOKEN.
+//
+// With METRICS_TOKEN set: require `Authorization: Bearer <token>` (constant-
+// time compared) from ANY caller, loopback or not — 404, not 401, on a
+// miss/mismatch, so an unauthenticated probe can't even learn the endpoint
+// exists. /health stays fully open (see comment above) — it leaks only a
+// liveness count, not usage/cost data.
+//
+// NOTE for deployment docs (.env.example, not owned by this pass): document
+// METRICS_TOKEN here loudly — set it in any deployment where a monitoring
+// scraper needs to reach /metrics from off-host.
+function isLoopbackAddress(addr: string | undefined): boolean {
+  if (!addr) return false;
+  const a = addr.replace(/^::ffff:/, '');
+  return a === '127.0.0.1' || a === '::1' || a.startsWith('127.');
+}
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, 'utf8');
+  const bBuf = Buffer.from(b, 'utf8');
+  if (aBuf.length !== bBuf.length) {
+    // Compare against itself so a length mismatch doesn't short-circuit
+    // instantly — reduces (does not eliminate) a length-based timing signal,
+    // same pattern as collab-auth.ts's verifyCollabToken.
+    crypto.timingSafeEqual(aBuf, aBuf);
+    return false;
+  }
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+router.get('/metrics', (req, res) => {
+  const metricsToken = process.env.METRICS_TOKEN;
+  if (metricsToken) {
+    const auth = req.headers.authorization ?? '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!provided || !timingSafeStringEqual(provided, metricsToken)) {
+      res.status(404).end();
+      return;
+    }
+  } else if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    res.status(404).end();
+    return;
+  }
   res.json({ sessions: sessions.size, ...metrics.snapshot() });
 });
 

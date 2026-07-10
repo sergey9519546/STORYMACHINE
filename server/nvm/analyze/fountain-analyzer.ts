@@ -355,6 +355,9 @@ const CAPS_STOPWORDS = new Set([
 ]);
 
 const RELATIONSHIP_SHIFT_THRESHOLD = 2;
+/** DoS guard (S1-b), defense-in-depth cap on detectRelationshipShifts'
+ *  per-scene all-pairs scan — see the call site for the full rationale. */
+const MAX_RELATIONSHIP_PAIRING_CHARACTERS = 50;
 /** Net valence beyond which emotionalShift reports positive/negative rather
  *  than neutral — a small deadband so a single stray word doesn't flip it. */
 const EMOTIONAL_SHIFT_THRESHOLD = 1;
@@ -672,10 +675,24 @@ function detectRelationshipShifts(
 ): Array<{ pairKey: string; dimension: string; amount: number }> {
   if (characters.length < 2) return [];
   const shifts: Array<{ pairKey: string; dimension: string; amount: number }> = [];
-  for (let i = 0; i < characters.length; i++) {
-    for (let j = i + 1; j < characters.length; j++) {
-      const a = characters[i];
-      const b = characters[j];
+  // DoS guard (S1-b), defense-in-depth: this is an O(charactersInScene^2 *
+  // dialogueLinesInScene) all-pairs scan, and characters-per-scene is NOT
+  // bounded by ANALYZER_SCENE_CEILING (that caps scene COUNT, not distinct
+  // speaker cues within one scene) — a pathological single scene with
+  // thousands of unique one-off speaker names would otherwise still make
+  // this quadratic. Real scenes — even large ensemble ones — speak through
+  // at most a handful of characters; MAX_RELATIONSHIP_PAIRING_CHARACTERS is
+  // generous headroom above any legitimate scene's cast size, using the
+  // scene's own first-appearance order (characters is already built that
+  // way — see extractSceneContent) so which characters get dropped, on the
+  // rare pathological input that hits the cap, is deterministic.
+  const pairingChars = characters.length > MAX_RELATIONSHIP_PAIRING_CHARACTERS
+    ? characters.slice(0, MAX_RELATIONSHIP_PAIRING_CHARACTERS)
+    : characters;
+  for (let i = 0; i < pairingChars.length; i++) {
+    for (let j = i + 1; j < pairingChars.length; j++) {
+      const a = pairingChars[i];
+      const b = pairingChars[j];
       const relevantLines = dialogueLines.filter(d => d.speaker === a || d.speaker === b);
       let sum = 0;
       for (const line of relevantLines) {
@@ -1139,6 +1156,22 @@ function clueClusterId(anchor: string, words: Set<string>): string {
  *  kind of noise this file's rules are supposed to guard against. This
  *  channel's job is recall for PAYOFFS the exact-token channel misses, not a
  *  second census of every prop word in the script. */
+// DoS guard (S1-b), defense-in-depth: the pre-fix loop below scanned EVERY
+// existing cluster (`if (cluster.anchor !== cand.anchor) continue`) for every
+// new candidate, making the whole function O(totalCandidates^2) even for a
+// single pathologically long scene (ANALYZER_SCENE_CEILING bounds scene
+// COUNT, not per-scene text volume). clustersByAnchor below removes the
+// wrong-anchor scan entirely (candidates only ever compare against clusters
+// that already share their anchor), and CLUE_ANCHOR_CLUSTER_SCAN_CAP bounds
+// even the same-anchor comparison to a constant. 200 is far above anything a
+// real screenplay produces: CLUE_ANCHOR_NOUNS is a ~100-word closed lexicon,
+// and the calibration corpus (10-scene samples) never forms more than a
+// handful of distinct clusters for any single anchor — a real script would
+// need 200+ genuinely distinct recurring props/objects all sharing one
+// generic anchor noun (e.g. 200 different "letters") to ever hit this cap,
+// which no legitimate screenplay does.
+const CLUE_ANCHOR_CLUSTER_SCAN_CAP = 200;
+
 function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
   const characterNameWords = collectClueCharacterNameWords(scenes);
   const perScene = scenes.map(s => extractSceneClueCandidates(s.rawText, characterNameWords));
@@ -1149,30 +1182,38 @@ function computeContentWordClueClusters(scenes: SceneUnit[]): ClueCluster[] {
   }
 
   const clusters: ClueCluster[] = [];
+  const clustersByAnchor = new Map<string, ClueCluster[]>();
   for (let i = 0; i < scenes.length; i++) {
     const sceneIdx = scenes[i].sceneIdx;
     for (const cand of perScene[i]) {
       let matched: ClueCluster | null = null;
-      for (const cluster of clusters) {
-        if (cluster.anchor !== cand.anchor) continue;
-        const rare = !CLUE_GENERIC_OBJECT_WORDS.has(cand.anchor)
-          && (anchorCounts.get(cand.anchor) ?? 0) <= CLUE_RARE_ANCHOR_MAX_OCCURRENCES;
-        if (rare) { matched = cluster; break; }
-        let sharedExtra = 0;
-        for (const w of cand.words) {
-          if (w !== cand.anchor && cluster.words.has(w)) sharedExtra++;
+      const bucket = clustersByAnchor.get(cand.anchor);
+      if (bucket) {
+        const scanLimit = Math.min(bucket.length, CLUE_ANCHOR_CLUSTER_SCAN_CAP);
+        for (let k = 0; k < scanLimit; k++) {
+          const cluster = bucket[k];
+          const rare = !CLUE_GENERIC_OBJECT_WORDS.has(cand.anchor)
+            && (anchorCounts.get(cand.anchor) ?? 0) <= CLUE_RARE_ANCHOR_MAX_OCCURRENCES;
+          if (rare) { matched = cluster; break; }
+          let sharedExtra = 0;
+          for (const w of cand.words) {
+            if (w !== cand.anchor && cluster.words.has(w)) sharedExtra++;
+          }
+          if (sharedExtra >= CLUE_MIN_SHARED_NON_ANCHOR_WORDS) { matched = cluster; break; }
         }
-        if (sharedExtra >= CLUE_MIN_SHARED_NON_ANCHOR_WORDS) { matched = cluster; break; }
       }
       if (matched) {
         if (matched.occurrences[matched.occurrences.length - 1] !== sceneIdx) matched.occurrences.push(sceneIdx);
       } else {
-        clusters.push({
+        const newCluster: ClueCluster = {
           anchor: cand.anchor,
           words: cand.words,
           occurrences: [sceneIdx],
           id: clueClusterId(cand.anchor, cand.words),
-        });
+        };
+        clusters.push(newCluster);
+        if (bucket) bucket.push(newCluster);
+        else clustersByAnchor.set(cand.anchor, [newCluster]);
       }
     }
   }
@@ -1299,6 +1340,10 @@ const MIN_SUBSTANTIVE_QUESTION_WORDS = 4;
  *  real topical match) — excluded from the fingerprint. */
 const MIN_CONTENT_WORD_LENGTH = 4;
 
+/** DoS guard (S1-b), defense-in-depth cap on detectQuestionLatency's
+ *  per-line open-thread scan — see the call site for the full rationale. */
+const OPEN_QUESTIONS_SCAN_CAP = 500;
+
 /** Split a line into sentence-like chunks so a single dialogue line that
  *  contains a question alongside other sentences ("Wait. Why is it open?")
  *  still gets each clause evaluated on its own punctuation. */
@@ -1384,8 +1429,21 @@ function detectQuestionLatency(scenes: SceneUnit[]): QuestionLatencySignal {
       // of its own, so a question sentence never resolves itself. Cross-scene
       // carryovers are checked first — the longest-waiting thread in the
       // whole document gets credit before anything raised in this same scene.
+      // DoS guard (S1-b), defense-in-depth: ANALYZER_SCENE_CEILING bounds
+      // scene COUNT, but nothing bounds LINES within a single scene — a
+      // pathological script could pack thousands of substantive dialogue
+      // questions into one giant scene (well under the 1000-scene ceiling)
+      // and still drive this per-line scan quadratic. OPEN_QUESTIONS_SCAN_CAP
+      // caps each scan to the oldest CAP threads (scan order is already
+      // oldest-first, matching the "longest-waiting thread gets credit
+      // first" contract in this function's header), so a real script — where
+      // concurrently-open unresolved questions realistically number in the
+      // dozens, not thousands — is completely unaffected; only scripts with
+      // an implausible number of simultaneously unanswered questions stop
+      // getting checked against every single one.
       let matched = false;
-      for (let k = 0; k < open.length; k++) {
+      const openScanLimit = Math.min(open.length, OPEN_QUESTIONS_SCAN_CAP);
+      for (let k = 0; k < openScanLimit; k++) {
         if (shareContentWord(open[k].words, lineWords)) {
           open.splice(k, 1);
           resolvedByScene[scene.sceneIdx]++;
@@ -1394,7 +1452,8 @@ function detectQuestionLatency(scenes: SceneUnit[]): QuestionLatencySignal {
         }
       }
       if (!matched) {
-        for (let k = 0; k < openThisScene.length; k++) {
+        const openThisSceneScanLimit = Math.min(openThisScene.length, OPEN_QUESTIONS_SCAN_CAP);
+        for (let k = 0; k < openThisSceneScanLimit; k++) {
           if (shareContentWord(openThisScene[k].words, lineWords)) {
             openThisScene.splice(k, 1);
             resolvedByScene[scene.sceneIdx]++;
@@ -1734,11 +1793,42 @@ function emptyAnalysis(): FountainAnalysis {
  * needs, reconstructed heuristically from the text alone. Pure and
  * deterministic: no LLM, no I/O, no wall-clock reads.
  */
+// ── DoS guard (S1-b, security audit BLOCKER) ─────────────────────────────────
+// DoctorBodySchema (validation.ts) caps the raw fountain body at 900k chars
+// but not scene/issue COUNT, so a script built from tens of thousands of
+// minimal scenes ("INT. A - DAY\nA.\n" repeated) fits comfortably under the
+// byte cap while driving sceneCount into the tens of thousands. Several
+// cross-scene passes below (detectClueLifecycle's content-word channel,
+// detectQuestionLatency) are O(sceneCount^2)-shaped in the worst case, which
+// freezes the single-threaded event loop for EVERY concurrent session, not
+// just the attacker's own request.
+//
+// ANALYZER_SCENE_CEILING is the primary guard: real feature screenplays top
+// out at roughly 150-250 scenes (industry rule of thumb: ~1 scene/page, a
+// two-hour feature runs ~110-180 pages), and the calibration corpus's
+// richest sample — deliberately built to be richer than any of the other 19,
+// see calibration/reference.ts's header — analyzes only 10 scenes. 1000 sits
+// 4-6x above the real-world ceiling (so no legitimate screenplay, however
+// long, is ever truncated) while remaining orders of magnitude below the
+// pathological regime (tens of thousands of scenes) that makes the quadratic
+// passes below actually hang. Scripts at or under the ceiling get exactly
+// the pre-guard analysis (byte-identical FountainAnalysis — the extra fields
+// below are only ever added when truncation actually happens, never present
+// otherwise). Scripts over the ceiling are analyzed on their first
+// ANALYZER_SCENE_CEILING scenes only (option (a): degrade honestly with a
+// flagged, complete-for-its-scope report, rather than (b) hard-rejecting a
+// legitimately huge script outright) — see FountainAnalysis.truncatedForAnalysis
+// / totalSceneCount, surfaced as a report notice by doctor.ts.
+const ANALYZER_SCENE_CEILING = 1000;
+
 export function analyzeFountainText(fountain: string): FountainAnalysis {
   if (!fountain || !fountain.trim()) return emptyAnalysis();
 
   const blocks = parseFountain(fountain);
-  const rawScenes = segmentScenes(blocks);
+  const allRawScenes = segmentScenes(blocks);
+  const totalSceneCount = allRawScenes.length;
+  const truncatedForAnalysis = totalSceneCount > ANALYZER_SCENE_CEILING;
+  const rawScenes = truncatedForAnalysis ? allRawScenes.slice(0, ANALYZER_SCENE_CEILING) : allRawScenes;
   const sceneCount = rawScenes.length;
 
   const sceneUnits: SceneUnit[] = rawScenes.map((rs, idx) => ({
@@ -1859,5 +1949,12 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const actionLineCount = blocks.filter(b => b.type === 'action' && b.text.trim() !== '').length;
   const wordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
 
-  return { records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount };
+  return {
+    records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount,
+    // Only ever present when the ceiling actually engaged — omitted (not
+    // `false`/`undefined`-valued-but-present) for every script at or under
+    // ANALYZER_SCENE_CEILING, so JSON.stringify output for normal-sized
+    // scripts is byte-identical to before this guard existed.
+    ...(truncatedForAnalysis ? { truncatedForAnalysis, totalSceneCount } : {}),
+  };
 }

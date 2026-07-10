@@ -790,3 +790,29 @@ These hold across every run above without exception:
 execution order are two different 14-pass orderings — do not conflate them.
 See `ARCHITECTURE.md`'s pipeline list and `CLAUDE.md`'s rotation list for the
 (different) sequences.*
+
+## Pre-deployment audit (2026-07-10) — S-wave fix plan
+
+Two read-only audits (ops + security). BLOCKERS:
+- SEC-1: /api/ai-config SSRF + unauthenticated GLOBAL provider hijack —
+  baseUrl has no host/scheme allowlist; config is process-global; /test
+  fires the request. Anon visitor can hit cloud metadata AND redirect
+  every session's AI traffic. (validation.ts:143, ai-config.ts:55,
+  openai-compat.ts:75)
+- SEC-2: O(n^2) analyzer DoS — overlapClusters/detectQuestionLatency/
+  computeContentWordClueClusters unbounded; DoctorBodySchema caps bytes
+  not scene count. Crafted many-scene script freezes the shared event
+  loop. (cluster.ts:591, fountain-analyzer.ts:1118/1314)
+- OPS-1: no process.on(uncaughtException/unhandledRejection) — a
+  rejection from the sweep intervals crashes the container, nothing
+  restarts a bare docker run.
+- OPS-2: /metrics fully unauth — leaks token usage, est_cost_usd,
+  session counts (config.ts:30).
+- OPS-3 (wave 2): no release pipeline / tags / version / health SHA.
+- OPS-4 (wave 2): no backup job (README documents, nothing calls it).
+SHOULD folded into S-wave: CSV formula injection (breakdown.ts:644),
+collab token no room-ownership (collab.ts:12), run-room limiter tier
+mismatch (game.ts:245), no prod CSP (app.ts:97), container runs root.
+NICE: 4 transitive dev-dep CVEs (npm audit fix), ai-config/test error
+snippet. Clean: session capability model, HTML export escaping, prompt-
+injection boundary, secrets never in bundle/logs, body/rate limits.

@@ -75,6 +75,43 @@ describe('escapeCsvField — RFC 4180 escaping', () => {
   });
 });
 
+describe('escapeCsvField — CSV/formula injection neutralization', () => {
+  it('prefixes a single quote for a field starting with "=" (and RFC-4180-quotes it, since it also contains commas/quotes)', () => {
+    assert.equal(
+      escapeCsvField('=HYPERLINK("http://evil","x")'),
+      '"\'=HYPERLINK(""http://evil"",""x"")"',
+    );
+  });
+
+  it('prefixes a single quote for a field starting with "+"', () => {
+    assert.equal(escapeCsvField('+1-800-555-0100'), "'+1-800-555-0100");
+  });
+
+  it('prefixes a single quote for a field starting with "-"', () => {
+    assert.equal(escapeCsvField('-2+3+cmd|/c calc'), "'-2+3+cmd|/c calc");
+  });
+
+  it('prefixes a single quote for a field starting with "@" (RFC-4180-quoted too, since it contains a comma)', () => {
+    assert.equal(escapeCsvField('@SUM(1,1)'), '"\'@SUM(1,1)"');
+  });
+
+  it('neutralizes a formula lead preceded by a leading TAB', () => {
+    assert.equal(escapeCsvField('\t=cmd'), "'\t=cmd");
+  });
+
+  it('neutralizes a formula lead preceded by a leading CR (also RFC-4180-quoted, since \\r requires quoting)', () => {
+    assert.equal(escapeCsvField('\r-cmd'), '"\'\r-cmd"');
+  });
+
+  it('does not neutralize a benign field that happens to contain, but not start with, a dangerous character', () => {
+    assert.equal(escapeCsvField('EXT. WAREHOUSE - NIGHT'), 'EXT. WAREHOUSE - NIGHT');
+  });
+
+  it('leaves an ordinary name unchanged (benign control)', () => {
+    assert.equal(escapeCsvField('Bob'), 'Bob');
+  });
+});
+
 const MULTI_SCENE_FOUNTAIN = [
   'INT. WAREHOUSE - NIGHT',
   '',

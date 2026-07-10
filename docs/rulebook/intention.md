@@ -1,6 +1,6 @@
 # Pass: `intention`
 
-Founding wave: 39. Total distinct rules: 227 (179 attributed to a specific wave, 48 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 228 (179 attributed to a specific wave, 49 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1179
 
@@ -591,6 +591,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `PROACTIVE_RELATIONSHIP_VOID` — Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID
 - `PROACTIVE_REVELATION_COINCIDENCE_ABSENT` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
 - `PROTAGONIST_ACTED_UPON_FINALE` — PROTAGONIST_ACTED_UPON_FINALE
+- `PROTAGONIST_DECISION_VACUUM` — P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM
 - `PROTAGONIST_DEFERENCE_RUN` — PROTAGONIST_DEFERENCE_RUN
 - `PROTAGONIST_REACTIVE_DOMINANCE` — Wave 156: Protagonist reactive dominance
 - `REACTIVE_GOAL_ADOPTION` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption

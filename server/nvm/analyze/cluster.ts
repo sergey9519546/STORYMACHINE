@@ -483,12 +483,23 @@ function matchOverlapTemplate(
   );
   if (candidates.length < 2) return { consumed: [], findings: [] };
 
+  // DoS guard (S1-b), defense-in-depth: same shape and same fix as
+  // overlapClusters' identical all-pairs scan below — sort by startLine so
+  // the inner loop can break the instant B.startLine exceeds A.endLine,
+  // rather than scanning every remaining candidate. See overlapClusters'
+  // comment for the full correctness argument (it applies unchanged here:
+  // union-find is order-independent, so this is a pure speedup).
+  const order = candidates.map((_, i) => i).sort((x, y) => candidates[x].startLine! - candidates[y].startLine!);
+
   const uf = makeUnionFind(candidates.length);
-  for (let a = 0; a < candidates.length; a++) {
-    const A = candidates[a];
-    for (let b = a + 1; b < candidates.length; b++) {
-      const B = candidates[b];
-      if (A.startLine! <= B.endLine! && B.startLine! <= A.endLine!) uf.union(a, b);
+  for (let a = 0; a < order.length; a++) {
+    const i = order[a];
+    const A = candidates[i];
+    for (let b = a + 1; b < order.length; b++) {
+      const j = order[b];
+      const B = candidates[j];
+      if (B.startLine! > A.endLine!) break;
+      uf.union(i, j);
     }
   }
 
@@ -597,14 +608,32 @@ function overlapClusters(located: LocatedIssue[]): LocatedIssue[][] {
   });
   if (idxs.length === 0) return [];
 
+  // DoS guard (S1-b): the naive double loop below is O(idxs.length^2), which
+  // freezes the event loop when a pathological script (tens of thousands of
+  // trivial scenes, each producing its own scene-anchored issue) drives
+  // idxs.length into the tens of thousands. Sorting by startLine first makes
+  // the inner loop safely early-out WITHOUT changing which pairs union:
+  // once idxs is ordered by startLine ascending, comparing a fixed A against
+  // B's in that order guarantees A.startLine <= B.startLine, which makes the
+  // overlap test's first clause (A.startLine <= B.endLine) trivially true
+  // (B.endLine >= B.startLine >= A.startLine) — so overlap reduces to just
+  // B.startLine <= A.endLine. The moment that fails for one B it fails for
+  // every later B too (their startLine only grows), so the inner loop can
+  // break immediately instead of scanning the rest. This turns the pair scan
+  // from O(n^2) worst case into O(n log n + n*k) (k = average overlap-window
+  // size), with the union-find result — order-independent by construction —
+  // byte-identical to the pre-fix all-pairs scan for every existing script.
+  const sortedIdxs = [...idxs].sort((x, y) => located[x].startLine! - located[y].startLine!);
+
   const uf = makeUnionFind(located.length);
-  for (let a = 0; a < idxs.length; a++) {
-    const i = idxs[a];
+  for (let a = 0; a < sortedIdxs.length; a++) {
+    const i = sortedIdxs[a];
     const A = located[i];
-    for (let b = a + 1; b < idxs.length; b++) {
-      const j = idxs[b];
+    for (let b = a + 1; b < sortedIdxs.length; b++) {
+      const j = sortedIdxs[b];
       const B = located[j];
-      if (A.startLine! <= B.endLine! && B.startLine! <= A.endLine!) uf.union(i, j);
+      if (B.startLine! > A.endLine!) break;
+      uf.union(i, j);
     }
   }
 

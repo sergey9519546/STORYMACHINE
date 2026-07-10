@@ -5,6 +5,52 @@
 import type { GenerateContentParameters, GenerateContentResponse, Schema } from '@google/genai';
 import type { EmbeddingProvider, ImageProvider, TTSProvider, LLMProvider } from '../../engine/ai.ts';
 import { geminiSchemaToJsonSchema } from './schema.ts';
+import { ssrfUnsafeUrlReason } from '../validation.ts';
+
+// ── Belt-and-suspenders SSRF guard (audit finding S1-a-1) ───────────────────
+// server/lib/validation.ts's AiConfigSchema already rejects a private/
+// loopback/link-local/metadata baseUrl at the POST /api/ai-config boundary —
+// that's the primary fix, closing the anonymous-caller attack path. This is
+// the second checkpoint, re-checked right here at the actual fetch site, so
+// the protection holds even if a baseURL reaches this adapter through a path
+// that bypasses that schema entirely — the clearest example being
+// server/lib/ai-config.ts's initFromEnv(), which reads AI_BASE_URL/
+// AI_IMG_BASE_URL/AI_TTS_BASE_URL/AI_EMBEDDING_BASE_URL straight from
+// process.env with no zod validation at all.
+//
+// Scoped to NODE_ENV==='production', same convention server/app.ts already
+// uses for its own environment-gated hardening (its production-only CSP) and
+// server/routes/collab.ts now uses for its COLLAB_SECRET gate. Two reasons:
+//   1. Self-hosted deployments that intentionally point at a LOCAL model
+//      server (Ollama, LM Studio — both commonly run on localhost/RFC1918,
+//      and both are explicitly-supported targets per this file's header
+//      comment) need an escape hatch; AI_ALLOW_PRIVATE_NETWORK_TARGETS=true
+//      is that hatch for a production deployment, but development/test runs
+//      should never need to set it just to talk to a local mock server —
+//      and this codebase's own test suite (tests/core/core-01.test.ts and
+//      siblings) does exactly that, spinning up real loopback HTTP servers
+//      to exercise this adapter.
+//   2. The primary fix — AiConfigSchema's SSRF refinement — already blocks
+//      the actual anonymous-caller attack path (POST /api/ai-config) in
+//      EVERY environment, dev included, because zod validation isn't
+//      environment-gated. This fetch-site check is purely the second,
+//      defense-in-depth checkpoint for paths that bypass that schema
+//      (chiefly env-var-sourced config — see below) — it's acceptable, not
+//      a silent hole, for that second checkpoint to apply where it matters
+//      most: a real deployment.
+// Self-hosted production deployments that intentionally point at a LOCAL
+// model server must opt in explicitly via AI_ALLOW_PRIVATE_NETWORK_TARGETS=
+// true — see .env.example for the flag.
+const ALLOW_PRIVATE_NETWORK_TARGETS = process.env.AI_ALLOW_PRIVATE_NETWORK_TARGETS === 'true';
+const ENFORCE_FETCH_SITE_GUARD = process.env.NODE_ENV === 'production';
+
+function assertFetchTargetSafe(baseURL: string): void {
+  if (!ENFORCE_FETCH_SITE_GUARD || ALLOW_PRIVATE_NETWORK_TARGETS) return;
+  const reason = ssrfUnsafeUrlReason(baseURL);
+  if (reason) {
+    throw new Error(`Refusing outbound AI-provider request: baseUrl ${reason}`);
+  }
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +97,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
 }): LLMProvider {
   return {
     generate: async (params: GenerateContentParameters): Promise<GenerateContentResponse> => {
+      assertFetchTargetSafe(cfg.baseURL);
       const messages = buildMessages(params);
       const body: Record<string, unknown> = { model: params.model, messages };
 
@@ -111,6 +158,7 @@ export function makeOpenAICompatEmbeddingProvider(cfg: {
 }): EmbeddingProvider {
   return {
     embed: async (text: string): Promise<number[]> => {
+      assertFetchTargetSafe(cfg.baseURL);
       const res = await fetch(`${cfg.baseURL}/embeddings`, {
         method: 'POST',
         headers: {
@@ -135,6 +183,7 @@ export function makeOpenAICompatImageProvider(cfg: {
 }): ImageProvider {
   return {
     generate: async (prompt: string): Promise<string | undefined> => {
+      assertFetchTargetSafe(cfg.baseURL);
       const res = await fetch(`${cfg.baseURL}/images/generations`, {
         method: 'POST',
         headers: {
@@ -168,6 +217,7 @@ export function makeOpenAICompatTTSProvider(cfg: {
   return {
     speak: async (text: string): Promise<{ dataUrl: string; mimeType: string } | undefined> => {
       if (!text) return undefined;
+      assertFetchTargetSafe(cfg.baseURL);
       const res = await fetch(`${cfg.baseURL}/audio/speech`, {
         method: 'POST',
         headers: {
