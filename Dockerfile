@@ -45,11 +45,31 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # container restarts, e.g.:
 #   docker run -v storymachine-data:/app/data ...
 RUN mkdir -p /app/data/sessions
+
+# ── Run as non-root ──────────────────────────────────────────────────────────
+# node:22-alpine ships a preexisting, unprivileged `node` user/group (uid/gid
+# 1000, created by the upstream image) — no separate useradd/addgroup needed.
+# Everything COPY'd above lands owned by root (Docker's default COPY
+# behavior), so `node` couldn't read/write any of it without the chown below;
+# in particular /app/data is where session-store.ts opens/creates per-session
+# SQLite files (WAL mode, so it also creates -wal/-shm sidecar files at
+# runtime) — that directory specifically MUST be writable by the user the
+# process actually runs as, not just readable. `chown -R node:node /app`
+# covers dist/, server/, src/lib/, node_modules/, and data/ in one pass since
+# nothing after this point is written outside /app.
+RUN chown -R node:node /app
 VOLUME ["/app/data"]
+USER node
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
+# tsx-in-prod is a documented tradeoff (no separate server compile step — see
+# the `deps` stage comment above): it still boots correctly as the non-root
+# `node` user because everything it needs (node_modules/tsx, server/, dist/,
+# src/lib/, and now /app/data) was chown'd to that user above, and npx
+# resolves tsx from the already-installed local node_modules/.bin rather than
+# needing network access or write access outside /app.
 CMD ["npx", "tsx", "server.ts"]

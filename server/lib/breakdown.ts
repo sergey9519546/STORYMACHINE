@@ -636,16 +636,39 @@ const CSV_HEADER = [
   'Animals', 'Weapons', 'Night Exterior', 'Page Eighths', 'Continuity Day',
 ];
 
-/** RFC 4180 field escaping: a field containing a comma, double quote, or any
- *  line break gets wrapped in double quotes, with every internal double
- *  quote doubled. Exported so its escaping edge cases (comma-and-quote
- *  slugs, embedded newlines) are directly unit-testable without building a
- *  whole BreakdownRow. */
+// CSV-injection (a.k.a. "formula injection") leading characters: spreadsheet
+// apps (Excel, Google Sheets, LibreOffice) treat a cell whose content starts
+// with any of these as a live formula, not text — '=', '+', '-', '@' are the
+// classic OWASP-documented set, and a leading TAB (\t) or CR (\r) before one
+// of them doesn't stop the app from still parsing it as a formula, so both
+// are skipped before checking the first "real" character. Every field here
+// is screenplay-derived (sluglines, character names, prop/vehicle/SFX lists)
+// — attacker-controlled if the screenplay itself is — so e.g. a slugline
+// "=HYPERLINK(...)" or a prop list starting "-2+3+cmd|..." exported to CSV
+// and opened in Excel/Sheets would execute as a formula rather than display
+// as text.
+const CSV_FORMULA_LEAD = /^[\t\r]*[=+\-@]/;
+
+/** RFC 4180 field escaping plus CSV-injection (formula injection) neutralization:
+ *  - a field containing a comma, double quote, or any line break gets wrapped
+ *    in double quotes, with every internal double quote doubled (unchanged
+ *    RFC 4180 behavior);
+ *  - a field whose first character (after skipping a leading TAB/CR) is one
+ *    of `= + - @` gets a single quote prefixed, INSIDE the quoting above —
+ *    the standard mitigation: spreadsheet apps render a leading `'` as a
+ *    literal-text marker and strip it on display rather than treating the
+ *    cell as a formula, while any other consumer (this project's own CSV
+ *    parsing, a human reading the raw file) sees the character unchanged. A
+ *    benign field ("Bob", "KITCHEN") is untouched either way.
+ *  Exported so its escaping edge cases (comma-and-quote slugs, embedded
+ *  newlines, formula-injection leads) are directly unit-testable without
+ *  building a whole BreakdownRow. */
 export function escapeCsvField(value: string): string {
-  if (/["\n\r,]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const neutralized = CSV_FORMULA_LEAD.test(value) ? `'${value}` : value;
+  if (/["\n\r,]/.test(neutralized)) {
+    return `"${neutralized.replace(/"/g, '""')}"`;
   }
-  return value;
+  return neutralized;
 }
 
 /** Serialize breakdown rows to a CSV document, header included. CRLF row
