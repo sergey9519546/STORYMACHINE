@@ -642,6 +642,80 @@ const WAVE_1187_MARKERS = [
   'keeps generating real turns',        // buildDramaticTurnDensityStrength
 ] as const;
 
+// ── Run 20 (excellence sprint) — cold-open hook, climax placement, acceleration ──
+// Fixture evidence for the never-padded prime directive: the calibration
+// corpus sits under these detectors' scene floors (structurally exempt), so
+// fire + no-fire proof lives here. Real-corpus fire rates at introduction:
+// acceleration 17/69, cold-open 13/69, climax 7/69 (see doctor.ts header).
+
+describe('buildStrengths — Run 20 excellence detectors (hand-built fixtures)', () => {
+  it('cold-open FIRE: first scene turns + first-quarter clock', () => {
+    const records = buildSceneRecords(12, {
+      0: { suspenseDelta: 2, dramaticTurn: 'the body is found' },
+      2: { clockRaised: true, clockDelta: 1 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+    assert.ok(strengths.some(s => s.includes('opening earns attention immediately')),
+      `expected cold-open strength; got: ${strengths.join(' | ')}`);
+  });
+
+  it('cold-open NO-FIRE: first scene moves but no first-quarter stakes (competent, unremarkable)', () => {
+    const records = buildSceneRecords(12, {
+      0: { suspenseDelta: 2, dramaticTurn: 'the body is found' },
+      8: { clockRaised: true }, // stakes arrive, but late — the OPENING did not earn it
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+    assert.ok(!strengths.some(s => s.includes('opening earns attention immediately')),
+      'late stakes must not earn a cold-open claim');
+  });
+
+  it('climax placement FIRE: peak intensity in the final 30%, last quarter outweighs first', () => {
+    const records = buildSceneRecords(12, {
+      1: { suspenseDelta: 1 },
+      9: { suspenseDelta: 3, clockDelta: 2, dramaticTurn: 'everything breaks' },
+      10: { suspenseDelta: 2 },
+      11: { suspenseDelta: 2, dramaticTurn: 'the answer lands' },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+    assert.ok(strengths.some(s => s.includes('climax is where it belongs')),
+      `expected climax-placement strength; got: ${strengths.join(' | ')}`);
+  });
+
+  it('climax placement NO-FIRE: draft peaks early (front-loaded intensity)', () => {
+    const records = buildSceneRecords(12, {
+      1: { suspenseDelta: 4, clockDelta: 2, dramaticTurn: 'everything breaks' },
+      2: { suspenseDelta: 3 },
+      10: { suspenseDelta: 1 },
+    });
+    const strengths = buildStrengths(baseStrengthsInputFor(records));
+    assert.ok(!strengths.some(s => s.includes('climax is where it belongs')),
+      'a front-loaded draft must not earn the climax-placement claim');
+  });
+
+  it('acceleration FIRE: final-quarter scenes measurably tighter than the opening', () => {
+    const longScene = (i: number) => `INT. SC${i} - DAY\n\n${'word '.repeat(120).trim()}\n\n`;
+    const shortScene = (i: number) => `INT. SC${i} - DAY\n\n${'word '.repeat(30).trim()}\n\n`;
+    const fountain =
+      Array.from({ length: 8 }, (_, i) => longScene(i)).join('') +
+      Array.from({ length: 8 }, (_, i) => shortScene(8 + i)).join('');
+    const records = buildSceneRecords(16);
+    const strengths = buildStrengths({ ...baseStrengthsInputFor(records), fountain });
+    assert.ok(strengths.some(s => s.includes('cutting accelerates')),
+      `expected acceleration strength; got: ${strengths.join(' | ')}`);
+  });
+
+  it('acceleration NO-FIRE: uniform scene lengths, and silently absent without fountain', () => {
+    const uniform = Array.from({ length: 16 }, (_, i) => `INT. SC${i} - DAY\n\n${'word '.repeat(60).trim()}\n\n`).join('');
+    const records = buildSceneRecords(16);
+    const withUniform = buildStrengths({ ...baseStrengthsInputFor(records), fountain: uniform });
+    assert.ok(!withUniform.some(s => s.includes('cutting accelerates')),
+      'flat pacing must not earn the acceleration claim');
+    const withoutFountain = buildStrengths(baseStrengthsInputFor(records));
+    assert.ok(!withoutFountain.some(s => s.includes('cutting accelerates')),
+      'no fountain provided -> detector must silently no-fire, never throw');
+  });
+});
+
 describe('buildStrengths — Wave 1187 excellence detectors (hand-built fixtures)', () => {
   it('scene-purpose variety FIRE: 8 distinct purposes with no dominant one names the count and the top purpose', () => {
     const records = buildSceneRecords(8, {

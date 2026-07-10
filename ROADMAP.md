@@ -707,6 +707,43 @@ missing or thin, ranked by product value:
   setup/turn/prestige already); retrieval scoring w/ recency + emotional
   salience (embeddings.ts is semantic-only).
 
+## 13c. D-wave — Seeded divergence operators (filed 2026-07-10)
+
+Source: "Enhancing AI Creativity: A Multi-Agent Approach to Flash Fiction
+Generation" (Stanford CS224N student paper, user-supplied). Mapping sweep
+verdict: their MFER pipeline is a weaker converge loop (LLM role-play judge
+vs. our proof kernel + room critics + writer-in-the-loop), their RFM
+one-metric-per-pass finding is our 14-pass architecture, their eval is
+LLM-as-judge (rejected by NORTH_STAR.md). ONE transferable insight, backed
+by their ablation: a deliberate DIVERGENCE phase before convergence —
+random-stimulus injection + Osborn-checklist "expert angle" prompts —
+measurably raised creativity. Our generative shell has no such phase: the
+candidate generator samples near the probability mass and the proof kernel
+prunes; nothing ever forces the sampler AWAY from the mass first. We built
+the strongest editor in the market; this files the brainstormer.
+
+- [ ] **(S)** Stimulus module: curated lexicon pools (objects, reversals,
+  tonal injections) + SEEDED selection via repro/seed.ts's PRNG so a run
+  manifest reproduces the exact stimulus — determinism receipts survive.
+- [ ] **(M)** Angle operators: 8-10 Osborn-style progression angles
+  (romantic shift, betrayal, secret revelation, humorous misunderstanding,
+  social reflection, internal-vs-external conflict...) expressed as
+  prompt-spec variants over the EXISTING drama//mechanisms vocabulary —
+  no new judgment surface; model diverges, rules still verdict.
+- [ ] **(M)** Wire into makeLLMCandidateGenerator prompt assembly as an
+  opt-in divergence knob on /api/nvm/converge (zod-validated body field,
+  aiLimiter unchanged). Rejected wild candidates persist to the ghost
+  ledger as always.
+- [ ] **(S)** Keyless: no-op passthrough (divergence only shapes LLM
+  prompts) — honest-degradation principle holds byte-identically.
+- [ ] **(S)** Eval: A/B candidate-set diversity via room critics' existing
+  scoring, before/after divergence, reported in the landing commit. 6 tests
+  (fire + no-fire: seeded reproducibility, keyless no-op, validation).
+
+Integration check (Standing Directive 2): consumer chain = stimulus →
+prompt-spec → converge candidates → proof/valuation/room → writer commit.
+No dangling ends; UI knob rides the existing ConvergePanel.
+
 ### Run 17b — Polish (retained, after function work)
 
 - [ ] **(M)** Panel consolidation: 24+ flat buttons in the UI → grouped nav

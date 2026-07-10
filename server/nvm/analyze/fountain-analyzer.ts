@@ -785,17 +785,41 @@ const CAPS_TOKEN_RE = /\b[A-Z]{3,}(?:\s[A-Z]{3,}){0,2}\b/g;
  *  flagging a significant prop/sound on its first mention). Returns a
  *  deduplicated per-scene set — a token mentioned 3 times in one scene still
  *  counts once toward that scene's occurrence list. */
+/** True when a line is entirely upper-case screenplay furniture — a dialogue
+ *  cue, a transition, or (the big real-corpus noise source) a SUNG LYRIC
+ *  block in a musical, where every line of a song arrives in caps and the
+ *  naive token walk shredded "STRIKE FOR LOVE AND STRIKE FOR FEAR" into
+ *  half-a-dozen fake "clues" per bar. The screenwriting convention this
+ *  channel exists for is INLINE caps inside a mixed-case action line ("A
+ *  BRASS KEY glints on the sill") — a line with no lower-case letters at all
+ *  is never that convention, so it is skipped wholesale. */
+function isAllCapsLine(line: string): boolean {
+  const t = line.trim();
+  return t.length > 0 && !/[a-z]/.test(t);
+}
+
 function extractDistinctiveTokens(text: string): string[] {
   const tokens = new Set<string>();
   for (const m of text.matchAll(QUOTE_RE)) {
     const id = m[1].trim().toLowerCase();
     if (id.length >= 3) tokens.add(id);
   }
-  for (const m of text.matchAll(CAPS_TOKEN_RE)) {
-    const words = m[0].split(/\s+/).filter(w => !CAPS_STOPWORDS.has(w));
-    if (words.length === 0) continue;
-    const id = words.join(' ').toLowerCase();
-    if (id.length >= 3) tokens.add(id);
+  // Line-scoped CAPS walk (clue-channel precision wave, 2026-07-10): the
+  // previous whole-text matchAll treated caps-cue lines, transitions, and
+  // musical-number lyric blocks as prop introductions — measured on the
+  // 69-script real corpus at 300-700 seeded "clues" per feature (median 462)
+  // with ~20% payoff ratio, i.e. a noise-dominated channel (the direct cause
+  // of the ORPHAN_CLUE flood fixed in payoff.ts, and the reason a
+  // payoff-discipline excellence detector measured dead in Run 20). Only
+  // inline caps inside mixed-case lines — the actual convention — survive.
+  for (const line of text.split(/\r?\n/)) {
+    if (isAllCapsLine(line)) continue;
+    for (const m of line.matchAll(CAPS_TOKEN_RE)) {
+      const words = m[0].split(/\s+/).filter(w => !CAPS_STOPWORDS.has(w));
+      if (words.length === 0) continue;
+      const id = words.join(' ').toLowerCase();
+      if (id.length >= 3) tokens.add(id);
+    }
   }
   return [...tokens];
 }
@@ -1217,8 +1241,26 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   unresolvedByScene: Record<number, string[]>;
 } {
   const tokenScenes = new Map<string, number[]>();
+  // Speaker-name guard (clue-channel precision wave): a caps token equal to
+  // a dialogue cue name is a CHARACTER, not a planted object — on the real
+  // corpus character names were among the highest-frequency fake clues
+  // ("kristoff", "sven"). Cue lines are whole-line caps and already skipped
+  // by isAllCapsLine, but names also appear as INLINE caps at first
+  // introduction ("KRISTOFF (8), and his reindeer") — the intro convention —
+  // so the guard must be by-name, not by-line.
+  const speakerNames = new Set<string>();
+  const CUE_LINE_RE = /^[A-Z][A-Z0-9\s\-'\.]{1,}(\s*\([A-Za-z.\s']+\))?$/;
+  for (const s of scenes) {
+    for (const line of s.rawText.split(/\r?\n/)) {
+      const t = line.trim();
+      if (t && CUE_LINE_RE.test(t) && !/^(INT\.|EXT\.|CUT|FADE|SMASH)/.test(t)) {
+        speakerNames.add(t.split('(')[0].trim().toLowerCase());
+      }
+    }
+  }
   for (const s of scenes) {
     for (const token of extractDistinctiveTokens(s.rawText)) {
+      if (speakerNames.has(token)) continue;
       const arr = tokenScenes.get(token);
       if (arr) arr.push(s.sceneIdx);
       else tokenScenes.set(token, [s.sceneIdx]);
@@ -1229,7 +1271,13 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   const payoffsByScene: Record<number, string[]> = {};
   const unresolvedByScene: Record<number, string[]> = {};
 
+  // Ubiquity guard (same wave): a token present in over a quarter of a
+  // feature's scenes (min 4) is ambient vocabulary or a protagonist-adjacent
+  // fixture, not a plant the audience is owed a payoff on. Small scripts are
+  // unaffected (the >= 4 floor keeps every existing short-fixture behavior
+  // byte-identical).
   for (const [token, occ] of tokenScenes) {
+    if (occ.length >= 4 && occ.length / scenes.length > 0.25) continue;
     applyClueLifecycle(slugifyToken(token), occ, seedsByScene, payoffsByScene, unresolvedByScene);
   }
 

@@ -1,6 +1,6 @@
 # Pass: `payoff`
 
-Founding wave: 39. Total distinct rules: 228 (171 attributed to a specific wave, 57 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 229 (171 attributed to a specific wave, 58 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1182
 
@@ -569,6 +569,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `NO_SETUPS` — No clues planted at all (no setup/payoff engine)
 - `OPEN_CLUES_AT_END` — Open clue count in structure
 - `ORPHAN_CLUE` — Orphan clues (never paid off)
+- `ORPHAN_CLUE_PERVASIVE` — Orphan clues (never paid off)
 - `PAYOFF_ACT2A_VOID` — Wave 275: Act 2a payoff void, late-majority clue seeding, setup/payoff act skew
 - `PAYOFF_ACT3_ABSENT` — Wave 370: PAYOFF_CURIOSITY_PEAK_DECOUPLED, PAYOFF_ACT3_ABSENT, CLUE_SEED_MIDPOINT_VOID
 - `PAYOFF_AFTERMATH_RELATIONSHIP_VOID` — Wave 482: SEED_CURIOSITY_AFTERMATH_ABSENT, SEED_ACT3_VOID, PAYOFF_AFTERMATH_RELATIONSHIP_VOID

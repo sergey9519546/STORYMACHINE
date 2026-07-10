@@ -592,6 +592,33 @@ export function verdictFor(health: number, sceneCount: number): CoverageVerdict 
   return 'CONSIDER';
 }
 
+/** Deterministic page/runtime estimate from the analyzed Fountain text.
+ *  Pure arithmetic over the text the doctor already holds — no layout engine,
+ *  no new heuristics: non-blank rendered lines at the classic ~55 lines per
+ *  screenplay page, runtime at the 1-page-≈-1-minute convention. Constants
+ *  stay function-local per this file's standing TDZ note (doctor↔reference
+ *  circular import). Floors at 1 page for any non-empty text so a one-scene
+ *  excerpt never reports "0 pages"; returns null for empty/whitespace input
+ *  (degenerate reports carry no estimate rather than a fabricated one). */
+export function estimatePages(fountain: string): ScriptDoctorReport['pageEstimate'] | null {
+  const LINES_PER_PAGE = 55; // classic screenplay layout density
+  const lines = fountain.split(/\r?\n/).filter(l => l.trim().length > 0).length;
+  if (lines === 0) return null;
+  const pages = Math.max(1, Math.round(lines / LINES_PER_PAGE));
+  return { pages, runtimeMinutes: pages, basis: 'lines' };
+}
+
+/** One honest sentence when the input is thinner than the RECOMMEND verdict
+ *  floor (verdictFor's sceneCount >= 8) — the report is excerpt feedback,
+ *  not feature coverage, and saying so beats false precision. Returns
+ *  undefined at or above the floor: never padded onto full-length input. */
+export function excerptNoteFor(sceneCount: number): string | undefined {
+  if (sceneCount >= 8) return undefined;
+  return `This reads like an excerpt (${sceneCount} scene${sceneCount === 1 ? '' : 's'} analyzed): ` +
+    'scores and verdicts are computed the same way as for a full script, but with this ' +
+    'little material they should be read as feedback on the pages, not coverage of a feature.';
+}
+
 // ── Dimension rollup ──────────────────────────────────────────────────────────
 // The 14 passes, regrouped into the 5 writer-facing dimensions fixed by the
 // DimensionKey contract in types.ts. Each pass belongs to exactly one
@@ -785,6 +812,11 @@ export interface StrengthsInput {
   sceneCount: number;
   bySeverity: { critical: number; major: number; minor: number };
   dimensions: DimensionScore[];
+  /** Run 20 (excellence sprint): raw analyzed Fountain text for the
+   *  acceleration detector's per-scene word counts (records don't carry
+   *  scene length). Optional — absent means that detector silently
+   *  no-fires, so every pre-Run-20 caller/fixture stays byte-identical. */
+  fountain?: string;
   /** Wave 1183 (Program v2, Type 2 — excellence): the per-scene records the
    *  three new detectors below read (clockRaised, relationshipShifts,
    *  emotionalShift). Optional — defaults to [] inside buildStrengths — so
@@ -1220,6 +1252,85 @@ function buildDramaticTurnDensityStrength(
  * bullet, with no dependency on which of the hundreds of accumulated pass
  * rules happen to fire for a given fountain string.
  */
+// ── Run 20 (excellence sprint) detectors ─────────────────────────────────────
+// Measured against the 69-script real corpus AND the 20-sample calibration
+// corpus BEFORE thresholds were committed (standing measure-before-threshold
+// practice). Fire rates at introduction: acceleration 17/69, cold-open 13/69,
+// climax-placement 7/69 real produced features; 0/20 calibration (the corpus
+// samples sit under the 12/16-scene floors — structurally exempt, so the
+// never-padded no-fire evidence for these three lives in their fixture tests,
+// not corpus silence). Selectivity is intentional: an excellence claim earned
+// by 10-25% of PRODUCED features is a real distinction, not participation
+// praise. Two candidates were measured and honestly DROPPED this wave: voice
+// distinctness (dialogue-cue parsing on the PDF import path only yields 3
+// qualifying speakers on 12/69 scripts — the channel is extraction-noise-
+// bound) and payoff discipline (the content-word clue channel seeds 300-700
+// "clues" on features with ~20% payoff ratio everywhere — noise-dominated,
+// a detector on it would reward noise). Their measurements are retained here
+// so the next excellence wave doesn't re-run the same dead ends.
+
+const RUN20_MIN_SCENES = 12;
+const RUN20_ACCEL_MIN_SCENES = 16;
+
+/** Cold-open hook: the first scene already moves (suspense/curiosity rises or
+ *  a real dramatic turn) AND real stakes (a clock) appear inside the first
+ *  quarter. Distinct from buildStakesContinuityStrength (clock PERSISTENCE
+ *  across the whole script) and structure.escalating (half-vs-half trend):
+ *  this reads only the opening — a script can hook cold and still fail both
+ *  of those, and vice versa. */
+function buildColdOpenStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < RUN20_MIN_SCENES || records.length === 0) return null;
+  const first = records[0];
+  const hooked = (first.suspenseDelta ?? 0) > 0 || (first.curiosityDelta ?? 0) > 0 ||
+    (first.dramaticTurn != null && first.dramaticTurn !== 'nothing' && first.dramaticTurn !== '');
+  if (!hooked) return null;
+  const q1 = records.slice(0, Math.max(3, Math.floor(sceneCount / 4)));
+  if (!q1.some(r => r.clockRaised || (r.clockDelta ?? 0) > 0)) return null;
+  return 'The opening earns attention immediately — the very first scene already turns, and real stakes are on the table before the first quarter is out.';
+}
+
+/** Climax placement: the single most intense scene (suspense + clock + turn)
+ *  lands in the final 30%, and the final quarter carries more total intensity
+ *  than the first. Distinct from buildSuspenseShapingStrength (quartile-zone
+ *  suspense AVERAGES) — this is about where the PEAK sits and whether the
+ *  ending outweighs the opening, which zone averages can miss entirely. */
+function buildClimaxPlacementStrength(
+  records: ScreenplaySceneRecord[], sceneCount: number,
+): string | null {
+  if (sceneCount < RUN20_MIN_SCENES || records.length === 0) return null;
+  const intensity = records.map(r =>
+    Math.max(0, r.suspenseDelta ?? 0) + Math.max(0, r.clockDelta ?? 0) +
+    ((r.dramaticTurn != null && r.dramaticTurn !== 'nothing' && r.dramaticTurn !== '') ? 1 : 0));
+  const max = Math.max(...intensity);
+  if (max <= 0) return null;
+  if (intensity.indexOf(max) < Math.floor(sceneCount * 0.7)) return null;
+  const sumQ4 = intensity.slice(Math.floor(sceneCount * 0.75)).reduce((a, b) => a + b, 0);
+  const sumQ1 = intensity.slice(0, Math.floor(sceneCount * 0.25)).reduce((a, b) => a + b, 0);
+  if (sumQ4 <= sumQ1) return null;
+  return 'The climax is where it belongs — the story\'s single most intense scene lands in the final stretch, and the last quarter outweighs the first instead of the draft peaking early.';
+}
+
+/** Acceleration: scene lengths compress toward the end (final-quarter mean
+ *  word count <= 75% of first-quarter mean) — the cutting gets faster as the
+ *  stakes rise, a hallmark of controlled feature pacing. Needs the raw
+ *  fountain (records carry no scene length); silently no-fires without it. */
+function buildAccelerationStrength(
+  fountain: string | undefined, sceneCount: number,
+): string | null {
+  if (!fountain || sceneCount < RUN20_ACCEL_MIN_SCENES) return null;
+  const scenes = fountain.split(/^(?=INT\.|EXT\.)/mi).filter(s => /^(INT\.|EXT\.)/i.test(s));
+  if (scenes.length < RUN20_ACCEL_MIN_SCENES) return null;
+  const w = scenes.map(s => s.split(/\s+/).length);
+  const q = Math.floor(w.length / 4);
+  if (q === 0) return null;
+  const first = w.slice(0, q).reduce((a, b) => a + b, 0) / q;
+  const last = w.slice(-q).reduce((a, b) => a + b, 0) / q;
+  if (first <= 0 || last > 0.75 * first) return null;
+  return 'The cutting accelerates as the story closes — scenes in the final quarter run measurably tighter than the opening\'s, pacing that rises with the stakes instead of flattening.';
+}
+
 export function buildStrengths(input: StrengthsInput): string[] {
   const { structure, anyClueSeeded, sceneCount, bySeverity, dimensions, records = [] } = input;
   const strengths: string[] = [];
@@ -1281,6 +1392,17 @@ export function buildStrengths(input: StrengthsInput): string[] {
 
   const suspenseShaping = buildSuspenseShapingStrength(records, sceneCount);
   if (suspenseShaping) strengths.push(suspenseShaping);
+
+  // Run 20 (excellence sprint) additions — see the block comment above the
+  // three helpers for measurement evidence and the two candidates dropped.
+  const coldOpen = buildColdOpenStrength(records, sceneCount);
+  if (coldOpen) strengths.push(coldOpen);
+
+  const climaxPlacement = buildClimaxPlacementStrength(records, sceneCount);
+  if (climaxPlacement) strengths.push(climaxPlacement);
+
+  const acceleration = buildAccelerationStrength(input.fountain, sceneCount);
+  if (acceleration) strengths.push(acceleration);
 
   const dramaticTurnDensity = buildDramaticTurnDensityStrength(records, sceneCount);
   if (dramaticTurnDensity) strengths.push(dramaticTurnDensity);
@@ -1438,6 +1560,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bySeverity,
     dimensions,
     records: analysis.records,
+    fountain,
   });
   let plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
   // DoS guard (S1-b) notice: analysis.sceneCount is already the
@@ -1547,6 +1670,8 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     contentHash: computeContentHash(fountain),
     healthPercentile,
     metrics,
+    pageEstimate: estimatePages(fountain) ?? undefined,
+    excerptNote: excerptNoteFor(analysis.sceneCount),
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),

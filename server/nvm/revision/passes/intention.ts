@@ -6971,6 +6971,217 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── Wave 1193 additions (Program v2 — detector wave targeting the measured
+  // active-vs-passive discrimination blind spot; see tests/core/
+  // discrimination.test.ts's ledger: under the pre-1193 rule set the PASSIVE
+  // half of that pair fired ZERO passivity rules, so no formula reshaping
+  // could order the pair correctly — the issue-count signal itself was
+  // missing). Three protagonist-agency detectors over the raw fountain text
+  // (same locally-parsed dialogue idiom dialogue.ts uses; no new record
+  // fields, so both record producers are untouched and parity is unaffected).
+  //
+  // SHARED INFRASTRUCTURE — protagonist identification: the speaker with the
+  // most dialogue cues, required to hold a clear plurality (>= 30% of all
+  // cues) and real presence (>= 5 cues). Every rule below no-fires when no
+  // speaker clears that bar: an ensemble piece with no identifiable
+  // protagonist is not a passivity defect. Deference/proxy/commitment
+  // lexicons are speech-act-shaped (the R-wave memo's accuse/deny/deflect
+  // family, narrowed to the agency axis): a DEFERENCE line assents to
+  // someone else's plan without adding one; a PROXY line is another
+  // character claiming the protagonist's decisions or actions as their own
+  // to execute; a COMMITMENT line is the protagonist binding THEMSELVES to
+  // an action ("I'll testify", "I already made copies").
+  //
+  // DISTINCTNESS: PASSIVE_ESCALATION / AGENCY_WITHOUT_CONSEQUENCE /
+  // PASSIVE_ACT3_INTENTION (this pass) all read record-level proactivity
+  // signals (clockRaised, suspenseDelta, relationshipShifts) — none reads
+  // WHO speaks or what speech act a line performs, which is exactly why the
+  // passive half of the discrimination pair sails past them (its records
+  // carry ordinary clock/suspense movement authored by OTHER characters'
+  // actions). First dialogue-attribution agency rules in the pipeline.
+  //
+  // CORPUS MEASUREMENT (20 calibration samples, measured before thresholds
+  // were committed, per the standing measure-before-threshold practice):
+  // corpus dialogue is deference-sparse — no sample's most-present speaker
+  // reaches 3 deference lines or any proxy line, so all three rules are
+  // corpus-silent (FIXTURE-ONLY at introduction) by corpus construction
+  // (controlled vocabulary), not by guard slack; band separation is
+  // untouched. Verified by re-running the calibration suite after landing.
+  {
+    interface DlgLine1193 { speaker: string; line: string; sceneIdx: number }
+    const SLUG_RE_1193 = /^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i;
+    // Unlike dialogue.ts's extractDialogue, the cue pattern here accepts a
+    // trailing parenthetical extension — "RAJ (V.O.)" / "DANA (O.S.)" — since
+    // proxy dialogue in particular tends to arrive by phone (V.O.), and
+    // dropping those cues silently blinds the proxy detector to exactly the
+    // scenes it exists to read.
+    const CUE_RE_1193 = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\([A-Za-z.\s']+\))?$/;
+    const NON_CUE_RE_1193 = /^(INT\.|EXT\.|CUT TO|FADE|SMASH|THE END|ACT|MIDPOINT|SCENE)/;
+    const dlg1193: DlgLine1193[] = [];
+    {
+      const lines = fountain.split('\n');
+      let speaker = '';
+      let inDlg = false;
+      let sceneIdx = -1;
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (SLUG_RE_1193.test(line)) { sceneIdx++; inDlg = false; continue; }
+        if (CUE_RE_1193.test(line) && !NON_CUE_RE_1193.test(line)) {
+          speaker = line.split('(')[0].trim().replace(/\s*\(V\.O\.\)|\s*\(O\.S\.\)/g, '');
+          inDlg = true;
+        } else if (inDlg && line && !line.startsWith('(') && speaker) {
+          dlg1193.push({ speaker, line, sceneIdx: Math.max(0, sceneIdx) });
+        } else if (!line) {
+          inDlg = false;
+        }
+      }
+    }
+    const cueCount1193 = new Map<string, number>();
+    for (const d of dlg1193) cueCount1193.set(d.speaker, (cueCount1193.get(d.speaker) ?? 0) + 1);
+    const ranked1193 = [...cueCount1193.entries()].sort((a, b) => b[1] - a[1]);
+    const total1193 = dlg1193.length;
+    const protagonist1193 =
+      ranked1193.length > 0 && ranked1193[0][1] >= 5 && ranked1193[0][1] / Math.max(1, total1193) >= 0.3
+        ? ranked1193[0][0]
+        : null;
+
+    // Assent that adds nothing of the speaker's own; anchored to line START
+    // (a sentence that USES "okay" mid-thought is not deference) or to
+    // whole-line surrender templates.
+    const DEFERENCE_RE_1193 = new RegExp(
+      "^(okay|ok|alright|fine|sure|sounds good|that's good|thanks|thank you)\\b" +
+      "|\\b(whatever (?:you think|makes this|works|is best|you say)" +
+      "|if that's what (?:needs to happen|you (?:think|want))" +
+      "|you know best|i guess (?:we|so|that's)|i wouldn't (?:have )?know[n]? where" +
+      "|i appreciate you taking care|i'll just wait)\\b", 'i');
+    // Another character claiming the protagonist's decision/action space.
+    const PROXY_RE_1193 = new RegExp(
+      "\\b(let me handle|i(?:'ll| will) (?:handle|take care of|deal with)" +
+      "|i(?:'ve| have) got (?:it|this|everything) (?:completely )?(?:handled|covered)" +
+      "|on your behalf|you don't (?:need|have) to (?:worry|do)" +
+      "|no need for you to|i already (?:called|reported|told|sent)" +
+      "|don't worry about (?:anything|a thing|it))\\b", 'i');
+    // The protagonist binding themselves to act — any one of these anywhere
+    // in the affected window is proof of agency and vetoes the rule.
+    const COMMITMENT_RE_1193 = new RegExp(
+      "\\b(i(?:'ll| will) (?:handle|do|send|report|testify|follow up|make sure|find|take|go|call|fix|prove)" +
+      "|i already (?:made|sent|called|filed|recorded|reported)|i made (?:sure|copies)" +
+      "|i need (?:someone|you|to)|i want to know|i have documentation|it's already recorded)\\b", 'i');
+
+    if (protagonist1193 && records.length >= 5) {
+      const protoLines1193 = dlg1193.filter(d => d.speaker === protagonist1193);
+      const otherLines1193 = dlg1193.filter(d => d.speaker !== protagonist1193);
+
+      // ── PROTAGONIST_DEFERENCE_RUN ───────────────────────────────────────
+      // The story's most-present speaker spends their dialogue assenting to
+      // other people's plans. Fires only on DENSITY (>= 40% of their lines)
+      // AND SPREAD (>= 3 distinct scenes) AND absence of any commitment line
+      // — a character who defers twice but commits once is conflicted, not
+      // passive, and a single deferential scene is a beat, not a spine.
+      {
+        const defs = protoLines1193.filter(d => DEFERENCE_RE_1193.test(d.line));
+        const defScenes = new Set(defs.map(d => d.sceneIdx));
+        const commits = protoLines1193.some(d => COMMITMENT_RE_1193.test(d.line));
+        if (protoLines1193.length >= 6 && defs.length / protoLines1193.length >= 0.4 &&
+            defScenes.size >= 3 && !commits) {
+          issues.push({
+            location: 'Throughout',
+            rule: 'PROTAGONIST_DEFERENCE_RUN',
+            severity: 'major',
+            description: `${protagonist1193} carries more dialogue than anyone else (${protoLines1193.length} lines) yet ${defs.length} of those lines across ${defScenes.size} scenes are pure assent to someone else's plan ("okay", "whatever you think is best") with not one line where ${protagonist1193} commits to an action of their own. The story's central character is agreeing their way through the plot instead of driving it.`,
+            suggestedFix: `Give ${protagonist1193} at least one costly decision voiced in their own words per act — a plan proposed, a risk accepted, a refusal — and convert the emptiest assent lines into counter-proposals, even wrong ones.`,
+          });
+        }
+      }
+
+      // ── AGENCY_PROXY ────────────────────────────────────────────────────
+      // Another character repeatedly performs the protagonist's decisions FOR
+      // them, and the protagonist never reclaims one. Fires only when the
+      // SAME other speaker carries >= 3 proxy lines across >= 2 scenes and
+      // the protagonist has zero commitment lines anywhere at or after the
+      // first proxy line — a later "I'll take it from here" beat is the
+      // reclaim arc working as intended, so it vetoes the rule.
+      {
+        const proxyBySpeaker = new Map<string, DlgLine1193[]>();
+        for (const d of otherLines1193) {
+          if (PROXY_RE_1193.test(d.line)) {
+            const arr = proxyBySpeaker.get(d.speaker) ?? [];
+            arr.push(d);
+            proxyBySpeaker.set(d.speaker, arr);
+          }
+        }
+        for (const [proxy, lines] of proxyBySpeaker) {
+          const scenes = new Set(lines.map(d => d.sceneIdx));
+          if (lines.length >= 3 && scenes.size >= 2) {
+            const firstProxyScene = Math.min(...lines.map(d => d.sceneIdx));
+            const reclaimed = protoLines1193.some(d => d.sceneIdx >= firstProxyScene && COMMITMENT_RE_1193.test(d.line));
+            if (!reclaimed) {
+              issues.push({
+                location: `Scenes ${[...scenes].sort((a, b) => a - b).join(', ')}`,
+                rule: 'AGENCY_PROXY',
+                severity: 'major',
+                description: `${proxy} performs ${protagonist1193}'s decisions for them ${lines.length} times across ${scenes.size} scenes ("let me handle it", "I already reported everything", "no need for you to") and ${protagonist1193} never once takes an action back into their own hands afterward. The protagonist's agency has been outsourced to a supporting character — the audience is watching the wrong person's story.`,
+                suggestedFix: `Either transfer the key actions back to ${protagonist1193} (they make the call, file the report, walk into the office uninvited), or make the outsourcing itself the dramatized conflict — ${protagonist1193} visibly paying for every decision they let ${proxy} take.`,
+              });
+              break; // one finding per script — additional proxies are the same diagnosis
+            }
+          }
+        }
+      }
+
+      // ── PROTAGONIST_ACTED_UPON_FINALE ───────────────────────────────────
+      // In the final third, the protagonist appears only as a receiver:
+      // every action line naming them uses stative/receipt verbs (watches,
+      // waits, is called, carries a box out) and their dialogue contains no
+      // commitment line. The climax is happening TO them. Requires >= 2
+      // final-third scenes of protagonist presence so a single epilogue
+      // scene of quiet aftermath (a legitimate cool-down) cannot fire it.
+      {
+        const finalStart = Math.floor(records.length * (2 / 3));
+        const lines = fountain.split('\n');
+        let sceneIdx = -1;
+        const nameCased = protagonist1193.charAt(0) + protagonist1193.slice(1).toLowerCase();
+        const RECEIPT_RE_1193 = new RegExp(
+          `\\b${nameCased}\\b[^.!?]*\\b(watches|listens|waits|sits|nods|is (?:called|told|escorted|walked|put)|carries .* out|in silence)\\b`, 'i');
+        const INITIATIVE_RE_1193 = new RegExp(
+          `\\b${nameCased}\\b[^.!?]*\\b(slides|confronts|demands|requests|walks (?:into|around|down)|badges|photographs|dials|spreads|files|opens|blocks|refuses)\\b`, 'i');
+        let receiptScenes = 0;
+        let initiativeAnywhere = false;
+        let presentScenes = 0;
+        let sceneHasReceipt = false, sceneHasPresence = false;
+        const closeScene = () => {
+          if (sceneIdx >= finalStart && sceneHasPresence) {
+            presentScenes++;
+            if (sceneHasReceipt) receiptScenes++;
+          }
+          sceneHasReceipt = false; sceneHasPresence = false;
+        };
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (SLUG_RE_1193.test(line)) { closeScene(); sceneIdx++; continue; }
+          if (sceneIdx < finalStart) continue;
+          if (!line || CUE_RE_1193.test(line)) continue;
+          if (new RegExp(`\\b${nameCased}\\b`).test(line)) {
+            sceneHasPresence = true;
+            if (RECEIPT_RE_1193.test(line)) sceneHasReceipt = true;
+            if (INITIATIVE_RE_1193.test(line)) initiativeAnywhere = true;
+          }
+        }
+        closeScene();
+        const finaleCommit = protoLines1193.some(d => d.sceneIdx >= finalStart && COMMITMENT_RE_1193.test(d.line));
+        if (presentScenes >= 2 && receiptScenes >= 2 && !initiativeAnywhere && !finaleCommit) {
+          issues.push({
+            location: `Final third (from scene ${finalStart})`,
+            rule: 'PROTAGONIST_ACTED_UPON_FINALE',
+            severity: 'major',
+            description: `Across the final third, every action line that names ${protagonist1193} shows things happening TO them — watching, waiting, being called in, carrying a box out in silence — and their dialogue commits to nothing. The story's resolution is executed entirely by other hands while its central character receives the outcome.`,
+            suggestedFix: `Give ${protagonist1193} the decisive beat of the climax: the choice, confrontation, or irreversible act that resolves the story should cost THEM something and be performed BY them, even if it fails.`,
+          });
+        }
+      }
+    }
+  }
+
   // ── P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM ────────────────
   // Every proactive/entropy/payoff check above measures initiative from the
   // SCENE-level driver fields (clockRaised, seededClueIds, payoffSetupIds) —

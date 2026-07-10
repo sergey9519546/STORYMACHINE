@@ -154,6 +154,11 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [showScriptDoctor, setShowScriptDoctor] = useState(false);
+  // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
+  // idiom as sm_fdx_import_pending below): when set, the doctor overlay opens
+  // on mount and auto-runs the built-in sample through its own loadSample
+  // flow, preserving "sample" provenance end to end.
+  const [doctorAutoSample, setDoctorAutoSample] = useState(false);
   const [showSlate, setShowSlate] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
   // a first pass doesn't want squiggles until they ask for them.
@@ -628,6 +633,12 @@ export default function ScriptIDE({
           `"${pendingFdx}" is a Final Draft (.fdx) file — this app converts .fdx server-side. Open Script Doctor (below) and use its "Upload script" button to bring it in as Fountain.`
         );
         sessionStorage.removeItem("sm_fdx_import_pending");
+      }
+      const pendingSample = sessionStorage.getItem("sm_sample_pending");
+      if (pendingSample) {
+        sessionStorage.removeItem("sm_sample_pending");
+        setDoctorAutoSample(true);
+        setShowScriptDoctor(true);
       }
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
@@ -1708,7 +1719,8 @@ export default function ScriptIDE({
               setScriptText(text);
               triggerAnalysis(text);
             }}
-            onClose={() => setShowScriptDoctor(false)}
+            autoLoadSample={doctorAutoSample}
+            onClose={() => { setDoctorAutoSample(false); setShowScriptDoctor(false); }}
           /></Suspense>
         )}
       </AnimatePresence>

@@ -309,6 +309,27 @@ export interface ScriptDoctorReport {
    *  rather than fabricating a neutral score — see computePacingFit's header
    *  in metrics.ts. */
   metrics?: NarrativeMetricsReport;
+  /** Deterministic industry-units estimate so a producer-facing report can
+   *  speak in pages and minutes, not word counts. Derived from the analyzed
+   *  Fountain text's rendered line count at the classic ~55 lines/page, with
+   *  runtime at the 1-page-≈-1-minute convention. An ESTIMATE, clearly
+   *  labeled as such by consumers — Fountain has no true pagination, so this
+   *  is reproducible arithmetic, not layout. Optional so reports serialized
+   *  before this field existed stay valid; the doctor populates it on every
+   *  non-degenerate run. */
+  pageEstimate?: {
+    pages: number;
+    runtimeMinutes: number;
+    /** How the estimate was computed — 'lines' is the only basis today. */
+    basis: 'lines';
+  };
+  /** Present ONLY when the input is too thin to judge as a complete work
+   *  (fewer scenes than the RECOMMEND verdict floor of 8): one plain-language
+   *  sentence telling the reader the report should be read as excerpt
+   *  feedback, not feature coverage. Absent on full-length input — never
+   *  padded. Confidence honesty, not a verdict change: verdict/dimensions
+   *  are computed exactly as before. */
+  excerptNote?: string;
   /** DoS guard (S1-b): mirrors FountainAnalysis.truncatedForAnalysis — set
    *  only when the submitted script exceeded the analyzer's scene ceiling and
    *  this report covers its first `sceneCount` scenes only. Absent for every

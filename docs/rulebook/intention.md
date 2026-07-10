@@ -1,6 +1,6 @@
 # Pass: `intention`
 
-Founding wave: 39. Total distinct rules: 225 (179 attributed to a specific wave, 46 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 228 (179 attributed to a specific wave, 49 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1179
 
@@ -557,6 +557,7 @@ Rules named in this wave's header:
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
 - `AGENCY_ENTROPY_COLLAPSE` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
+- `AGENCY_PROXY` — AGENCY_PROXY
 - `CLIMAX_WITHOUT_CHOICE` — Act 3 without a character making the climactic choice
 - `CLOCK_REVELATION_AFTERMATH_VOID` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
 - `COMMITMENT_RAMP_INVERSION` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
@@ -589,7 +590,9 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `PROACTIVE_PAYOFF_COINCIDENCE_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
 - `PROACTIVE_RELATIONSHIP_VOID` — Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID
 - `PROACTIVE_REVELATION_COINCIDENCE_ABSENT` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
+- `PROTAGONIST_ACTED_UPON_FINALE` — PROTAGONIST_ACTED_UPON_FINALE
 - `PROTAGONIST_DECISION_VACUUM` — P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM
+- `PROTAGONIST_DEFERENCE_RUN` — PROTAGONIST_DEFERENCE_RUN
 - `PROTAGONIST_REACTIVE_DOMINANCE` — Wave 156: Protagonist reactive dominance
 - `REACTIVE_GOAL_ADOPTION` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
 - `REVELATION_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID

@@ -37,10 +37,21 @@
 //
 //   escalation-vs-flat-repetition:    good 76.1 > bad 70.0  (gap +6.1) PASS
 //   setup-payoff-vs-orphaned-setups:  good 74.6 > bad 70.0  (gap +4.6) PASS
+//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS (flipped by W1)
+//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS (flipped by W1)
 //   composite-reviewer-scenario:      good 72.2 > bad 70.0  (gap +2.2) PASS ordering; 5.0-pt min-gap still FAILS
-//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS
-//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS
-//   active-vs-passive-protagonist:    good 76.6 > bad 75.3  (gap +1.3) PASS (flipped this wave, P6)
+//   active-vs-passive-protagonist:    good 76.6 > bad 70.4  (gap +6.2, measured post-merge — the two
+//                                     parallel fixes COMPOUND: P6's climax fix lifts the good half while
+//                                     both rule families fire on the passive half)
+//                                     — closed INDEPENDENTLY by two parallel sessions
+//                                     whose work is merged here: Wave 1193 (three protagonist-agency
+//                                     detectors: PROTAGONIST_DEFERENCE_RUN / AGENCY_PROXY /
+//                                     PROTAGONIST_ACTED_UPON_FINALE) and P6 (PROTAGONIST_DECISION_VACUUM +
+//                                     the INTENTION_REACTIVE_CLIMAX payoff fix). The rule families overlap
+//                                     by design lineage but carry distinct gates (30% vs 40% plurality,
+//                                     split vs combined lexicons, finale action-line receipts) — co-firing
+//                                     on strongly passive scripts is correct behavior, and the W3
+//                                     duplicate-family merge layer already dedupes them for display.
 //
 // active-vs-passive-protagonist flipped by closing BOTH diagnosed causes,
 // principled fix in each case (P6, discrimination-harness hardening — see
@@ -118,6 +129,13 @@ const KNOWN_DISCRIMINATING = new Set<string>([
   // above and densityPenalty's own comment for the measurement.
   'subtext-vs-on-the-nose',
   'dramatized-vs-told-exposition',
+  // Flipped by Wave 1193 (protagonist-agency detectors: PROTAGONIST_
+  // DEFERENCE_RUN, AGENCY_PROXY, PROTAGONIST_ACTED_UPON_FINALE in
+  // intention.ts): the passive half now fires the three passivity rules the
+  // blind-spot note said were missing (measured good 75.8 > bad 71.2,
+  // gap +4.6); all three are corpus-silent (0/20) and fire on no other
+  // pair's either half — precision verified before this flip.
+  'active-vs-passive-protagonist',
   // Also flipped: the plain good > bad ORDERING now genuinely holds for the
   // composite pair too (+2.2, up from a dead tie) — but the separate
   // minimum-gap regression guard below (COMPOSITE_MIN_GAP=5.0) still does
@@ -136,10 +154,20 @@ const KNOWN_DISCRIMINATING = new Set<string>([
  *  it inline via the message argument below rather than having to go dig up
  *  this comment block. */
 const BLIND_SPOT_NOTE: Record<string, string> = {
+  'active-vs-passive-protagonist':
+    'CLOSED twice in parallel (Wave 1193 dialogue-attribution agency detectors + P6 DECISION_VACUUM/'
+    + 'REACTIVE_CLIMAX fix, merged) — retained so a regression here surfaces the history: pre-fix no signal '
+    + 'distinguished a protagonist who drives decisions from one things merely happen to',
   'composite-reviewer-scenario':
     "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '
-    + 'from a dead tie) — real but short of the 5.0-point floor below',
+    + 'from a dead tie) — real but short of the 5.0-point floor below. DIAGNOSED 2026-07-10 (rule-level diff): '
+    + 'the bad half already fires 22 rules the good half does not (EXPOSITION_DUMP x2, NO_RELATIONSHIP_MOVEMENT, '
+    + 'dialogue floods) — the residual gap is ~19 STYLE-MINOR false positives on the GOOD half (rhythm/dialogue '
+    + 'line-shape rules: LONG_LINE_FLOOD, ACTION_CONSECUTIVE_LONG_RUN, DIALOGUE_ANAPHORA_RUN, etc.) tripping on '
+    + 'dramatized action prose, the same D2 pattern spread thin across many rules. Closing it honestly is a '
+    + 'dedicated guard wave over those rhythm minors (each measured against calibration), not a lexicon chase '
+    + 'on this fixture',
 };
 
 function topIssues(report: ScriptDoctorReport, n = 3): string {

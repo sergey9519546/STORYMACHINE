@@ -591,14 +591,41 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Orphan clues (never paid off) ────────────────────────────────────────
-  for (const [clueId, info] of clueInfo) {
-    if (!payoffInfo.has(clueId) && (structure.actPosition === 'act3' || structure.completionPercent >= 70)) {
+  // CAPPED per real-script corpus finding (2026-07-10): on imported feature-
+  // length scripts the content-word clue channel seeds hundreds of clues, and
+  // an unbounded per-clue loop emitted 556-1,077 CRITICAL instances on
+  // professionally produced screenplays (Frozen, Coraline, Ratatouille, The
+  // Incredibles), single-handedly saturating health to 0 — one systemic
+  // phenomenon was being counted as a thousand independent defects. The first
+  // ORPHAN_CLUE_DETAIL_CAP orphans are still reported individually (each one
+  // actionable), and everything beyond folds into ONE aggregate critical
+  // carrying the count — same diagnostic information, honest weight. Same
+  // report-quality principle as the W3 duplicate-family merge layer.
+  {
+    const ORPHAN_CLUE_DETAIL_CAP = 8;
+    const orphans: Array<{ clueId: string; plantedAt: number; slug: string }> = [];
+    if (structure.actPosition === 'act3' || structure.completionPercent >= 70) {
+      for (const [clueId, info] of clueInfo) {
+        if (!payoffInfo.has(clueId)) orphans.push({ clueId, plantedAt: info.plantedAt, slug: info.slug });
+      }
+    }
+    for (const o of orphans.slice(0, ORPHAN_CLUE_DETAIL_CAP)) {
       issues.push({
-        location: `Scene ${info.plantedAt} (${info.slug})`,
+        location: `Scene ${o.plantedAt} (${o.slug})`,
         rule: 'ORPHAN_CLUE',
-        description: `Clue "${clueId}" was planted in Scene ${info.plantedAt} but never paid off — a broken promise to the audience`,
+        description: `Clue "${o.clueId}" was planted in Scene ${o.plantedAt} but never paid off — a broken promise to the audience`,
         severity: 'critical',
-        suggestedFix: `Add a scene in Act 3 that reveals the significance of "${clueId}" and closes the loop`,
+        suggestedFix: `Add a scene in Act 3 that reveals the significance of "${o.clueId}" and closes the loop`,
+      });
+    }
+    if (orphans.length > ORPHAN_CLUE_DETAIL_CAP) {
+      const rest = orphans.length - ORPHAN_CLUE_DETAIL_CAP;
+      issues.push({
+        location: 'Throughout',
+        rule: 'ORPHAN_CLUE_PERVASIVE',
+        description: `Beyond the ${ORPHAN_CLUE_DETAIL_CAP} unresolved planted details listed individually, ${rest} more planted details never pay off. At this volume the pattern is systemic — either the story plants far more promises than it keeps, or (on imported scripts) many of these are texture the importer read as plants. Review the individually-listed clues first; they are the highest-confidence breaks.`,
+        severity: 'critical',
+        suggestedFix: `Triage the planted details: pay off the ones that matter, cut or de-emphasize the ones that were never promises, and re-run the doctor — this finding shrinks as either happens.`,
       });
     }
   }

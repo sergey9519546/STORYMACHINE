@@ -242,6 +242,23 @@ export default function StartScreen({
                   >
                     <Upload className="w-4 h-4" /> Open A Script File
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // One-click sample: hand off to ScriptIDE via the same
+                      // sessionStorage idiom as the .fdx pending flag. The
+                      // IDE opens Script Doctor and triggers its existing
+                      // "Try a sample script" flow, so provenance stays
+                      // "sample" end to end (draft history is never
+                      // polluted — see ScriptDoctorPanel's isSampleRun).
+                      try { sessionStorage.setItem("sm_sample_pending", "1"); } catch { /* still opens the editor */ }
+                      onStart(DEFAULT_STORY_CONFIG);
+                    }}
+                    disabled={isGenerating}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
+                  >
+                    <Sparkles className="w-4 h-4" /> Try The Sample Script
+                  </button>
                   <input
                     type="file"
                     accept=".fountain,.txt,.fdx"

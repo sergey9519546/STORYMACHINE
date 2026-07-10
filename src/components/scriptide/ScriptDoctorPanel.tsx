@@ -54,6 +54,11 @@ interface ScriptDoctorPanelProps {
    *  Optional so the panel still renders (minus the "load into editor" button)
    *  when a host doesn't wire it up. */
   onLoadFountain?: (text: string) => void;
+  /** When true, the panel runs its own "Try a sample script" flow once on
+   *  mount — the StartScreen one-click entry (sm_sample_pending handoff in
+   *  ScriptIDE.tsx). Same code path as the in-panel button, so provenance is
+   *  "sample" and the draft-history guard holds. */
+  autoLoadSample?: boolean;
   onClose: () => void;
 }
 
@@ -1236,6 +1241,7 @@ export default function ScriptDoctorPanel({
   fountain,
   title,
   onLoadFountain,
+  autoLoadSample,
   onClose,
 }: ScriptDoctorPanelProps) {
   const [status, setStatus] = useState<Status>("idle");
@@ -1639,6 +1645,18 @@ export default function ScriptDoctorPanel({
     setErrorMessage(null);
     runDiagnosis({ fountain: sampleScriptFountain, title: sampleScriptTitle });
   };
+
+  // StartScreen one-click entry: run the sample flow once on mount when the
+  // host asked for it. Ref-gated (not dep-gated) so a parent re-render with
+  // the prop still true can never re-fire a second diagnosis.
+  const autoSampleFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoLoadSample && !autoSampleFiredRef.current) {
+      autoSampleFiredRef.current = true;
+      loadSample();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoadSample]);
 
   const handleExportReport = () => {
     if (!report) return;
