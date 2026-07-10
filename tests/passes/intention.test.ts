@@ -7258,4 +7258,101 @@ describe('P6 — intentionPass: PROTAGONIST_DECISION_VACUUM', () => {
       'PROTAGONIST_DECISION_VACUUM should not fire when no single speaker holds >=40% of dialogue',
     );
   });
+
+  // Regression for the confirmed bug: commitment counting used to be per-SPEECH
+  // with a blanket deferral exclusion, so a mixed dialogue block like "Okay.
+  // I'll handle this myself." matched DEFERRAL_RE (via "okay") and discarded
+  // the genuine first-person commitment sentence right alongside it. Sentence-
+  // level evaluation must recognize the commitment even though the same speech
+  // also contains a deferral sentence.
+  it('does not fire when the top speaker\'s only zero-deferral speech is a mixed "Okay. I\'ll handle this myself." block', async () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ANNA',
+      'Whatever you think is best.',
+      '',
+      "ANNA",
+      "If that's what needs to happen, okay.",
+      '',
+      'ANNA',
+      'Sounds good.',
+      '',
+      'ANNA',
+      "Okay. I'll handle this myself.",
+      '',
+      'ANNA',
+      "I wouldn't have known what to do.",
+      '',
+      'BOB',
+      'Let me handle it.',
+      '',
+      'BOB',
+      "You don't need to worry about this.",
+      '',
+      'BOB',
+      'I already told them everything.',
+      '',
+      'BOB',
+      "It's fine, really.",
+      '',
+      'BOB',
+      "I've got this handled.",
+    ].join('\n');
+    const res = await runVacuum(fountain);
+    assert.ok(
+      !res.issues.some(i => i.rule === 'PROTAGONIST_DECISION_VACUUM'),
+      `PROTAGONIST_DECISION_VACUUM should not fire when a mixed speech contains a genuine first-person commitment sentence; got: ${res.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  // The hedge guard must survive the move to sentence-level evaluation: "I'll
+  // just wait and see." matches both COMMIT_RE and DEFERRAL_RE on the SAME
+  // sentence, and the deferral phrasing must still win there.
+  it('still does not count "I\'ll just wait and see." alone as a commitment', async () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ANNA',
+      'Okay.',
+      '',
+      'ANNA',
+      'Whatever you think is best.',
+      '',
+      "ANNA",
+      "If that's what needs to happen, okay.",
+      '',
+      'ANNA',
+      "I'll just wait and see.",
+      '',
+      'ANNA',
+      'I guess so.',
+      '',
+      'ANNA',
+      'I appreciate you handling that.',
+      '',
+      'ANNA',
+      "I wouldn't have known what to do.",
+      '',
+      'BOB',
+      'Let me handle it.',
+      '',
+      'BOB',
+      "You don't need to worry about this.",
+      '',
+      'BOB',
+      'I already told them everything.',
+      '',
+      'BOB',
+      "It's fine, really.",
+      '',
+      'BOB',
+      "I've got this handled.",
+    ].join('\n');
+    const res = await runVacuum(fountain);
+    assert.ok(
+      res.issues.some(i => i.rule === 'PROTAGONIST_DECISION_VACUUM'),
+      `PROTAGONIST_DECISION_VACUUM should still fire — "I'll just wait" is a hedge, not a commitment; got: ${res.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
 });

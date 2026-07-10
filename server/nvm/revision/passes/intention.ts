@@ -7042,12 +7042,27 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         const COMMIT_RE_728 = /\bi'?ll\b|\bi'?m going to\b|\bi need to\b|\bi'?ve decided\b|\bi won'?t\b|\bi demand\b|\bi insist\b|\bi'?m not\b/i;
         const DECIDES_FOR_RE_728 = /\blet me handle\b|\bi'?ll (take care of|handle)\b|\byou don'?t need to\b|\bdon'?t worry about\b|\bi'?ve (already )?(got|handled) (it|this)\b|\bi already (called|reported|handled|told|know exactly)\b|\bno need for you to\b/i;
 
+        // Sentence-level split (this file's standard punctuation-based chunking,
+        // matching splitSentences in fountain-analyzer.ts) so a mixed speech like
+        // "Okay. I'll handle this myself." is judged sentence-by-sentence instead
+        // of the whole block being disqualified by one deferral word elsewhere in
+        // it — a blanket per-speech exclusion was discarding genuine first-person
+        // commitments that happened to share a speech with an "okay".
+        const SENTENCE_SPLIT_RE_728 = /[^.!?]+[.!?]+|[^.!?]+$/g;
+        const splitSentences728 = (text: string): string[] =>
+          (text.match(SENTENCE_SPLIT_RE_728) ?? [text]).map(s => s.trim()).filter(Boolean);
+
         const topSpeeches728 = speeches728.filter(s => s.speaker === topSpeaker728);
         const deferralHits728 = topSpeeches728.filter(s => DEFERRAL_RE_728.test(s.text)).length;
-        // A line that matches BOTH regexes ("I'll just wait...") is deferral wearing
-        // "I'll" as a false commitment flag — the deferral phrasing wins so a hedge
-        // dressed in first-person-future grammar can't launder itself into agency.
-        const commitHits728 = topSpeeches728.filter(s => COMMIT_RE_728.test(s.text) && !DEFERRAL_RE_728.test(s.text)).length;
+        // A speech counts as a genuine commitment only if at least one of its
+        // sentences matches COMMIT_RE without itself being a hedge-commitment
+        // sentence ("I'll just wait..." matches both regexes on that sentence —
+        // the deferral phrasing wins there so a hedge dressed in first-person-
+        // future grammar can't launder itself into agency). A different sentence
+        // in the same speech matching DEFERRAL_RE no longer suppresses this.
+        const commitHits728 = topSpeeches728.filter(s =>
+          splitSentences728(s.text).some(sent => COMMIT_RE_728.test(sent) && !DEFERRAL_RE_728.test(sent))
+        ).length;
         const othersDecideHits728 = speeches728.filter(s => s.speaker !== topSpeaker728 && DECIDES_FOR_RE_728.test(s.text)).length;
 
         if (deferralHits728 >= 2 && commitHits728 === 0 && othersDecideHits728 >= 2) {
