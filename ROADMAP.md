@@ -503,6 +503,31 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## W-wave — ✅ COMPLETE (deployment-gate wave)
+
+- **W1 — health-formula sensitivity**: piecewise density curve (>=1
+  branch byte-identical; sub-1 logistic tuned by parameter search).
+  5 of 6 discrimination pairs are now HARD CI assertions with real
+  margins (+1.4 to +6.1); calibration/length-invariance fully held.
+  active-protagonist stays todo with a precise diagnosis: residual
+  false positives on the active half (ACTION_WITHOUT_CONSEQUENCE,
+  GOAL_WITHOUT_OPPOSITION, RUN_ON_ACTION 2v0 each) + missing passivity
+  true-positives — the next detector wave's target, cleanly scoped.
+- **W2 — action verbs in export/display**: all 10 new verbs render as
+  real screenplay in transcriptToFountain + covert/threat visual
+  treatment in the Script Ledger.
+- **W3 — report quality**: duplicate-family merge layer (incl. three
+  rules independently implemented twice under identical names) + 4
+  document-mode root-cause templates (static-spine, promises-unkept,
+  unearned-change, talk-over-action).
+- **W4 — validation completeness**: 26 new schemas + validateParams;
+  every JSON body and identifier param validated; honest exceptions
+  enumerated; six 500s fixed to 400s.
+
+DEPLOYMENT GATE at this point: suite 8822/0 (2 scoped todos), lint
+clean, build clean, console-grep 0, CI green, Docker boot-proofed
+keyless, .env.example exhaustive, session TTL/backup/auth documented.
+
 ## Sim + producer wave — ✅ COMPLETE
 
 - **X1 — action vocabulary 5→15**: HIDE/OBSERVE/LISTEN/SEARCH/REVEAL/
