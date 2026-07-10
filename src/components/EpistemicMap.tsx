@@ -75,7 +75,7 @@ export default function EpistemicMap({ onClose }: EpistemicMapProps) {
   };
 
   const agentInitials = (name: string) =>
-    name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    (name.match(/\S+/g) || []).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div
@@ -200,7 +200,7 @@ export default function EpistemicMap({ onClose }: EpistemicMapProps) {
                       fontSize="9"
                       fill="#6b7280"
                     >
-                      {a.name.split(' ')[0]}
+                      {a.name.indexOf(' ') !== -1 ? a.name.slice(0, a.name.indexOf(' ')) : a.name}
                     </text>
                   </g>
                 );

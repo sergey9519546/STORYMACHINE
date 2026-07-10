@@ -71,7 +71,8 @@ export default function StartScreen({
   const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB per file
 
   const inferDropCategory = (filename: string): typeof uploadedFiles[number]['category'] => {
-    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    const dotIdx = filename.lastIndexOf('.');
+    const ext = dotIdx !== -1 ? filename.slice(dotIdx + 1).toLowerCase() : '';
     if (ext === 'fountain' || ext === 'fdx') return 'Plot';
     if (ext === 'json' || ext === 'csv') return 'Rules';
     return 'Lore';
