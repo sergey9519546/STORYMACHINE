@@ -566,6 +566,24 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
+
+// D2-c (subtext-aware movement guard): relationshipShifts is a per-pair valence-lexicon
+// count over dialogue only — it sees explicit feeling-naming but is blind to bonds that
+// move through subtext. True when at least one subtextual channel shows movement across
+// the record set: the conversational-control holder alternates between two or more named
+// characters, control flips within any single scene, or any scene surfaces a revelation.
+// (relationshipShifts itself is checked separately by the caller via totalShifts, so it
+// is not duplicated here.) Used to rescue genuinely-moving relationships from the
+// zero-shift NO_RELATIONSHIP_MOVEMENT detector; a script with NO movement on any channel
+// still trips the caller's check.
+function hasSubtextualMovement(records: ScreenplaySceneRecord[]): boolean {
+  const powerHolders = new Set(records.map(r => r.powerHolder).filter((h): h is string => !!h));
+  if (powerHolders.size >= 2) return true;
+  if (records.some(r => r.powerFlipped)) return true;
+  if (records.some(r => r.revelation)) return true;
+  return false;
+}
 
 // Minimum co-appearances before a never-shifting pair is considered static.
 const STATIC_COAPPEAR_THRESHOLD = 3;
@@ -602,7 +620,7 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
 
   // ── NO_RELATIONSHIP_MOVEMENT — multi-scene story with zero shifts ─────────
   // Only meaningful once the story is substantial; a short opening has no arc yet.
-  if (totalShifts === 0 && records.length >= 5) {
+  if (totalShifts === 0 && records.length >= 5 && !hasSubtextualMovement(records)) {
     issues.push({
       location: 'Entire screenplay',
       rule: 'NO_RELATIONSHIP_MOVEMENT',

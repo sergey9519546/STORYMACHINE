@@ -6993,6 +6993,37 @@ describe('Wave 134 — Relationship Arc Pass', () => {
     );
   });
 
+  // D2-c fix — subtext-aware movement guard: relationshipShifts is a per-pair
+  // valence-lexicon count over dialogue only, blind to bonds that move through
+  // subtext (professional shorthand, a shifting balance of control) rather than
+  // characters naming their feelings.
+  it('does NOT fire NO_RELATIONSHIP_MOVEMENT when relationshipShifts is empty but conversational control passes between characters', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        relationshipShifts: [],
+        powerHolder: i < 3 ? 'ALICE' : 'BOB',
+      }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      !result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
+      'Should NOT fire when conversational control shifts between two named characters even though no pair crosses the valence-shift threshold',
+    );
+  });
+
+  it('still fires NO_RELATIONSHIP_MOVEMENT when every movement channel is flat, not just relationshipShifts', async () => {
+    const records: ScreenplaySceneRecord[] = Array.from({ length: 6 }, (_, i) =>
+      makeSceneRecord({
+        sceneIdx: i, slug: `INT. ROOM ${i}`,
+        relationshipShifts: [], powerHolder: null, powerFlipped: false, revelation: null,
+      }));
+    const result = await relationshipArcPass(makeMinimalInput({ records }));
+    assert.ok(
+      result.issues.some(i => i.rule === 'NO_RELATIONSHIP_MOVEMENT'),
+      'Should still fire when no channel — relationship shifts, power, or revelation — shows any movement at all',
+    );
+  });
+
   it('flags MONOTONE_RELATIONSHIP when a pair only ever warms', async () => {
     const records: ScreenplaySceneRecord[] = Array.from({ length: 4 }, (_, i) =>
       makeSceneRecord({
