@@ -1,7 +1,7 @@
 {
   "name": "storymachine",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "node --experimental-strip-types --test",
-    "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts"
+    "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
+    "backup": "node --experimental-strip-types scripts/backup-sessions.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
