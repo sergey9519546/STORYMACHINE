@@ -1691,10 +1691,18 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // resolves into the same three-part cadence, and the prose acquires a sing-song
   // predictability. Distinct from POLYSYNDETON_OVERLOAD (3+ "and" coordinators, no commas)
   // and DECLARATIVE_PILE (sentence-structure uniformity): this targets the comma-list triad.
+  // LENGTH-NORMALIZED (real-corpus guard wave, 2026-07-10): the original
+  // absolute >=3 threshold fired on 69/69 produced features in the
+  // real-script corpus — at 1,000+ action lines every professional script
+  // contains three comma triads, so the rule was diagnosing screenplay
+  // length, not a rhythmic tic. The density gate (>=10% of action lines)
+  // keeps every short-fixture behavior identical (3 triads in <=30 action
+  // lines clears 10% automatically) while a feature must genuinely lean on
+  // the cadence to fire. Post-change corpus fire rate: 0/69.
   if (actionLines.length >= 8) {
     const triadRe372 = /[^,]+,\s+[^,]+,?\s+(and|or)\s+\w+/i;
     const triadCount372 = actionLines.filter(l => triadRe372.test(l.text)).length;
-    if (triadCount372 >= 3) {
+    if (triadCount372 >= 3 && triadCount372 / actionLines.length >= 0.10) {
       issues.push({
         location: 'Action lines throughout',
         rule: 'TRIADIC_LIST_OVERLOAD',
@@ -2198,7 +2206,20 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
         }
       } else { curLongRun456a = 0; }
     }
-    if (maxLongRun456a >= 5) {
+    // LENGTH-NORMALIZED (real-corpus guard wave, 2026-07-10): a single
+    // 5-line dense run somewhere in a feature's ~1,500 action lines is
+    // ordinary prose, not an avalanche — the original single-run trigger
+    // fired on 62/69 produced features. Under 150 action lines (every
+    // fixture, every short) one run still fires exactly as before; above
+    // that, the dense-run pattern must RECUR (one distinct >=5 run per ~150
+    // action lines) to be a diagnosable habit rather than a single passage.
+    let longRunCount456a = 0, inRun456a = 0;
+    for (let i = 0; i < actionLines.length; i++) {
+      if (wordCounts[i] >= 9) { if (++inRun456a === 5) longRunCount456a++; }
+      else inRun456a = 0;
+    }
+    const requiredRuns456a = Math.max(1, Math.floor(actionLines.length / 150));
+    if (maxLongRun456a >= 5 && longRunCount456a >= requiredRuns456a) {
       issues.push({
         location: `Action lines near line ${maxLongStart456a} — consecutive long-line run (${maxLongRun456a} lines ≥9w)`,
         rule: 'ACTION_CONSECUTIVE_LONG_RUN',
