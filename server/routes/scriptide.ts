@@ -12,7 +12,12 @@ import {
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
 import { listPersonas, getPersona, registerUserPersona, personaPromptBlock } from '../personas/registry.ts';
 import { getPrompt } from '../lib/prompts.ts';
-import { validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema } from '../lib/validation.ts';
+import {
+  validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
+  ScriptideSaveBodySchema, PersonaBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
+  AnalyzeTensionBodySchema, CleanActionBodySchema, CharacterProfileBodySchema, AnalyzeScriptBodySchema,
+  CharactersExportBodySchema, CharactersImportBodySchema,
+} from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
 import { clusterIssues } from '../nvm/analyze/cluster.ts';
@@ -194,7 +199,7 @@ const router = express.Router();
 export default router;
 
 // ── ScriptIDE persistence routes (H2) ────────────────────────────────────────
-router.post('/api/scriptide/save', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const body = req.body as {
     scriptText?: unknown;
@@ -689,7 +694,7 @@ router.get('/api/scriptide/personas', gameLimiter, asyncHandler(async (_req, res
 
 // POST /api/scriptide/personas — register a custom (user-uploaded) persona.
 // Body: a CopilotPersona JSON object. Returns the normalized persona, or 400.
-router.post('/api/scriptide/personas', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/personas', gameLimiter, validate(PersonaBodySchema), asyncHandler(async (req, res) => {
   const persona = registerUserPersona(req.body);
   if (!persona) {
     res.status(400).json({ error: 'Invalid persona: requires id (kebab-case), name, and systemPreamble.' });
@@ -736,7 +741,7 @@ const sessionStyleGenreBlock = (req: import('express').Request): string => {
   return block ? `\n${block}\n` : '';
 };
 
-router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySchema), asyncHandler(async (req, res) => {
   const beat = requireString(req.body?.beat, 'beat');
   const scriptContext = scriptContextOf(req.body);
   const contextBlock = scriptContext
@@ -761,7 +766,7 @@ router.post('/api/scriptide/world-build', aiLimiter, asyncHandler(async (req, re
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogueBodySchema), asyncHandler(async (req, res) => {
   const dialogue = requireString(req.body?.dialogue, 'dialogue');
 
   // Validate profiles array — each element sanitized and capped
@@ -807,7 +812,7 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, asyncHandler(async (req
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTensionBodySchema), asyncHandler(async (req, res) => {
   const scene = requireString(req.body?.scene, 'scene');
   const tnContext = scriptContextOf(req.body);
   const tnContextBlock = tnContext
@@ -832,7 +837,7 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, asyncHandler(async (req
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySchema), asyncHandler(async (req, res) => {
   const text = requireString(req.body?.text, 'text');
   // P8: use full composed modifier (synergy override when available) instead of a simple genre hint string.
   const genreHint = sessionStyleGenreBlock(req);
@@ -846,12 +851,8 @@ router.post('/api/scriptide/clean-action', aiLimiter, asyncHandler(async (req, r
   res.json({ result: response.text ?? '' });
 }));
 
-router.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (req, res) => {
-  const profile = req.body?.profile;
-  if (!profile || typeof profile !== 'object') {
-    res.status(400).json({ error: 'profile is required' });
-    return;
-  }
+router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterProfileBodySchema), asyncHandler(async (req, res) => {
+  const profile = req.body.profile;
   const name  = sanitizeForPrompt(requireString(profile.name,  'profile.name', 256), 256);
   const ghost = sanitizeForPrompt(requireString(profile.ghost, 'profile.ghost'), 1000);
   const lie   = sanitizeForPrompt(requireString(profile.lie,   'profile.lie'), 1000);
@@ -879,7 +880,7 @@ router.post('/api/scriptide/character-profile', aiLimiter, asyncHandler(async (r
 }));
 
 // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──
-router.post('/api/analyze-script', aiLimiter, asyncHandler(async (req, res) => {
+router.post('/api/analyze-script', aiLimiter, validate(AnalyzeScriptBodySchema), asyncHandler(async (req, res) => {
   const scriptText = requireString(req.body?.scriptText, 'scriptText');
   const engineState = req.body?.engineState ?? {};
   const storyConfig = engineState?.config as Record<string, unknown> ?? {};
@@ -995,13 +996,9 @@ ${dirStyle ? `Cinematic composition and commentary must be filtered through the 
 }));
 
 // ── Character memory export / import (P6) ─────────────────────────────────────
-router.post('/api/characters/export', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/characters/export', gameLimiter, validate(CharactersExportBodySchema), asyncHandler(async (req, res) => {
   const { exportCharacter } = await import('../engine/character-memory.ts');
-  const charId = req.body?.charId;
-  if (typeof charId !== 'string' || !charId.trim()) {
-    res.status(400).json({ error: 'body.charId (string) is required' });
-    return;
-  }
+  const charId = (req.body as { charId: string }).charId;
   const sid = sessionId(req);
   const { stage } = getOrCreateSession(sid);
   const bundle = exportCharacter(stage, charId, sid);
@@ -1012,7 +1009,7 @@ router.post('/api/characters/export', gameLimiter, asyncHandler(async (req, res)
   res.json(bundle);
 }));
 
-router.post('/api/characters/import', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/characters/import', gameLimiter, validate(CharactersImportBodySchema), asyncHandler(async (req, res) => {
   const { importCharacter, isCharacterMemoryBundle } = await import('../engine/character-memory.ts');
   const bundle = req.body?.bundle;
   if (!isCharacterMemoryBundle(bundle)) {

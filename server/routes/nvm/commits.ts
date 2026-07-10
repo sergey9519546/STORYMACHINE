@@ -10,7 +10,8 @@ import {
   gameLimiter,
 } from '../../lib/session-store.ts';
 import {
-  validate, GhostBranchBodySchema, InjectOpsBodySchema, ConvergeCommitBodySchema,
+  validate, validateParams, GhostBranchBodySchema, InjectOpsBodySchema, ConvergeCommitBodySchema,
+  CommitIdParamSchema,
 } from '../../lib/validation.ts';
 
 const router = express.Router();
@@ -23,7 +24,7 @@ router.get('/api/nvm/commits', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // GET /api/nvm/commits/:commitId — single commit
-router.get('/api/nvm/commits/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/nvm/commits/:commitId', gameLimiter, validateParams(CommitIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const commit = stage.getCommit(req.params.commitId);
   if (!commit) { res.status(404).json({ error: 'commit not found' }); return; }

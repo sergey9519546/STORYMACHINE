@@ -7,13 +7,16 @@ import {
   asyncHandler, sessionId, getOrCreateSession,
   gameLimiter,
 } from '../../lib/session-store.ts';
-import { validate, RepairBodySchema } from '../../lib/validation.ts';
+import {
+  validate, validateParams, RepairBodySchema, EventIdParamSchema, LocationIdParamSchema,
+  CommitIdParamSchema, ProjectTargetParamSchema,
+} from '../../lib/validation.ts';
 
 const router = express.Router();
 export default router;
 
 // GET /api/debug/explain/:eventId — explain an action as a causal call stack
-router.get('/api/debug/explain/:eventId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/debug/explain/:eventId', gameLimiter, validateParams(EventIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { explainAction } = await import('../../nvm/debug/inspector.ts');
   const panel = explainAction(stage, req.params.eventId);
@@ -22,24 +25,17 @@ router.get('/api/debug/explain/:eventId', gameLimiter, asyncHandler(async (req, 
 }));
 
 // GET /api/debug/explain-scene/:locationId — explain all events in a scene
-router.get('/api/debug/explain-scene/:locationId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/debug/explain-scene/:locationId', gameLimiter, validateParams(LocationIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { explainScene } = await import('../../nvm/debug/inspector.ts');
   res.json({ panels: explainScene(stage, req.params.locationId) });
 }));
 
 // GET /api/nvm/project/:target — project current canon to a format
-router.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/nvm/project/:target', gameLimiter, validateParams(ProjectTargetParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { project } = await import('../../nvm/project/index.ts');
   const target = req.params.target as Parameters<typeof project>[1];
-  const VALID = [
-    'fountain','novel','stage','comic','interactive','pitch','bible','rewatch','cutting_room',
-    'treatment','outline','dialogue_only','epistolary','simulation_log','director_commentary',
-  ];
-  if (!VALID.includes(target)) {
-    res.status(400).json({ error: `Unknown projection target "${target}". Valid: ${VALID.join(', ')}` }); return;
-  }
   const commits = stage.getCommits().filter(c => !c.reverted);
   const state = buildEnrichedState(stage);
   const ghosts = stage.ghostLedgerGet();
@@ -48,7 +44,7 @@ router.get('/api/nvm/project/:target', gameLimiter, asyncHandler(async (req, res
 }));
 
 // GET /api/nvm/proof/:commitId — run all 4 proof tiers on a single commit.
-router.get('/api/nvm/proof/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/nvm/proof/:commitId', gameLimiter, validateParams(CommitIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runTier1, runTier2, tier2Score, runTier3, tier3Rank, runTier4 } = await import('../../nvm/proof/kernel.ts');
   const { repair } = await import('../../nvm/proof/repair.ts');

@@ -3,9 +3,14 @@ import { generateContent, getModel } from '../engine/ai.ts';
 import { validate, AiConfigSchema, StoryToneSchema } from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
 import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
-import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES } from '../lib/structure-presets.ts';
+import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
-import { validate as validateOutline, OutlineBodySchema, ImportBodySchema } from '../lib/validation.ts';
+import {
+  validate as validateOutline, OutlineBodySchema, ImportBodySchema,
+  PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
+  StoryGenreBodySchema, CharacterArcModeBodySchema, StoryThemeBodySchema,
+  ApplyPresetBodySchema,
+} from '../lib/validation.ts';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, sessions, sessionId, getOrCreateSession, destroySession,
@@ -74,14 +79,10 @@ router.get('/api/pacing-target', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ target });
 }));
 
-router.post('/api/pacing-target', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/pacing-target', gameLimiter, validate(PacingTargetBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { target } = req.body as { target?: string };
-  if (!target || !['slow', 'medium', 'fast'].includes(target)) {
-    res.status(400).json({ error: 'target must be "slow", "medium", or "fast"' });
-    return;
-  }
-  stage.updateIllusionState({ pacing_target: target as 'slow' | 'medium' | 'fast' });
+  const { target } = req.body as { target: 'slow' | 'medium' | 'fast' };
+  stage.updateIllusionState({ pacing_target: target });
   res.json({ target });
 }));
 
@@ -102,38 +103,22 @@ router.get('/api/story-config', gameLimiter, asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/api/emotional-arc', gameLimiter, asyncHandler(async (req, res) => {
-  const { arc } = req.body as { arc?: string };
-  const VALID = Object.keys(ARC_TENSION_CURVES);
-  if (!arc || !VALID.includes(arc)) {
-    res.status(400).json({ error: `arc must be one of: ${VALID.join(', ')}` });
-    return;
-  }
+router.post('/api/emotional-arc', gameLimiter, validate(EmotionalArcBodySchema), asyncHandler(async (req, res) => {
+  const { arc } = req.body as { arc: string };
   const { stage } = getOrCreateSession(sessionId(req));
   stage.updateIllusionState({ emotional_arc: arc as NonNullable<import('../engine/types.ts').IllusionState['emotional_arc']> });
   res.json({ arc });
 }));
 
-router.post('/api/director-style', gameLimiter, asyncHandler(async (req, res) => {
-  const { style } = req.body as { style?: string };
-  const VALID = Object.keys(STYLE_MODIFIERS);
-  if (!style || !VALID.includes(style)) {
-    res.status(400).json({ error: `style must be one of: ${VALID.join(', ')}` });
-    return;
-  }
+router.post('/api/director-style', gameLimiter, validate(DirectorStyleBodySchema), asyncHandler(async (req, res) => {
+  const { style } = req.body as { style: string };
   const { stage } = getOrCreateSession(sessionId(req));
   stage.updateIllusionState({ director_style: style as NonNullable<import('../engine/types.ts').IllusionState['director_style']> });
   res.json({ style });
 }));
 
-router.post('/api/story-genre', gameLimiter, asyncHandler(async (req, res) => {
-  const { GENRE_NAMES } = await import('../lib/genre-router.ts');
-  const { genre } = req.body as { genre?: string };
-  const VALID = Object.keys(GENRE_NAMES);
-  if (!genre || !VALID.includes(genre)) {
-    res.status(400).json({ error: `genre must be one of: ${VALID.join(', ')}` });
-    return;
-  }
+router.post('/api/story-genre', gameLimiter, validate(StoryGenreBodySchema), asyncHandler(async (req, res) => {
+  const { genre } = req.body as { genre: string };
   const { stage } = getOrCreateSession(sessionId(req));
   stage.updateIllusionState({ story_genre: genre as NonNullable<import('../engine/types.ts').IllusionState['story_genre']> });
   res.json({ genre });
@@ -156,24 +141,16 @@ router.post('/api/story-tone', gameLimiter, validate(StoryToneSchema), asyncHand
 // IllusionState so the prompt-assembly path (server/engine/agent/decision.ts)
 // can inject the mode's promptInstruction the same way STYLE_MODIFIERS'
 // agentInstruction reaches prompts via director_style.
-router.post('/api/character-arc-mode', gameLimiter, asyncHandler(async (req, res) => {
-  const { mode } = req.body as { mode?: string };
-  const VALID = Object.keys(CHARACTER_ARC_MODES);
-  if (!mode || !VALID.includes(mode)) {
-    res.status(400).json({ error: `mode must be one of: ${VALID.join(', ')}` });
-    return;
-  }
+router.post('/api/character-arc-mode', gameLimiter, validate(CharacterArcModeBodySchema), asyncHandler(async (req, res) => {
+  const { mode } = req.body as { mode: string };
   const { stage } = getOrCreateSession(sessionId(req));
   stage.updateIllusionState({ character_arc_mode: mode as NonNullable<import('../engine/types.ts').IllusionState['character_arc_mode']> });
   res.json({ mode });
 }));
 
-router.post('/api/story-theme', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/story-theme', gameLimiter, validate(StoryThemeBodySchema), asyncHandler(async (req, res) => {
   const { sanitizeForPrompt } = await import('../lib/prompt-utils.ts');
-  const raw = req.body?.theme;
-  if (typeof raw !== 'string') {
-    res.status(400).json({ error: 'body.theme (string) is required' }); return;
-  }
+  const raw = (req.body as { theme: string }).theme;
   const theme = sanitizeForPrompt(raw.trim(), 500);
   const { stage } = getOrCreateSession(sessionId(req));
   stage.updateIllusionState({ story_theme: theme });
@@ -217,13 +194,8 @@ router.delete('/api/outline', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // Apply a structure preset — instantiates beat templates into OutlineBeat[] and persists.
-router.post('/api/outline/apply-preset', gameLimiter, asyncHandler(async (req, res) => {
-  const { structure, expectedTurns } = req.body as { structure?: string; expectedTurns?: number };
-  const VALID_STRUCTURES = Object.keys(STRUCTURE_NAMES);
-  if (!structure || !VALID_STRUCTURES.includes(structure)) {
-    res.status(400).json({ error: `structure must be one of: ${VALID_STRUCTURES.join(', ')}` });
-    return;
-  }
+router.post('/api/outline/apply-preset', gameLimiter, validate(ApplyPresetBodySchema), asyncHandler(async (req, res) => {
+  const { structure, expectedTurns } = req.body as { structure: string; expectedTurns?: number };
   const n = Math.max(4, Math.min(200, Number(expectedTurns) || 20));
   const { stage } = getOrCreateSession(sessionId(req));
   const beats = instantiatePreset(structure, n);

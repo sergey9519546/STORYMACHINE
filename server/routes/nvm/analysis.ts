@@ -10,7 +10,7 @@ import {
   asyncHandler, sessionId, getOrCreateSession,
   gameLimiter,
 } from '../../lib/session-store.ts';
-import { validate, QualityBodySchema } from '../../lib/validation.ts';
+import { validate, validateParams, QualityBodySchema, CommitIdParamSchema } from '../../lib/validation.ts';
 
 const router = express.Router();
 export default router;
@@ -110,7 +110,7 @@ router.get('/api/nvm/sidecar', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // GET /api/nvm/quality/scene/:commitId — run quality engine on a committed scene.
-router.get('/api/nvm/quality/scene/:commitId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/nvm/quality/scene/:commitId', gameLimiter, validateParams(CommitIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
   const { runQualityEngine } = await import('../../nvm/quality/index.ts');
   const { emptyState } = await import('../../nvm/state/NarrativeState.ts');

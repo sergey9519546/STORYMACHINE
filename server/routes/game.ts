@@ -8,9 +8,10 @@ import { transcriptToFountain, extractCharactersFromLog, syuzhetSort, wrapSyuzhe
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES } from '../lib/structure-presets.ts';
 import { logger } from '../lib/logger.ts';
 import {
-  validate, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema,
+  validate, validateParams, InitBodySchema, TurnBodySchema, RunRoomBodySchema, OutlineBodySchema, InterviewBodySchema,
   RunSceneBodySchema, DarkTriadFieldSchema, BigFiveFieldSchema, AttachmentStyleFieldSchema,
-  DefenseMechanismFieldSchema, GoalStackFieldSchema,
+  DefenseMechanismFieldSchema, GoalStackFieldSchema, SimulateToFountainBodySchema,
+  QbnFilterChoicesBodySchema, NcpStoryformBodySchema, CharIdParamSchema,
 } from '../lib/validation.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildInterviewGrounding } from '../lib/interview.ts';
@@ -499,13 +500,8 @@ router.get('/api/ledger/fountain', gameLimiter, asyncHandler(async (req, res) =>
 }));
 
 // Run a self-contained simulation and return Fountain output without polluting main stage
-router.post('/api/simulate-to-fountain', gameLimiter, asyncHandler(async (req, res) => {
-  const { nodes: nodesPayload, agents: agentPayload, location_id, maxTurns, title, author } = req.body ?? {};
-
-  if (!nodesPayload || !Array.isArray(nodesPayload) || !agentPayload || !Array.isArray(agentPayload)) {
-    res.status(400).json({ error: 'nodes and agents arrays are required' });
-    return;
-  }
+router.post('/api/simulate-to-fountain', gameLimiter, validate(SimulateToFountainBodySchema), asyncHandler(async (req, res) => {
+  const { nodes: nodesPayload, agents: agentPayload, location_id, maxTurns, title, author } = req.body;
 
   const simStage = new Stage(':memory:');
   const simOrchestrator = new Orchestrator(simStage);
@@ -595,11 +591,9 @@ router.get('/api/beat-traces', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // Active dramatic pressure on a specific agent (bias signals not yet applied)
-router.get('/api/dramatic-pressure/:charId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/dramatic-pressure/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const charId = req.params.charId?.substring(0, 128);
-  if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
-  res.json(stage.getActivePressures(charId));
+  res.json(stage.getActivePressures(req.params.charId));
 }));
 
 // All belief edges (contradiction graph)
@@ -618,11 +612,9 @@ router.get('/api/belief-edges', gameLimiter, asyncHandler(async (req, res) => {
 }));
 
 // Goal mutations for a specific agent
-router.get('/api/goal-mutations/:charId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/goal-mutations/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const charId = req.params.charId?.substring(0, 128);
-  if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
-  res.json(stage.getGoalMutations(charId));
+  res.json(stage.getGoalMutations(req.params.charId));
 }));
 
 // All goal mutations across all agents
@@ -647,20 +639,16 @@ router.get('/api/dramatic-pressure-all', gameLimiter, asyncHandler(async (req, r
 }));
 
 // Persuasion log for one agent
-router.get('/api/persuasion/:charId', gameLimiter, asyncHandler(async (req, res) => {
+router.get('/api/persuasion/:charId', gameLimiter, validateParams(CharIdParamSchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const charId = req.params.charId?.substring(0, 128);
-  if (!charId) { res.status(400).json({ error: 'charId is required' }); return; }
-  res.json(stage.getPersuasionLog(charId, 20));
+  res.json(stage.getPersuasionLog(req.params.charId, 20));
 }));
 
 // QBN choice filtering — filter by accumulated qualities AND consequenceScope ceiling
-router.post('/api/qbn/filter-choices', gameLimiter, asyncHandler(async (req, res) => {
-  const { choices, qualities, maxScope } = req.body ?? {};
-  if (!Array.isArray(choices)) {
-    res.status(400).json({ error: 'choices must be an array' });
-    return;
-  }
+router.post('/api/qbn/filter-choices', gameLimiter, validate(QbnFilterChoicesBodySchema), asyncHandler(async (req, res) => {
+  const { choices, qualities, maxScope } = req.body as {
+    choices: unknown[]; qualities?: Record<string, number>; maxScope?: string;
+  };
   const q = typeof qualities === 'object' && qualities !== null
     ? (qualities as Record<string, number>) : {};
   const scopeOrder: Record<string, number> = { micro: 0, macro: 1, crisis: 2 };
@@ -691,7 +679,7 @@ router.post('/api/qbn/filter-choices', gameLimiter, asyncHandler(async (req, res
 }));
 
 // NCP Storyform — synthesize Dramatica-style storyform from live session data
-router.post('/api/ncp-storyform', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/ncp-storyform', gameLimiter, validate(NcpStoryformBodySchema), asyncHandler(async (req, res) => {
   const { throughlines, characters } = req.body ?? {};
   const tl = typeof throughlines === 'object' && throughlines !== null ? throughlines as Record<string, unknown> : {};
   const inputChars = Array.isArray(characters) ? (characters as unknown[]).slice(0, 10) : [];

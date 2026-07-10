@@ -14,7 +14,7 @@ import { parseFountain, type FountainBlockType } from '../../src/lib/fountain.ts
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { logger } from '../lib/logger.ts';
 import { asyncHandler, gameLimiter } from '../lib/session-store.ts';
-import { validate, DoctorBodySchema, SlateBodySchema, VerifyBodySchema } from '../lib/validation.ts';
+import { validate, DoctorBodySchema, SlateBodySchema, VerifyBodySchema, FountainTitleBodySchema } from '../lib/validation.ts';
 import type { CoverageVerdict } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { renderCoverageHtml } from '../lib/coverage-html.ts';
@@ -96,7 +96,7 @@ ${paragraphs.join('\n')}
 </FinalDraft>`;
 }
 
-router.post('/api/export/fdx', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/export/fdx', gameLimiter, validate(FountainTitleBodySchema), asyncHandler(async (req, res) => {
   const fountain = extractFountain(req.body);
   if (!fountain.trim()) { res.status(400).json({ error: 'fountain is required' }); return; }
 
@@ -220,7 +220,7 @@ function fountainToDocxParagraphs(fountain: string): Paragraph[] {
   return paragraphs;
 }
 
-router.post('/api/export/docx', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/export/docx', gameLimiter, validate(FountainTitleBodySchema), asyncHandler(async (req, res) => {
   const fountain = extractFountain(req.body);
   if (!fountain.trim()) { res.status(400).json({ error: 'fountain is required' }); return; }
 
@@ -412,7 +412,7 @@ ${bodyParts.map(p => `  ${p}`).join('\n')}
 </html>`;
 }
 
-router.post('/api/export/print-html', gameLimiter, asyncHandler(async (req, res) => {
+router.post('/api/export/print-html', gameLimiter, validate(FountainTitleBodySchema), asyncHandler(async (req, res) => {
   const fountain = extractFountain(req.body);
   if (!fountain.trim()) { res.status(400).json({ error: 'fountain is required' }); return; }
 

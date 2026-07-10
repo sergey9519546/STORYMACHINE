@@ -7,7 +7,8 @@
 import { z } from 'zod';
 import type { Request, Response, NextFunction } from 'express';
 import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
-import { TONE_NAME_LIST } from './genre-router.ts';
+import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
+import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
 
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
@@ -198,6 +199,66 @@ export const CollabTokenBodySchema = z.object({
 // server/routes/config.ts's handler.
 export const StoryToneSchema = z.object({
   tone: z.enum(TONE_NAME_LIST),
+});
+
+// ── Story architecture config schemas (W4 validation-completeness audit) ────
+// These six routes previously validated their single enum-ish field with an
+// inline `if (!x || !VALID.includes(x))` check repeated at each route
+// (server/routes/config.ts) instead of going through validate()/zod like
+// their sibling /api/story-tone. Same contract, same 400 shape, now enforced
+// the same way — each schema's enum is built from the SAME Object.keys(...)
+// list the route itself used to construct its inline VALID array, so the
+// accepted value set is unchanged.
+
+export const PacingTargetBodySchema = z.object({
+  target: z.enum(['slow', 'medium', 'fast']),
+});
+
+export const EmotionalArcBodySchema = z.object({
+  arc: z.string().refine(k => k in ARC_TENSION_CURVES, {
+    message: `arc must be one of: ${Object.keys(ARC_TENSION_CURVES).join(', ')}`,
+  }),
+});
+
+export const DirectorStyleBodySchema = z.object({
+  style: z.string().refine(k => k in STYLE_MODIFIERS, {
+    message: `style must be one of: ${Object.keys(STYLE_MODIFIERS).join(', ')}`,
+  }),
+});
+
+export const StoryGenreBodySchema = z.object({
+  genre: z.string().refine(k => k in GENRE_NAMES, {
+    message: `genre must be one of: ${Object.keys(GENRE_NAMES).join(', ')}`,
+  }),
+});
+
+export const CharacterArcModeBodySchema = z.object({
+  mode: z.string().refine(k => k in CHARACTER_ARC_MODES, {
+    message: `mode must be one of: ${Object.keys(CHARACTER_ARC_MODES).join(', ')}`,
+  }),
+});
+
+// POST /api/story-theme — free-text theme, sanitized (sanitizeForPrompt) at
+// the route AFTER this schema only bounds the raw shape (must be a string;
+// the route's own sanitizeForPrompt(raw.trim(), 500) call remains the single
+// source of truth for the final stored/prompt-injected value, so the cap
+// here is intentionally generous — large enough to never be the thing that
+// truncates, matching how DoctorBodySchema's 900_000 relates to its route's
+// own behavior).
+export const StoryThemeBodySchema = z.object({
+  theme: z.string().max(5000),
+});
+
+// POST /api/outline/apply-preset — `structure` mirrors the other five routes
+// above; `expectedTurns` keeps the route's own clamp
+// (Math.max(4, Math.min(200, Number(expectedTurns) || 20))) as the sole
+// source of truth for out-of-range values, so this only rejects the
+// non-numeric shapes that clamp was never designed to rescue silently.
+export const ApplyPresetBodySchema = z.object({
+  structure: z.string().refine(k => k in STRUCTURE_NAMES, {
+    message: `structure must be one of: ${Object.keys(STRUCTURE_NAMES).join(', ')}`,
+  }),
+  expectedTurns: z.number().optional(),
 });
 
 // ── NVM route schemas (audit M2.3) ───────────────────────────────────────────
@@ -527,6 +588,250 @@ export const VerifyBodySchema = z.object({
   'provide exactly one of fountain or fdx',
 );
 
+// ── server/routes/game.ts schemas (W4 validation-completeness audit) ────────
+
+// POST /api/simulate-to-fountain — a self-contained, ephemeral-Stage sibling
+// of /api/init (same nodes/agents shape as InitBodySchema, capped at 10 each
+// rather than 50 — the route itself already `.slice(0, 10)`s both arrays, so
+// this schema's max(10) just turns that silent truncation into an honest
+// 400 for a caller who sent more than the route will ever use) plus the
+// run-shape fields (location_id, maxTurns, title, author) the route reads
+// directly off the body.
+export const SimulateToFountainBodySchema = z.object({
+  nodes: z.array(LocationItemSchema).max(10),
+  agents: z.array(AgentItemSchema).max(10),
+  location_id: z.string().max(64).optional(),
+  maxTurns: z.number().optional(),
+  title: z.string().max(256).optional(),
+  author: z.string().max(256).optional(),
+});
+
+// POST /api/qbn/filter-choices — `choices` is a caller-supplied list of QBN
+// choice objects; the route's own filter logic already tolerates arbitrary
+// shapes on each item (reading `qbnRequirements`/`consequenceScope` when
+// present, ignoring everything else), so `z.unknown()` per item mirrors that
+// looseness rather than re-deriving a full Choice type here. `qualities` and
+// `maxScope` keep the route's own defensive fallbacks (`{}` / `'crisis'`
+// ceiling) as the source of truth for out-of-range values — this schema only
+// rejects the shapes those fallbacks were never meant to rescue (e.g.
+// `choices` not being an array at all, which used to just be a 400 with a
+// different message).
+export const QbnFilterChoicesBodySchema = z.object({
+  choices: z.array(z.unknown()).max(500),
+  qualities: z.record(z.string(), z.number()).optional(),
+  maxScope: z.enum(['micro', 'macro', 'crisis']).optional(),
+});
+
+// POST /api/ncp-storyform — every field is optional caller-supplied override
+// context; the route derives the rest from the live session when omitted.
+// `throughlines` and `characters` are deliberately loose (`.passthrough()` /
+// `z.unknown()`) — the route only reads a handful of known string/array
+// fields off each and tolerates anything else, same rationale as the NVM
+// schemas above (M2.3) for domain objects the handler itself only
+// shallow-validates.
+export const NcpStoryformBodySchema = z.object({
+  throughlines: z.object({
+    objectiveStory: z.string().max(2000).optional(),
+    mainCharacter: z.string().max(2000).optional(),
+    influenceCharacter: z.string().max(2000).optional(),
+    relationshipStory: z.string().max(2000).optional(),
+    activeThroughlines: z.array(z.string().max(128)).max(20).optional(),
+  }).passthrough().optional(),
+  characters: z.array(z.unknown()).max(10).optional(),
+});
+
+// Path-param schema shared by GET /api/dramatic-pressure/:charId,
+// /api/goal-mutations/:charId, /api/persuasion/:charId — these previously
+// only did `req.params.charId?.substring(0, 128)` plus an empty-string
+// check (no charset guard at all, unlike sessionId's
+// `HEADER_SESSION_ID_RE`/query-body regex in session-store.ts). char_id is
+// never used to build a filesystem path the way sessionId is — every use
+// here is a plain in-memory Map/array lookup — so this deliberately doesn't
+// reuse sessionId's stricter `[a-zA-Z0-9_-]` charset (a caller's char_id can
+// legitimately contain spaces/punctuation, per AgentItemSchema's own
+// `z.string().min(1).max(64)` char_id field above). It matches AgentItemSchema's
+// char_id bound exactly (min 1, max 64) so a charId that could never have
+// been registered by /api/init in the first place 400s before reaching the
+// lookup, instead of silently falling through to a 200-with-empty-result.
+export const CharIdParamSchema = z.object({
+  charId: z.string().min(1).max(64),
+});
+
+// Path-param schemas for the NVM router's opaque-id lookups (server/routes/
+// nvm/{debug,commits,analysis}.ts): GET /api/debug/explain/:eventId,
+// /api/debug/explain-scene/:locationId, /api/nvm/commits/:commitId,
+// /api/nvm/proof/:commitId, /api/nvm/quality/scene/:commitId. Every one of
+// these previously took `req.params.<id>` completely unvalidated (no
+// length cap, unlike sessionId's regex/CharIdParamSchema above) straight
+// into an in-memory Map/array lookup (stage.getCommit, explainAction,
+// Array#findIndex by commitId, …) — never a filesystem path or query
+// string, so (like CharIdParamSchema) there's no charset to restrict, only
+// a sane length ceiling so a pathological megabyte-long path segment can't
+// be used to force a full linear scan/string-compare pass over every commit
+// for no benefit to a legitimate caller. 128 matches
+// GoalFieldSchema/StoryOpItemSchema's own id-field bound above — the same
+// ballpark every other opaque-id field in this file already uses.
+export const CommitIdParamSchema = z.object({
+  commitId: z.string().min(1).max(128),
+});
+
+export const EventIdParamSchema = z.object({
+  eventId: z.string().min(1).max(128),
+});
+
+export const LocationIdParamSchema = z.object({
+  locationId: z.string().min(1).max(128),
+});
+
+// GET /api/nvm/project/:target — the route already 400s cleanly on an
+// unknown target via its own inline `VALID.includes(target)` check; this
+// schema is the SAME list expressed as a zod enum (kept as the single
+// source of truth here rather than duplicated at the route) so the route
+// can go through the same validateParams() 400 shape every other route in
+// this audit now uses, instead of a route-local message string.
+export const ProjectTargetParamSchema = z.object({
+  target: z.enum([
+    'fountain', 'novel', 'stage', 'comic', 'interactive', 'pitch', 'bible', 'rewatch', 'cutting_room',
+    'treatment', 'outline', 'dialogue_only', 'epistolary', 'simulation_log', 'director_commentary',
+  ]),
+});
+
+// ── server/routes/scriptide.ts schemas (W4 validation-completeness audit) ───
+
+// POST /api/scriptide/save — persists the ScriptIDE editor's full working
+// state. Every cap below matches the route's own pre-existing inline
+// truncation exactly (`.substring(0, 500_000)`, `.slice(0, 20/100/200)`) —
+// this schema turns those silent truncations into an honest 400 for
+// malformed shapes (wrong type entirely), while leaving in-bounds-but-large
+// values to the route's own slice/substring as before, so valid payloads at
+// or under the existing caps are byte-for-byte unaffected.
+export const ScriptideSaveBodySchema = z.object({
+  scriptText: z.string().max(500_000).optional(),
+  snapshots: z.array(z.unknown()).max(20).optional(),
+  characters: z.array(z.unknown()).max(100).optional(),
+  researchNotes: z.array(z.unknown()).max(200).optional(),
+  isDarkMode: z.boolean().optional(),
+}).passthrough();
+
+// POST /api/scriptide/personas — registerUserPersona (server/personas/
+// registry.ts) already performs its own normalization/validation and
+// returns null on anything malformed (the route 400s on that null already);
+// this schema only guards the outer shape (an object) so a non-object body
+// 400s with the standard shape before ever reaching registerUserPersona.
+export const PersonaBodySchema = z.object({
+  id: z.unknown().optional(),
+  name: z.unknown().optional(),
+  systemPreamble: z.unknown().optional(),
+}).passthrough();
+
+// Shared by /api/scriptide/{world-build,refine-dialogue,analyze-tension,
+// clean-action}: each route reads one primary text field via requireString
+// (session-store.ts) — which throws a plain Error that previously fell
+// through asyncHandler to the global handler's generic 500, not a 400 (see
+// app.ts's error handler: only ValidationError/SyntaxError get 400) — plus
+// optional scriptContext/profiles the route itself already sanitizes and
+// caps via sanitizeForPrompt/sanitizeProfiles. This schema only bounds the
+// outer shape; the route's own sanitize helpers remain the source of truth
+// for the final prompt-injected text.
+const ProfileItemSchema = z.unknown();
+
+// Matches requireString's own contract exactly (session-store.ts): a
+// non-empty-after-trim string, capped at requireString's default maxLen
+// (20_000) since none of these four call sites pass an explicit maxLen.
+const requireStringField = z
+  .string()
+  .max(20_000)
+  .refine(s => s.trim() !== '', { message: 'must not be empty' });
+
+export const WorldBuildBodySchema = z.object({
+  beat: requireStringField,
+  scriptContext: z.string().optional(),
+  profiles: z.array(ProfileItemSchema).max(20).nullish(),
+});
+
+export const RefineDialogueBodySchema = z.object({
+  dialogue: requireStringField,
+  scriptContext: z.string().optional(),
+  // nullish (not optional): the route's own guard is `if (rawProfiles !=
+  // null)` — an explicit `null` is silently treated as "no profiles" rather
+  // than rejected, and this schema preserves that.
+  profiles: z.array(ProfileItemSchema).max(20).nullish(),
+});
+
+export const AnalyzeTensionBodySchema = z.object({
+  scene: requireStringField,
+  scriptContext: z.string().optional(),
+  profiles: z.array(ProfileItemSchema).max(20).nullish(),
+});
+
+export const CleanActionBodySchema = z.object({
+  text: requireStringField,
+});
+
+// POST /api/scriptide/character-profile — `profile` mirrors the route's own
+// requireString reads (name/ghost/lie/want/need), each object-shaped and
+// required per the existing inline `if (!profile || typeof profile !==
+// 'object')` guard this schema replaces.
+export const CharacterProfileBodySchema = z.object({
+  profile: z.object({
+    name: requireStringField,
+    ghost: requireStringField,
+    lie: requireStringField,
+    want: requireStringField,
+    need: requireStringField,
+  }).passthrough(),
+});
+
+// POST /api/analyze-script — `scriptText` is the one field the route
+// requires via requireString; everything else (engineState, characters) is
+// caller-supplied context the route already reads defensively field-by-field
+// with its own type guards and caps, so this schema leaves those loose
+// (`z.unknown()`) rather than re-deriving the full EngineState shape.
+export const AnalyzeScriptBodySchema = z.object({
+  scriptText: requireStringField,
+  engineState: z.unknown().optional(),
+  characters: z.array(z.unknown()).max(50).optional(),
+}).passthrough();
+
+// POST /api/characters/export — the route's own inline check
+// (`typeof charId !== 'string' || !charId.trim()`) becomes this schema;
+// max(64) matches AgentItemSchema's char_id bound above.
+export const CharactersExportBodySchema = z.object({
+  charId: z.string().min(1).max(64).refine(s => s.trim() !== '', { message: 'must not be empty' }),
+});
+
+// POST /api/characters/import — `bundle`'s real validation is
+// isCharacterMemoryBundle (engine/character-memory.ts), which the route
+// still calls after this schema — this only guards the outer shape (an
+// object) so a non-object/missing bundle 400s with the standard shape
+// before that deeper check runs. `targetLocationId` is nullish (not just
+// optional): the route's own guard (`typeof req.body?.targetLocationId ===
+// 'string' ? ... : undefined`) silently treats `null`/omitted as "no
+// target" without rejecting it, so `.nullish()` preserves that; any OTHER
+// wrong-typed value (a number, an object) now 400s here instead of being
+// silently coerced to undefined — a genuine hardening, called out in the
+// audit report.
+export const CharactersImportBodySchema = z.object({
+  bundle: z.unknown(),
+  targetLocationId: z.string().max(128).nullish(),
+}).refine(b => typeof b.bundle === 'object' && b.bundle !== null, {
+  message: 'bundle is required',
+  path: ['bundle'],
+});
+
+// ── server/routes/export.ts schemas (W4 validation-completeness audit) ──────
+// Shared by POST /api/export/{fdx,docx,print-html} — each route previously
+// hand-rolled the same check via its local extractFountain() helper (still
+// used for the actual 200_000-char truncation — this schema's ceiling is
+// set higher, at DoctorBodySchema's own 900_000, purely as an outer sanity
+// bound so a wildly oversized body 400s with a clear message instead of
+// silently truncating) plus a free-text optional title, sanitized by the
+// route's own sanitizeForPrompt call exactly as before.
+export const FountainTitleBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000),
+  title: z.string().max(2000).optional(),
+}).passthrough();
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
@@ -536,6 +841,23 @@ export function validate(schema: z.ZodTypeAny) {
     const result = schema.safeParse(req.body);
     if (!result.success) {
       const msg = result.error.issues[0]?.message ?? 'Invalid request body';
+      const path = result.error.issues[0]?.path.join('.') ?? '';
+      res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
+      return;
+    }
+    next();
+  };
+}
+
+// Usage:  app.get('/api/foo/:id', validateParams(FooParamSchema), handler)
+// Same 400 shape as validate() above, applied to req.params instead of
+// req.body — for GET/route-param routes (e.g. CharIdParamSchema) that have
+// no JSON body to validate at all.
+export function validateParams(schema: z.ZodTypeAny) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      const msg = result.error.issues[0]?.message ?? 'Invalid request parameters';
       const path = result.error.issues[0]?.path.join('.') ?? '';
       res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
       return;
