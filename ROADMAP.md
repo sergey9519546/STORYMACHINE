@@ -744,6 +744,52 @@ Integration check (Standing Directive 2): consumer chain = stimulus →
 prompt-spec → converge candidates → proof/valuation/room → writer commit.
 No dangling ends; UI knob rides the existing ConvergePanel.
 
+## 13d. OWNE integration (truth registry + design library, filed 2026-07-10)
+
+User supplied an audited "truth registry" + full response corpus for an
+Open-World Narrative Engine (OWNE v1.1) — fact-checked formula spine, an
+explicit rejection list (BK-inequality runtime filtering, CFTP story
+sampling, Shannon-Hartley reader bandwidth, JSD-to-point twist metrics —
+all rejected with reasons), and MACHINE-READABLE design assets now vendored
+under `docs/owne/`: a 22-entry promise-template library (PT_* with
+setup_class / machine-checkable payoff_pred / hard-soft flag / priority),
+48 parameterized micro-mystery templates (M01-M48 with hypothesis spaces,
+true-clue vs red-herring taxonomies, fairness gates), and the complete
+Tavern Letter golden fixture (world fluents, STRIPS schemas, physics
+invariants, likelihood tables, golden path, negative tests, CI gates).
+Registry hygiene note: everything under docs/owne/ is SOURCE DESIGN DATA,
+not verified universal fact — see TRUTH_REGISTRY.md §6.
+
+Ranked by product value; each is guarantee-doc-scoped wave work:
+
+- [ ] **O1 — Typed promises (supersedes/implements B-wave 3's setup-payoff
+  typing).** Adopt the PT_* template shape onto SEED_CLUE/PAYOFF_SETUP:
+  type + hard/soft + priority + payoff predicate class. Consumers: payoff
+  pass (ORPHAN_CLUE severity becomes principled — hard promise unpaid =
+  critical, soft = minor, priority-weighted), pitch kit, root causes.
+  StoryOp contract change: sequence with record-parity.
+- [ ] **O2 — Tavern Letter as OASIS golden fixture + Integrity Rate.**
+  Import the fixture as ops/scenario; add IR = (1/T)·Σ 1[event legal ∧
+  invariants hold] over sim traces; CI-assert IR = 1.0 and Halluc = 0 on
+  the golden path, plus its negative tests (early-accusation gate,
+  teleport prevention, double possession, herring non-softlock). Proves
+  the sim layer the way the 69-script corpus proves the doctor.
+- [ ] **O3 — Assertion containment on generative output.** Registry law:
+  Asserted(output) ⊆ licensed facts ∪ common ground. Every LLM rewrite/
+  candidate gets a deterministic post-check that its prose asserts no
+  unlicensed facts (entity/fact extraction vs session canon + input span).
+  Generalizes B-wave 2's Semantic Firewall to ALL generation paths.
+- [ ] **O4 — Belief-movement surprise channel (Type 1 wave).** Explicit
+  hypothesis distribution μ over who/what/why + per-scene TV-distance
+  Surprise(e) = ½·||μ_e − μ||₁ — deterministic twist metric with real
+  math, replacing lexicon-intensity proxies. Feeds twist/reveal rules and
+  the metrics module.
+- [ ] **O5 — Mystery fairness gates (Type 3, genre-routed).** Doctor
+  checks for mystery-genre scripts: min_true_clues_before_solve (>= 2),
+  red-herring non-softlock, reachability of solution clues before the
+  reveal. Discourse-class/meso-chain taxonomy (Myst_Hook → ... →
+  Aftermath) as ScenePurpose extensions for the mystery genre router.
+
 ### Run 17b — Polish (retained, after function work)
 
 - [ ] **(M)** Panel consolidation: 24+ flat buttons in the UI → grouped nav
