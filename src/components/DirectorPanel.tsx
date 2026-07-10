@@ -3,6 +3,13 @@ import { motion } from "motion/react";
 import { GameState, Choice, DefenseMechanism } from "../types";
 import type { OutlineBeat } from "../../server/engine/types";
 import {
+  GENRE_OPTIONS,
+  STRUCTURE_OPTIONS,
+  EMOTIONAL_ARC_OPTIONS,
+  DIRECTOR_STYLE_OPTIONS,
+  ARC_TENSION_CURVES,
+} from "../lib/story-axes";
+import {
   Brain,
   Heart,
   Activity,
@@ -1088,12 +1095,9 @@ export default function DirectorPanel({
                   className={inputClass}
                 >
                   <option value="">— None —</option>
-                  <option value="save_the_cat">Save the Cat (15 beats)</option>
-                  <option value="dan_harmon">Dan Harmon Story Circle (8)</option>
-                  <option value="john_yorke">John Yorke 5 Acts</option>
-                  <option value="freytag">Freytag's Pyramid (5)</option>
-                  <option value="sequence">Sequence Approach (8)</option>
-                  <option value="kishotenketsu">Kishōtenketsu (4)</option>
+                  {STRUCTURE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1135,12 +1139,11 @@ export default function DirectorPanel({
                   className={inputClass}
                 >
                   <option value="">— None (no tension curve) —</option>
-                  <option value="rags_to_riches">Rags to Riches (steady rise)</option>
-                  <option value="riches_to_rags">Riches to Rags (tragic fall)</option>
-                  <option value="man_in_a_hole">Man in a Hole (fall → rise)</option>
-                  <option value="icarus">Icarus (rise → fall)</option>
-                  <option value="cinderella">Cinderella (rise → fall → rise)</option>
-                  <option value="oedipus">Oedipus (fall → rise → fall)</option>
+                  {EMOTIONAL_ARC_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}{opt.description ? ` (${opt.description})` : ''}
+                    </option>
+                  ))}
                 </select>
                 {emotionalArc && (
                   <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Engine will emit ESCALATE/COOL pressure when tension deviates &gt;22pts from the curve.</p>
@@ -1149,16 +1152,8 @@ export default function DirectorPanel({
 
               {/* Emotional arc tension curve visualization */}
               {emotionalArc && (() => {
-                const CURVES: Record<string, number[]> = {
-                  rags_to_riches:  [10, 20, 30, 45, 58, 68, 78, 88],
-                  riches_to_rags:  [80, 72, 63, 54, 44, 33, 22, 12],
-                  man_in_a_hole:   [48, 36, 24, 16, 28, 46, 64, 80],
-                  icarus:          [18, 32, 52, 68, 80, 84, 62, 36],
-                  cinderella:      [28, 52, 72, 80, 52, 32, 58, 88],
-                  oedipus:         [72, 56, 42, 52, 68, 52, 35, 18],
-                };
-                const curve = CURVES[emotionalArc];
-                if (!curve) return null;
+                const curve = (ARC_TENSION_CURVES as Record<string, number[]>)[emotionalArc];
+                if (!curve || curve.length === 0) return null;
                 const W = 200; const H = 48;
                 const pts = curve.map((v, i) => `${(i / (curve.length - 1)) * W},${H - (v / 100) * H}`).join(' ');
                 return (
@@ -1183,12 +1178,11 @@ export default function DirectorPanel({
                   className={inputClass}
                 >
                   <option value="">— None —</option>
-                  <option value="hitchcock">Hitchcock — Voyeuristic Suspense</option>
-                  <option value="fincher">Fincher — Procedural & Cynical</option>
-                  <option value="nolan">Nolan — Cerebral & Non-Linear</option>
-                  <option value="villeneuve">Villeneuve — Atmospheric Dread</option>
-                  <option value="aster">Aster — Grief Horror</option>
-                  <option value="lynch">Lynch — Surreal Nightmare</option>
+                  {DIRECTOR_STYLE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.description ? `${opt.label} — ${opt.description}` : opt.label}
+                    </option>
+                  ))}
                 </select>
                 {directorStyle && (
                   <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
@@ -1204,14 +1198,11 @@ export default function DirectorPanel({
                   className={inputClass}
                 >
                   <option value="">— None —</option>
-                  <option value="thriller">Thriller — Propulsive Suspense</option>
-                  <option value="horror">Horror — Creeping Dread</option>
-                  <option value="drama">Drama — Internal Conflict</option>
-                  <option value="comedy">Comedy — Character-Driven Wit</option>
-                  <option value="romance">Romance — Yearning & Risk</option>
-                  <option value="sci_fi">Science Fiction — Premise-Driven</option>
-                  <option value="noir">Noir — Moral Fog</option>
-                  <option value="mystery">Mystery — Fair-Play Investigation</option>
+                  {GENRE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.description ? `${opt.label} — ${opt.description}` : opt.label}
+                    </option>
+                  ))}
                 </select>
                 {storyGenre && (
                   <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Sets tone, register, and genre-specific clichés to avoid. Composes with cinematic style.</p>
