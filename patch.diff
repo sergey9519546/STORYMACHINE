@@ -1,0 +1,36 @@
+<<<<<<< SEARCH
+// Reusable auth check for admin routes. Mirrors /metrics logic.
+function checkAdminAuth(req: express.Request, res: express.Response): boolean {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken) {
+    const auth = req.headers.authorization ?? '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!provided || !timingSafeStringEqual(provided, adminToken)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return false;
+    }
+  } else if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    res.status(401).json({ error: 'Unauthorized: set ADMIN_TOKEN to configure AI providers remotely' });
+    return false;
+  }
+  return true;
+}
+=======
+// Reusable auth check for admin routes. Mirrors /metrics logic but uses req.ip
+// to properly handle reverse-proxy setups when TRUST_PROXY is configured.
+function checkAdminAuth(req: express.Request, res: express.Response): boolean {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken) {
+    const auth = req.headers.authorization ?? '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!provided || !timingSafeStringEqual(provided, adminToken)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return false;
+    }
+  } else if (!isLoopbackAddress(req.ip)) {
+    res.status(401).json({ error: 'Unauthorized: set ADMIN_TOKEN to configure AI providers remotely' });
+    return false;
+  }
+  return true;
+}
+>>>>>>> REPLACE
