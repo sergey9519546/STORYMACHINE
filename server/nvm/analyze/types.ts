@@ -13,6 +13,7 @@ import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
+import type { NarrativeMetricsReport } from './metrics.ts';
 
 /** Output of the heuristic Fountain analyzer — everything the revision
  *  pipeline needs, reconstructed from raw text instead of StoryCommits. */
@@ -284,4 +285,19 @@ export interface ScriptDoctorReport {
    *  Optional so older consumers stay valid; the doctor populates it whenever
    *  there are issues to cluster. */
   rootCauses?: RootCauseFinding[];
+  /** Deterministic narrative-shape metrics from analyze/metrics.ts (blueprint
+   *  §27) — pivot/cliffhanger/twist/surprise/information-asymmetry per scene,
+   *  plus suspense/momentum/cohesion/final-hook/emotional-range/tension-
+   *  measures for the whole script. Reuses metrics.ts's own
+   *  NarrativeMetricsReport shape verbatim (no redeclaration here) so the two
+   *  can never drift apart. Optional so reports serialized/cached before this
+   *  field existed stay valid: a missing `metrics` means "not computed for
+   *  this report", never "computed as empty" (the doctor always populates it
+   *  on every non-degenerate run — see doctor.ts's aggregateReport). Every
+   *  pacingFit inside (per-scene and script-level) is `null` on every doctor
+   *  report: the doctor has no session `emotional_arc` to pass
+   *  computeNarrativeMetrics, and metrics.ts reports that absence honestly
+   *  rather than fabricating a neutral score — see computePacingFit's header
+   *  in metrics.ts. */
+  metrics?: NarrativeMetricsReport;
 }

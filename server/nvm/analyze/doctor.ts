@@ -41,6 +41,7 @@ import { analyzeFountainText } from './fountain-analyzer.ts';
 import { deepReadRecords } from './deep-read.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
+import { computeNarrativeMetrics } from './metrics.ts';
 import type {
   FountainAnalysis, ScriptDoctorReport, DoctorPassSummary, SceneDiagnostics, DoctorGrade,
   CoverageVerdict, DimensionKey, DimensionScore,
@@ -1347,6 +1348,32 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   });
   const plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
 
+  // ── Narrative metrics layer (I1-c) ──────────────────────────────────────
+  // Deterministic per-scene/whole-script narrative-shape metrics from
+  // analyze/metrics.ts (blueprint §27), computed from the SAME analyzer
+  // records every other layer above already reads (analysis.records —
+  // post-deep-read-merge when deepReadMode ran, since aggregateReport is
+  // always called with mergedAnalysis, never the pre-merge original — see
+  // runScriptDoctor). No emotionalArc is passed: the doctor has no session
+  // arc configuration to read (StoryContext carries theme/genre/
+  // directorStyle/characters only, no emotional_arc field — see
+  // revision/passes/types.ts), so every pacingFit value below is honestly
+  // `null` throughout, exactly as metrics.ts's computePacingFit documents
+  // for the no-arc case, never a fabricated neutral score. computeNarrativeMetrics
+  // never throws (guarded to safe all-zero/neutral defaults even for an
+  // empty records array — see its own header), so this needs no defensive
+  // try/catch the way the calibration layer below does.
+  //
+  // Cache note: this adds NO new cache-key dimension. metrics is a pure,
+  // deterministic function of analysis.records alone (no LLM, no
+  // Math.random/Date.now — metrics.ts's own header), and records are fully
+  // determined by (trimmed fountain, quick/deep mode) — both already folded
+  // into doctorCacheKey (contentHash + the 'q'/'d' discriminator).
+  // storyContext never influences records (it only gates which pass issues
+  // fire), so the existing key remains exactly sufficient for the metrics
+  // field too.
+  const metrics = computeNarrativeMetrics(analysis.records);
+
   // ── Calibration layer ─────────────────────────────────────────────────────
   // Rank this report's health and each dimension's score against
   // calibration/reference.ts's reference-corpus distribution, populating
@@ -1415,6 +1442,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     plainSummary,
     contentHash: computeContentHash(fountain),
     healthPercentile,
+    metrics,
   };
 }
 

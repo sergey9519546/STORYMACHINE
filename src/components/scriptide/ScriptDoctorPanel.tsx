@@ -33,6 +33,7 @@ import type {
   RootCauseFinding,
   FixVerifyResult,
 } from "../../../server/nvm/analyze/types.ts";
+import type { NarrativeMetricsReport } from "../../../server/nvm/analyze/metrics.ts";
 import type {
   RevisionIssue,
   PassName,
@@ -201,6 +202,212 @@ function ordinal(n: number): string {
     default:
       return `${rounded}th`;
   }
+}
+
+// ─── Story metrics (server/nvm/analyze/metrics.ts via report.metrics) ───────
+// Deterministic narrative-shape metrics, rendered only when the report
+// carries them (old cached/serialized reports predate the field and degrade
+// gracefully with no gap — same optional-field convention as report.deepRead
+// and report.rootCauses). Captions are deliberately plain screenwriter
+// language, not formula names; the numbers are descriptive shape readings,
+// not grades, so nothing here uses the green/amber/red severity palette.
+
+/** Script-level 0–100 metric rows: label + one-line plain-language caption.
+ *  Order matches the reading a writer would take: how tension moves, whether
+ *  anything stalls, whether it hangs together, how it ends, how wide it swings. */
+const SCRIPT_METRIC_ROWS: Array<{
+  key: "suspenseEntropy" | "momentumConsistency" | "narrativeCohesion" | "finalCliffhangerStrength";
+  label: string;
+  caption: string;
+}> = [
+  {
+    key: "suspenseEntropy",
+    label: "Suspense shape",
+    caption: "Rewards rise-and-fall over a flat line — a steady ramp or a flatline both score low.",
+  },
+  {
+    key: "momentumConsistency",
+    label: "Momentum",
+    caption: "How rarely the story goes dead — a long stretch where nothing moves drags this down.",
+  },
+  {
+    key: "narrativeCohesion",
+    label: "Cohesion",
+    caption: "How many scenes thread back into the rest of the script — orphan scenes lower it.",
+  },
+  {
+    key: "finalCliffhangerStrength",
+    label: "Final hook",
+    caption: "How strongly the last scene leaves threads open — near zero means a clean, closed ending.",
+  },
+];
+
+/** The four tensionMeasures readouts. Only `lexical` is NOT on a 0–100
+ *  scale — it's the signed mean suspense change per scene (metrics.ts) —
+ *  so it renders as a signed number, not a bar. */
+const TENSION_MEASURE_META: Array<{
+  key: keyof NarrativeMetricsReport["script"]["tensionMeasures"];
+  label: string;
+  caption: string;
+}> = [
+  { key: "lexical", label: "Lexical", caption: "Net suspense drift per scene (signed — above 0 rises, below 0 drains)" },
+  { key: "structural", label: "Structural", caption: "Ticking clocks and unclosed questions kept alive" },
+  { key: "rhythmic", label: "Rhythmic", caption: "Whether scenes compress as the story moves (50 = no trend)" },
+  { key: "asymmetric", label: "Dramatic irony", caption: "How much the audience knows that the story hasn't resolved" },
+];
+
+/** One labeled 0–100 stat row: name, number, neutral fill bar, caption. */
+function MetricStatRow({ label, value, caption }: { label: string; value: number; caption: string }) {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
+        <span className="text-xs font-bold text-black dark:text-white">{pct}</span>
+      </div>
+      <div
+        className="h-1.5 w-full bg-gray-200 dark:bg-zinc-700 border border-black/10 dark:border-white/10 overflow-hidden mt-1"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${label} reading`}
+      >
+        <div className="h-full bg-zinc-500 dark:bg-zinc-400" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mt-1">{caption}</p>
+    </div>
+  );
+}
+
+/** Per-scene sparkline strip for a 0–100 per-scene metric — pure CSS bars
+ *  (no charting lib), same flex-strip idiom as the scene heatmap so the two
+ *  read as siblings. Bar height encodes the value; the tooltip carries the
+ *  exact number and scene slug. */
+function MetricSparkline({
+  label,
+  caption,
+  points,
+}: {
+  label: string;
+  caption: string;
+  points: Array<{ sceneIdx: number; slug: string; value: number }>;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-black dark:text-white">{label}</span>
+        <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">{caption}</span>
+      </div>
+      <div
+        className="flex items-end gap-0.5 h-10 mt-1 overflow-x-auto pb-0.5"
+        role="list"
+        aria-label={`Per-scene ${label} readings`}
+      >
+        {points.map((p) => {
+          const pct = Math.max(0, Math.min(100, Math.round(p.value)));
+          return (
+            <div
+              key={p.sceneIdx}
+              role="listitem"
+              title={`${p.slug} — ${label} ${pct}`}
+              className="flex-1 min-w-[10px] h-full flex items-end bg-gray-100 dark:bg-zinc-800 border border-black/10 dark:border-white/10"
+            >
+              <div
+                className="w-full bg-zinc-500 dark:bg-zinc-400"
+                // Full-zero scenes still show a 1px sliver so a real reading of
+                // 0 is visibly "measured as zero" rather than a missing cell.
+                style={{ height: pct === 0 ? "1px" : `${pct}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The "Story Metrics" report section — script-level stat rows, the 4-way
+ *  tension readout, emotional range, and per-scene sparklines for pivot and
+ *  cliffhanger strength. pacingFit is deliberately not rendered: on doctor
+ *  reports it is always null (no session emotional arc exists to measure
+ *  against — see doctor.ts's narrative-metrics comment), and showing a
+ *  permanent "n/a" row would be noise, not honesty. */
+function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
+  const { script, perScene } = metrics;
+  return (
+    <div>
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+        Story Metrics
+      </h3>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-2">
+        Deterministic shape readings — how the story moves, not how good it is. Descriptive, not graded.
+      </p>
+      <div className="space-y-3">
+        {SCRIPT_METRIC_ROWS.map((row) => (
+          <MetricStatRow key={row.key} label={row.label} value={script[row.key]} caption={row.caption} />
+        ))}
+        <MetricStatRow
+          label="Emotional peak"
+          value={script.emotionalImpactRange.peak}
+          caption="The single most intense scene — whether the draft ever really hits hard."
+        />
+        <MetricStatRow
+          label="Emotional range"
+          value={script.emotionalImpactRange.spread}
+          caption="Distance between the quietest and loudest scenes — a wide dynamic range scores high."
+        />
+
+        {/* Tension, four ways — the same question read through four
+            independent signals, kept side by side so disagreements between
+            them are visible (that disagreement IS the insight). */}
+        <div>
+          <div className="flex items-baseline justify-between gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-widest text-black dark:text-white">
+              Tension, four ways
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {TENSION_MEASURE_META.map((m) => {
+              const raw = script.tensionMeasures[m.key];
+              const display =
+                m.key === "lexical" ? `${raw > 0 ? "+" : ""}${raw}` : `${Math.round(raw)}`;
+              return (
+                <div
+                  key={m.key}
+                  title={m.caption}
+                  className="bg-gray-50 dark:bg-zinc-800 border-2 border-black/10 dark:border-white/10 p-2"
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                    {m.label}
+                  </p>
+                  <p className="text-lg font-bold text-black dark:text-white leading-tight">{display}</p>
+                  <p className="text-[9px] font-mono text-gray-500 dark:text-gray-400 leading-snug mt-0.5">
+                    {m.caption}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {perScene.length > 0 && (
+          <div className="space-y-3">
+            <MetricSparkline
+              label="Turning points by scene"
+              caption="Taller = a bigger reversal in that scene"
+              points={perScene.map((s) => ({ sceneIdx: s.sceneIdx, slug: s.slug, value: s.pivotStrength }))}
+            />
+            <MetricSparkline
+              label="Scene-end hooks"
+              caption="Taller = the scene ends on a stronger open thread"
+              points={perScene.map((s) => ({ sceneIdx: s.sceneIdx, slug: s.slug, value: s.cliffhangerStrength }))}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** Heatmap cell color by issue density — critical presence always wins regardless
@@ -2520,6 +2727,13 @@ export default function ScriptDoctorPanel({
                 </div>
               </div>
             )}
+
+            {/* Story metrics — deterministic narrative-shape readings from
+                server/nvm/analyze/metrics.ts (report.metrics). Rendered only
+                when the report carries the field, so reports produced/cached
+                before it existed degrade gracefully with no gap — same
+                optional-field convention as report.deepRead/rootCauses. */}
+            {report.metrics && <StoryMetricsSection metrics={report.metrics} />}
 
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (

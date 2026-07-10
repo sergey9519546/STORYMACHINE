@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   runScriptDoctor, computeHealthScore, gradeForHealth, verdictFor, buildStrengths,
-  computeDimensionScore, computeDimensionRawScore, aggregateReport,
+  computeDimensionScore, computeDimensionRawScore, aggregateReport, clearDoctorCache,
 } from '../../server/nvm/analyze/doctor.ts';
 import { runDiagnoseOnly, rewritePass } from '../../server/nvm/revision/rewrite.ts';
 import { setLLMProvider, resetLLMProvider } from '../../server/engine/ai.ts';
@@ -1158,5 +1158,88 @@ describe('runScriptDoctor report shape — dimension-collapse fix, end to end (W
         assert.ok(dim.score >= 0 && dim.score <= 100, `dimension ${dim.key} out of range at x${multiplier}: ${dim.score}`);
       }
     }
+  });
+});
+
+// ── Narrative metrics (I1-c) ─────────────────────────────────────────────────
+// ScriptDoctorReport.metrics — analyze/metrics.ts's NarrativeMetricsReport,
+// computed by aggregateReport from the same analyzer records every other
+// layer reads, and attached on every non-degenerate run. pacingFit is null
+// throughout by construction: the doctor has no session emotional_arc to pass
+// (StoryContext carries no arc field), and metrics.ts reports that absence
+// honestly instead of fabricating a neutral score.
+describe('runScriptDoctor — narrative metrics (report.metrics)', () => {
+  it('is present on a normal run, with one per-scene entry per scene in sceneIdx order', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+
+    assert.ok(report.metrics, 'metrics must be populated on a non-degenerate report');
+    const metrics = report.metrics!;
+    assert.equal(metrics.perScene.length, report.sceneCount,
+      'perScene must carry exactly one entry per analyzed scene');
+    assert.equal(metrics.script.sceneCount, report.sceneCount);
+    metrics.perScene.forEach((scene, i) => {
+      assert.equal(scene.sceneIdx, i, 'perScene must be sceneIdx-ascending with no gaps');
+      assert.ok(scene.slug.length > 0, 'every per-scene entry must carry its slug');
+    });
+  });
+
+  it('every score is within its documented range', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+
+    for (const scene of metrics.perScene) {
+      for (const key of ['pivotStrength', 'cliffhangerStrength', 'twistImpact', 'surpriseProxy', 'informationAsymmetryStrength'] as const) {
+        const v = scene[key];
+        assert.ok(Number.isFinite(v) && v >= 0 && v <= 100, `scene ${scene.sceneIdx} ${key} out of [0,100]: ${v}`);
+      }
+    }
+
+    const s = metrics.script;
+    for (const key of ['suspenseEntropy', 'momentumConsistency', 'finalCliffhangerStrength', 'narrativeCohesion'] as const) {
+      assert.ok(s[key] >= 0 && s[key] <= 100, `script.${key} out of [0,100]: ${s[key]}`);
+    }
+    assert.ok(s.emotionalImpactRange.peak >= 0 && s.emotionalImpactRange.peak <= 100);
+    assert.ok(s.emotionalImpactRange.spread >= 0 && s.emotionalImpactRange.spread <= 100);
+    // tensionMeasures: lexical is SIGNED and unbounded by contract (finite is
+    // the only guarantee); the other three are 0-100.
+    assert.ok(Number.isFinite(s.tensionMeasures.lexical));
+    for (const key of ['structural', 'rhythmic', 'asymmetric'] as const) {
+      const v = s.tensionMeasures[key];
+      assert.ok(v >= 0 && v <= 100, `tensionMeasures.${key} out of [0,100]: ${v}`);
+    }
+  });
+
+  it('pacingFit is honestly null everywhere — the doctor has no session emotional arc to measure against', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+    assert.equal(metrics.script.pacingFit, null, 'script-level pacingFit must be null with no arc configured');
+    for (const scene of metrics.perScene) {
+      assert.equal(scene.pacingFit, null, `scene ${scene.sceneIdx} pacingFit must be null with no arc configured`);
+    }
+  });
+
+  it('is deterministic: two genuinely fresh runs (cache cleared between) produce deep-equal metrics', async () => {
+    const fountain = buildMultiSceneFountain();
+    clearDoctorCache();
+    const first = await runScriptDoctor(fountain);
+    clearDoctorCache(); // make the second run a real recompute, not a cache hit
+    const second = await runScriptDoctor(fountain);
+    assert.deepEqual(first.metrics, second.metrics,
+      'metrics must be byte-identical across independent runs on the same input');
+  });
+
+  it('final hook reconciles: script.finalCliffhangerStrength equals the last scene\'s cliffhangerStrength', async () => {
+    const report = await runScriptDoctor(buildMultiSceneFountain());
+    const metrics = report.metrics!;
+    assert.equal(
+      metrics.script.finalCliffhangerStrength,
+      metrics.perScene[metrics.perScene.length - 1].cliffhangerStrength,
+    );
+  });
+
+  it('is absent from the degenerate zero-scene report — a missing field, not a fabricated all-zero one', async () => {
+    const report = await runScriptDoctor('   \n\n  \t  ');
+    assert.equal(report.metrics, undefined,
+      'the zero-scene report skips the pipeline entirely and must not carry metrics');
   });
 });
