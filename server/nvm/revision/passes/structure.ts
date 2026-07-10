@@ -6831,6 +6831,100 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── SCENE_CONTINUITY_COLLAPSE (structural-AUC wave, 2026-07-10) ────────────
+  // WHY: the real-corpus degradation harness (tests/core/real-script-corpus
+  // .test.ts) measured the rule set nearly blind to wholesale scene-order
+  // destruction at feature length (AUC 0.677 intact-vs-scrambled) — every
+  // structural signal that existed was either scene-local or derived from
+  // first-occurrence bookkeeping that is shuffle-invariant by construction.
+  // This rule reads two adjacency signals that scrambling measurably breaks
+  // (12-pair intact-vs-degraded measurement, thresholds set from that data,
+  // not intuition): (a) character continuity — the fraction of adjacent
+  // scene pairs sharing at least one speaking character (intact features
+  // median 0.55; scrambled 0.39) — and (b) day/night thrash — the toggle
+  // rate of DAY/NIGHT across sluglines (intact 0.17; scrambled 0.40). The
+  // composite index (continuity − thrash) separates at median 0.34 vs 0.05;
+  // firing below 0.05 caught 5/12 scrambled features and 1/12 intact (an
+  // anthology-shaped outlier), so the threshold is conservative by design —
+  // an excellence-grade "never fire on ordinary craft" posture for a MAJOR
+  // defect claim. Floors (>= 16 scenes, >= 10 speaker-bearing scenes,
+  // >= 10 DAY/NIGHT-bearing slugs) keep every short fixture and the whole
+  // calibration corpus structurally exempt: this is a feature-scale rule.
+  {
+    const CUE_RE_SCC = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\([A-Za-z.\s']+\))?$/;
+    const speakersByScene: Array<Set<string>> = [];
+    const todByScene: number[] = [];
+    let cur = new Set<string>(); let started = false;
+    for (const raw of fountain.split(/\r?\n/)) {
+      const l = raw.trim();
+      if (/^(INT\.|EXT\.)/i.test(l)) {
+        if (started) speakersByScene.push(cur);
+        cur = new Set(); started = true;
+        todByScene.push(/ NIGHT/i.test(l) ? 1 : / DAY/i.test(l) ? 0 : -1);
+        continue;
+      }
+      if (started && CUE_RE_SCC.test(l) && !/^(INT\.|EXT\.|CUT|FADE|SMASH|THE END)/.test(l)) {
+        cur.add(l.split('(')[0].trim());
+      }
+    }
+    if (started) speakersByScene.push(cur);
+    const speakerScenes = speakersByScene.filter(x => x.size > 0);
+    const tod = todByScene.filter(x => x >= 0);
+    if (n >= 16 && speakerScenes.length >= 10 && tod.length >= 10) {
+      let share = 0;
+      for (let i = 1; i < speakerScenes.length; i++) {
+        for (const c of speakerScenes[i]) { if (speakerScenes[i - 1].has(c)) { share++; break; } }
+      }
+      const charCont = share / (speakerScenes.length - 1);
+      let toggles = 0;
+      for (let i = 1; i < tod.length; i++) if (tod[i] !== tod[i - 1]) toggles++;
+      const thrash = toggles / (tod.length - 1);
+      if (charCont - thrash < 0.05) {
+        // Under the (conservative, measured) global gate, every adjacent
+        // scene pair that BOTH shares no speaking character AND flips
+        // day/night is an individually locatable continuity break — emitted
+        // per-instance (detail cap + rollup, the ORPHAN_CLUE report-quality
+        // pattern) rather than as one flat finding, because at feature-scale
+        // issue density a single instance is formula-invisible: the
+        // degradation harness measured one lone major moving displayed
+        // health by ~0.0 on a 600-issue feature. Symptom multiplicity is
+        // real here, not padding: a scrambled feature has DOZENS of these
+        // breaks, an intact one has none past the gate.
+        const SCC_DETAIL_CAP = 12;
+        const breaks: number[] = [];
+        let ti = 0;
+        for (let i = 1; i < speakersByScene.length; i++) {
+          const a = speakersByScene[i - 1], b = speakersByScene[i];
+          if (a.size === 0 || b.size === 0) continue;
+          let shared = false;
+          for (const c of b) { if (a.has(c)) { shared = true; break; } }
+          const t1 = todByScene[i - 1] ?? -1, t2 = todByScene[i] ?? -1;
+          const flip = t1 >= 0 && t2 >= 0 && t1 !== t2;
+          if (!shared && flip) breaks.push(i);
+          void ti;
+        }
+        for (const idx of breaks.slice(0, SCC_DETAIL_CAP)) {
+          issues.push({
+            location: `Scene ${idx}`,
+            rule: 'SCENE_CONTINUITY_COLLAPSE',
+            severity: 'major',
+            description: `Scene ${idx} opens with no speaking character carried over from the previous scene AND flips day/night at the same cut — in a document whose overall continuity index is already below the scrambled-order line (${Math.round(charCont * 100)}% adjacent-character continuity vs ${Math.round(thrash * 100)}% day/night thrash). Each such cut forces the reader to re-orient on both WHO and WHEN simultaneously.`,
+            suggestedFix: `Bridge the cut into Scene ${idx}: carry one character across it, or hold the time-of-day — re-orienting the reader on one axis per cut is craft; both at once, this often, is disorder.`,
+          });
+        }
+        if (breaks.length > SCC_DETAIL_CAP) {
+          issues.push({
+            location: 'Scene order throughout',
+            rule: 'SCENE_CONTINUITY_PERVASIVE',
+            severity: 'critical',
+            description: `Beyond the ${SCC_DETAIL_CAP} double-break cuts listed individually, ${breaks.length - SCC_DETAIL_CAP} more adjacent scenes both drop every character AND flip day/night. At this volume the scene ORDER itself — not any individual scene — reads scrambled: feature screenplays follow characters and cluster time-of-day, and this draft does neither.`,
+            suggestedFix: 'Re-sequence around character throughlines and day/night blocks. If the mosaic is intentional, signal it structurally (chapter cards, act breaks) so disorientation is authored, not accidental.',
+          });
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 
