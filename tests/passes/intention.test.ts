@@ -568,6 +568,140 @@ import { evaluateRewrite, REWRITE_MIN_LENGTH_RATIO } from '../../server/nvm/revi
 import { relationshipArcPass } from '../../server/nvm/revision/passes/relationship-arc.ts';
 
 
+  describe('Wave 1193 — intentionPass: protagonist deference run, agency proxy, acted-upon finale', async () => {
+    const makeRec1193 = (idx: number): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    });
+    const recs1193 = (n: number) => Array.from({ length: n }, (_, i) => makeRec1193(i));
+    const noAnn1193 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    const run1193 = async (fountain: string, n: number) => {
+      const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+      return intentionPass({
+        fountain, original: fountain, records: recs1193(n) as any,
+        structure: {} as any, annotations: noAnn1193(n), approvedSpans: [],
+      });
+    };
+    /** 6 scenes; MARA (protagonist by cue count) speaks `maraLines[i]` in scene i,
+     *  TOBIN speaks `tobinLines[i]`. Empty string skips that speaker that scene. */
+    const buildScript1193 = (maraLines: string[], tobinLines: string[]) =>
+      maraLines.map((m, i) => [
+        `INT. SC${i} - DAY`,
+        '',
+        'The office hums under fluorescent light.',
+        '',
+        ...(tobinLines[i] ? ['TOBIN', tobinLines[i], ''] : []),
+        ...(m ? ['MARA', m, ''] : []),
+      ].join('\n')).join('\n');
+
+    // ── PROTAGONIST_DEFERENCE_RUN ─────────────────────────────────────────────
+    it('fires when the most-present speaker assents through the plot with no commitment line', async () => {
+      const fountain = buildScript1193(
+        [
+          'Okay. Whatever you think is best.',
+          'Sure. Sounds good to me.',
+          "Fine. If that's what needs to happen.",
+          'Okay. Thanks for taking charge.',
+          'Alright. You know best.',
+          'Okay. I guess so.',
+        ],
+        ['We should check the ledgers.', 'I drafted the report.', 'I set the meeting.', '', '', ''],
+      );
+      const result = await run1193(fountain, 6);
+      const hits = result.issues.filter(i => i.rule === 'PROTAGONIST_DEFERENCE_RUN');
+      assert.ok(hits.length >= 1, `expected PROTAGONIST_DEFERENCE_RUN; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.equal(hits[0].severity, 'major');
+    });
+
+    it('does NOT fire PROTAGONIST_DEFERENCE_RUN when the protagonist commits to an action of their own', async () => {
+      const fountain = buildScript1193(
+        [
+          'Okay. Whatever you think is best.',
+          'Sure. Sounds good to me.',
+          "I'll handle the filing myself tonight.", // one commitment vetoes the run
+          'Okay. Thanks for taking charge.',
+          'Alright. You know best.',
+          'Okay. I guess so.',
+        ],
+        ['We should check the ledgers.', 'I drafted the report.', 'I set the meeting.', '', '', ''],
+      );
+      const result = await run1193(fountain, 6);
+      assert.equal(result.issues.filter(i => i.rule === 'PROTAGONIST_DEFERENCE_RUN').length, 0,
+        'a conflicted-but-committing protagonist is not a deference run');
+    });
+
+    // ── AGENCY_PROXY ──────────────────────────────────────────────────────────
+    it('fires when another character performs the protagonist\'s decisions 3+ times unreclaimed', async () => {
+      const fountain = buildScript1193(
+        ['What did you find?', 'Oh. All right then.', 'Thank you, I suppose.', 'What happens now?', 'Right.', 'Hm.'],
+        [
+          'Let me handle the reporting part.',
+          "I already called the board on your behalf.",
+          "Don't worry about anything, I've got it completely handled.",
+          '', '', '',
+        ],
+      );
+      const result = await run1193(fountain, 6);
+      const hits = result.issues.filter(i => i.rule === 'AGENCY_PROXY');
+      assert.ok(hits.length >= 1, `expected AGENCY_PROXY; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.equal(hits[0].severity, 'major');
+    });
+
+    it('does NOT fire AGENCY_PROXY when the protagonist reclaims an action after the proxying starts', async () => {
+      const fountain = buildScript1193(
+        ['What did you find?', 'Oh. All right then.', "I'll report it myself, today.", 'What happens now?', 'Right.', 'Hm.'],
+        [
+          'Let me handle the reporting part.',
+          "I already called the board on your behalf.",
+          "Don't worry about anything, I've got it completely handled.",
+          '', '', '',
+        ],
+      );
+      const result = await run1193(fountain, 6);
+      assert.equal(result.issues.filter(i => i.rule === 'AGENCY_PROXY').length, 0,
+        'a reclaim beat after the proxying begins is the arc working, not a defect');
+    });
+
+    // ── PROTAGONIST_ACTED_UPON_FINALE ─────────────────────────────────────────
+    it('fires when the final third shows the protagonist only as a receiver', async () => {
+      const front = buildScript1193(
+        ['What did you find?', 'Oh. All right then.', 'Thank you, I suppose.', 'Is that everything?', '', ''],
+        ['I found duplicate invoices.', 'The board already knows.', 'They put you on leave.', 'It will be fine.', '', ''],
+      );
+      const finale = [
+        'INT. SC4 - DAY', '',
+        'Mara is called into the office and told to wait.', '',
+        'MARA', 'Okay.', '',
+        'INT. SC5 - DAY', '',
+        'Mara watches the news alone. Mara sits in silence as the story runs.', '',
+      ].join('\n');
+      const result = await run1193(front.replace(/INT\. SC4 - DAY[\s\S]*$/, '') + finale, 6);
+      const hits = result.issues.filter(i => i.rule === 'PROTAGONIST_ACTED_UPON_FINALE');
+      assert.ok(hits.length >= 1, `expected PROTAGONIST_ACTED_UPON_FINALE; got: ${result.issues.map(i => i.rule).join(', ')}`);
+      assert.equal(hits[0].severity, 'major');
+    });
+
+    it('does NOT fire PROTAGONIST_ACTED_UPON_FINALE when the protagonist takes one initiative beat', async () => {
+      const front = buildScript1193(
+        ['What did you find?', 'Oh. All right then.', 'Thank you, I suppose.', 'Is that everything?', '', ''],
+        ['I found duplicate invoices.', 'The board already knows.', 'They put you on leave.', 'It will be fine.', '', ''],
+      );
+      const finale = [
+        'INT. SC4 - DAY', '',
+        'Mara is called into the office and told to wait.', '',
+        'MARA', 'Okay.', '',
+        'INT. SC5 - DAY', '',
+        'Mara slides the folder across the desk and demands a hearing.', '',
+      ].join('\n');
+      const result = await run1193(front.replace(/INT\. SC4 - DAY[\s\S]*$/, '') + finale, 6);
+      assert.equal(result.issues.filter(i => i.rule === 'PROTAGONIST_ACTED_UPON_FINALE').length, 0,
+        'one initiative beat in the finale is agency — the rule must stay silent');
+    });
+  });
+
   describe('Wave 171 — intentionPass: goal inversion, passive act3 intention, misplaced entropy spike', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
       commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,

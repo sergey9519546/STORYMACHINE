@@ -37,10 +37,12 @@
 //
 //   escalation-vs-flat-repetition:    good 76.1 > bad 70.0  (gap +6.1) PASS
 //   setup-payoff-vs-orphaned-setups:  good 74.6 > bad 70.0  (gap +4.6) PASS
-//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS (flipped this wave)
-//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS (flipped this wave)
+//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS (flipped by W1)
+//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS (flipped by W1)
 //   composite-reviewer-scenario:      good 72.2 > bad 70.0  (gap +2.2) PASS ordering; 5.0-pt min-gap still FAILS
-//   active-vs-passive-protagonist:    good 75.8 < bad 77.7  (gap -1.9) FAIL — WORSE than the prior tie
+//   active-vs-passive-protagonist:    good 75.8 > bad 71.2  (gap +4.6) PASS (flipped by Wave 1193's
+//                                     protagonist-agency detectors — see intention.ts; was -1.9 after W1,
+//                                     a missing-detector gap no formula change could close)
 //
 // active-vs-passive-protagonist is not a compression artifact: measured
 // weighted-issue counts show the "good" (active-protagonist) half already
@@ -86,6 +88,13 @@ const KNOWN_DISCRIMINATING = new Set<string>([
   // above and densityPenalty's own comment for the measurement.
   'subtext-vs-on-the-nose',
   'dramatized-vs-told-exposition',
+  // Flipped by Wave 1193 (protagonist-agency detectors: PROTAGONIST_
+  // DEFERENCE_RUN, AGENCY_PROXY, PROTAGONIST_ACTED_UPON_FINALE in
+  // intention.ts): the passive half now fires the three passivity rules the
+  // blind-spot note said were missing (measured good 75.8 > bad 71.2,
+  // gap +4.6); all three are corpus-silent (0/20) and fire on no other
+  // pair's either half — precision verified before this flip.
+  'active-vs-passive-protagonist',
   // Also flipped: the plain good > bad ORDERING now genuinely holds for the
   // composite pair too (+2.2, up from a dead tie) — but the separate
   // minimum-gap regression guard below (COMPOSITE_MIN_GAP=5.0) still does
@@ -99,10 +108,9 @@ const KNOWN_DISCRIMINATING = new Set<string>([
  *  this comment block. */
 const BLIND_SPOT_NOTE: Record<string, string> = {
   'active-vs-passive-protagonist':
-    'no signal distinguishes a protagonist who drives decisions from one things merely happen to — and (measured '
-    + 'by the W1 health-formula wave) the "active" half already fires MORE weighted issues than the "passive" '
-    + 'half under the current rule set (38 vs 35), so this is a missing-detector gap, not a formula-sensitivity '
-    + 'one; no density-curve change can close it',
+    'CLOSED by Wave 1193 (dialogue-attribution agency detectors) — retained so a regression here surfaces the '
+    + 'history: pre-1193 no signal distinguished a protagonist who drives decisions from one things merely '
+    + 'happen to, and the active half out-fired the passive half 38 vs 35 weighted',
   'composite-reviewer-scenario':
     "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '
