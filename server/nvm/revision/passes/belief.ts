@@ -545,7 +545,8 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
-import { GENRE_RULE_MODIFIERS } from '../../../lib/genre-router.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
 // Wave 1188 additions (Program v2, Type 3 — genre-conditioned): EXPOSITION_DUMP is one
@@ -566,6 +567,22 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
   // consumer falls through to its own generic constant in that case.
   const genre1188 = input.storyContext?.genre as StoryGenre | undefined;
   const genreMod1188 = genre1188 ? GENRE_RULE_MODIFIERS[genre1188] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1188 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1188 = tone1188 ? TONE_REGISTERS[tone1188]?.thresholdDeltas : undefined;
+  const composed1188 = composeThresholds(genre1188, tone1188);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("sci_fi", "cerebral", or "sci_fi + cerebral").
+  const thresholdNote1188 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1188?.[field] !== undefined) parts.push(String(genre1188));
+    if (toneDeltas1188?.[field] !== undefined) parts.push(String(tone1188));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   // ── Track belief propositions and their sources ────────────────────────────
   const toldBeliefs: Array<{ sceneIdx: number; proposition: string; slug: string }> = [];
@@ -627,11 +644,12 @@ export async function beliefPass(input: PassInput): Promise<PassResult> {
 
   // ── Consecutive told-beliefs with no witness ───────────────────────────────
   // More than 3 told beliefs in a row without any witnessed belief = exposition dump.
-  // Wave 1188: generic streak 3, genre-shifted per GENRE_RULE_MODIFIERS (see the
-  // file-header comment and genre-router.ts for the craft argument). Absent/unknown
-  // genre falls through to the pre-wave 3 constant.
-  const expositionDumpStreak1188 = genreMod1188?.expositionDumpStreak ?? 3;
-  const genreNote1188 = genreMod1188?.expositionDumpStreak !== undefined ? ` (threshold adjusted for ${genre1188})` : '';
+  // Wave 1188: generic streak 3, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 3 constant.
+  const expositionDumpStreak1188 = composed1188.expositionDumpStreak ?? 3;
+  const genreNote1188 = thresholdNote1188('expositionDumpStreak');
   let consecutiveTold = 0;
   let expositionStartScene = -1;
   for (const r of records) {

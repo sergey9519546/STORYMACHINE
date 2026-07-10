@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getTemperature } from '../ai.ts';
 import { composePromptModifiers } from '../../lib/genre-router.ts';
+import { CHARACTER_ARC_MODES } from '../../lib/structure-presets.ts';
 import { effectiveScore } from '../../lib/personality.ts';
 import { ACTION_TYPES } from '../types.ts';
 import type {
@@ -150,12 +151,25 @@ export function buildPrompt(
   })();
 
   // ── Outline + cinematic style + genre (P8 synergy compositor) ──
+  // I1-a: tone (mood register) is layered after genre/style, and the genre's
+  // structural promise block (genrePromiseBlock — required behaviors,
+  // forbidden shortcuts) is opted in so the genre contract reaches generation
+  // rather than just its vocabulary. The character-arc mode's
+  // promptInstruction lands on the same path STYLE_MODIFIERS' agentInstruction
+  // does — appended to this composed block. All four axes are optional; with
+  // none set the block is empty exactly as before.
   const illusionState = stage.getIllusionState();
   const illusionPhase = illusionState.phase;
-  const { block: styleGenreBlock } = composePromptModifiers(
+  const { block: composedModifierBlock } = composePromptModifiers(
     illusionState.story_genre,
     illusionState.director_style,
+    illusionState.story_tone,
+    true, // include genrePromiseBlock (I1-a)
   );
+  const arcModeInstruction = illusionState.character_arc_mode
+    ? CHARACTER_ARC_MODES[illusionState.character_arc_mode]?.promptInstruction ?? ''
+    : '';
+  const styleGenreBlock = [composedModifierBlock, arcModeInstruction].filter(Boolean).join('\n\n');
   const activeBeat = illusionState.outline?.find(b =>
     b.phase === illusionPhase && currentTurn >= b.turn_start && currentTurn <= b.turn_end,
   );

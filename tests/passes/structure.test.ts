@@ -6811,3 +6811,67 @@ We should really figure out who did this.
     });
   });
 });
+// ── I1-a — structurePass: tone deltas compose with genre via composeThresholds ──
+
+describe('I1-a — structurePass: DARK_NIGHT_ABSENT tone-composed thresholds (composeThresholds)', () => {
+  const makeRecI1 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const blankFountainI1 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const baseStructureI1 = {
+    completionPercent: 50, actPosition: 'act2a' as const,
+    midpointPressure: 2, tightestScene: 7, reversalCount: 2,
+  };
+  // 10 scenes; dark-night zone = scenes 6-7; scene 7 dips negative at the given suspense.
+  const darkNightInputI1 = (dipSuspense: number) => ({
+    fountain: blankFountainI1(10), original: blankFountainI1(10),
+    records: Array.from({ length: 10 }, (_, i) =>
+      makeRecI1(i, { emotionalShift: i === 7 ? 'negative' : 'neutral', suspenseDelta: i === 7 ? dipSuspense : 1.5 }),
+    ) as any,
+    structure: baseStructureI1 as any, annotations: [], approvedSpans: [],
+  });
+
+  // Tone relaxes a threshold and stops a borderline fire: hopeful's
+  // darkNightSuspenseFloor delta is -0.4, composing the generic 1 down to 0.6,
+  // so a 0.7-suspense dip that fails the generic floor still counts as the
+  // "all is lost" beat under a hopeful register.
+  it('structurePass: DARK_NIGHT_ABSENT fires generically at a 0.7 dip but NOT under tone hopeful (floor relaxed to 0.6)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const baseInput = darkNightInputI1(0.7);
+    const genericResult = await structurePass(baseInput);
+    assert.ok(
+      genericResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      'Should fire generically: 0.7 does not clear the generic floor of 1',
+    );
+    const hopefulResult = await structurePass({ ...baseInput, storyContext: { tone: 'hopeful' } });
+    assert.ok(
+      !hopefulResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      "Should NOT fire under hopeful's relaxed 0.6 floor — the milder dip is the register's low point",
+    );
+  });
+
+  // Genre and tone compose: comedy 0.5 + dread_driven +0.4 = 0.9. A 0.7 dip
+  // satisfies comedy alone but not the composed floor, and the note names both.
+  it('structurePass: DARK_NIGHT_ABSENT composes comedy genre + dread_driven tone and names both axes in the note', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const baseInput = darkNightInputI1(0.7);
+    const comedyResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy' } });
+    assert.ok(
+      !comedyResult.issues.some(i => i.rule === 'DARK_NIGHT_ABSENT'),
+      "comedy alone must accept the 0.7 dip (floor 0.5) — no fire",
+    );
+    const composedResult = await structurePass({ ...baseInput, storyContext: { genre: 'comedy', tone: 'dread_driven' } });
+    const darkNight = composedResult.issues.filter(i => i.rule === 'DARK_NIGHT_ABSENT');
+    assert.ok(darkNight.length >= 1, `Expected DARK_NIGHT_ABSENT under comedy+dread_driven; got: ${composedResult.issues.map(i => i.rule).join(', ')}`);
+    assert.ok(
+      darkNight[0].description.includes('(threshold adjusted for comedy + dread_driven)'),
+      `note must name both axes; got: ${darkNight[0].description}`,
+    );
+  });
+});

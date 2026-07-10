@@ -630,3 +630,35 @@ describe('routes/config — POST /api/story-genre accepts the expanded 47-genre 
     assert.equal(res.status, 200);
   });
 });
+
+// ── I1-a — composePromptModifiers: genrePromiseBlock opt-in ─────────────────
+
+describe('composePromptModifiers — includeGenrePromise layers the structural contract (I1-a)', () => {
+  it('fire: promise lines appear when a genre with genreRules is set and includeGenrePromise is true', () => {
+    const { block } = composePromptModifiers('drama', undefined, undefined, true);
+    assert.match(block, /GENRE PROMISE — DRAMA/);
+    assert.match(block, /REQUIRED:/);
+    assert.match(block, /FORBIDDEN SHORTCUTS:/);
+    assert.ok(block.startsWith(genrePromptBlock('drama')), 'voice block still leads; promise follows');
+  });
+
+  it('fire: the promise block survives a synergy override (structural contract binds even when the voice is replaced)', () => {
+    const { block, hasSynergy } = composePromptModifiers('thriller', 'hitchcock', 'bleak', true);
+    assert.equal(hasSynergy, true);
+    assert.ok(block.startsWith(SYNERGY_OVERRIDES.thriller_hitchcock!.combinedInstruction));
+    assert.match(block, /GENRE PROMISE — THRILLER/);
+    // Tone stays last: mood layered on top of contract.
+    assert.ok(block.indexOf('GENRE PROMISE — THRILLER') < block.indexOf('TONE — BLEAK'));
+  });
+
+  it('no-fire: includeGenrePromise defaults to false — existing call sites stay byte-identical', () => {
+    const { block } = composePromptModifiers('drama', undefined);
+    assert.doesNotMatch(block, /GENRE PROMISE/);
+    assert.equal(block, genrePromptBlock('drama'));
+  });
+
+  it('no-fire: includeGenrePromise with no genre set adds nothing', () => {
+    const { block } = composePromptModifiers(undefined, 'hitchcock', undefined, true);
+    assert.doesNotMatch(block, /GENRE PROMISE/);
+  });
+});

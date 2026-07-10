@@ -6478,3 +6478,97 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       );
     });
   });
+// ── I1-a — pacingPass: tone deltas compose with genre via composeThresholds ──
+
+describe('I1-a — pacingPass: ENERGY_MONOTONE tone-composed thresholds (composeThresholds)', () => {
+  const makeRecI1 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    ...override,
+  });
+  const noAnnotationsI1 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+  function fountainWithLengthsI1(sceneLinesArray: number[]): string {
+    return sceneLinesArray.map((len, i) => {
+      const body = Array.from({ length: len }, (_, j) => `Scene ${i} action line ${j + 1}.`).join('\n');
+      return `INT. SC${i} - DAY\n\n${body}\n`;
+    }).join('\n');
+  }
+  const inputForLengthsI1 = (sceneLens: number[]) => ({
+    fountain: fountainWithLengthsI1(sceneLens),
+    original: '', records: Array.from({ length: sceneLens.length }, (_, i) => makeRecI1(i)) as any,
+    structure: {} as any, annotations: noAnnotationsI1(sceneLens.length), approvedSpans: [],
+  });
+
+  // Tone relaxes a threshold and stops a borderline fire: bleak's
+  // energyMonotoneCoV delta is -0.05, composing the generic 0.35 down to 0.30.
+  // A CoV ≈ 0.32 rhythm fires generically but is the intended grinding
+  // flatness under a bleak register.
+  it('pacingPass: ENERGY_MONOTONE fires generically at CoV≈0.32 but NOT under tone bleak (relaxed to 0.30)', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [10, 10, 10, 10, 10, 10, 10, 21]; // CoV ≈ 0.320
+    const baseInput = inputForLengthsI1(sceneLens);
+    const genericResult = await pacingPass(baseInput);
+    assert.ok(
+      genericResult.issues.some(i => i.rule === 'ENERGY_MONOTONE'),
+      'Should fire generically at CoV≈0.32 (below the generic 0.35 cutoff)',
+    );
+    const bleakResult = await pacingPass({ ...baseInput, storyContext: { tone: 'bleak' } });
+    assert.ok(
+      !bleakResult.issues.some(i => i.rule === 'ENERGY_MONOTONE'),
+      "Should NOT fire under bleak's relaxed 0.30 cutoff — the flat grind is the register",
+    );
+  });
+
+  // Tone tightens: chaotic promises unpredictable swing (delta +0.15 → 0.50),
+  // so a CoV ≈ 0.42 rhythm that is fine generically reads as monotone under it.
+  it('pacingPass: ENERGY_MONOTONE does not fire generically at CoV≈0.42 but fires under tone chaotic with a tone note', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [10, 10, 10, 10, 10, 10, 10, 25]; // CoV ≈ 0.418
+    const baseInput = inputForLengthsI1(sceneLens);
+    const genericResult = await pacingPass(baseInput);
+    assert.ok(
+      !genericResult.issues.some(i => i.rule === 'ENERGY_MONOTONE'),
+      'Should NOT fire generically at CoV≈0.42 (above the generic 0.35 cutoff)',
+    );
+    const chaoticResult = await pacingPass({ ...baseInput, storyContext: { tone: 'chaotic' } });
+    const monotone = chaoticResult.issues.filter(i => i.rule === 'ENERGY_MONOTONE');
+    assert.ok(monotone.length >= 1, `Expected ENERGY_MONOTONE under chaotic; got: ${chaoticResult.issues.map(i => i.rule).join(', ')}`);
+    assert.ok(monotone[0].description.includes('(threshold adjusted for chaotic)'), 'tone-shifted issue must explain why');
+  });
+
+  // Genre and tone compose: thriller 0.45 + bleak -0.05 = 0.40. A CoV ≈ 0.37
+  // rhythm passes generically (0.35) but stalls under the composed cutoff,
+  // and the note names both contributing axes.
+  it('pacingPass: ENERGY_MONOTONE composes thriller genre + bleak tone and names both axes in the note', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [10, 10, 10, 10, 10, 10, 10, 23]; // CoV ≈ 0.370
+    const baseInput = inputForLengthsI1(sceneLens);
+    const genericResult = await pacingPass(baseInput);
+    assert.ok(
+      !genericResult.issues.some(i => i.rule === 'ENERGY_MONOTONE'),
+      'Should NOT fire generically at CoV≈0.37',
+    );
+    const composedResult = await pacingPass({ ...baseInput, storyContext: { genre: 'thriller', tone: 'bleak' } });
+    const monotone = composedResult.issues.filter(i => i.rule === 'ENERGY_MONOTONE');
+    assert.ok(monotone.length >= 1, `Expected ENERGY_MONOTONE under thriller+bleak; got: ${composedResult.issues.map(i => i.rule).join(', ')}`);
+    assert.ok(
+      monotone[0].description.includes('(threshold adjusted for thriller + bleak)'),
+      `note must name both axes; got: ${monotone[0].description}`,
+    );
+  });
+
+  // No-fire guard: with a genre set and tone ABSENT the composed threshold and
+  // the note are byte-identical to the pre-I1-a genre-only path.
+  it('pacingPass: tone-absent path keeps the genre-only note byte-identical (no tone leakage)', async () => {
+    const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+    const sceneLens = [10, 10, 10, 10, 10, 10, 10, 24]; // CoV ≈ 0.394: thriller (0.45) fires
+    const baseInput = inputForLengthsI1(sceneLens);
+    const thrillerResult = await pacingPass({ ...baseInput, storyContext: { genre: 'thriller' } });
+    const monotone = thrillerResult.issues.filter(i => i.rule === 'ENERGY_MONOTONE');
+    assert.ok(monotone.length >= 1, 'thriller alone must still fire at CoV≈0.39');
+    assert.ok(monotone[0].description.endsWith('(threshold adjusted for thriller)'), 'genre-only note must not mention any tone');
+  });
+});

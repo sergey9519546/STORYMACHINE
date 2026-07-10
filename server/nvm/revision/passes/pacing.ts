@@ -558,7 +558,8 @@ import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import type { ScreenplaySceneRecord } from '../../screenplay/memory.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkAftermathVoid, checkZoneImbalance, checkCoOccurrenceDecoupled, checkPeakUncaused, checkDroughtRun, checkZoneCluster, checkHalfLoaded, FOUR_ZONE_NAMES } from './lib/checks.ts';
-import { GENRE_RULE_MODIFIERS } from '../../../lib/genre-router.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
 /**
@@ -615,6 +616,22 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   // every consumer falls through to its own generic constant in that case.
   const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
   const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1184 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1184 = tone1184 ? TONE_REGISTERS[tone1184]?.thresholdDeltas : undefined;
+  const composed1184 = composeThresholds(genre1184, tone1184);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("thriller", "bleak", or "thriller + bleak").
+  const thresholdNote1184 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1184?.[field] !== undefined) parts.push(String(genre1184));
+    if (toneDeltas1184?.[field] !== undefined) parts.push(String(tone1184));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   const sceneLengths = sceneLineCount(fountain);
   if (sceneLengths.size === 0) {
@@ -711,14 +728,15 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   const stdDev = Math.sqrt(lineCountVariance);
   const coefficientOfVariation = stdDev / avgLength;
 
-  // Wave 1184: generic cutoff 0.35, genre-shifted per GENRE_RULE_MODIFIERS (see the
-  // file-header comment and genre-router.ts for the craft argument). Absent/unknown
-  // genre falls through to the pre-wave 0.35 constant.
-  const energyMonotoneCoV1184 = genreMod1184?.energyMonotoneCoV ?? 0.35;
+  // Wave 1184: generic cutoff 0.35, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 0.35 constant.
+  const energyMonotoneCoV1184 = composed1184.energyMonotoneCoV ?? 0.35;
 
   if (coefficientOfVariation < energyMonotoneCoV1184 && records.length >= 8) {
     // Low variation (< the resolved cutoff) means scenes are all similar length
-    const genreNote1184 = genreMod1184?.energyMonotoneCoV !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
+    const genreNote1184 = thresholdNote1184('energyMonotoneCoV');
     issues.push({
       location: 'Overall pacing',
       rule: 'ENERGY_MONOTONE',
@@ -850,13 +868,14 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
   // ENERGY_MONOTONE stays quiet), a flat local stretch reads as a sag — four
   // scenes in a row at the same cadence with no acceleration or contraction.
   if (records.length >= 8) {
-    // Wave 1184: generic ratio 1.2 (±20%), genre-shifted per GENRE_RULE_MODIFIERS (see
-    // the file-header comment). Absent/unknown genre falls through to the pre-wave 1.2
+    // Wave 1184: generic ratio 1.2 (±20%), genre-shifted per GENRE_RULE_MODIFIERS;
+    // I1-a: tone deltas compose on top via composeThresholds (see the file-header
+    // comment). Absent/unknown genre AND tone fall through to the pre-wave 1.2
     // constant, and the displayed percentage is derived from the same ratio so the two
     // never drift apart.
-    const pacingPlateauRatio1184 = genreMod1184?.pacingPlateauRatio ?? 1.2;
+    const pacingPlateauRatio1184 = composed1184.pacingPlateauRatio ?? 1.2;
     const pacingPlateauPct1184 = Math.round((pacingPlateauRatio1184 - 1) * 100);
-    const genreNote1184Plateau = genreMod1184?.pacingPlateauRatio !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
+    const genreNote1184Plateau = thresholdNote1184('pacingPlateauRatio');
 
     const orderedLengths = Array.from({ length: records.length }, (_, i) => sceneLengths.get(i) ?? 0);
     for (let i = 0; i + 4 <= orderedLengths.length; i++) {

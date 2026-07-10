@@ -44,6 +44,12 @@ export interface StoryContext {
   theme?: string;
   /** Genre (e.g. "thriller", "drama") */
   genre?: string;
+  /** Tone register (e.g. "bleak", "operatic") — I1-a: composed with genre via
+   *  composeThresholds (server/lib/genre-router.ts) by the passes whose rule
+   *  thresholds are genre-conditioned (pacing, structure, belief). Follows
+   *  IllusionState.story_tone through the same route-level threading genre
+   *  uses (server/routes/nvm/revision.ts). */
+  tone?: string;
   /** Director/style shorthand (e.g. "Hitchcock — slow build, subtext") */
   directorStyle?: string;
   /** Compact character summary — names + emotional state */

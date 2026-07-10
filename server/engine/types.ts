@@ -320,6 +320,15 @@ export interface IllusionState {
   expected_turns?: number;      // writer's estimate of total session length for arc curve
   story_theme?: string;         // author-declared thematic statement ("power corrupts", etc.)
   story_genre?: StoryGenre;     // genre routing signal — selects tone/vocabulary/cliché modifiers
+  // Tone register (I1-a): the orthogonal mood/register axis alongside genre —
+  // see server/lib/genre-router.ts's TONE_REGISTERS. Typed via an inline
+  // type-only import (erased at runtime) so this file stays import-free and no
+  // runtime cycle forms with genre-router.ts, which imports StoryGenre above.
+  story_tone?: import('../lib/genre-router.ts').ToneName;
+  // Character arc mode (I1-a): moral/psychological direction of the central
+  // character — see server/lib/structure-presets.ts's CHARACTER_ARC_MODES.
+  // Same inline type-only import rationale as story_tone.
+  character_arc_mode?: import('../lib/structure-presets.ts').CharacterArcMode;
 }
 
 // ── Persuasion strategy ──────────────────────────────────────────────────────
@@ -566,7 +575,8 @@ export interface StageSnapshot {
   illusion_state: Pick<IllusionState,
     | 'phase' | 'planted_elements' | 'pending_recontextualization'
     | 'outline' | 'pacing_target' | 'structure' | 'emotional_arc'
-    | 'director_style' | 'expected_turns' | 'story_theme' | 'story_genre'>;
+    | 'director_style' | 'expected_turns' | 'story_theme' | 'story_genre'
+    | 'story_tone' | 'character_arc_mode'>;
   beat_traces: BeatTrace[];
   belief_edges: BeliefEdge[];
   goal_mutations: GoalMutation[];

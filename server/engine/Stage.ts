@@ -729,6 +729,8 @@ export class Stage {
       expected_turns: config.expected_turns,
       story_theme: config.story_theme,
       story_genre: config.story_genre,
+      story_tone: config.story_tone,
+      character_arc_mode: config.character_arc_mode,
     };
   }
 
@@ -753,6 +755,8 @@ export class Stage {
         expected_turns: next.expected_turns,
         story_theme: next.story_theme,
         story_genre: next.story_genre,
+        story_tone: next.story_tone,
+        character_arc_mode: next.character_arc_mode,
       };
       this.db.prepare(`
         UPDATE Illusion_State
@@ -1300,6 +1304,8 @@ export class Stage {
           expected_turns: s.expected_turns,
           story_theme: s.story_theme,
           story_genre: s.story_genre,
+          story_tone: s.story_tone,
+          character_arc_mode: s.character_arc_mode,
         };
       })(),
       beat_traces: this.getAllBeatTraces(),

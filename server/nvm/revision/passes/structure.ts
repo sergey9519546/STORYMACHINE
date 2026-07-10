@@ -568,7 +568,8 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
-import { GENRE_RULE_MODIFIERS } from '../../../lib/genre-router.ts';
+import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
+import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
 
 export async function structurePass(input: PassInput): Promise<PassResult> {
@@ -582,6 +583,22 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   // consumer falls through to its own generic constant in that case.
   const genre1184 = input.storyContext?.genre as StoryGenre | undefined;
   const genreMod1184 = genre1184 ? GENRE_RULE_MODIFIERS[genre1184] : undefined;
+  // I1-a: tone deltas compose with the genre base via composeThresholds
+  // (server/lib/genre-router.ts), clamped per field to THRESHOLD_BOUNDS. With
+  // tone absent, composed values equal the raw GENRE_RULE_MODIFIERS lookups
+  // exactly, so pre-I1-a behavior — thresholds AND issue text — is
+  // byte-identical.
+  const tone1184 = input.storyContext?.tone as ToneName | undefined;
+  const toneDeltas1184 = tone1184 ? TONE_REGISTERS[tone1184]?.thresholdDeltas : undefined;
+  const composed1184 = composeThresholds(genre1184, tone1184);
+  // Issue-note helper: names whichever axes actually shifted the field, in
+  // genre-then-tone order ("comedy", "bleak", or "comedy + bleak").
+  const thresholdNote1184 = (field: keyof GenreRuleThresholds): string => {
+    const parts: string[] = [];
+    if (genreMod1184?.[field] !== undefined) parts.push(String(genre1184));
+    if (toneDeltas1184?.[field] !== undefined) parts.push(String(tone1184));
+    return parts.length > 0 ? ` (threshold adjusted for ${parts.join(' + ')})` : '';
+  };
 
   // ── Act balance checks ────────────────────────────────────────────────────
   if (structure.completionPercent < 80 && structure.actPosition === 'act3') {
@@ -607,12 +624,13 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Midpoint pressure ─────────────────────────────────────────────────────
-  // Wave 1188: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS (see the
-  // file-header comment and genre-router.ts for the craft argument). Absent/unknown
-  // genre falls through to the pre-wave 1 constant.
-  const weakMidpointFloor1188 = genreMod1184?.weakMidpointPressureFloor ?? 1;
+  // Wave 1188: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS; I1-a: tone
+  // deltas compose on top via composeThresholds (see the file-header comment and
+  // genre-router.ts for the craft argument). Absent/unknown genre AND tone fall
+  // through to the pre-wave 1 constant.
+  const weakMidpointFloor1188 = composed1184.weakMidpointPressureFloor ?? 1;
   if (n >= 6 && structure.midpointPressure < weakMidpointFloor1188) {
-    const genreNote1188 = genreMod1184?.weakMidpointPressureFloor !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
+    const genreNote1188 = thresholdNote1184('weakMidpointPressureFloor');
     issues.push({
       location: `Scene ${Math.floor(n / 2)} (midpoint)`,
       rule: 'WEAK_MIDPOINT',
@@ -821,15 +839,16 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const darkNightEnd = Math.floor(n * 0.85);
     const darkZone = records.slice(darkNightStart, darkNightEnd);
     if (darkZone.length >= 2) {
-      // Wave 1184: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS (see the
-      // file-header comment). Absent/unknown genre falls through to the pre-wave
+      // Wave 1184: generic floor 1, genre-shifted per GENRE_RULE_MODIFIERS; I1-a:
+      // tone deltas compose on top via composeThresholds (see the file-header
+      // comment). Absent/unknown genre AND tone fall through to the pre-wave
       // constant of 1.
-      const darkNightSuspenseFloor1184 = genreMod1184?.darkNightSuspenseFloor ?? 1;
+      const darkNightSuspenseFloor1184 = composed1184.darkNightSuspenseFloor ?? 1;
       const hasDarkNight = darkZone.some(r =>
         r.emotionalShift === 'negative' && r.suspenseDelta > darkNightSuspenseFloor1184,
       );
       if (!hasDarkNight) {
-        const genreNote1184 = genreMod1184?.darkNightSuspenseFloor !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
+        const genreNote1184 = thresholdNote1184('darkNightSuspenseFloor');
         issues.push({
           location: `Scenes ${darkNightStart}–${darkNightEnd} (pre-climax zone)`,
           rule: 'DARK_NIGHT_ABSENT',
@@ -1015,11 +1034,12 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const act3SceneStart = Math.floor(n * 0.75);
     const act3SceneCount = n - act3SceneStart;
     // Wave 1188: generic ratio 1 (Act 3 merely has to out-count Act 1), genre-shifted
-    // per GENRE_RULE_MODIFIERS (see the file-header comment). Absent/unknown genre
-    // falls through to the pre-wave ratio of 1.
-    const act3ExcessRatio1188 = genreMod1184?.act3ExcessRatio ?? 1;
+    // per GENRE_RULE_MODIFIERS; I1-a: tone deltas compose on top via composeThresholds
+    // (see the file-header comment). Absent/unknown genre AND tone fall through to
+    // the pre-wave ratio of 1.
+    const act3ExcessRatio1188 = composed1184.act3ExcessRatio ?? 1;
     if (act3SceneCount > act1SceneCount * act3ExcessRatio1188) {
-      const genreNote1188b = genreMod1184?.act3ExcessRatio !== undefined ? ` (threshold adjusted for ${genre1184})` : '';
+      const genreNote1188b = thresholdNote1184('act3ExcessRatio');
       issues.push({
         location: `Act 1 (${act1SceneCount} scenes) vs Act 3 (${act3SceneCount} scenes)`,
         rule: 'ACT3_SCENE_EXCESS',

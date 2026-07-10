@@ -93,6 +93,7 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
   const storyCtx: import('../../nvm/revision/passes/types.ts').StoryContext = {
     theme: illusionCtx.story_theme ? sanitizeForPrompt(illusionCtx.story_theme, 200) : undefined,
     genre: illusionCtx.story_genre ?? undefined,
+    tone: illusionCtx.story_tone ?? undefined,
     directorStyle: illusionCtx.director_style ?? undefined,
     characters: characterSummary || undefined,
   };
@@ -155,6 +156,7 @@ router.get('/api/nvm/revise-stream', aiLimiter, async (req, res) => {
     const storyCtxStream: import('../../nvm/revision/passes/types.ts').StoryContext = {
       theme: illusionCtxStream.story_theme ? sanitizeForPrompt(illusionCtxStream.story_theme, 200) : undefined,
       genre: illusionCtxStream.story_genre ?? undefined,
+      tone: illusionCtxStream.story_tone ?? undefined,
       directorStyle: illusionCtxStream.director_style ?? undefined,
       characters: characterSummaryStream || undefined,
     };

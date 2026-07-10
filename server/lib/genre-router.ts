@@ -32,9 +32,9 @@
 //      contract (central threat, information position, required beats,
 //      forbidden shortcuts) that generation must obey — this is what makes
 //      genre modify engine behavior rather than just word choice.
-// Persistence note: story_tone is NOT added to IllusionState (engine/types.ts
-// is foreign to this module) — see server/routes/config.ts's story-tone route
-// for the in-memory, per-session mechanism used instead.
+// Persistence note (updated I1-a): story_tone now lives in IllusionState
+// (engine/types.ts) and persists through Stage's config_json exactly like
+// story_genre — the interim in-memory map in server/routes/config.ts is gone.
 //
 // Genre-completion wave — exhaustive real-screenwriter coverage:
 // Expands the roster from 28 to 47 genres (19 new: dark_comedy,
@@ -1236,6 +1236,15 @@ export interface ComposedModifiers {
  * every existing call site that only passes (genre, directorStyle) is
  * unaffected.
  *
+ * I1-a: `includeGenrePromise` additionally layers genrePromiseBlock(genre) —
+ * the genre's structural contract (central threat, information position,
+ * required behaviors, forbidden shortcuts) — after the genre/synergy voice
+ * block and before the tone block, so plot obligations reach generation
+ * prompts, not just vocabulary. It applies on BOTH the synergy and
+ * non-synergy paths: a synergy override replaces the genre's tonal voice,
+ * but the structural contract still binds. Defaults to false so every
+ * existing call site's output stays byte-identical until it opts in.
+ *
  * Use this everywhere instead of the old two-block pattern:
  *   const styleBlock = …STYLE_MODIFIERS[style]?.agentInstruction…
  *   const genreBlock = …genrePromptBlock(genre)…
@@ -1246,14 +1255,18 @@ export function composePromptModifiers(
   genre: GenreId | undefined,
   directorStyle: DirectorStyle | undefined,
   tone?: ToneName,
+  includeGenrePromise = false,
 ): ComposedModifiers {
   const synergyKey = genre && directorStyle ? `${genre}_${directorStyle}` : null;
   const synergy = synergyKey ? SYNERGY_OVERRIDES[synergyKey] : null;
   const toneBlock = toneInstructionBlock(tone);
+  const promiseBlock = includeGenrePromise ? genrePromiseBlock(genre) : '';
 
   if (synergy) {
-    const block = toneBlock ? `${synergy.combinedInstruction}\n\n${toneBlock}` : synergy.combinedInstruction;
-    return { block, hasSynergy: true };
+    const synergyParts = [synergy.combinedInstruction];
+    if (promiseBlock) synergyParts.push(promiseBlock);
+    if (toneBlock) synergyParts.push(toneBlock);
+    return { block: synergyParts.join('\n\n'), hasSynergy: true };
   }
 
   const parts: string[] = [];
@@ -1263,6 +1276,7 @@ export function composePromptModifiers(
   }
   const g = genre ? genrePromptBlock(genre) : '';
   if (g) parts.push(g);
+  if (promiseBlock) parts.push(promiseBlock);
   if (toneBlock) parts.push(toneBlock);
 
   return { block: parts.join('\n\n'), hasSynergy: false };

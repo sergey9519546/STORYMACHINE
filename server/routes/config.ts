@@ -3,37 +3,15 @@ import { generateContent, getModel } from '../engine/ai.ts';
 import { validate, AiConfigSchema, StoryToneSchema } from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
 import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
-import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
+import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { validate as validateOutline, OutlineBodySchema, ImportBodySchema } from '../lib/validation.ts';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
   asyncHandler, gameLimiter, sessions, sessionId, getOrCreateSession, destroySession,
-  metrics, MAX_SESSIONS,
+  metrics,
 } from '../lib/session-store.ts';
 import type { StageSnapshot, DirectorStyle, StoryStructure, OutlineBeat } from '../engine/types.ts';
-
-// ── Story tone (B1-a) ─────────────────────────────────────────────────────
-// Tone is a new routing axis alongside story_genre (see server/lib/genre-
-// router.ts's TONE_REGISTERS), but IllusionState (server/engine/types.ts) and
-// Stage's persistence (server/engine/Stage.ts) are outside this module's
-// ownership boundary and cannot be extended to add a `story_tone` field or a
-// new config_json key the way story_genre/story_theme were. Instead, tone is
-// tracked in this small per-session, in-memory map — functionally the same
-// "set once, read on every subsequent request" behavior story_genre gives
-// callers, just not persisted into the session DB snapshot/export. The size
-// cap plus oldest-first eviction keeps this bounded even though nothing ties
-// its lifecycle to destroySession()/session TTL sweeps (also foreign code).
-const storyToneBySession = new Map<string, ToneName>();
-const MAX_TONE_ENTRIES = Math.max(500, MAX_SESSIONS * 5);
-
-function setStoryTone(sid: string, tone: ToneName): void {
-  if (storyToneBySession.size >= MAX_TONE_ENTRIES && !storyToneBySession.has(sid)) {
-    const oldestKey = storyToneBySession.keys().next().value;
-    if (oldestKey !== undefined) storyToneBySession.delete(oldestKey);
-  }
-  storyToneBySession.set(sid, tone);
-}
 
 const router = express.Router();
 export default router;
@@ -119,7 +97,8 @@ router.get('/api/story-config', gameLimiter, asyncHandler(async (req, res) => {
     pacing_target: s.pacing_target ?? null,
     story_theme: s.story_theme ?? null,
     story_genre: s.story_genre ?? null,
-    story_tone: storyToneBySession.get(sessionId(req)) ?? null,
+    story_tone: s.story_tone ?? null,
+    character_arc_mode: s.character_arc_mode ?? null,
   });
 }));
 
@@ -160,16 +139,33 @@ router.post('/api/story-genre', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ genre });
 }));
 
-// POST /api/story-tone (B1-a) — mirrors story-genre's contract (validate,
-// persist against sessionId, echo the value back) but through a proper zod
-// schema (StoryToneSchema, validated against TONE_NAME_LIST) rather than the
-// inline Object.keys(...) check story-genre uses, per the task's ask that the
-// new route be zod-validated. See the storyToneBySession comment above for
-// why persistence goes through an in-memory map instead of updateIllusionState.
+// POST /api/story-tone (B1-a, persistence upgraded I1-a) — mirrors
+// story-genre's contract (validate, persist against sessionId, echo the value
+// back) but through a proper zod schema (StoryToneSchema, validated against
+// TONE_NAME_LIST). Tone now persists in IllusionState's config_json exactly
+// like story_genre, so it survives restarts and rides /api/session/export.
 router.post('/api/story-tone', gameLimiter, validate(StoryToneSchema), asyncHandler(async (req, res) => {
   const { tone } = req.body as { tone: ToneName };
-  setStoryTone(sessionId(req), tone);
+  const { stage } = getOrCreateSession(sessionId(req));
+  stage.updateIllusionState({ story_tone: tone });
   res.json({ tone });
+}));
+
+// POST /api/character-arc-mode (I1-a) — mirrors /api/emotional-arc exactly:
+// validate the mode against CHARACTER_ARC_MODES' keys, persist into
+// IllusionState so the prompt-assembly path (server/engine/agent/decision.ts)
+// can inject the mode's promptInstruction the same way STYLE_MODIFIERS'
+// agentInstruction reaches prompts via director_style.
+router.post('/api/character-arc-mode', gameLimiter, asyncHandler(async (req, res) => {
+  const { mode } = req.body as { mode?: string };
+  const VALID = Object.keys(CHARACTER_ARC_MODES);
+  if (!mode || !VALID.includes(mode)) {
+    res.status(400).json({ error: `mode must be one of: ${VALID.join(', ')}` });
+    return;
+  }
+  const { stage } = getOrCreateSession(sessionId(req));
+  stage.updateIllusionState({ character_arc_mode: mode as NonNullable<import('../engine/types.ts').IllusionState['character_arc_mode']> });
+  res.json({ mode });
 }));
 
 router.post('/api/story-theme', gameLimiter, asyncHandler(async (req, res) => {
