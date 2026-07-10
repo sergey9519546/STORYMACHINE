@@ -96,9 +96,62 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
 
   // ── Security headers ─────────────────────────────────────────────────────────
   // Hand-set (no dependency) and applied to every response, including static
-  // assets. No Content-Security-Policy: Vite's dev-mode inline scripts and HMR
-  // would need a nonce/unsafe-inline policy that weakens it to noise — revisit
-  // if the app is ever served exclusively from a production build.
+  // assets.
+  //
+  // Content-Security-Policy is gated to NODE_ENV==='production' only — that's
+  // exactly the branch (below, "Static serving") where app.ts serves the
+  // built dist/ instead of Vite's dev middleware. Vite dev mode injects its
+  // own inline HMR client script and needs eval() for fast refresh; a policy
+  // strict enough to be worth anything would break that, and a policy loose
+  // enough not to would be noise. Production serves a build with no such
+  // needs (verified against the actual `npm run build` output, dist/, below),
+  // so dev mode is left exactly as before: no CSP header at all.
+  //
+  // Policy derivation (verified against dist/ produced by `npm run build`):
+  //   - script-src 'self': dist/index.html's only <script> is the bundled,
+  //     same-origin `/assets/index-*.js` entry; no inline <script>, no CDN.
+  //   - style-src 'self' 'unsafe-inline': dist/index.html has no inline
+  //     <style>/style="" of its own, but two bundled dependencies write
+  //     inline style at runtime and would break under a strict style-src:
+  //     the `motion` (Framer Motion) vendor chunk animates by setting
+  //     `el.style.transform`/`el.style.display` directly (grepped in
+  //     dist/assets/vendor-motion-*.js), and CodeMirror (ScriptIDE's editor)
+  //     injects its theme as a runtime-created <style> element (its
+  //     StyleModule mechanism) rather than a static stylesheet. Neither
+  //     supports CSP nonces, so 'unsafe-inline' is the only workable
+  //     mitigation short of ripping out both — scoped to style-src only,
+  //     never script-src, so it can't be used to run script.
+  //   - img-src 'self' data:: CodeMirror also emits `data:image/svg+xml`
+  //     background-image URLs for its gutter markers (grepped in
+  //     dist/assets/ScriptIDE-*.js) — those need img-src, not style-src, to
+  //     load.
+  //   - font-src 'self': no data:/CDN font URLs found in dist/assets/*.css.
+  //   - connect-src 'self': every API call and the /api/scriptide/complete
+  //     SSE stream is same-origin fetch/EventSource; per the CSP spec,
+  //     'self' for connect-src also covers same-origin ws:/wss: (the collab
+  //     WebSocket at /collab/:room), so no separate ws: entry is needed.
+  //   - object-src 'none', base-uri 'self', frame-ancestors 'none': no
+  //     <object>/<embed>, no <base>, and this app is never meant to be
+  //     framed (X-Frame-Options: DENY below is the legacy form of the same
+  //     rule) — belt-and-suspenders defaults with no functional cost.
+  if (process.env.NODE_ENV === 'production') {
+    const CSP = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ');
+    app.use((_req, res, next) => {
+      res.setHeader('Content-Security-Policy', CSP);
+      next();
+    });
+  }
+
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
