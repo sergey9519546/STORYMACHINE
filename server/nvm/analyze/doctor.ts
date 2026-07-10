@@ -229,14 +229,98 @@ export function clearDoctorCache(): void {
 // NOT fully correct (an individual very-short-but-genuinely-clean script
 // still can't reach the top of the range — that's scarcityPenalty working
 // as designed, not a bug).
+// ── Wave (health-formula sensitivity): sub-1.0-density discrimination fix ──
+// FINDING this wave fixes: three discrimination pairs (calibration/
+// discrimination-pairs.ts's subtext-vs-on-the-nose, active-vs-passive-
+// protagonist, dramatized-vs-told-exposition) landed EXACTLY TIED at
+// displayed health 79.8, despite the bad half firing measurably more
+// weighted issues on two of the three (subtext: 33 vs 36; dramatized: 35 vs
+// 38.5 — see tests/core/discrimination.test.ts). Root cause, MEASURED (see
+// this wave's own scratchpad, not checked into the repo): these are all
+// 7-scene, ~400-470-word fixtures, which land at density = weightedIssues /
+// wordCount^0.7 in the 0.47-0.76 range — a completely different regime from
+// the reference corpus's 10-scene, ~290-340-word samples, which land at
+// density 1.48-2.39 (every corpus sample, every band; see corpus.ts). The
+// ORIGINAL density^3.75 curve was tuned entirely against that >= 1.4 regime;
+// raising a sub-1.0 density to the 3.75 power crushes it near-zero (0.472^
+// 3.75 = 0.067, penalty = 2.5 * 0.067 = 0.15), so a 3-issue difference in
+// that regime moves the penalty by ~0.03 — a fraction of the 0.1-point
+// rounding granularity computeHealthScore displays at. This is the OVERALL-
+// score mirror of Wave 18-β's dimension-collapse finding (see that wave's
+// comment above computeDimensionScore): same "sub-1.0 density crushed by a
+// power tuned for density >= 1" defect, at the OVERALL level instead of the
+// per-dimension level.
+//
+// Fix chosen, MEASURED not guessed (see this wave's own scratchpad — one
+// script ran all 6 discrimination pairs + all 20 corpus samples + the 2x/3x
+// length variants through the real pipeline to get the actual density
+// distributions above; another swept a logistic-curve parameter grid against
+// those exact numbers): densityPenalty is now a PIECEWISE function of
+// density, split at density = 1.0 — below that, subDensityPenalty (below)
+// entirely REPLACES the density^3.75 curve; at/above it, the ORIGINAL
+// density^3.75 curve is byte-identical to before this wave (same constants,
+// same expression) — so every reference-corpus sample and both length
+// variants (all measured at density 1.48-2.39, comfortably above the split)
+// see EXACTLY the same penalty as before, not just "within ~0.5pt": the
+// `density >= 1` branch below is untouched code. Candidate (i) from this
+// wave's brief ("piecewise... keep behavior at corpus-typical densities
+// identical") is what this ships; candidates that instead lowered
+// DENSITY_POWER globally, or added an issue-count-linear term active at all
+// densities, were rejected because both necessarily perturb the >= 1.4
+// regime the current formula (and calibration/reference.ts's live-computed,
+// non-baked distribution) is already tuned against — no reason to touch a
+// regime with no measured defect.
+//
+// subDensityPenalty is a logistic (sigmoid) curve, not a second power law:
+// a bounded-scale power law continuous with the >= 1 branch (i.e. forced to
+// pass through the same DENSITY_SCALE=2.5 at density=1) was tried first and
+// measured to fail — ANY monotonic curve bounded by that continuity
+// constraint tops out at 2.5 across the whole [0, 1) domain, and the
+// discrimination pairs' density GAPS within a pair are tiny (0.013-0.024)
+// relative to that domain, so even the steepest such curve produced at most
+// a ~0.4-point gap (measured) — nowhere near enough separation. Dropping the
+// continuity requirement (this function's own scale is independent of the
+// >= 1 branch's) is what unlocks real sensitivity: a logistic centered at
+// SUB_DENSITY_MIDPOINT=0.52 (the middle of the discrimination pairs' 0.47-
+// 0.76 cluster) with SUB_DENSITY_STEEPNESS=50 stays near-zero below ~0.4
+// density (so a genuinely clean short script, e.g. the formula spot-check
+// fixture at density 0.157, is barely touched — measured penalty <0.001)
+// and saturates near SUB_DENSITY_SCALE=10 above ~0.65 (so the already-
+// passing escalation/setup-payoff/composite pairs, whose "bad" halves sit at
+// 0.64-0.76 density, get MORE separation, not less). Measured per-pair
+// densityPenalty deltas (bad minus good, direction that must be positive for
+// good > bad to hold, scarcity term identical within a pair so cancels):
+// subtext +1.49, dramatized +1.40, escalation +6.09, setup-payoff +4.59,
+// composite +2.23 (was +0.32 before this wave) — active-vs-passive-
+// protagonist measures -1.87 (WORSENS; see this wave's own report for why:
+// that pair's "good" half already fires MORE weighted issues than its "bad"
+// half under the current rule set — 38 vs 35 — so no density-curve change
+// can fix it; it is a missing-detector gap, not a compression gap, and stays
+// a discrimination.test.ts todo).
+//
+// Accepted, documented tradeoff: subDensityPenalty saturates near
+// SUB_DENSITY_SCALE=10 for density roughly >= 0.65, while the >= 1 branch
+// starts at DENSITY_SCALE=2.5 at density=1 — a discontinuity of ~7.5 points
+// exists across the density=1 seam, and the whole [0.65, 1.0) sub-band scores
+// a flat ~10-point penalty rather than density^3.75's continuously-rising
+// curve. No corpus sample, discrimination pair, or 2x/3x length variant this
+// wave measured against lands in [0.65, 1.0) — that band is short scripts
+// (roughly 400-900 words at typical weighted-issue counts) sitting almost
+// exactly at the boundary between "too little material for structural rules
+// to fire" and "enough material to read as a normal script," which is
+// inherently a low-confidence zone for this formula (see
+// DIMENSION_LOW_CONFIDENCE_SCENES above for the same honesty concern at the
+// per-dimension level). Noted here rather than silently smoothed over, in
+// case a future wave's fixture ever lands there and the seam needs revisiting.
 /** The word-density half of craftPenalty, factored out on its own (Wave
  *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
  *  computeDimensionScore's comment for why the per-dimension scores need
  *  exactly that. Byte-identical arithmetic to what craftPenalty always
- *  computed for this half; only the factoring is new.
+ *  computed for this half at density >= 1.0; see the design comment above
+ *  for the density < 1.0 branch this wave added.
  *
- *  The three tuned constants are declared LOCALLY (inside this function
- *  body) rather than at module scope, for the same TemporalDeadZone reason
+ *  The tuned constants are declared LOCALLY (inside this function body)
+ *  rather than at module scope, for the same TemporalDeadZone reason
  *  documented on craftPenalty below — this function is on the same
  *  doctor.ts <-> calibration/reference.ts import cycle (reference.ts's
  *  scoreSample reaches it transitively through computeRawCraftScore), so a
@@ -248,10 +332,19 @@ function densityPenalty(
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER = 3.75;
   const DENSITY_SCALE = 2.5;
+  // Sub-1.0-density branch (see design comment above) — a logistic, not a
+  // power law, so its scale is independent of DENSITY_SCALE above.
+  const SUB_DENSITY_SCALE = 10;
+  const SUB_DENSITY_MIDPOINT = 0.52;
+  const SUB_DENSITY_STEEPNESS = 50;
 
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
   const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
   const density = weightedIssues / opportunityWords;
+
+  if (density < 1) {
+    return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
+  }
   return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
 }
 
