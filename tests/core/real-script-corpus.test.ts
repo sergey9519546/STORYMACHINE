@@ -70,3 +70,47 @@ describe('real-script corpus — produced features through the full doctor', () 
     });
   }
 });
+
+// ── Degraded band: structural-destruction AUC (Step 5 / north-star metric) ──
+// Deterministic degradation of each corpus script (seeded scene shuffle +
+// every 3rd scene dropped) creates a matched BAD band from the same prose:
+// surface craft identical, global structure destroyed. FIRST MEASUREMENT
+// (2026-07-10, 12-script subset): meanGood 92.3 vs meanBad 91.1, AUC 0.677
+// — the rule set is largely LOCAL and barely notices wholesale structural
+// scrambling at feature length (Bee Movie's shuffle scored HIGHER). That is
+// the honest state of the art, recorded here as a ratchet: the hard floor
+// asserts we never get worse; the todo names the target (0.9) that
+// feature-scale structural detectors (setup-before-payoff ordering, act
+// shape, escalation coherence) must reach. This is the north-star
+// separation metric made executable.
+describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+  const SUBSET = 12;
+  async function measure() {
+    const { makePrng, seedFromString, shuffle } = await import('../../server/nvm/repro/seed.ts');
+    const files = MANIFEST.slice(0, SUBSET).map(m => m.file);
+    const goods: number[] = [], bads: number[] = [];
+    for (const f of files) {
+      const t = readFileSync(path.join(CORPUS_DIR, f), 'utf8');
+      const parts = t.split(/^(?=INT\.|EXT\.)/mi);
+      const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
+      const scenes = parts.filter(x => /^(INT\.|EXT\.)/i.test(x));
+      const rng = makePrng(seedFromString(`degrade:${f}`));
+      const degraded = head + shuffle(rng, scenes).filter((_, i) => i % 3 !== 2).join('');
+      goods.push((await runScriptDoctor(t)).health);
+      bads.push((await runScriptDoctor(degraded)).health);
+    }
+    let wins = 0, ties = 0;
+    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
+    return { auc: (wins + ties / 2) / (goods.length * bads.length), goods, bads };
+  }
+  let measured: { auc: number; goods: number[]; bads: number[] } | null = null;
+  it('AUC hard floor: never regress below the measured baseline (0.6)', async () => {
+    measured = await measure();
+    assert.ok(measured.auc >= 0.6,
+      `structural-degradation AUC ${measured.auc.toFixed(3)} fell below the 0.6 ratchet — a change made the doctor MORE structure-blind`);
+  });
+  it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.677 at introduction — needs feature-scale structural detectors (see header)' }, async () => {
+    const m = measured ?? await measure();
+    assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target`);
+  });
+});
