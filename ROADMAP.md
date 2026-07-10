@@ -503,7 +503,36 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
-## D2-wave — Discrimination false-positive reduction (in flight)
+## D2-wave — ✅ COMPLETE (inversion fixed) + next-step finding
+
+RESULT (measured after a+b+c landed): every pair's GOOD half rose to
+79.8 (false positives removed); NO pair inverts anymore (good ≥ bad
+everywhere — the reviewer's actual bug, good scoring LOWER, is gone).
+3 pairs strictly pass (escalation +0.7, setup-payoff +0.3, composite
++0.3 — the reconstructed reviewer scenario flipped from a dead tie to
+passing). 3 pairs now EXACTLY TIED at 79.8 (subtext, active-protagonist,
+dramatized-exposition) — up from inverted, not yet strict good>bad.
+
+ROOT CAUSE of the residual tie (diagnosed, not guessed): the bad halves
+DO fire far more true-positive issues (subtext-bad fires 23 rules good
+doesn't — EXPOSITION_DUMP, DIALOGUE_DOMINANCE, on-the-nose floods;
+dramatized-told-bad fires AS_YOU_KNOW_BOB, REVELATION_UNEARNED). The
+discrimination signal is fully present in ISSUE COUNTS. But the health
+formula's density penalty (steep ^3.75 curve) crushes sub-1.0 densities
+toward zero at short-script issue densities, and the identical
+scarcity term (140/sceneCount) dominates — so a 15-23 rule-instance
+gap yields a <0.05 health delta. Same short-script compression 18-β
+fixed for DIMENSIONS, now at the OVERALL health level.
+
+NEXT STEP (high-risk, dedicated, heavily calibration-guarded — NOT more
+detectors): a health-formula-sensitivity wave to make the density term
+responsive at short lengths without breaking band monotonicity,
+no-saturation, or length-invariance (±7 at 1x/2x/3x). Alternative:
+longer discrimination fixtures where density has room. Filed. The 3
+tied pairs stay non-failing todos until then; their comments should be
+updated from "inverted" to "tied at short-script health ceiling."
+
+## D2-wave — Discrimination false-positive reduction (landed)
 
 Diagnosed the 4 inverted discrimination pairs (I ran the doctor on each
 half and diffed which rules fire). ROOT CAUSE: not missing detectors —
