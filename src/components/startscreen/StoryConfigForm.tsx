@@ -42,7 +42,9 @@ export function StoryConfigForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inferCategory = (filename: string): FileCategory => {
-    const ext = filename.toLowerCase().split('.').pop() ?? '';
+    const lower = filename.toLowerCase();
+    const lastDot = lower.lastIndexOf('.');
+    const ext = lastDot !== -1 ? lower.slice(lastDot + 1) : '';
     if (ext === 'fountain' || ext === 'fdx') return 'Plot';
     if (ext === 'json' || ext === 'csv') return 'Rules';
     return 'Lore';

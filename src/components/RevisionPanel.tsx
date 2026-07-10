@@ -353,7 +353,16 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
     const start = Number(spanStart);
     const end = Number(spanEnd);
     const reason = spanReason.trim();
-    const totalLines = previewFountain ? (previewFountain === '' ? 0 : previewFountain.split('\n').length) : 0;
+
+    let totalLines = 0;
+    if (previewFountain && previewFountain !== '') {
+      totalLines = 1;
+      let idx = previewFountain.indexOf('\n');
+      while (idx !== -1) {
+        totalLines++;
+        idx = previewFountain.indexOf('\n', idx + 1);
+      }
+    }
 
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < 1) {
       setSpanError('Start and end must be positive line numbers.'); return;

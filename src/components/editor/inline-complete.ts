@@ -178,7 +178,8 @@ function acceptFull(view: EditorView): boolean {
 function acceptWord(view: EditorView): boolean {
   const completion = view.state.field(completionField);
   if (!completion) return false;
-  const word = completion.text.match(/^[\s]*\S+/)?.[0] ?? completion.text.split(' ')[0];
+  const firstSpaceIdx = completion.text.indexOf(' ');
+  const word = completion.text.match(/^[\s]*\S+/)?.[0] ?? (firstSpaceIdx !== -1 ? completion.text.slice(0, firstSpaceIdx) : completion.text);
   const remaining = completion.text.slice(word.length);
   view.dispatch({
     changes: { from: completion.cursor, insert: word },

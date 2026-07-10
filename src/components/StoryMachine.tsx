@@ -948,7 +948,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                                 <div
                                   key={k}
                                   title={`${k}: ${agent.emotionState![k]}`}
-                                  className={`w-1.5 transition-all ${EMOTION_COLOR[k].split(' ')[0]}`}
+                                  className={`w-1.5 transition-all ${EMOTION_COLOR[k].indexOf(' ') !== -1 ? EMOTION_COLOR[k].slice(0, EMOTION_COLOR[k].indexOf(' ')) : EMOTION_COLOR[k]}`}
                                   style={{ height: `${Math.max(2, (agent.emotionState![k] / 100) * 12)}px` }}
                                 />
                               ))}
