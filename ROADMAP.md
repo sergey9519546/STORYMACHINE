@@ -503,6 +503,29 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## D2-wave — Discrimination false-positive reduction (in flight)
+
+Diagnosed the 4 inverted discrimination pairs (I ran the doctor on each
+half and diffed which rules fire). ROOT CAUSE: not missing detectors —
+FALSE POSITIVES on the well-crafted halves. Dramatized/active/subtextual
+writing trips "absence-of-craft" rules that flat/told/passive writing
+avoids. Biggest lever: ACTION_WITHOUT_CONSEQUENCE (causality.ts) fires
+10-vs-2 weighted on dramatized-exposition's GOOD half — it reads
+dramatized action as consequence-free when the consequence lands in the
+following reaction. Cluster:
+- causality.ts: ACTION_WITHOUT_CONSEQUENCE, GOAL_WITHOUT_OPPOSITION (D2-a)
+- intention.ts: ZERO_ENTROPY_SCENE, AGENCY_WITHOUT_CONSEQUENCE,
+  GOAL_INVERSION_ABSENT, PASSIVE_ESCALATION, ENTROPY_CLUSTER (D2-b)
+- character-arc.ts ARC_EMOTIONAL_MONOTONE / originality.ts
+  EMOTIONAL_ARC_PLATEAU / relationship-arc.ts NO_RELATIONSHIP_MOVEMENT —
+  subtext registers as monotone because on-the-nose emotion-naming
+  inflates the movement signal (D2-c).
+Fix = principled guards (consequence-lands-downstream; present-but-
+compact ≠ absent; subtext-aware movement), NOT fixture overfitting.
+Each measured against pair fixtures + calibration monotonicity. On
+landing: integrate, run the harness, flip todos that now pass to hard
+assertions. The honest fix the reviewer's A/B inversion demanded.
+
 ## STANDING DIRECTIVE 2 — Integration over accumulation (user, 2026-07-05)
 
 Nothing ships as a separate feature of its own. Every axis entry and
