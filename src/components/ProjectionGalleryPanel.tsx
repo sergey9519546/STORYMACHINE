@@ -1,11 +1,17 @@
 // ProjectionGalleryPanel — G3 Holographic Projection UI.
-// One canon, every format. All 10 ProjectionTargets + P2 export (FDX/DOCX/PDF).
+// One canon, every format. All 16 ProjectionTargets + P2 export (FDX/DOCX/PDF).
+// Tab order groups the Output Syntax additions: documents (treatment, outline),
+// alternate drafts (dialogue_only, epistolary), then engine views
+// (simulation_log, director_commentary). Server-authoritative target list:
+// server/routes/nvm/debug.ts's VALID array.
 
 import React, { useState, useCallback } from 'react';
 
 type ProjectionTarget =
   | 'fountain' | 'novel' | 'stage' | 'comic' | 'interactive'
-  | 'pitch' | 'bible' | 'rewatch' | 'cutting_room' | 'sidecar';
+  | 'pitch' | 'bible' | 'rewatch' | 'cutting_room' | 'sidecar'
+  | 'treatment' | 'outline' | 'dialogue_only' | 'epistolary'
+  | 'simulation_log' | 'director_commentary';
 
 interface Artifact {
   target: ProjectionTarget;
@@ -34,6 +40,15 @@ const TABS: TabSpec[] = [
   { id: 'rewatch',      label: 'Rewatch',       icon: '🔁', ext: 'md',       mime: 'text/markdown',    description: 'Annotated second-viewing guide',               color: '#a3e635' },
   { id: 'cutting_room', label: 'Cutting Room',  icon: '✂️', ext: 'md',       mime: 'text/markdown',    description: 'Rejected ghost candidates',                    color: '#94a3b8' },
   { id: 'sidecar',      label: 'Sidecar',       icon: '📊', ext: 'json',     mime: 'application/json', description: 'NVM quality metrics for CI/tooling',           color: '#e879f9' },
+  // Documents
+  { id: 'treatment',           label: 'Treatment',    icon: '📝', ext: 'txt', mime: 'text/plain', description: 'Treatment — prose development document with logline',                        color: '#f59e0b' },
+  { id: 'outline',             label: 'Beat Outline', icon: '🗂️', ext: 'txt', mime: 'text/plain', description: 'Beat Outline — numbered beat sheet with act breaks',                          color: '#22d3ee' },
+  // Drafts
+  { id: 'dialogue_only',       label: 'Table Read',   icon: '🗣️', ext: 'txt', mime: 'text/plain', description: 'Table Read — spoken lines only, for voice testing',                           color: '#4ade80' },
+  { id: 'epistolary',          label: 'Epistolary',   icon: '✉️', ext: 'txt', mime: 'text/plain', description: 'Epistolary — the story as first-person letters and journal entries',          color: '#c084fc' },
+  // Engine views
+  { id: 'simulation_log',      label: 'Sim Log',      icon: '🧾', ext: 'txt', mime: 'text/plain', description: 'Simulation Log — the objective what-happened ledger',                         color: '#f87171' },
+  { id: 'director_commentary', label: 'Commentary',   icon: '🎙️', ext: 'txt', mime: 'text/plain', description: "Director's Commentary — what the machinery is doing under each scene",        color: '#fde047' },
 ];
 
 interface Props { onClose: () => void; }
@@ -278,7 +293,10 @@ function ContentRenderer({ artifact, tab }: { artifact: Artifact; tab: TabSpec }
     return <RewatchRenderer content={content} color={tab.color} />;
   }
 
-  // Default: monospace text block (fountain, novel, stage, pitch, bible, cutting_room)
+  // Default: monospace text block (fountain, novel, stage, pitch, bible,
+  // cutting_room, and the six document/draft/engine-view targets: treatment,
+  // outline, dialogue_only, epistolary, simulation_log, director_commentary —
+  // all of which project as plain preformatted text)
   return (
     <pre style={{
       background: '#0c1525', border: '1px solid #334155', borderRadius: 5,
