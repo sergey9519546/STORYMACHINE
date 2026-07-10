@@ -1064,6 +1064,12 @@ function collectClueCharacterNameWords(scenes: SceneUnit[]): Set<string> {
     for (const name of s.characters) {
       for (const w of name.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean)) {
         words.add(w);
+        // Possessive/plural surface forms of a character name are the same
+        // name for clue purposes ("Anna's hand" must not smuggle "anna's"
+        // into a cluster's word set after "anna" was excluded) — content-
+        // word channel precision wave, 2026-07-10.
+        words.add(`${w}'s`);
+        words.add(`${w}s`);
       }
     }
   }
@@ -1281,7 +1287,15 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
     applyClueLifecycle(slugifyToken(token), occ, seedsByScene, payoffsByScene, unresolvedByScene);
   }
 
+  // Ubiquity guard, cluster channel (content-word precision wave,
+  // 2026-07-10): the token channel above already refuses to treat a token
+  // present in over a quarter of a feature's scenes as a plant; the cluster
+  // channel had no such guard, so ambient anchor clusters ("the door" +
+  // one shared descriptor recurring through a whole act) flooded feature-
+  // length seeds. Same floor (>= 4 occurrences) keeps every short-fixture
+  // behavior byte-identical.
   for (const cluster of computeContentWordClueClusters(scenes)) {
+    if (cluster.occurrences.length >= 4 && cluster.occurrences.length / scenes.length > 0.25) continue;
     applyClueLifecycle(cluster.id, cluster.occurrences, seedsByScene, payoffsByScene, unresolvedByScene);
   }
 
