@@ -715,31 +715,78 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
   // ACTION_WITHOUT_CONSEQUENCE: Character takes action (high suspense delta or
   // clues planted) but it produces zero effect on other characters (no relationship
   // shifts in following scenes) or plot (no subsequent scenes with high suspense).
+  //
+  // D2-a false-positive fix (discrimination-harness finding, see
+  // WAVE_QUALITY_GUARANTEE.md): the original guard recognized exactly three
+  // "consequence" shapes, all in the 2-scene wake only — a relationship shift, a
+  // suspenseDelta escalation, or a non-neutral emotionalShift. That is a narrower
+  // definition of "consequence" than the craft concept it's named for, and it
+  // systematically misses how DRAMATIZED (shown, not told) writing lands a
+  // reaction: subtext-heavy or procedural-professional dialogue clears the same
+  // valence-lexicon bar far less often than on-the-nose writing that states its
+  // feelings outright, even when the consequence is unambiguously on the page.
+  // Root cause, and the fix for each:
+  //   (a) the reaction can land in the SAME beat as the action — a character who
+  //       acts and is answered within that one scene was never "unaffecting";
+  //       the original guard only ever looked forward, never at curr itself.
+  //   (b) a revelation (a belief update surfacing to the audience) is a textbook
+  //       consequence and was never checked at all.
+  //   (c) a clock tightening in the wake of the action is the story registering
+  //       that the stakes rose — also never checked.
+  //   (d) the causal chain can keep moving forward instead of settling: the next
+  //       scene planting its own clue or raising the clock is a responsive beat
+  //       that proves the story built on this one rather than stranding it.
+  //   (e) the clearest possible proof an action mattered is the SAME clue id
+  //       resurfacing later as a payoff — but a bounded 2-scene window structurally
+  //       cannot see a callback that arrives further downstream, so this is
+  //       checked separately over the whole remainder of the story (distinct from
+  //       CONSEQUENCE_DELAY_EXCESSIVE, which penalizes a payoff that arrives late;
+  //       this only asks whether the callback exists, not how promptly).
+  // None of (a)-(e) narrow what counts as "no consequence": a clue that produces
+  // no driver signal in its own scene or its wake, that nothing chains onto, and
+  // that is never paid off anywhere later, still fires exactly as before — see
+  // the "genuinely consequence-free" fire tests below.
   for (let i = 0; i < records.length - 2; i++) {
     const curr = records[i];
     const isActionScene = (curr.seededClueIds?.length ?? 0) > 0 || curr.clockRaised || curr.suspenseDelta > 2;
 
     if (isActionScene) {
-      // Check if the next 1-2 scenes show consequence
-      let hasConsequence = false;
-      for (let j = i + 1; j <= Math.min(i + 2, records.length - 1); j++) {
-        const next = records[j];
-        const showsConsequence =
-          (next.relationshipShifts?.length ?? 0) > 0 || // other character reacts
-          next.suspenseDelta > 1.5 || // escalation
-          next.emotionalShift !== 'neutral'; // emotional response
-        if (showsConsequence) {
-          hasConsequence = true;
-          break;
-        }
-      }
+      const wake = records.slice(i + 1, Math.min(i + 3, records.length));
+
+      // (a) action and reaction in the same beat.
+      const sameSceneReaction =
+        (curr.relationshipShifts?.length ?? 0) > 0 ||
+        curr.emotionalShift !== 'neutral' ||
+        curr.revelation !== null;
+
+      // (b)/(c) the original 2-scene wake, now also crediting a revelation and a
+      // clock raise — the same "driver" vocabulary this file already uses for
+      // EMOTION_WITHOUT_DRIVER_RUN (suspense / relationship / revelation / clock).
+      const wakeReaction = wake.some(next =>
+        (next.relationshipShifts?.length ?? 0) > 0 ||
+        next.suspenseDelta > 1.5 ||
+        next.emotionalShift !== 'neutral' ||
+        next.revelation !== null ||
+        next.clockRaised,
+      );
+
+      // (d) the chain keeps moving: a following scene plants its own clue or
+      // raises the clock, showing the story built forward from this beat.
+      const chainedForward = wake.some(next => (next.seededClueIds?.length ?? 0) > 0 || next.clockRaised);
+
+      // (e) this scene's own clue is explicitly paid off later, however far
+      // downstream (beyond the bounded wake window above).
+      const laterPayoff = (curr.seededClueIds?.length ?? 0) > 0 &&
+        records.slice(i + 1).some(r => (r.payoffSetupIds ?? []).some(id => curr.seededClueIds!.includes(id)));
+
+      const hasConsequence = sameSceneReaction || wakeReaction || chainedForward || laterPayoff;
 
       if (!hasConsequence && (curr.seededClueIds?.length ?? 0) > 0) {
         // Only flag for planted clues, not every suspense scene
         issues.push({
           location: `Scene ${i} (${curr.slug})`,
           rule: 'ACTION_WITHOUT_CONSEQUENCE',
-          description: `Scene ${i} plants clues or raises stakes but the next 2 scenes show no consequence — other characters are unaffected`,
+          description: `Scene ${i} plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected`,
           severity: 'major',
           suggestedFix: 'Add a reaction scene where a character responds to or is affected by the action in this scene',
         });
@@ -850,12 +897,26 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
   // GOAL_WITHOUT_OPPOSITION: The story plants a goal (recurring clue) but no scene
   // ever shows a negative relationship shift or reversal opposing it. A goal with
   // no opposing force has no dramatic tension — drama is desire meeting resistance.
+  //
+  // D2-a false-positive fix: `suspenseDelta` is `clamp(Math.round(raw), -3, 5)`
+  // (fountain-analyzer.ts's detectSuspenseDelta) — an INTEGER after rounding, not
+  // a continuum. A `< -1` reversal threshold therefore requires a suspenseDelta of
+  // -2 or lower, silently excluding the single most common size of on-page
+  // reversal: an exact -1 (a scene whose relief/calm-down lexicon net beats its
+  // danger lexicon by one rounded step — precisely what a controlled, professional,
+  // or subtextual pushback/de-escalation beat produces, as opposed to a shouted,
+  // exclamation-heavy confrontation that racks up enough danger-lexicon hits to
+  // clear -2). The bug rewarded loud reversals and blinded the check to quiet
+  // ones — the same craft axis ACTION_WITHOUT_CONSEQUENCE's fix above addresses.
+  // `<= -1` restores the modest-but-real reversal to view without loosening
+  // anything else: a flat/positive-only story (every reversalless fixture already
+  // covered by this rule's tests) is unaffected, since it never dips to -1 either.
   if (records.length >= 6) {
     const hasGoal = records.some(r => (r.seededClueIds?.length ?? 0) > 0);
     if (hasGoal) {
       const hasOpposition = records.some(r => {
         const hasNegShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.5);
-        const hasReversal = r.suspenseDelta < -1;
+        const hasReversal = r.suspenseDelta <= -1;
         return hasNegShift || hasReversal;
       });
       if (!hasOpposition) {

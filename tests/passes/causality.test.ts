@@ -571,6 +571,162 @@ import { evaluateRewrite, REWRITE_MIN_LENGTH_RATIO } from '../../server/nvm/revi
 import { relationshipArcPass } from '../../server/nvm/revision/passes/relationship-arc.ts';
 
 
+  // ── D2-a: ACTION_WITHOUT_CONSEQUENCE / GOAL_WITHOUT_OPPOSITION false-positive
+  // fix ─────────────────────────────────────────────────────────────────────
+  // The discrimination harness (tests/core/discrimination.test.ts) measured both
+  // rules firing MORE on well-crafted, dramatized/subtextual GOOD halves than on
+  // their on-the-nose/passive BAD counterparts — an inversion. Root cause and the
+  // guard redesign are documented at each rule's definition in causality.ts. The
+  // tests below prove: (1) each newly-recognized consequence/opposition shape
+  // suppresses the false positive, and (2) the genuinely consequence-free /
+  // opposition-free pattern each rule exists to catch still fires — the guard was
+  // tightened on principle, not disabled.
+  describe('D2-a — causalityPass: ACTION_WITHOUT_CONSEQUENCE / GOAL_WITHOUT_OPPOSITION guard fix', async () => {
+    const makeRec = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blankFountain = (n: number) =>
+      Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnnotations = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    const causeInput = (records: any[]) => ({
+      fountain: blankFountain(records.length), original: blankFountain(records.length),
+      records: records as any, structure: {} as any,
+      annotations: noAnnotations(records.length), approvedSpans: [],
+    });
+
+    // ── ACTION_WITHOUT_CONSEQUENCE ──────────────────────────────────────────
+
+    it('causalityPass does NOT fire ACTION_WITHOUT_CONSEQUENCE when the reaction lands in the SAME scene as the action', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // Scene 0 both plants the clue AND carries its own reaction (a revelation
+      // landing in the same beat) — the old guard only ever looked forward.
+      const records = [
+        makeRec(0, { seededClueIds: ['clue1'], revelation: 'the truth comes out right here' }),
+        makeRec(1), makeRec(2), makeRec(3), makeRec(4),
+      ];
+      const result = await causalityPass(causeInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
+        'Should NOT flag Scene 0 when its own scene carries the reaction',
+      );
+    });
+
+    it('causalityPass does NOT fire ACTION_WITHOUT_CONSEQUENCE when a revelation lands in the 2-scene wake', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // Dramatized-writing pattern (the subtext/dramatized-exposition discrimination
+      // pairs): the wake carries no relationship shift, no suspense escalation, no
+      // emotional-valence swing — but it DOES carry a revelation, a belief update
+      // that is unambiguously a consequence and was never checked before this fix.
+      const records = [
+        makeRec(0, { seededClueIds: ['clue1'] }),
+        makeRec(1, { revelation: 'the ledger was doctored' }),
+        makeRec(2), makeRec(3), makeRec(4),
+      ];
+      const result = await causalityPass(causeInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
+        'Should NOT flag Scene 0 when a revelation lands in its wake',
+      );
+    });
+
+    it('causalityPass does NOT fire ACTION_WITHOUT_CONSEQUENCE when the wake chains forward into more action', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // Dramatized-exposition pattern: no emotional/relational/suspense signal
+      // anywhere, but the very next scene plants its OWN clue — the investigation
+      // visibly builds on this scene rather than stranding it.
+      const records = [
+        makeRec(0, { seededClueIds: ['clue1'] }),
+        makeRec(1, { seededClueIds: ['clue2'] }),
+        makeRec(2), makeRec(3), makeRec(4),
+      ];
+      const result = await causalityPass(causeInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
+        'Should NOT flag Scene 0 when the following scene chains forward with its own clue',
+      );
+    });
+
+    it('causalityPass does NOT fire ACTION_WITHOUT_CONSEQUENCE when the clue is paid off later, beyond the 2-scene wake', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // The wake (scenes 1-2) is flat, but the clue explicitly resurfaces as a
+      // payoff three scenes later — the clearest possible proof it mattered, even
+      // though a bounded 2-scene window can't see that far.
+      const records = [
+        makeRec(0, { seededClueIds: ['clue1'] }),
+        makeRec(1), makeRec(2), makeRec(3),
+        makeRec(4, { payoffSetupIds: ['clue1'] }),
+      ];
+      const result = await causalityPass(causeInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0')),
+        'Should NOT flag Scene 0 when its clue is paid off later in the story',
+      );
+    });
+
+    it('causalityPass still fires ACTION_WITHOUT_CONSEQUENCE when the action is genuinely consequence-free', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // No same-scene reaction, no wake driver, no chained clue/clock, no later
+      // payoff anywhere in the story — the guard must still catch a true dead end,
+      // proving the fix tightened the guard rather than disabling the rule.
+      const records = [
+        makeRec(0, { seededClueIds: ['clue1'] }),
+        makeRec(1), makeRec(2), makeRec(3), makeRec(4),
+      ];
+      const result = await causalityPass(causeInput(records));
+      const consequence = result.issues.filter(i => i.rule === 'ACTION_WITHOUT_CONSEQUENCE' && i.location.includes('Scene 0'));
+      assert.ok(consequence.length >= 1, 'Should still detect ACTION_WITHOUT_CONSEQUENCE for a truly consequence-free plant');
+      assert.ok(consequence[0].severity === 'major');
+    });
+
+    // ── GOAL_WITHOUT_OPPOSITION ──────────────────────────────────────────────
+
+    it('causalityPass does NOT fire GOAL_WITHOUT_OPPOSITION for a quiet (exactly -1) reversal', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // suspenseDelta is an integer after rounding (fountain-analyzer.ts clamps
+      // and rounds it) — a modest, controlled/subtextual pushback rounds to exactly
+      // -1, not -2. The old `< -1` threshold missed this, the most common size of
+      // a quiet reversal, while still catching loud ones.
+      const records = [
+        makeRec(0, { seededClueIds: ['goal1'] }),
+        makeRec(1, { suspenseDelta: 1 }),
+        makeRec(2, { suspenseDelta: -1 }), // quiet reversal
+        makeRec(3, { suspenseDelta: 1 }),
+        makeRec(4, { suspenseDelta: 1.5 }),
+        makeRec(5, { suspenseDelta: 1 }),
+      ];
+      const result = await causalityPass(causeInput(records));
+      assert.ok(
+        !result.issues.some(i => i.rule === 'GOAL_WITHOUT_OPPOSITION'),
+        'Should NOT fire when a quiet (-1) reversal opposes the goal',
+      );
+    });
+
+    it('causalityPass still fires GOAL_WITHOUT_OPPOSITION when suspense only ever flattens to 0, never dips negative', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      // Guards against over-loosening: a flat beat (suspenseDelta 0) is NOT a
+      // reversal and must not be mistaken for opposition — only a rounded -1 or
+      // lower counts. Every other scene is positive, so no resistance exists at all.
+      const records = [
+        makeRec(0, { seededClueIds: ['goal1'] }),
+        makeRec(1, { suspenseDelta: 1 }),
+        makeRec(2, { suspenseDelta: 0 }), // flat, not a reversal
+        makeRec(3, { suspenseDelta: 1 }),
+        makeRec(4, { suspenseDelta: 1.5 }),
+        makeRec(5, { suspenseDelta: 1 }),
+      ];
+      const result = await causalityPass(causeInput(records));
+      const opposition = result.issues.filter(i => i.rule === 'GOAL_WITHOUT_OPPOSITION');
+      assert.ok(opposition.length >= 1, 'Should still detect GOAL_WITHOUT_OPPOSITION when nothing ever dips into reversal territory');
+      assert.ok(opposition[0].severity === 'major');
+    });
+  });
+
+
   // ── Wave 155: Causality pass enhancements ─────────────────────────────────
   describe('Wave 155 — causalityPass: deus ex machina, suspense spike, goal opposition', async () => {
     const makeRec = (idx: number, override: Partial<any> = {}): any => ({
