@@ -503,6 +503,22 @@ product", exposition detection real, ~15ms doctor runs.
   R13 flag persistence; real-key LLM quality eval (needs user key);
   then 17b polish items.
 
+## Sim + producer wave — ✅ COMPLETE
+
+- **X1 — action vocabulary 5→15**: HIDE/OBSERVE/LISTEN/SEARCH/REVEAL/
+  THREATEN/BETRAY/PROTECT/FORM_ALLIANCE/FLEE, each with a real mechanic
+  + full wiring (Orchestrator/CausalSpine/Stage/bridge/personality/
+  cascade). FLEE dominates at cascade flight, THREATEN at fight; THREATEN/
+  BETRAY land DramaticPressure the target's next cascade reads. 5 actions
+  honestly excluded (no inventory/evidence/async/combat model). 30
+  new tests. Follow-ups FILED: (a) fountain.ts export switch has no
+  cases for the 10 new verbs — they render as nothing in exported
+  screenplays (degrade gracefully); (b) StoryMachine.tsx action-display
+  logic has no bespoke treatment for new verbs. Both non-crashing.
+- **X2 — pitch kit + Untitled fix**: deterministic logline/synopsis/
+  comps-slot + title-page parser feeding pitchkit + coverage; cast
+  table with role hints. The producer critic's two findings resolved.
+
 ## D2-wave — ✅ COMPLETE (inversion fixed) + next-step finding
 
 RESULT (measured after a+b+c landed): every pair's GOOD half rose to
