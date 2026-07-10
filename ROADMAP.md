@@ -790,6 +790,50 @@ Ranked by product value; each is guarantee-doc-scoped wave work:
   reveal. Discourse-class/meso-chain taxonomy (Myst_Hook → ... →
   Aftermath) as ScenePurpose extensions for the mystery genre router.
 
+## 13e. STORY GOD v3.5 integration (own prior-gen design, cataloged 2026-07-10)
+
+Research-folder audit (subagent full read of all 13 files; 7 superseded
+files archived to _superseded_2026-07-10/): the canonical assets are the
+STORY GOD v3.5 spec (60pp, the project's own prior-generation design) and
+its Advanced Architectures blueprint, both in
+`William joyce/story_machine_research_files_references/`. Mechanisms with
+QUANTIFIED thresholds not yet in this engine, ranked; each converges with
+an existing filed item where noted:
+
+- [ ] **SG1 — Well-Made Surprise Test** (twist-quality check): passes when
+  preTwistSatisfaction >= 0.6, hindsightInevitability >= 0.7, >= 3 setups
+  for the twist, misdirectionEffectiveness >= 0.5. Deterministic
+  formulation over the setup/payoff ledger → pairs with O1 typed promises.
+- [ ] **SG2 — Genre Obligation Engine** (Type 3 wave): per-genre obligatory
+  scenes with act deadlines (psych-thriller: discovery_of_wrongness by
+  Act 2, trust_betrayal by Act 2). Defect rule (missing obligation) +
+  excellence twin (obligation delivered WITH variation). Extends
+  genre-router; converges with O5 mystery fairness gates.
+- [ ] **SG3 — Cold Open Promise Tracker** (Type 1 signal channel): opening
+  promise + typed echoes (reinforcement/variation/subversion/inversion) +
+  finalImageMirrorsColdOpen — opening-vs-final-image mirroring is also a
+  SHUFFLE-SENSITIVE document-scale signal → candidate axis for the
+  degradation-AUC spine (§ULTRAPLAN 1.2).
+- [ ] **SG4 — Pattern-establishment rule**: "you cannot subvert a pattern
+  until it is established (minimum 3 exposures)" — countable motif/behavior
+  exposure tracking; flags premature subversion; feeds dramatic-irony
+  accounting with the sim layer.
+- [ ] **SG5 — Causality Enforcer**: coincidence allowed in Act 1 only, and
+  must gain meaning later — crisp act-positioned defect rule for
+  causality.ts.
+- [ ] **SG6 — Corpus expansion via Film_Script_Research_Report.docx**: the
+  155-screenplay sourcing index (91.6% publicly available, per-title
+  sources) is the acquisition map for growing the corpus 69 → 150+ across
+  eras/genres; first LIVE-ACTION entries available today: Pulp Fiction
+  (_PULP FICTION_ copy — trim trailing web-capture junk) and Jaws
+  (jaws-1975.pdf, clean); Godfather needs OCR.
+
+Deliberately NOT adopted: the Five-Evaluator LLM negotiation system as a
+scoring surface (NORTH_STAR rejects LLM judges; its act-weighted arbitration
+MATRIX is salvageable as deterministic position weights for findings), and
+Suspense = Threat x Anticipation as a display metric only until a threat
+signal exists.
+
 ### Run 17b — Polish (retained, after function work)
 
 - [ ] **(M)** Panel consolidation: 24+ flat buttons in the UI → grouped nav
