@@ -42,6 +42,28 @@ import {
   trinityActionBias,
 } from './psychology.ts';
 
+// X1 — blueprint action-vocabulary expansion. The LLM schema enum grows
+// automatically with ACTION_TYPES (see selectBestAction's responseSchema
+// below), but an enum member with no explanation is a name the model can't
+// use well — this glossary is the one place their semantics are spelled out
+// for generation. Kept short (one line each) and static (no per-turn state),
+// so it costs nothing to build and never desyncs from ACTION_TYPES' own
+// ordering. SPEAK/EXAMINE/LIE/RELOCATE/WAIT are deliberately NOT re-explained
+// here — the surrounding prompt already establishes their use contextually
+// (RELOCATE via AVAILABLE EXITS, LIE via the psychology blocks, etc.) and
+// this run must not touch that byte-stable baseline.
+const NEW_ACTION_GLOSSARY = `NEW ACTIONS AVAILABLE THIS TURN (in addition to SPEAK/EXAMINE/LIE/RELOCATE/WAIT):
+  - HIDE: conceal yourself; a silent, unseen action — lowers how much attention you're drawing.
+  - OBSERVE (target): silently watch someone; you may pick up on a tell in their emotional state.
+  - LISTEN (target): silently eavesdrop near someone; you may catch what they privately think of a third party.
+  - SEARCH: silently investigate this room; can expose anyone present who has an unconfronted lie on record.
+  - REVEAL (target, content): deliberately and TRUTHFULLY disclose something to someone — guaranteed to land as real knowledge for them, unlike SPEAK.
+  - THREATEN (target, content): coerce someone with an explicit threat — damages how much they trust you, and puts them on guard.
+  - BETRAY (target, content): break a trust or commitment against someone, visibly — sharply damages how they see you.
+  - PROTECT (target, content): shield or vouch for someone — strengthens how much they trust you.
+  - FORM_ALLIANCE (target, content): commit to working together with someone — strengthens trust and mutual obligation.
+  - FLEE (target = an exit name): a fear-driven, urgent escape — use this instead of RELOCATE when you are running from danger, not just repositioning.`;
+
 // ── buildPrompt ───────────────────────────────────────────────────────────────
 
 export interface BuiltPrompt {
@@ -273,7 +295,10 @@ ${beatHint}
 
 PERSUASION LEVERAGE:
 ${persuasionHints || '  (No other agents present.)'}
-${styleGenreBlock ? `\n${styleGenreBlock}\n` : ''}Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
+${styleGenreBlock ? `\n${styleGenreBlock}\n` : ''}
+${NEW_ACTION_GLOSSARY}
+
+Generate 3 candidate actions. Score each 0–100 on goal alignment. The best-scoring will be selected.${emotionBlock}`;
 
   const consumedPressureIds = activePressures.map(p => p.pressure_id);
   return { prompt, pendingStrategies, consumedPressureIds };

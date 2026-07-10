@@ -151,6 +151,13 @@ function deceptionLine(): string {
 function flightLine(): string {
   return `I can't stay in this room right now.`;
 }
+// X1: distinct line for the cascade-driven FLEE latent candidate (see
+// BASE_SCORE.FLEE_LATENT below) — a sharper, more urgent register than
+// flightLine()'s personality-driven RELOCATE, since this only ever fires
+// under a genuine 'flight' threat-response, not a personality trait alone.
+function fleeLine(): string {
+  return `I have to get out of here — right now.`;
+}
 function goalVoicingLine(goal: string, underPressure: boolean): string {
   return `${underPressure ? 'Right now, ' : ''}I need to ${goal}.`;
 }
@@ -174,13 +181,20 @@ function goalVoicingLine(goal: string, underPressure: boolean): string {
 // Trinity alone therefore never reorders the legacy priority; only a
 // non-arousal cascade state (a real threat response) can — which is exactly
 // the intended semantics. Regression-pinned in deterministic-sim.test.ts.
+//
+// X1: FLEE_LATENT's blended trinity range is [1.0, 1.105] (only `id` carries a
+// FLEE entry — see psychology.ts's TRINITY_ACTION_BIAS). Its worst-case
+// arousal score (20 × 1.105 ≈ 22.1) stays below SPEAK_DEFAULT's best-case
+// floor (26 × 1.03 ≈ 26.78), so — exactly like the RELOCATE_LATENT tier it
+// replaces — it can NEVER win at baseline; only cascade state 'flight'
+// (×2.20, psychology.ts) lifts it past the legacy tiers.
 const BASE_SCORE = {
   FLIGHT_FIRED: 100,   // legacy trigger 1: avoidant + suspicion + exit
   LIE_FIRED: 55,       // legacy trigger 2: high-dark-triad deception
   SPEAK_DEFENSE: 30,   // legacy trigger 3: active defense mechanism
   SPEAK_DEFAULT: 26,   // legacy trigger 4: plain goal voicing
   WAIT_LATENT: 22,     // never wins at arousal; freeze/collapse (×1.5/×1.6) lift it
-  RELOCATE_LATENT: 20, // never wins at arousal; flight state (×1.5) lifts it
+  FLEE_LATENT: 20,     // never wins at arousal; cascade 'flight' (×2.20) lifts it
 } as const;
 
 interface DeterministicCandidate {
@@ -248,9 +262,19 @@ function waitLine(state: CascadeState, goal: string): string {
  * Those tiers are then arbitrated by the SAME defense cascade + trinity
  * layers the LLM path uses (cascadeActionBias × trinityActionBias over the
  * candidate scores — see the BASE_SCORE contract above): under a real threat
- * response the winner can change (freeze → WAIT, flight → evasive RELOCATE),
- * and the winning line is recolored via cascadeFlavor; at baseline ('arousal')
- * neither layer alters the output byte.
+ * response the winner can change (freeze → WAIT, flight → FLEE — the
+ * cascade's own signature evasive action, distinct from tier 1's
+ * personality-driven RELOCATE), and the winning line is recolored via
+ * cascadeFlavor; at baseline ('arousal') neither layer alters the output byte.
+ *
+ * X1: only FLEE was added to this rule-based tier system (as tier 6, below) —
+ * the other nine new blueprint actions (HIDE, OBSERVE, LISTEN, SEARCH,
+ * REVEAL, THREATEN, BETRAY, PROTECT, FORM_ALLIANCE) are LLM-selectable (the
+ * schema enum grows with ACTION_TYPES automatically — decision.ts) and fully
+ * mechanically wired (Orchestrator/CausalSpine/Stage/bridge), but are not
+ * hand-authored rule-based candidates here, exactly like EXAMINE never was.
+ * FLEE is the one exception because item 3 of this run's brief specifically
+ * requires it to be the cascade's natural flight-state winner even keylessly.
  *
  * Pure with respect to its inputs (only reads Stage, never writes) — the same
  * (sheet, stage-state, node, otherAgents) always produces the same action,
@@ -289,7 +313,7 @@ export function composeDeterministicAction(
   };
 
   // ── Candidate set: the four legacy priority tiers as scored candidates, plus
-  // two latent candidates (WAIT, evasive RELOCATE) that only a non-arousal
+  // two latent candidates (WAIT, evasive FLEE) that only a non-arousal
   // cascade state can lift into first place (see BASE_SCORE's contract).
   const candidates: DeterministicCandidate[] = [];
   const exit = pickExit();
@@ -347,12 +371,17 @@ export function composeDeterministicAction(
     action: { action_type: 'WAIT', target: null, content: waitLine(cascade.state, goalText), deterministic: true },
   });
 
-  // 6. Latent evasive RELOCATE — the flight-state outlet, only when the legacy
-  // flight trigger did not already produce a RELOCATE and a real exit exists.
+  // 6. Latent FLEE — the cascade-driven flight-state outlet, only when the
+  // legacy (personality-driven) flight trigger did not already produce a
+  // RELOCATE and a real exit exists. Distinct action TYPE from tier 1 on
+  // purpose: tier 1's RELOCATE is an avoidant PERSONALITY TRAIT choosing to
+  // leave; this FLEE is the defense CASCADE's fear-driven response (only
+  // ever wins when cascadeActionBias(state) === 'flight' lifts its ×2.20 —
+  // see the BASE_SCORE contract above for the byte-stability proof).
   if (exit && candidates[0]?.action.action_type !== 'RELOCATE') {
     candidates.push({
-      base: BASE_SCORE.RELOCATE_LATENT,
-      action: { action_type: 'RELOCATE', target: exit.target, content: flightLine(), deterministic: true },
+      base: BASE_SCORE.FLEE_LATENT,
+      action: { action_type: 'FLEE', target: exit.target, content: fleeLine(), deterministic: true },
     });
   }
 

@@ -313,29 +313,33 @@ describe('agent/deterministic — cascade + trinity arbitration of the keyless c
     }
   });
 
-  it('flight via cascade (fire): an id-dominated character under survival threat skews to the evasive RELOCATE', () => {
+  it('flight via cascade (fire): an id-dominated character under survival threat FLEEs (X1: the cascade\'s own signature evasive action, not the legacy personality RELOCATE)', () => {
     const stage = makeStageWithExits();
     try {
       // fear 90 + active survival stake 90 ⇒ trinity ID wins; no pressure ⇒
       // suddenness 0 (no freeze), threat not social, anger not dominant, a
       // real exit exists ⇒ cascade FLIGHT. Attachment is secure and suspicion
-      // low, so the LEGACY flight trigger does NOT fire — the RELOCATE here
-      // can only come from the cascade's ×1.5 evasive bias.
+      // low, so the LEGACY (personality-driven) flight trigger does NOT fire
+      // — this FLEE can only come from the cascade's own ×2.20 bias on tier 6
+      // (X1 — replaces the old "evasive RELOCATE" latent candidate; see
+      // deterministic.ts's BASE_SCORE contract comment for the byte-stability
+      // proof that this can never fire at baseline arousal).
       const sheet = baseAgent({
         emotionState: fearEmotion(90),
         stakes: [{ id: 's1', char_id: 'a1', category: 'survival', description: 'Might not survive the night.', magnitude: 90, is_active: true }],
       });
       const node = stage.getLocation('room-a')!;
       const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
-      assert.equal(action.action_type, 'RELOCATE');
+      assert.equal(action.action_type, 'FLEE');
       assert.equal(action.target, 'Hallway');
       assert.equal(action.deterministic, true);
+      assert.match(action.content, /get out of here/);
     } finally {
       stage.close();
     }
   });
 
-  it('flight via cascade (no-fire): same character with no exit cannot flee — and no exit means no RELOCATE at all', () => {
+  it('flight via cascade (no-fire): same character with no exit cannot flee — and no exit means no FLEE (or RELOCATE) at all', () => {
     const stage = new Stage(':memory:');
     try {
       const sealed: Location = { location_id: 'room-a', name: 'Vault', description: 'A sealed vault.', adjacent_locations: [] };
@@ -345,7 +349,25 @@ describe('agent/deterministic — cascade + trinity arbitration of the keyless c
         stakes: [{ id: 's1', char_id: 'a1', category: 'survival', description: 'Might not survive the night.', magnitude: 90, is_active: true }],
       });
       const action = composeDeterministicAction(sheet, stage, stage.getLocation('room-a')!, [otherAgent()]);
+      assert.notEqual(action.action_type, 'FLEE');
       assert.notEqual(action.action_type, 'RELOCATE');
+    } finally {
+      stage.close();
+    }
+  });
+
+  it('FLEE (no-fire, personality trigger still wins): avoidant + suspicion>40 + exit produces the LEGACY personality RELOCATE, not FLEE, even with no cascade active', () => {
+    const stage = makeStageWithExits();
+    try {
+      // Same fixture as the top-of-file "flight (fire)" avoidant test — pinned
+      // here too, from the opposite angle: confirms tier 1 (RELOCATE) still
+      // pre-empts tier 6 (FLEE) when both could theoretically apply, because
+      // tier 6 only pushes a candidate when tier 1 did NOT already fire.
+      const sheet = baseAgent({ attachmentStyle: 'avoidant', suspicion_score: 60 });
+      const node = stage.getLocation('room-a')!;
+      const action = composeDeterministicAction(sheet, stage, node, [otherAgent()]);
+      assert.equal(action.action_type, 'RELOCATE');
+      assert.notEqual(action.action_type, 'FLEE');
     } finally {
       stage.close();
     }

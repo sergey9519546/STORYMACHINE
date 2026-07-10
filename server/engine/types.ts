@@ -42,7 +42,37 @@ export interface Location {
 //   4. CausalSpine.processEvent(): decide whether the action emits an
 //      EventProposition (SPEAK / LIE / EXAMINE currently do).
 //   5. Stage.recordAction(): set the is_audible flag for the new type.
-export const ACTION_TYPES = ['SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT'] as const;
+//
+// Blueprint action-vocabulary expansion (X1): the blueprint's fuller agent
+// action set is `hide, search, observe, listen, reveal, threaten, attack,
+// flee, protect, steal, destroy, plant_evidence, send_message, form_alliance,
+// betray`. Ten of those are HONESTLY simulable against state this engine
+// already tracks (locations/adjacency, the belief+knowledge ledger,
+// TheoryOfMind, the defense cascade) and are included below: HIDE, OBSERVE,
+// LISTEN, SEARCH, REVEAL, THREATEN, BETRAY, PROTECT, FORM_ALLIANCE, FLEE.
+// Five are DELIBERATELY EXCLUDED because they need state this engine does not
+// model, and a no-op action that pretends to work is worse than an honest gap:
+//   - STEAL / DESTROY:    need an inventory/object-ownership system (no
+//                          CharacterSheet field tracks possessions).
+//   - PLANT_EVIDENCE:     needs an evidence/clue-placement system distinct
+//                          from the belief ledger (a planted clue must be
+//                          discoverable independent of any character's
+//                          beliefs about it — nothing here models that).
+//   - SEND_MESSAGE:       needs asynchronous, location-independent delivery;
+//                          every existing action resolves synchronously
+//                          within one location via the sensory filter.
+//   - ATTACK:             CharacterState.is_alive is a binary flag with no
+//                          hit/injury/health resolution behind it. Reusing it
+//                          for a scored, LLM/deterministic-selected action
+//                          would mean silently killing characters off a
+//                          personality-weighted coin flip with no combat
+//                          model — narrative-consequential enough that it
+//                          needs a real resolution system, not a stretch.
+export const ACTION_TYPES = [
+  'SPEAK', 'EXAMINE', 'LIE', 'RELOCATE', 'WAIT',
+  'HIDE', 'OBSERVE', 'LISTEN', 'SEARCH', 'REVEAL',
+  'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE', 'FLEE',
+] as const;
 export type ActionType = typeof ACTION_TYPES[number];
 
 export interface ActionLogEntry {

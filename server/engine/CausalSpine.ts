@@ -15,11 +15,26 @@ import type {
   InformationPosition,
 } from './types.ts';
 import { Stage } from './Stage.ts';
+import type { ActionType } from './types.ts';
 
 // ── CausalSpine ───────────────────────────────────────────────────────────────
 // Pure deterministic logic — no Gemini calls.
 // Converts raw engine events into the causal-epistemic graph:
 //   ActionLogEntry → EventCard → BeliefEdge → GoalMutation → DramaticPressure → BeatTrace
+
+// X1 (types.ts "TO ADD A NEW ACTION TYPE" step 4): the five blueprint
+// additions that are genuine DECLARATIVE acts — content asserted at/about
+// another character, exactly like SPEAK — earn an EventProposition too, so
+// they participate in the belief-contradiction graph (a THREATEN or a
+// FORM_ALLIANCE claim can later be corroborated or contradicted, same as
+// anything SPOKEN). Always is_lie=false: unlike LIE, none of these five are a
+// deception-flagged action type — if a character wants to fake a threat or a
+// betrayal, that is a LIE wrapping the same content, not a new is_lie state
+// on these five. HIDE/OBSERVE/LISTEN/SEARCH/FLEE are perceptual or physical
+// acts, not truth-claims, so — like RELOCATE/WAIT today — they emit none.
+const DECLARATIVE_NO_LIE_ACTION_TYPES = new Set<ActionType>([
+  'REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE',
+]);
 
 export class CausalSpine {
   private stage: Stage;
@@ -42,6 +57,15 @@ export class CausalSpine {
         perceived_truth: true,
       });
     } else if (entry.action_type === 'EXAMINE' && entry.content.trim()) {
+      propositions.push({
+        proposition_id: randomUUID(),
+        event_id: entry.action_id,
+        content: entry.content,
+        is_lie: false,
+        asserted_by: entry.char_id,
+        perceived_truth: true,
+      });
+    } else if (DECLARATIVE_NO_LIE_ACTION_TYPES.has(entry.action_type) && entry.content.trim()) {
       propositions.push({
         proposition_id: randomUUID(),
         event_id: entry.action_id,

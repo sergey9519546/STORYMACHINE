@@ -41,6 +41,30 @@ import { logger } from '../../lib/logger.ts';
  *   EXAMINE → ADD_FACT (observed content) + UPDATE_READER_STATE (curiosity ↑)
  *   RELOCATE→ ADD_FACT (location change) + UPDATE_READER_STATE (minor suspense)
  *   WAIT    → (no ops — silent beat)
+ *
+ * X1 additions (blueprint action-vocabulary expansion):
+ *   HIDE       → ADD_FACT (conceals_self) + UPDATE_READER_STATE (suspense ↑ — an
+ *                audience senses the character trying to go unseen)
+ *   OBSERVE    → ADD_FACT (observes) + UPDATE_READER_STATE (curiosity ↑)
+ *   LISTEN     → ADD_FACT (overhears) + UPDATE_READER_STATE (curiosity ↑)
+ *   SEARCH     → ADD_FACT (searches) + UPDATE_READER_STATE (curiosity ↑↑ — an
+ *                active investigation, stronger signal than passive OBSERVE/LISTEN)
+ *   REVEAL     → UPDATE_READER_STATE (curiosity ↑↑↑) + UPDATE_BELIEF at 0.85
+ *                confidence — higher than SPEAK/LIE's 0.7 "claim" confidence,
+ *                since REVEAL is a guaranteed, intentional, always-truthful
+ *                disclosure (see Orchestrator._applyReveal), not an overheard
+ *                claim the listener merely has the speaker's word for.
+ *   THREATEN   → UPDATE_READER_STATE (suspense ↑↑↑) + UPDATE_BELIEF at 0.9
+ *                confidence, source 'witnessed' — the target directly
+ *                experiences being threatened; it is not secondhand.
+ *   BETRAY     → UPDATE_READER_STATE (suspense ↑↑↑↑ — the steepest tension
+ *                spike of the vocabulary) + UPDATE_BELIEF ('witnessed', 0.9)
+ *   PROTECT    → UPDATE_READER_STATE (curiosity ↑) + UPDATE_BELIEF
+ *                ('witnessed', 0.85)
+ *   FORM_ALLIANCE → UPDATE_READER_STATE (curiosity ↑↑) + UPDATE_BELIEF
+ *                ('witnessed', 0.85)
+ *   FLEE       → ADD_FACT (flees_to) + UPDATE_READER_STATE (suspense ↑↑ — a
+ *                fear-driven exit reads as more urgent than RELOCATE's ↑)
  */
 export function entryToOps(
   entry: ActionLogEntry,
@@ -125,6 +149,180 @@ export function entryToOps(
     case 'WAIT':
       // Silent beat — no narrative information produced
       break;
+
+    // ── X1 additions ──────────────────────────────────────────────────────
+    case 'HIDE': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { suspense: 1 } });
+      const fact: AtomicFact = {
+        factId: randomUUID(),
+        subject: entry.char_id,
+        predicate: 'conceals_self',
+        object: entry.location_id,
+        addedAtTurn: turnIndex,
+        validFrom: turnIndex,
+        validTo: null,
+      };
+      ops.push({ op: 'ADD_FACT', fact });
+      break;
+    }
+    case 'OBSERVE': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 1 } });
+      const target = entry.target_char_id ?? entry.content.slice(0, 60);
+      const fact: AtomicFact = {
+        factId: randomUUID(),
+        subject: entry.char_id,
+        predicate: 'observes',
+        object: target,
+        addedAtTurn: turnIndex,
+        validFrom: turnIndex,
+        validTo: null,
+      };
+      ops.push({ op: 'ADD_FACT', fact });
+      break;
+    }
+    case 'LISTEN': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 1 } });
+      const target = entry.target_char_id ?? entry.content.slice(0, 60);
+      const fact: AtomicFact = {
+        factId: randomUUID(),
+        subject: entry.char_id,
+        predicate: 'overhears',
+        object: target,
+        addedAtTurn: turnIndex,
+        validFrom: turnIndex,
+        validTo: null,
+      };
+      ops.push({ op: 'ADD_FACT', fact });
+      break;
+    }
+    case 'SEARCH': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } });
+      const fact: AtomicFact = {
+        factId: randomUUID(),
+        subject: entry.char_id,
+        predicate: 'searches',
+        object: entry.location_id,
+        addedAtTurn: turnIndex,
+        validFrom: turnIndex,
+        validTo: null,
+      };
+      ops.push({ op: 'ADD_FACT', fact });
+      break;
+    }
+    case 'REVEAL': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 3 } });
+      for (const prop of card?.propositions ?? []) {
+        ops.push({
+          op: 'UPDATE_BELIEF',
+          charId: entry.target_char_id ?? entry.char_id,
+          belief: {
+            id: prop.proposition_id,
+            proposition: prop.content,
+            confidence: 0.85, // guaranteed direct disclosure — see header comment
+            source: 'told',
+            source_agent_id: entry.char_id,
+            source_event_id: entry.action_id,
+            acquired_at: turnIndex,
+            contradicts: [],
+          },
+        });
+      }
+      break;
+    }
+    case 'THREATEN': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { suspense: 3 } });
+      for (const prop of card?.propositions ?? []) {
+        ops.push({
+          op: 'UPDATE_BELIEF',
+          charId: entry.target_char_id ?? entry.char_id,
+          belief: {
+            id: prop.proposition_id,
+            proposition: prop.content,
+            confidence: 0.9, // directly experienced by the target, not secondhand
+            source: 'witnessed',
+            source_agent_id: entry.char_id,
+            source_event_id: entry.action_id,
+            acquired_at: turnIndex,
+            contradicts: [],
+          },
+        });
+      }
+      break;
+    }
+    case 'BETRAY': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { suspense: 4 } }); // steepest spike in the vocabulary
+      for (const prop of card?.propositions ?? []) {
+        ops.push({
+          op: 'UPDATE_BELIEF',
+          charId: entry.target_char_id ?? entry.char_id,
+          belief: {
+            id: prop.proposition_id,
+            proposition: prop.content,
+            confidence: 0.9,
+            source: 'witnessed',
+            source_agent_id: entry.char_id,
+            source_event_id: entry.action_id,
+            acquired_at: turnIndex,
+            contradicts: [],
+          },
+        });
+      }
+      break;
+    }
+    case 'PROTECT': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 1 } });
+      for (const prop of card?.propositions ?? []) {
+        ops.push({
+          op: 'UPDATE_BELIEF',
+          charId: entry.target_char_id ?? entry.char_id,
+          belief: {
+            id: prop.proposition_id,
+            proposition: prop.content,
+            confidence: 0.85,
+            source: 'witnessed',
+            source_agent_id: entry.char_id,
+            source_event_id: entry.action_id,
+            acquired_at: turnIndex,
+            contradicts: [],
+          },
+        });
+      }
+      break;
+    }
+    case 'FORM_ALLIANCE': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { curiosity: 2 } });
+      for (const prop of card?.propositions ?? []) {
+        ops.push({
+          op: 'UPDATE_BELIEF',
+          charId: entry.target_char_id ?? entry.char_id,
+          belief: {
+            id: prop.proposition_id,
+            proposition: prop.content,
+            confidence: 0.85,
+            source: 'witnessed',
+            source_agent_id: entry.char_id,
+            source_event_id: entry.action_id,
+            acquired_at: turnIndex,
+            contradicts: [],
+          },
+        });
+      }
+      break;
+    }
+    case 'FLEE': {
+      ops.push({ op: 'UPDATE_READER_STATE', delta: { suspense: 2 } }); // higher than RELOCATE's 1 — fear-driven
+      const fact: AtomicFact = {
+        factId: randomUUID(),
+        subject: entry.char_id,
+        predicate: 'flees_to',
+        object: entry.content.replace(/^→\s*/, '').replace(/\s*\(flees\)\s*$/, '').slice(0, 80),
+        addedAtTurn: turnIndex,
+        validFrom: turnIndex,
+        validTo: null,
+      };
+      ops.push({ op: 'ADD_FACT', fact });
+      break;
+    }
   }
 
   return ops;
@@ -379,6 +577,17 @@ function actionToSceneFunction(
     case 'EXAMINE':  return 'reveal_character';
     case 'RELOCATE': return 'advance_plot';
     case 'WAIT':     return 'build_tension';
+    // X1 additions
+    case 'HIDE':          return 'build_tension';       // concealment builds tension
+    case 'OBSERVE':        return 'reveal_character';    // passive reading of another character
+    case 'LISTEN':          return 'reveal_character';
+    case 'SEARCH':          return 'reveal_character';    // active investigation, mirrors EXAMINE
+    case 'REVEAL':           return 'reveal_character';    // a disclosure IS a reveal, by definition
+    case 'THREATEN':         return 'build_tension';
+    case 'BETRAY':           return 'build_tension';       // the sharpest tension move in the vocabulary
+    case 'PROTECT':          return 'reveal_character';    // a self-sacrificing/protective act reveals character
+    case 'FORM_ALLIANCE':    return 'advance_plot';         // commits the plot to a new configuration
+    case 'FLEE':             return 'advance_plot';         // mirrors RELOCATE
   }
 }
 
@@ -390,11 +599,20 @@ function actionToSceneFunction(
  * - LIE           → legitimacy_split (deception delegitimizes)
  * - EXAMINE        → object_burden (physical object carries story weight)
  * - RELOCATE       → relationship_externalization (social positioning)
+ *
+ * X1: SEARCH mirrors EXAMINE (object_burden — a physical, investigative act);
+ * THREATEN/BETRAY mirror LIE (legitimacy_split — both delegitimize a
+ * relationship's good faith, the same way a lie does). Every other new
+ * action (HIDE, OBSERVE, LISTEN, REVEAL, PROTECT, FORM_ALLIANCE, FLEE) is a
+ * social/positioning move and falls through to the default.
  */
 function actionToMechanism(entry: ActionLogEntry): string {
   switch (entry.action_type) {
-    case 'LIE':     return 'legitimacy_split';
-    case 'EXAMINE': return 'object_burden';
-    default:        return 'relationship_externalization';
+    case 'LIE':      return 'legitimacy_split';
+    case 'EXAMINE':  return 'object_burden';
+    case 'SEARCH':   return 'object_burden';
+    case 'THREATEN': return 'legitimacy_split';
+    case 'BETRAY':   return 'legitimacy_split';
+    default:         return 'relationship_externalization';
   }
 }

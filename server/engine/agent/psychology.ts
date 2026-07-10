@@ -395,15 +395,66 @@ export function cascadeBehaviorProfile(state: CascadeState): CascadeBehaviorProf
 // candidate actions are penalized before scoring picks the best one — not
 // merely narrated as frozen in the prompt while still being free to pick a
 // bold confrontational candidate.
+// X1 — blueprint action-vocabulary expansion: the five legacy keys above are
+// UNCHANGED (byte-stability for every pinned deterministic-sim.test.ts
+// fixture depends on it — see deterministic.ts's BASE_SCORE contract comment).
+// New keys are additive per state:
+//   - FLEE is FLIGHT's signature action (much stronger than RELOCATE there —
+//     RELOCATE in 'flight' now reads as the tier-1 PERSONALITY-driven exit
+//     (avoidant trait), while FLEE is the tier-6 CASCADE-driven evasive exit;
+//     see deterministic.ts's composeDeterministicAction for the split).
+//   - THREATEN is FIGHT's signature action (the confrontational escalation).
+//   - HIDE is boosted in FREEZE/COLLAPSE (the task's own framing: "a
+//     threatened/frozen character biases toward HIDE/WAIT") and in FLIGHT as
+//     a secondary evasion option, but suppressed in FIGHT (a fighting
+//     character isn't trying to go unseen).
+//   - PROTECT/FORM_ALLIANCE/REVEAL are boosted in FAWN (appeasement can take
+//     the shape of placating, allying with, or over-disclosing to the more
+//     powerful party) and suppressed everywhere threat-response narrows the
+//     choice space (freeze/collapse/fight).
+//   - OBSERVE/LISTEN/SEARCH (investigation) are suppressed under every
+//     non-arousal state — a nervous system mid-threat-response is not in a
+//     position to conduct calm, methodical inquiry.
 export function cascadeActionBias(state: CascadeState): Partial<Record<ActionType, number>> {
   switch (state) {
-    case 'freeze':   return { SPEAK: 0.55, LIE: 0.40, EXAMINE: 0.70, RELOCATE: 0.30, WAIT: 1.50 };
-    case 'flight':   return { RELOCATE: 1.50, SPEAK: 0.70, LIE: 0.60, EXAMINE: 0.60, WAIT: 0.70 };
-    case 'fight':    return { SPEAK: 1.20, LIE: 1.15, RELOCATE: 0.50, EXAMINE: 0.60, WAIT: 0.40 };
-    case 'fawn':     return { SPEAK: 1.15, LIE: 0.70, RELOCATE: 0.60, EXAMINE: 0.80, WAIT: 1.00 };
-    case 'collapse': return { SPEAK: 0.30, LIE: 0.20, EXAMINE: 0.30, RELOCATE: 0.20, WAIT: 1.60 };
+    case 'freeze':
+      return {
+        SPEAK: 0.55, LIE: 0.40, EXAMINE: 0.70, RELOCATE: 0.30, WAIT: 1.50,
+        HIDE: 1.30, OBSERVE: 0.55, LISTEN: 0.55, SEARCH: 0.35,
+        REVEAL: 0.35, THREATEN: 0.25, BETRAY: 0.20, PROTECT: 0.35,
+        FORM_ALLIANCE: 0.30, FLEE: 0.25, // freeze precedes flight — can't flee yet
+      };
+    case 'flight':
+      return {
+        RELOCATE: 1.50, SPEAK: 0.70, LIE: 0.60, EXAMINE: 0.60, WAIT: 0.70,
+        FLEE: 2.20, // the cascade's own signature action — dominant here
+        HIDE: 1.10, OBSERVE: 0.55, LISTEN: 0.55, SEARCH: 0.45,
+        REVEAL: 0.50, THREATEN: 0.40, BETRAY: 0.35, PROTECT: 0.50, FORM_ALLIANCE: 0.45,
+      };
+    case 'fight':
+      return {
+        SPEAK: 1.20, LIE: 1.15, RELOCATE: 0.50, EXAMINE: 0.60, WAIT: 0.40,
+        THREATEN: 1.60, // this cascade's own signature action
+        BETRAY: 1.10, HIDE: 0.25, FLEE: 0.30, OBSERVE: 0.50, LISTEN: 0.50,
+        SEARCH: 0.55, REVEAL: 0.70, PROTECT: 0.65, FORM_ALLIANCE: 0.55,
+      };
+    case 'fawn':
+      return {
+        SPEAK: 1.15, LIE: 0.70, RELOCATE: 0.60, EXAMINE: 0.80, WAIT: 1.00,
+        PROTECT: 1.25, FORM_ALLIANCE: 1.20, REVEAL: 1.05, // appeasement-shaped moves
+        THREATEN: 0.30, BETRAY: 0.25, HIDE: 0.70, FLEE: 0.55,
+        OBSERVE: 0.85, LISTEN: 0.85, SEARCH: 0.60,
+      };
+    case 'collapse':
+      return {
+        SPEAK: 0.30, LIE: 0.20, EXAMINE: 0.30, RELOCATE: 0.20, WAIT: 1.60,
+        HIDE: 1.20, // just enough will left to go still/unseen — below WAIT's dominance
+        FLEE: 0.15, OBSERVE: 0.25, LISTEN: 0.25, SEARCH: 0.15,
+        REVEAL: 0.20, THREATEN: 0.15, BETRAY: 0.10, PROTECT: 0.20, FORM_ALLIANCE: 0.15,
+      };
     case 'arousal':
-    default:         return {};
+    default:
+      return {};
   }
 }
 
@@ -562,10 +613,22 @@ export function arbitrateTrinity(sheet: CharacterSheet): TrinityArbitrationResul
 // dictates the category; the runner-up only "colors" execution, per the
 // blueprint's own phrasing) — combined multiplicatively with effectiveScore()
 // in decision.ts's selectBestAction, mirroring cascadeActionBias() above.
+// X1: new-vocabulary entries follow each agent's existing character —
+//   - id (raw drive): favors the two most aggressive/impulsive new actions
+//     (THREATEN, BETRAY) and the panic exit (FLEE); mildly disfavors the
+//     patience HIDE requires.
+//   - ego (rational self-interest): favors the calculated information-
+//     gathering actions (SEARCH/OBSERVE/LISTEN) and a strategic alliance.
+//   - superego (conscience): favors the prosocial/honest moves (PROTECT,
+//     REVEAL) and strongly disfavors the two that violate trust (BETRAY,
+//     THREATEN).
 const TRINITY_ACTION_BIAS: Record<TrinityAgent, Partial<Record<ActionType, number>>> = {
-  id:       { LIE: 1.20, SPEAK: 1.10, RELOCATE: 1.10, EXAMINE: 0.85, WAIT: 0.75 },
-  ego:      { EXAMINE: 1.25, WAIT: 1.10, SPEAK: 1.00, LIE: 0.90, RELOCATE: 0.95 },
-  superego: { LIE: 0.55, SPEAK: 1.15, EXAMINE: 1.05, WAIT: 1.00, RELOCATE: 0.90 },
+  id:       { LIE: 1.20, SPEAK: 1.10, RELOCATE: 1.10, EXAMINE: 0.85, WAIT: 0.75,
+              THREATEN: 1.25, BETRAY: 1.20, FLEE: 1.15, HIDE: 0.90 },
+  ego:      { EXAMINE: 1.25, WAIT: 1.10, SPEAK: 1.00, LIE: 0.90, RELOCATE: 0.95,
+              SEARCH: 1.20, OBSERVE: 1.15, LISTEN: 1.10, FORM_ALLIANCE: 1.05 },
+  superego: { LIE: 0.55, SPEAK: 1.15, EXAMINE: 1.05, WAIT: 1.00, RELOCATE: 0.90,
+              PROTECT: 1.30, REVEAL: 1.20, BETRAY: 0.40, THREATEN: 0.60 },
 };
 
 export function trinityActionBias(winner: TrinityAgent, colorer: TrinityAgent): Partial<Record<ActionType, number>> {

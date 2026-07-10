@@ -108,6 +108,108 @@ function groundedState(charIds: string[]): NarrativeState {
   return state;
 }
 
+// ── X1: entryToOps — blueprint action-vocabulary expansion ─────────────────
+// Direct, Tier-1-independent proof that each new action type maps to the
+// StoryOp shape documented in action-to-ops.ts's entryToOps header comment.
+
+describe('X1: entryToOps — new action types map to the documented ops', () => {
+  it('HIDE → ADD_FACT(conceals_self) + UPDATE_READER_STATE(suspense+1)', () => {
+    const entry = makeEntry({ action_type: 'HIDE', content: '(goes still)', target_char_id: null });
+    const ops = entryToOps(entry, null, 4);
+    const fact = ops.find(op => op.op === 'ADD_FACT');
+    assert.ok(fact && fact.op === 'ADD_FACT' && fact.fact.predicate === 'conceals_self');
+    const reader = ops.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(reader && reader.op === 'UPDATE_READER_STATE' && reader.delta.suspense === 1);
+  });
+
+  it('OBSERVE → ADD_FACT(observes, object = target) + UPDATE_READER_STATE(curiosity+1)', () => {
+    const entry = makeEntry({ action_type: 'OBSERVE', content: '(watches)', target_char_id: 'bob' });
+    const ops = entryToOps(entry, null, 4);
+    const fact = ops.find(op => op.op === 'ADD_FACT');
+    assert.ok(fact && fact.op === 'ADD_FACT' && fact.fact.predicate === 'observes' && fact.fact.object === 'bob');
+  });
+
+  it('LISTEN → ADD_FACT(overhears, object = target)', () => {
+    const entry = makeEntry({ action_type: 'LISTEN', content: '(listens)', target_char_id: 'bob' });
+    const ops = entryToOps(entry, null, 4);
+    const fact = ops.find(op => op.op === 'ADD_FACT');
+    assert.ok(fact && fact.op === 'ADD_FACT' && fact.fact.predicate === 'overhears' && fact.fact.object === 'bob');
+  });
+
+  it('SEARCH → ADD_FACT(searches, object = location) + UPDATE_READER_STATE(curiosity+2, stronger than passive OBSERVE/LISTEN)', () => {
+    const entry = makeEntry({ action_type: 'SEARCH', content: '(searches)', target_char_id: null });
+    const ops = entryToOps(entry, null, 4);
+    const fact = ops.find(op => op.op === 'ADD_FACT');
+    assert.ok(fact && fact.op === 'ADD_FACT' && fact.fact.predicate === 'searches' && fact.fact.object === entry.location_id);
+    const reader = ops.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(reader && reader.op === 'UPDATE_READER_STATE' && reader.delta.curiosity === 2);
+  });
+
+  it('REVEAL → UPDATE_BELIEF at 0.85 confidence, source "told" — higher than SPEAK/LIE\'s 0.7 claim confidence', () => {
+    const entry = makeEntry({ action_type: 'REVEAL', content: 'The vault code is 4479.', target_char_id: 'bob' });
+    const card = makeCard(entry, [makeProp({ content: entry.content })]);
+    const ops = entryToOps(entry, card, 4);
+    const beliefOp = ops.find(op => op.op === 'UPDATE_BELIEF');
+    assert.ok(beliefOp && beliefOp.op === 'UPDATE_BELIEF');
+    assert.equal(beliefOp!.charId, 'bob');
+    assert.equal(beliefOp!.belief.confidence, 0.85);
+    assert.equal(beliefOp!.belief.source, 'told');
+  });
+
+  it('THREATEN → UPDATE_BELIEF at 0.9 confidence, source "witnessed" (directly experienced by the target)', () => {
+    const entry = makeEntry({ action_type: 'THREATEN', content: 'Say a word and you\'ll regret it.', target_char_id: 'bob' });
+    const card = makeCard(entry, [makeProp({ content: entry.content })]);
+    const ops = entryToOps(entry, card, 4);
+    const beliefOp = ops.find(op => op.op === 'UPDATE_BELIEF');
+    assert.ok(beliefOp && beliefOp.op === 'UPDATE_BELIEF');
+    assert.equal(beliefOp!.belief.confidence, 0.9);
+    assert.equal(beliefOp!.belief.source, 'witnessed');
+    const reader = ops.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(reader && reader.op === 'UPDATE_READER_STATE' && reader.delta.suspense === 3);
+  });
+
+  it('BETRAY → the steepest UPDATE_READER_STATE suspense spike of the vocabulary', () => {
+    const entry = makeEntry({ action_type: 'BETRAY', content: 'Alice gives you up.', target_char_id: 'bob' });
+    const card = makeCard(entry, [makeProp({ content: entry.content })]);
+    const ops = entryToOps(entry, card, 4);
+    const reader = ops.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(reader && reader.op === 'UPDATE_READER_STATE' && reader.delta.suspense === 4);
+    const beliefOp = ops.find(op => op.op === 'UPDATE_BELIEF');
+    assert.ok(beliefOp && beliefOp.op === 'UPDATE_BELIEF' && beliefOp.belief.source === 'witnessed');
+  });
+
+  it('PROTECT → UPDATE_BELIEF (witnessed, 0.85) + a mild curiosity bump', () => {
+    const entry = makeEntry({ action_type: 'PROTECT', content: 'Leave him alone.', target_char_id: 'bob' });
+    const card = makeCard(entry, [makeProp({ content: entry.content })]);
+    const ops = entryToOps(entry, card, 4);
+    const beliefOp = ops.find(op => op.op === 'UPDATE_BELIEF');
+    assert.ok(beliefOp && beliefOp.op === 'UPDATE_BELIEF' && beliefOp.belief.confidence === 0.85 && beliefOp.belief.source === 'witnessed');
+  });
+
+  it('FORM_ALLIANCE → UPDATE_BELIEF (witnessed, 0.85)', () => {
+    const entry = makeEntry({ action_type: 'FORM_ALLIANCE', content: "Let's work together.", target_char_id: 'bob' });
+    const card = makeCard(entry, [makeProp({ content: entry.content })]);
+    const ops = entryToOps(entry, card, 4);
+    const beliefOp = ops.find(op => op.op === 'UPDATE_BELIEF');
+    assert.ok(beliefOp && beliefOp.op === 'UPDATE_BELIEF' && beliefOp.belief.confidence === 0.85 && beliefOp.belief.source === 'witnessed');
+  });
+
+  it('FLEE → ADD_FACT(flees_to) + UPDATE_READER_STATE(suspense+2, stronger than RELOCATE\'s +1 — fear-driven)', () => {
+    const entry = makeEntry({ action_type: 'FLEE', content: '→ Hallway (flees)', target_char_id: null });
+    const ops = entryToOps(entry, null, 4);
+    const fact = ops.find(op => op.op === 'ADD_FACT');
+    assert.ok(fact && fact.op === 'ADD_FACT' && fact.fact.predicate === 'flees_to' && fact.fact.object === 'Hallway');
+    const reader = ops.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(reader && reader.op === 'UPDATE_READER_STATE' && reader.delta.suspense === 2);
+
+    const relocateEntry = makeEntry({ action_type: 'RELOCATE', content: '→ Hallway', target_char_id: null });
+    const relocateOps = entryToOps(relocateEntry, null, 4);
+    const relocateReader = relocateOps.find(op => op.op === 'UPDATE_READER_STATE');
+    assert.ok(relocateReader && relocateReader.op === 'UPDATE_READER_STATE');
+    assert.ok(reader!.delta.suspense! > relocateReader!.delta.suspense!, 'FLEE reads as more urgent than a plain RELOCATE');
+  });
+});
+
 // ── relationshipDeltasToOps ──────────────────────────────────────────────────
 
 describe('bridge (Fix A): relationshipDeltasToOps', () => {
