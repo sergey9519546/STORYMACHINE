@@ -1,21 +1,25 @@
 // Run 14, Deliverable 3 — Pitch Kit export. Standalone, print-quality HTML
-// document for development desks: title block, an inline-SVG tension curve
-// (cumulative per-scene suspenseDelta, act-zone shading), an inline-SVG
-// character map (nodes sized by dialogue-line count, edges weighted by
-// co-scene count, simple circular layout), and a scene/word/verdict summary
-// strip. Same discipline as server/lib/coverage-html.ts: pure function over
-// already-computed inputs (no I/O, no Date.now(), no randomness, no external
-// requests, no <script>), so the same inputs always render byte-for-byte
-// identical HTML. The caller (POST /api/export/pitchkit in
-// server/routes/export.ts) is responsible for re-running the doctor and the
-// analyzer so the exported document is authentic, exactly as the coverage
-// export does.
+// document for development desks: title block, a logline/genre/synopsis/
+// comps pitch section, an inline-SVG tension curve (cumulative per-scene
+// suspenseDelta, act-zone shading), an inline-SVG character map (nodes sized
+// by dialogue-line count, edges weighted by co-scene count, simple circular
+// layout) PLUS a cast table (speaking-line counts and a protagonist/
+// supporting role hint — the "bare character-name list" the adversarial
+// review flagged), and a scene/word/verdict summary strip. Same discipline
+// as server/lib/coverage-html.ts: pure function over already-computed
+// inputs (no I/O, no Date.now(), no randomness, no external requests, no
+// <script>), so the same inputs always render byte-for-byte identical HTML.
+// The caller (POST /api/export/pitchkit in server/routes/export.ts) is
+// responsible for re-running the doctor and the analyzer, and for building
+// the pitch content via server/lib/logline.ts, so the exported document is
+// authentic, exactly as the coverage export does.
 //
-// SECURITY: title and every character name are screenplay-derived,
-// untrusted input — every interpolation of either goes through escapeHtml()
-// below, including inside the SVG <text> nodes (SVG text content is HTML
-// content for XSS purposes in a browser-rendered document; there is no
-// separate "SVG is safe" exemption here).
+// SECURITY: title, author, every character name, and every pitch-content
+// string (logline/genre/synopsis) are screenplay-derived, untrusted input —
+// every interpolation of any of these goes through escapeHtml() below,
+// including inside the SVG <text> nodes (SVG text content is HTML content
+// for XSS purposes in a browser-rendered document; there is no separate
+// "SVG is safe" exemption here).
 
 import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import type { ScreenplaySceneRecord } from '../nvm/screenplay/memory.ts';
@@ -125,13 +129,11 @@ interface CharNode {
   r: number;
 }
 
-/** Simple deterministic circular layout: the top MAP_MAX_CHARACTERS speaking
- *  characters (by total dialogue-line count, first-appearance order breaking
- *  ties) placed evenly around a circle, node radius scaled to line count,
- *  edges between any two kept characters weighted by how many scenes they
- *  both speak in. Character NAMES are the one piece of user-controlled text
- *  in this SVG and are escaped via escapeHtml() before interpolation. */
-function buildCharacterMapSvg(sceneCharacters: SceneCharacterTally[]): string {
+/** Shared aggregation used by both the character map SVG and the cast table
+ *  below: total dialogue-line count per speaking character (across every
+ *  scene) plus first-appearance order, so the two renderings can never
+ *  disagree about who spoke how much. */
+function aggregateCharacterTotals(sceneCharacters: SceneCharacterTally[]): { order: string[]; totalCounts: Map<string, number> } {
   const totalCounts = new Map<string, number>();
   const order: string[] = [];
   const seen = new Set<string>();
@@ -145,14 +147,37 @@ function buildCharacterMapSvg(sceneCharacters: SceneCharacterTally[]): string {
     }
   }
 
+  return { order, totalCounts };
+}
+
+/** Characters ranked by total dialogue-line count descending, ties broken by
+ *  first-appearance order (Array.sort is stable). Shared ranking used by
+ *  both the character map (top MAP_MAX_CHARACTERS only) and the cast table
+ *  (role hint: rank 0 is the protagonist by this document's own definition
+ *  — the same "top speaker" rule server/lib/logline.ts uses via
+ *  report.characters[0]). */
+function rankCharacters(sceneCharacters: SceneCharacterTally[]): { name: string; lineCount: number }[] {
+  const { order, totalCounts } = aggregateCharacterTotals(sceneCharacters);
+  return order
+    .filter(name => totalCounts.has(name))
+    .map(name => ({ name, lineCount: totalCounts.get(name)! }))
+    .sort((a, b) => b.lineCount - a.lineCount);
+}
+
+/** Simple deterministic circular layout: the top MAP_MAX_CHARACTERS speaking
+ *  characters (by total dialogue-line count, first-appearance order breaking
+ *  ties) placed evenly around a circle, node radius scaled to line count,
+ *  edges between any two kept characters weighted by how many scenes they
+ *  both speak in. Character NAMES are the one piece of user-controlled text
+ *  in this SVG and are escaped via escapeHtml() before interpolation. */
+function buildCharacterMapSvg(sceneCharacters: SceneCharacterTally[]): string {
+  const { totalCounts } = aggregateCharacterTotals(sceneCharacters);
+
   if (totalCounts.size === 0) {
     return '<p class="empty-note">No dialogue to map.</p>';
   }
 
-  const characters = order
-    .filter(name => totalCounts.has(name))
-    .sort((a, b) => (totalCounts.get(b)! - totalCounts.get(a)!))
-    .slice(0, MAP_MAX_CHARACTERS);
+  const characters = rankCharacters(sceneCharacters).map(c => c.name).slice(0, MAP_MAX_CHARACTERS);
   const characterSet = new Set(characters);
 
   const edgeCounts = new Map<string, number>();
@@ -216,6 +241,99 @@ function buildSummaryStrip(report: ScriptDoctorReport): string {
     <div class="stat"><div class="stat-value">${report.sceneCount.toLocaleString('en-US')}</div><div class="stat-label">Scenes</div></div>
     <div class="stat"><div class="stat-value">${report.wordCount.toLocaleString('en-US')}</div><div class="stat-label">Words</div></div>
   </div>`;
+}
+
+// ── Pitch section: logline / genre / synopsis / comps ───────────────────────
+// Every string here is already the OUTPUT of server/lib/logline.ts's
+// builders (called by the route, server/routes/export.ts) — this file's own
+// job is only to render what it's given, escaped, matching the rest of the
+// document's discipline. null means that builder degraded (a signal was
+// missing) and the field is presented honestly as absent, never padded.
+
+function buildLoglineSection(logline: string | null): string {
+  const body = logline
+    ? `<p class="logline-text">${escapeHtml(logline)}</p>`
+    : '<p class="empty-note">No logline could be assembled — too little signal in this script (no speaking character, or no detected opening beat).</p>';
+  return `
+  <section class="section">
+    <h2>Logline</h2>
+    ${body}
+  </section>`;
+}
+
+// Genre/tone is fully OMITTED (not shown with an empty-note) when absent —
+// unlike logline/synopsis, an absent genre isn't a degraded-but-notable
+// finding, it's just a field this report doesn't carry yet (see
+// logline.ts's buildGenreLine doc comment).
+function buildGenreSection(genreLine: string | null): string {
+  if (!genreLine) return '';
+  return `
+  <section class="section">
+    <h2>Genre &amp; Tone</h2>
+    <p class="genre-text">${escapeHtml(genreLine)}</p>
+  </section>`;
+}
+
+function buildSynopsisSection(synopsis: string | null): string {
+  const body = synopsis
+    ? `<p class="synopsis-text">${escapeHtml(synopsis)}</p>`
+    : '<p class="empty-note">No act-structure beats were detected clearly enough to summarize.</p>';
+  return `
+  <section class="section">
+    <h2>Synopsis</h2>
+    ${body}
+  </section>`;
+}
+
+function buildCompsSection(comps: string): string {
+  return `
+  <section class="section">
+    <h2>Comparable Titles</h2>
+    <p class="comps-text">${escapeHtml(comps)}</p>
+  </section>`;
+}
+
+// ── Cast table ────────────────────────────────────────────────────────────────
+// Replaces the "bare character-name list" the adversarial review flagged:
+// every speaking character with a line count and a role hint, not just a
+// name. Role hint is deliberately two-tier (Protagonist / Supporting) —
+// exactly what the task asks for and exactly what total dialogue-line rank
+// alone can honestly support; anything finer (deuteragonist, antagonist,
+// ...) would need signal this document doesn't have.
+const CAST_LIST_MAX = 30;
+
+function buildCastSection(sceneCharacters: SceneCharacterTally[]): string {
+  const ranked = rankCharacters(sceneCharacters);
+  if (ranked.length === 0) {
+    return `
+  <section class="section">
+    <h2>Cast</h2>
+    <p class="empty-note">No speaking characters detected.</p>
+  </section>`;
+  }
+
+  const rows = ranked.slice(0, CAST_LIST_MAX).map((c, i) => {
+    const role = i === 0 ? 'Protagonist' : 'Supporting';
+    return `
+    <div class="cast-row">
+      <div class="cast-name">${escapeHtml(c.name)}</div>
+      <div class="cast-lines">${c.lineCount.toLocaleString('en-US')} line${c.lineCount === 1 ? '' : 's'}</div>
+      <div class="cast-role cast-role-${role.toLowerCase()}">${role}</div>
+    </div>`;
+  }).join('\n');
+
+  const overflowNote = ranked.length > CAST_LIST_MAX
+    ? `<p class="empty-note">+ ${ranked.length - CAST_LIST_MAX} more speaking character${ranked.length - CAST_LIST_MAX === 1 ? '' : 's'}, not shown.</p>`
+    : '';
+
+  return `
+  <section class="section">
+    <h2>Cast</h2>
+    <div class="cast-list">
+      ${rows}
+    </div>
+    ${overflowNote}
+  </section>`;
 }
 
 // ── Document shell ────────────────────────────────────────────────────────────
@@ -303,6 +421,54 @@ const STYLES = `
       border-radius: 2px;
     }
     .curve-legend-note { color: #71717a; margin-left: auto; }
+    .byline {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      color: #52525b;
+      margin: 6px 0 0;
+    }
+    .logline-text, .synopsis-text {
+      margin: 0;
+      font-size: 16px;
+      font-style: italic;
+      line-height: 1.6;
+    }
+    .genre-text, .comps-text {
+      margin: 0;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      color: #3f3f46;
+    }
+    .cast-list { display: flex; flex-direction: column; gap: 6px; }
+    .cast-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 14px;
+      align-items: center;
+      padding: 6px 10px;
+      background: #faf9f5;
+      border: 1px solid #e4e2d8;
+      border-radius: 5px;
+    }
+    .cast-name { font-weight: 700; font-size: 13.5px; }
+    .cast-lines {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      white-space: nowrap;
+    }
+    .cast-role {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .cast-role-protagonist { background: #ede9fe; color: #5b21b6; }
+    .cast-role-supporting { background: #f1f5f9; color: #475569; }
     .pk-footer {
       border-top: 1px solid #d4d4d8;
       margin-top: 20px;
@@ -321,24 +487,68 @@ const STYLES = `
 `;
 
 export interface PitchKitInput {
+  /** Explicit title, as posted by the caller. May be empty/'Untitled' — see
+   *  titlePageTitle below for the fallback this now supports. */
   title: string;
+  /** Title parsed from the Fountain title page (server/lib/logline.ts's
+   *  extractTitlePage), if any. Used ONLY when `title` itself is empty or
+   *  the literal 'Untitled' placeholder — an explicit title the caller
+   *  supplied always wins over whatever the script's own title page says. */
+  titlePageTitle?: string | null;
+  /** Author parsed from the Fountain title page, if any. Purely additive
+   *  (rendered as a byline) — never a fallback for `title`. */
+  titlePageAuthor?: string | null;
   report: ScriptDoctorReport;
   records: ScreenplaySceneRecord[];
   sceneCharacters: SceneCharacterTally[];
+  /** Pitch content built by server/lib/logline.ts's buildPitchContent — the
+   *  actual persuasive content (logline, genre/tone, synopsis, comps slot)
+   *  this document was missing. Optional so any pre-existing caller that
+   *  hasn't been updated to build it yet still typechecks and still renders
+   *  a valid (just content-light) document; every field degrades to an
+   *  honest "not available" state exactly like the tension curve/character
+   *  map already do for a dialogue-free script. */
+  pitchContent?: {
+    logline: string | null;
+    genreLine: string | null;
+    synopsis: string | null;
+    comps: string;
+  };
 }
 
 /**
  * Render a standalone, print-quality Pitch Kit HTML document: title block,
- * tension curve, character map, and a scene/word/verdict summary strip.
- * Pure function — no I/O, no Date.now(), no randomness, all-inline CSS/SVG,
- * every screenplay-derived string (title, character names, verdict) escaped
- * via escapeHtml() before interpolation.
+ * logline/genre/synopsis/comps pitch section, tension curve, character map
+ * + cast table, and a scene/word/verdict summary strip. Pure function — no
+ * I/O, no Date.now(), no randomness, all-inline CSS/SVG, every
+ * screenplay-derived string (title, author, character names, verdict,
+ * pitch content) escaped via escapeHtml() before interpolation.
  */
 export function renderPitchKitHtml(input: PitchKitInput): string {
-  const safeTitle = escapeHtml(input.title.trim() || 'Untitled');
+  // Title fallback chain: explicit title > parsed title page > 'Untitled'.
+  // An explicit 'Untitled' (the client's own default when no title field was
+  // posted — see server/routes/export.ts) is treated the same as empty, so
+  // a script with a real Title: page never displays the literal word
+  // "Untitled" just because the caller didn't bother passing a title.
+  const explicitTitle = input.title.trim();
+  const resolvedTitle = (explicitTitle && explicitTitle !== 'Untitled')
+    ? explicitTitle
+    : (input.titlePageTitle?.trim() || explicitTitle || 'Untitled');
+  const safeTitle = escapeHtml(resolvedTitle);
+  const byline = input.titlePageAuthor?.trim()
+    ? `<div class="byline">Written by ${escapeHtml(input.titlePageAuthor.trim())}</div>`
+    : '';
+
   const tensionSvg = buildTensionCurveSvg(input.records);
   const mapSvg = buildCharacterMapSvg(input.sceneCharacters);
+  const castSection = buildCastSection(input.sceneCharacters);
   const summary = buildSummaryStrip(input.report);
+
+  const pitch = input.pitchContent;
+  const loglineSection = buildLoglineSection(pitch?.logline ?? null);
+  const genreSection = buildGenreSection(pitch?.genreLine ?? null);
+  const synopsisSection = buildSynopsisSection(pitch?.synopsis ?? null);
+  const compsSection = buildCompsSection(pitch?.comps ?? 'Comparable titles: ___');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -355,7 +565,12 @@ ${STYLES}
     <header class="pk-header">
       <div class="masthead">PITCH KIT &mdash; STORYMACHINE</div>
       <h1 class="title">${safeTitle}</h1>
+      ${byline}
     </header>
+    ${loglineSection}
+    ${genreSection}
+    ${synopsisSection}
+    ${compsSection}
     ${summary}
     <section class="section">
       <h2>Tension Curve</h2>
@@ -365,6 +580,7 @@ ${STYLES}
       <h2>Character Map</h2>
       ${mapSvg}
     </section>
+    ${castSection}
     <footer class="pk-footer">
       Deterministic analysis &mdash; no generative AI read or scored this script.
     </footer>

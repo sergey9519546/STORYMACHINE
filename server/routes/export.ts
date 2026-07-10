@@ -20,6 +20,7 @@ import { fdxToFountain } from '../lib/fdx-import.ts';
 import { renderCoverageHtml } from '../lib/coverage-html.ts';
 import { buildBreakdownRows, breakdownRowsToCsv, analyzeSceneCharacters } from '../lib/breakdown.ts';
 import { renderPitchKitHtml } from '../lib/pitchkit-html.ts';
+import { extractTitlePage, buildLogline, buildPitchContent } from '../lib/logline.ts';
 import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '../lib/slate.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 
@@ -489,7 +490,21 @@ router.post('/api/export/coverage', gameLimiter, validate(DoctorBodySchema), asy
     // it directly, that value wins here and this becomes a no-op fallback.
     const contentHash = report.contentHash ?? createHash('sha256').update(fountain.trim()).digest('hex');
 
-    const html = renderCoverageHtml({ ...report, contentHash }, title);
+    // Title-page fallback (P2 — "Untitled" bug fix) + a logline line in the
+    // header: both are cheap, pure, deterministic derivations from the same
+    // fountain text and records already in hand, so they're always computed
+    // rather than gated behind an opt-in flag. extractTitlePage/buildLogline
+    // degrade to null on their own when the script carries no title page or
+    // no usable signal — see server/lib/logline.ts.
+    const titlePage = extractTitlePage(fountain);
+    const { records } = analyzeFountainText(fountain);
+    const logline = buildLogline(report, records, fountain);
+
+    const html = renderCoverageHtml({ ...report, contentHash }, title, {
+      titlePageTitle: titlePage.title,
+      titlePageAuthor: titlePage.author,
+      logline,
+    });
 
     const filename = `${encodeURIComponent(title)}-coverage.html`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -615,13 +630,17 @@ router.post('/api/export/breakdown', gameLimiter, validate(DoctorBodySchema), as
 }));
 
 // ── Pitch Kit export (standalone HTML) ───────────────────────────────────────
-// POST /api/export/pitchkit — title block, inline-SVG tension curve, inline-
-// SVG character map, and a scene/word/verdict summary strip, all in one
-// standalone print-quality HTML document. Deterministic and keyless: re-runs
-// the doctor (server/nvm/analyze/doctor.ts) and the analyzer
-// (server/nvm/analyze/fountain-analyzer.ts) here for the same authenticity
-// reason POST /api/export/coverage does — the exported numbers are always
-// the numbers the tool actually computed for this exact script.
+// POST /api/export/pitchkit — title block, a logline/genre/synopsis/comps
+// pitch section, inline-SVG tension curve, inline-SVG character map + cast
+// table, and a scene/word/verdict summary strip, all in one standalone
+// print-quality HTML document. Deterministic and keyless: re-runs the
+// doctor (server/nvm/analyze/doctor.ts), the analyzer (server/nvm/analyze/
+// fountain-analyzer.ts), and the pitch-content builders (server/lib/
+// logline.ts) here for the same authenticity reason POST /api/export/
+// coverage does — the exported numbers (and now the exported pitch
+// content) are always what the tool actually computed for this exact
+// script, never something a client could hand-edit before asking the
+// server to wrap it in a nice PDF-ready shell.
 router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asyncHandler(async (req, res) => {
   const fountain = resolveFountainOrRespond(req, res);
   if (fountain === undefined) return;
@@ -638,7 +657,21 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
     const { records } = analyzeFountainText(fountain);
     const sceneCharacters = analyzeSceneCharacters(fountain);
 
-    const html = renderPitchKitHtml({ title, report, records, sceneCharacters });
+    // Title-page fallback (P2 — "Untitled" bug fix) + the pitch content
+    // itself (logline/genre/synopsis/comps) — see server/lib/logline.ts for
+    // every builder's exact inputs and degradation rule.
+    const titlePage = extractTitlePage(fountain);
+    const pitchContent = buildPitchContent(report, records, fountain);
+
+    const html = renderPitchKitHtml({
+      title,
+      titlePageTitle: titlePage.title,
+      titlePageAuthor: titlePage.author,
+      report,
+      records,
+      sceneCharacters,
+      pitchContent,
+    });
 
     const filename = `${encodeURIComponent(title)}-pitchkit.html`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
