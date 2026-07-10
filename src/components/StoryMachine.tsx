@@ -115,6 +115,33 @@ const BEAT_COLORS: Record<string, string> = {
   turning_point:            'bg-green-600',
 };
 
+// ── Script Ledger action-type display (X1 vocabulary) ───────────────────────
+// Badge color per action_type. Falls back to the original bg-black/white
+// treatment for any type not listed here (SPEAK, EXAMINE, RELOCATE, WAIT).
+const ACTION_TYPE_BADGE: Partial<Record<ActionLogEntry['action_type'], string>> = {
+  LIE:           'bg-[#FF4444] text-white',
+  THREATEN:      'bg-[#FF4444] text-white',
+  BETRAY:        'bg-[#FF4444] text-white',
+  REVEAL:        'bg-blue-600 text-white',
+  PROTECT:       'bg-green-600 text-white',
+  FORM_ALLIANCE: 'bg-green-600 text-white',
+  FLEE:          'bg-orange-500 text-white',
+  HIDE:          'bg-gray-600 text-white',
+  OBSERVE:       'bg-gray-600 text-white',
+  LISTEN:        'bg-gray-600 text-white',
+  SEARCH:        'bg-gray-600 text-white',
+};
+
+// Covert set — mirrors SILENT_ACTION_TYPES in server/nvm/bridge/action-to-ops.ts.
+// Nothing is spoken aloud for these, so the ledger row reads as concealment
+// rather than open conflict (dashed border, muted background, EYE tag).
+const COVERT_ACTION_TYPES = new Set<ActionLogEntry['action_type']>(['HIDE', 'OBSERVE', 'LISTEN', 'SEARCH']);
+
+// Action types whose target_char_id is meaningful to surface as a "to X" label.
+const TARGETED_ACTION_TYPES = new Set<ActionLogEntry['action_type']>([
+  'SPEAK', 'LIE', 'OBSERVE', 'LISTEN', 'REVEAL', 'THREATEN', 'BETRAY', 'PROTECT', 'FORM_ALLIANCE',
+]);
+
 const INFO_POS_LABEL: Record<string, string> = {
   superior: 'AUD > CHARS',
   inferior: 'CHARS > AUD',
@@ -1237,17 +1264,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                 const agent = agents.find(a => a.char_id === entry.char_id);
                 const node = nodes.find(n => n.location_id === entry.location_id);
                 const isLie = entry.action_type === "LIE";
+                const isThreatOrBetray = entry.action_type === "THREATEN" || entry.action_type === "BETRAY";
+                const isCovert = COVERT_ACTION_TYPES.has(entry.action_type);
+                const badgeClass = ACTION_TYPE_BADGE[entry.action_type] ?? "bg-black text-white";
+                const rowClass = isLie || isThreatOrBetray
+                  ? "border-[#FF4444] bg-red-50"
+                  : isCovert
+                    ? "border-dashed border-gray-400 bg-gray-100"
+                    : "border-black bg-gray-50";
                 return (
                   <div
                     key={entry.action_id}
-                    className={`border-l-4 pl-4 py-2 ${isLie ? "border-[#FF4444] bg-red-50" : "border-black bg-gray-50"}`}
+                    className={`border-l-4 pl-4 py-2 ${rowClass}`}
                   >
                     <div className="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-bold">
                       [{new Date(entry.timestamp).toLocaleTimeString()}] @ {node?.name || entry.location_id}
                     </div>
                     <div className="flex items-start gap-2 mb-2 flex-wrap">
                       <span className="font-bold text-black uppercase">{agent?.name || entry.char_id}</span>
-                      <span className={`text-[10px] px-2 py-0.5 uppercase font-bold tracking-widest ${isLie ? "bg-[#FF4444] text-white" : "bg-black text-white"}`}>
+                      <span className={`text-[10px] px-2 py-0.5 uppercase font-bold tracking-widest ${badgeClass}`}>
                         {entry.action_type}
                       </span>
                       {isLie && (
@@ -1255,7 +1290,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                           <AlertTriangle className="w-3 h-3" /> LIE
                         </span>
                       )}
-                      {entry.target_char_id && (entry.action_type === "SPEAK" || entry.action_type === "LIE") && (
+                      {isThreatOrBetray && (
+                        <span className="text-[10px] flex items-center gap-1 text-[#FF4444] font-bold">
+                          <AlertTriangle className="w-3 h-3" /> {entry.action_type === "THREATEN" ? "THREAT" : "BETRAYAL"}
+                        </span>
+                      )}
+                      {isCovert && (
+                        <span className="text-[10px] flex items-center gap-1 text-gray-500 font-bold">
+                          <Eye className="w-3 h-3" /> COVERT
+                        </span>
+                      )}
+                      {entry.target_char_id && TARGETED_ACTION_TYPES.has(entry.action_type) && (
                         <span className="text-[#FF4444] font-bold uppercase text-xs">
                           to {agents.find(a => a.char_id === entry.target_char_id)?.name || entry.target_char_id}
                         </span>
