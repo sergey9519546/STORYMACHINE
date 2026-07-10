@@ -247,6 +247,22 @@ interface RootCauseTemplate {
    *  single concrete change that clears both at once (the fix-and-verify
    *  surface consumes this text as its fix target). */
   explanation: (members: LocatedIssue[], where: string) => string;
+  /** 'spatial' (default, omitted) — the Wave 1185/1189 mechanism: every
+   *  required rule must land in the same scene/lines-overlapping group,
+   *  matched via matchOverlapTemplate's self-contained union-find.
+   *  'document' (Wave 1193) — for required-rule sets whose members are
+   *  document-anchored (whole-script aggregate checks with no line span to
+   *  overlap — see the Wave 1189 comment's list of rules that resolve to
+   *  'document' for exactly this reason). A document-mode template has no
+   *  spatial claim to make: "the whole script" is the only meaningful
+   *  location, so it fires whenever every required rule appears ANYWHERE in
+   *  the located issues, matched via matchDocumentTemplate. Kept as a
+   *  distinct mode (not folded into matchOverlapTemplate) because the two
+   *  have genuinely different evidentiary bars: spatial mode proves the
+   *  SAME place, document mode can only prove the same SCRIPT — conflating
+   *  them would silently weaken the spatial claim the six existing
+   *  templates already made and are tested against. */
+  mode?: 'spatial' | 'document';
 }
 
 const ROOT_CAUSE_TEMPLATES: RootCauseTemplate[] = [
@@ -313,6 +329,138 @@ const ROOT_CAUSE_TEMPLATES: RootCauseTemplate[] = [
       + `before where the character learns something, faces pressure, or confronts a choice, and both `
       + `the reversal and the decision earn their moment.`,
   },
+
+  // ── Wave 1193 additions (Program v2, Type 4 — root-cause templates, third
+  // of its kind; adversarial-review response) — four DOCUMENT-mode templates
+  // (see the `mode` field's doc comment on RootCauseTemplate above). Wave
+  // 1189 found that several strong candidate pairs resolve to anchor
+  // 'document' and are therefore invisible to the spatial mechanism; rather
+  // than discard them again, Wave 1193 adds the document-mode matcher
+  // (matchDocumentTemplate below) so they can be named too. All four were
+  // audited directly against the pass source (not assumed from rule names —
+  // see the wave commit) to confirm the required rules are genuinely
+  // distinct signals that converge on one diagnosis, not restatements of
+  // each other or of an existing template:
+  //
+  //   static-spine     — NO_REVERSALS + SUSPENSE_FLATLINE_RUN +
+  //     PURPOSE_MONOTONE_RUN. All three are document-anchored (structure.ts's
+  //     "Overall structure", pacing.ts's "N consecutive scenes — suspense
+  //     flatline", structure.ts's "Scenes N–M (purpose: ...)" — the plural
+  //     "Scenes" form SCENE_RE deliberately excludes, per the Wave 1189
+  //     comment). Chosen because they audit the story's turning mechanism
+  //     from three independent angles (opposition, tension trend, scene
+  //     function) that a script with no narrative reversal will very often
+  //     fail together: no reversal anywhere means suspense has nothing to
+  //     climb (flatline) and scenes keep re-running the same job (monotone
+  //     purpose run) because nothing has happened to change what any scene
+  //     needs to do.
+  //   promises-unkept   — CHEKHOV_GUN_UNFIRED + SETUP_PAYOFF_IMBALANCE. Both
+  //     document-anchored (causality.ts's "Scenes 0–N (setup zone)" — plural
+  //     form, excluded from SCENE_RE — and "Setup/payoff distribution").
+  //     Genuinely distinct signals kept apart on purpose: UNFIRED audits
+  //     WHICH early clues never got a matching payoffSetupIds entry;
+  //     IMBALANCE audits the raw COUNT ratio of seeds to payoffs script-wide.
+  //     A script can fail one without the other (a handful of orphaned early
+  //     clues in an otherwise seed-light script won't trip the 5-seed/≤1-
+  //     payoff count threshold), so co-firing is real corroboration: named
+  //     unfired guns AND a script-wide payoff drought are the same craft
+  //     failure — planted material that never cashes in — read at two
+  //     different grains.
+  //   unearned-change   — UNMOTIVATED_TRANSFORMATION + ESCALATION_PLATEAU.
+  //     Both document-anchored (character-arc.ts's "Mid-story character arc"
+  //     and causality.ts's "Suspense escalation arc"). Distinct from the
+  //     existing causeless-turn template (BELIEF_REVERSAL_UNSUPPORTED +
+  //     UNMOTIVATED_DECISION, Wave 1189): causeless-turn is about a single
+  //     SCENE-level swing with no immediately preceding setup; this template
+  //     is about the story's OVERALL arc — the protagonist's dominant
+  //     emotional tone changes between the first and last third with no
+  //     revelation/turning-point/climax/raise-stakes/complicate scene in the
+  //     middle third to cause it, while separately the tension curve itself
+  //     never climbs (last suspense peak no higher than the first). A
+  //     character who ends up somewhere different with no rising pressure to
+  //     have pushed them there is one wound, not two unrelated notes.
+  //   talk-over-action  — DIALOGUE_DOMINANCE + TALKING_HEADS. Mixed grain on
+  //     purpose: DIALOGUE_DOMINANCE is a single document-anchored,
+  //     whole-script ratio check ("Script dialogue/action balance", >70% of
+  //     non-slug/non-cue lines are dialogue); TALKING_HEADS is a lines-
+  //     anchored, per-run check (5+ consecutive dialogue exchanges with no
+  //     action beat). Document mode was chosen deliberately over trying to
+  //     force a spatial overlap: a script-wide dialogue-heavy ratio and a
+  //     concrete talking-heads run are evidence of the SAME imbalance at two
+  //     granularities (the global statistic and a named local instance of
+  //     it), not two coincidentally-adjacent symptoms, so requiring them to
+  //     share a line span would be a stricter bar than the claim actually
+  //     needs.
+  //
+  // Rejected as overlapping with existing coverage (audited, not assumed):
+  //   NO_REVERSALS_LONG_STORY as a SEPARATE static-spine member — its
+  //     `structure.reversalDensity === 0` condition and NO_REVERSALS's
+  //     `structure.reversalCount === 0` condition both express "zero
+  //     reversals"; for the n≥8 scripts where LONG_STORY can even fire,
+  //     density and count are zero together, so LONG_STORY is not new
+  //     evidence beyond NO_REVERSALS — including both would inflate the
+  //     template's memberCount without adding a distinct observation.
+  //   ESCALATION_PLATEAU's own SECOND independent implementation
+  //     (conflict.ts, first-half-max vs. second-half-average) as an
+  //     ADDITIONAL required rule alongside the causality.ts implementation
+  //     used above — both fire under the SAME rule name already (see the
+  //     duplicate-family registry below, which is exactly the mechanism for
+  //     same-name/cross-pass convergence; a template's requiredRules is the
+  //     wrong layer to also solve that problem).
+  //   ORPHAN_CLUE as a third promises-unkept member — scene-anchored
+  //     (fires once per orphaned clue at its planting scene), so folding it
+  //     into a document-mode template would silently claim every orphan
+  //     instance script-wide and remove them from ever forming their own
+  //     scene-level generic cluster; the two document-anchored aggregate
+  //     rules already prove the same wound without that side effect.
+  {
+    id: 'static-spine',
+    requiredRules: ['NO_REVERSALS', 'SUSPENSE_FLATLINE_RUN', 'PURPOSE_MONOTONE_RUN'],
+    mode: 'document',
+    title: 'The story has no turning mechanism',
+    explanation: () =>
+      `The script has zero dramatic reversals, a long consecutive run of scenes where tension never `
+      + `rises, and a long run of scenes repeating the same purpose — three independent readings of `
+      + `the same structural failure: nothing happens that changes what the story needs from any given `
+      + `scene. Give the middle of the story one hard reversal — a plan that backfires, an ally who `
+      + `turns — and suspense has somewhere to climb and scenes have a new job to do.`,
+  },
+  {
+    id: 'promises-unkept',
+    requiredRules: ['CHEKHOV_GUN_UNFIRED', 'SETUP_PAYOFF_IMBALANCE'],
+    mode: 'document',
+    title: 'Planted material never pays off',
+    explanation: () =>
+      `Early clues are named as never fired, and separately the script plants far more setups than it `
+      + `ever resolves — the same broken promise seen at two grains: specific guns on the mantel and the `
+      + `overall ledger of seeds versus payoffs. Pick the two or three planted threads that matter most `
+      + `and give each one a scene that cashes it in; the ledger and the named guns clear together.`,
+  },
+  {
+    id: 'unearned-change',
+    requiredRules: ['UNMOTIVATED_TRANSFORMATION', 'ESCALATION_PLATEAU'],
+    mode: 'document',
+    title: 'The character changes, but nothing pushed them there',
+    explanation: () =>
+      `The protagonist's dominant emotional tone is different at the end than at the start with no `
+      + `revelation, turning point, or rising-stakes scene in the middle third to explain the shift, and `
+      + `separately the story's own tension curve never climbs — the pressure that would justify a `
+      + `changed person never builds. Add one causal scene in the middle third where the character is `
+      + `forced to confront something, and let the stakes genuinely escalate toward it; the transformation `
+      + `earns itself once there is pressure behind it.`,
+  },
+  {
+    id: 'talk-over-action',
+    requiredRules: ['DIALOGUE_DOMINANCE', 'TALKING_HEADS'],
+    mode: 'document',
+    title: 'The story is being told in conversation, not in action',
+    explanation: () =>
+      `Over 70% of the script's content lines are dialogue, and at least one stretch runs five or more `
+      + `consecutive dialogue exchanges with no action beat at all — the same imbalance at the global `
+      + `statistic and in a concrete instance of it. Break up the longest talking-heads run with physical `
+      + `action tied to what's being said, and look for at least one scene that could be dramatized `
+      + `through behavior instead of a line of dialogue explaining it.`,
+  },
 ];
 
 /** Run one template's recognizer over every located issue: filter to the
@@ -365,16 +513,43 @@ function matchOverlapTemplate(
   return { consumed, findings };
 }
 
+/** Run one document-mode template's recognizer: filter to the template's own
+ *  rule set with NO anchor restriction (document-mode templates fire on
+ *  presence, not spatial overlap — see RootCauseTemplate's `mode` doc
+ *  comment), then fire once, script-wide, when every required rule appears
+ *  at least once anywhere in `located`. Unlike matchOverlapTemplate there is
+ *  no grouping step: "the whole script" is the only location a document-mode
+ *  template can claim, so all matching issues form the one and only
+ *  candidate group. */
+function matchDocumentTemplate(
+  template: RootCauseTemplate,
+  located: LocatedIssue[],
+): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
+  const candidates = located.filter(li => template.requiredRules.includes(li.issue.rule));
+  const rulesPresent = new Set(candidates.map(li => li.issue.rule));
+  const allRequiredPresent = template.requiredRules.every(r => rulesPresent.has(r));
+  if (!allRequiredPresent) return { consumed: [], findings: [] };
+  return { consumed: candidates, findings: [synthesizeTemplateFinding(template, candidates)] };
+}
+
 function synthesizeTemplateFinding(template: RootCauseTemplate, members: LocatedIssue[]): RootCauseFinding {
   const memberRules = uniqueRules(members);
-  const startLine = Math.min(...members.map(m => m.startLine!));
-  const endLine = Math.max(...members.map(m => m.endLine!));
+  // Document-mode members (and, in principle, a mixed-anchor group) may
+  // carry no line span at all — Math.min/max over an all-undefined array
+  // would be NaN, so span bookkeeping is scoped to whichever members DO
+  // carry one; a group with none simply reports no span, same as any other
+  // document-anchored finding (see RootCauseFinding.startLine's doc comment).
+  const linedMembers = members.filter(m => m.startLine !== undefined && m.endLine !== undefined);
+  const startLine = linedMembers.length > 0 ? Math.min(...linedMembers.map(m => m.startLine!)) : undefined;
+  const endLine = linedMembers.length > 0 ? Math.max(...linedMembers.map(m => m.endLine!)) : undefined;
   const sceneIdxs = sceneIdxsOf(members);
   const where = sceneIdxs.length === 1
     ? `Scene ${sceneIdxs[0]}`
     : sceneIdxs.length > 1
       ? `Scenes ${sceneIdxs[0]}–${sceneIdxs[sceneIdxs.length - 1]}`
-      : `lines ${startLine}-${endLine}`;
+      : startLine !== undefined
+        ? `lines ${startLine}-${endLine}`
+        : 'across the script';
 
   return {
     // Template id is folded into both the hash discriminator (extra) AND the
@@ -549,6 +724,176 @@ function synthesizeDocumentFamilyFinding(family: string, members: LocatedIssue[]
   };
 }
 
+// ── Wave 1193 additions (Program v2, Type 4 — cross-pass duplicate-family
+// merging; adversarial-review response) — a review of the shipped product
+// praised root-cause clustering but flagged that near-duplicate ISSUE
+// FAMILIES (different rule names, different passes, but the same single
+// craft observation) reach the user un-merged: e.g. SEED_EMOTIONAL_DECOUPLED
+// (intention.ts, Wave 451), CLUE_SEED_EMOTION_FLAT (payoff.ts, Wave 328),
+// PROACTIVE_EMOTION_DECOUPLED (intention.ts, Wave 339), and
+// ARC_SEED_EMOTIONAL_AFTERMATH_VOID (character-arc.ts, Wave 505) can all fire
+// on the same script and surface as four separate lines, when a writer reads
+// them as one note said four times. This is a DIFFERENT failure mode from
+// the Wave 1185/1189 templates above: a template names a co-occurrence of
+// genuinely DIFFERENT symptoms that together prove one wound; a duplicate
+// family merges near-restatements of the SAME symptom that different passes
+// happened to name differently (or, in the dual-authorship cases below,
+// literally the same rule name computed independently by two passes).
+//
+// Every entry here was verified by reading the actual check logic in
+// passes/*.ts, not assumed from rule-name similarity — the rulebook has
+// hundreds of X_Y_DECOUPLED combinatorial rules (co-occurrence mode across
+// dozens of channel pairs) and most pairs that merely share the "DECOUPLED"
+// or "MONOTONE" stem audit genuinely different channels (e.g.
+// REVELATION_SUSPENSE_DECOUPLED appears in both belief.ts and structure.ts
+// under the SAME name but with DIFFERENT logic — belief.ts uses average-mode
+// suspenseDelta, structure.ts uses categorical every-scene-flat — so it is
+// correctly NOT a family here; conflating those two would be a false merge).
+//
+//   seed-scene-emotional-flatline — SEED_EMOTIONAL_DECOUPLED,
+//     CLUE_SEED_EMOTION_FLAT, PROACTIVE_EMOTION_DECOUPLED,
+//     ARC_SEED_EMOTIONAL_AFTERMATH_VOID (the reviewer's named example).
+//     SEED_EMOTIONAL_DECOUPLED and CLUE_SEED_EMOTION_FLAT are the same check
+//     (every seed scene has emotionalShift === 'neutral', n≥8, ≥3 seed
+//     scenes) implemented independently in intention.ts and payoff.ts.
+//     PROACTIVE_EMOTION_DECOUPLED audits the same neutral-emotion failure
+//     over the broader proactive-scene set (clock-raised OR seeded, not seed
+//     alone). ARC_SEED_EMOTIONAL_AFTERMATH_VOID checks the AFTERMATH channel
+//     (the scene immediately AFTER a seed, not the seed scene itself) — a
+//     related but not identical signal, kept in the family because all four
+//     converge on one writer-facing note ("your seeding carries no feeling")
+//     and a script that fails one very often fails the others too.
+//   payoff-scene-emotional-flatline — PAYOFF_EMOTION_DECOUPLED, which is
+//     defined TWICE under the identical rule name: intention.ts (Wave 521,
+//     co-occurrence mode — payoff scenes vs. ≥2 emotional scenes elsewhere,
+//     zero overlap) and payoff.ts (Wave 317, simpler "every payoff scene is
+//     neutral" condition). Same rule constant, two independent authors, two
+//     LocatedIssues on any script that fails both — the purest case of
+//     unmerged duplication this mechanism exists to catch.
+//   payoff-scene-relational-flatline — PAYOFF_RELATIONSHIP_DECOUPLED, same
+//     dual-authorship pattern: intention.ts (Wave 591) and payoff.ts
+//     (Wave 328) both independently check "no payoff scene carries a
+//     relationship shift" under the identical rule name.
+//   revelation-relational-flatline — REVELATION_RELATIONSHIP_DECOUPLED, same
+//     pattern again: belief.ts (Wave 334) and intention.ts (Wave 591) both
+//     check "no revelation scene carries a relationship shift" under the
+//     identical rule name.
+//
+// All four families are document-anchored aggregate checks (the underlying
+// rules' locations are all whole-script summaries like "All N seed scenes —
+// emotionally neutral", never "Scene N"), so — like the Wave 1193 templates
+// above — there is no line span to overlap: the merge fires whenever 2+ of a
+// family's member rules appear anywhere in the report, contributed by 2+
+// DISTINCT passes (a family converging within a SINGLE pass would mean one
+// pass fired the same observation twice, which the existing rule contract
+// doesn't allow — the cross-pass requirement is what makes this a genuine
+// "two authors said the same thing" case rather than a false positive).
+
+interface DuplicateFamily {
+  /** Slug embedded in the finding's id, same convention as RootCauseTemplate. */
+  id: string;
+  /** The rule names this family recognizes. A family fires when 2+ of these
+   *  appear, contributed by 2+ distinct passes — NOT "all of them", since a
+   *  script can plausibly trip only two of a four-member family and that is
+   *  still a real duplicate (the reviewer's own example: any 2 of the 4
+   *  seed-emotion rules saying the same thing is already noise worth
+   *  merging, not just when all 4 land together). */
+  memberRules: string[];
+  /** Plain-language name of the merged observation. No rule-name jargon. */
+  title: string;
+  /** The single observation every member rule is restating, plus the one
+   *  craft fix — states how many passes agree (the evidence-strength framing
+   *  the named templates above already use) instead of listing N near-
+   *  identical lines. */
+  observation: (members: LocatedIssue[], passCount: number) => string;
+}
+
+const DUPLICATE_FAMILIES: DuplicateFamily[] = [
+  {
+    id: 'seed-scene-emotional-flatline',
+    memberRules: [
+      'SEED_EMOTIONAL_DECOUPLED', 'CLUE_SEED_EMOTION_FLAT',
+      'PROACTIVE_EMOTION_DECOUPLED', 'ARC_SEED_EMOTIONAL_AFTERMATH_VOID',
+    ],
+    title: 'Seeded threads carry no feeling',
+    observation: (members, passCount) =>
+      `${passCount} separate checks agree on the same thing: the scenes where this script plants its `
+      + `clues and threads (and, more broadly, where the protagonist takes initiative) are emotionally `
+      + `neutral. A thread planted in a scene that also carries some feeling — dread, hope, grief — is `
+      + `imprinted on the audience; one planted in a flat scene is catalogued as information and `
+      + `forgotten before it can pay off. Move at least one seed into (or right after) a scene where a `
+      + `character is already feeling something, rather than treating every plant as pure mechanism.`,
+  },
+  {
+    id: 'payoff-scene-emotional-flatline',
+    memberRules: ['PAYOFF_EMOTION_DECOUPLED'],
+    title: 'Payoffs land with no feeling attached',
+    observation: (members, passCount) =>
+      `${passCount} independent checks land on the same payoff scenes and agree they're all `
+      + `emotionally neutral — every thread resolution happens with the protagonist (and the audience) `
+      + `feeling nothing in the moment. The double-impact payoff — the resolution that also breaks `
+      + `someone's heart or delivers real relief — is one of the highest-yield fixes available: fuse at `
+      + `least one payoff with an emotionally charged beat instead of resolving it as pure information.`,
+  },
+  {
+    id: 'payoff-scene-relational-flatline',
+    memberRules: ['PAYOFF_RELATIONSHIP_DECOUPLED'],
+    title: 'Payoffs never move a relationship',
+    observation: (members, passCount) =>
+      `${passCount} independent checks agree that no payoff scene in this script also shifts a `
+      + `relationship — thread resolutions run in a lane entirely separate from the characters' bonds. `
+      + `The most resonant payoffs change how two people stand with each other AS they close a loop; `
+      + `let at least one resolution also move a relationship instead of resolving in a relational vacuum.`,
+  },
+  {
+    id: 'revelation-relational-flatline',
+    memberRules: ['REVELATION_RELATIONSHIP_DECOUPLED'],
+    title: 'Discoveries never change how anyone relates to anyone',
+    observation: (members, passCount) =>
+      `${passCount} independent checks agree that no revelation scene in this script also carries a `
+      + `relationship shift — the truth comes out, but nobody's bond with anybody else moves because of `
+      + `it. Most revelations should reframe a relationship (the truth about who someone is changes how `
+      + `much they're trusted); let at least one disclosure land on a relationship, not just on the plot.`,
+  },
+];
+
+/** Run one family's recognizer: filter to the family's member rules
+ *  (document-anchored only — see the Wave 1193 comment above for why all
+ *  four current families are), require the DISTINCT-PASS count to be 2+ (a
+ *  single pass repeating itself isn't a cross-pass duplicate), and — when
+ *  satisfied — claim every matching issue into one merged finding. Mirrors
+ *  matchDocumentTemplate's shape deliberately (same anchor assumption, same
+ *  "claim everything that matched" behavior) but is kept as its own function
+ *  because the fire condition is a genuinely different quantifier: a
+ *  template requires EVERY required rule; a family requires only 2+ of its
+ *  member rules, since partial agreement between passes is already the
+ *  noise this mechanism exists to remove. */
+function matchDuplicateFamily(
+  family: DuplicateFamily,
+  located: LocatedIssue[],
+): { consumed: LocatedIssue[]; findings: RootCauseFinding[] } {
+  const candidates = located.filter(li => family.memberRules.includes(li.issue.rule) && li.anchor === 'document');
+  if (candidates.length < 2) return { consumed: [], findings: [] };
+  const passesInvolved = new Set(candidates.map(li => li.pass));
+  if (passesInvolved.size < 2) return { consumed: [], findings: [] };
+  return { consumed: candidates, findings: [synthesizeFamilyFinding(family, candidates, passesInvolved.size)] };
+}
+
+function synthesizeFamilyFinding(family: DuplicateFamily, members: LocatedIssue[], passCount: number): RootCauseFinding {
+  const memberRules = uniqueRules(members);
+  return {
+    id: `${family.id}-${findingId(memberRules, undefined, undefined, family.id)}`,
+    title: family.title,
+    explanation: family.observation(members, passCount),
+    severity: worstSeverity(members),
+    memberRules,
+    memberCount: members.length,
+    sceneIdxs: sceneIdxsOf(members),
+    startLine: undefined,
+    endLine: undefined,
+  };
+}
+
 /**
  * Roll located issues up into named root-cause findings. Pure and
  * deterministic: iteration is over plain arrays/Maps in insertion order (no
@@ -557,14 +902,31 @@ function synthesizeDocumentFamilyFinding(family: string, members: LocatedIssue[]
  */
 export function clusterIssues(located: LocatedIssue[]): RootCauseFinding[] {
   const findings: RootCauseFinding[] = [];
+  const consumed = new Set<LocatedIssue>();
 
-  // Named templates run first and claim their member issues (see the Wave
+  // Duplicate-family merging runs FIRST — before the named templates and
+  // before the generic clusterers — so a near-duplicate restatement never
+  // gets a second, template- or generic-cluster-shaped chance to surface
+  // (see the Wave 1193 comment above for why this is a different mechanism
+  // from claim-before-generic template matching, not a special case of it).
+  for (const family of DUPLICATE_FAMILIES) {
+    const { consumed: familyConsumed, findings: familyFindings } = matchDuplicateFamily(family, located);
+    for (const li of familyConsumed) consumed.add(li);
+    findings.push(...familyFindings);
+  }
+
+  // Named templates run next and claim their member issues (see the Wave
   // 1185 design-choice comment above matchOverlapTemplate) so the generic
   // clusterers below never re-report the same spatial convergence under the
-  // generic "Recurring X trouble" wording.
-  const consumed = new Set<LocatedIssue>();
+  // generic "Recurring X trouble" wording. Spatial-mode templates only ever
+  // see issues the family pass above didn't already claim; document-mode
+  // templates do the same, scoped to a disjoint rule set (see the Wave 1193
+  // template comment) so the two mechanisms never compete for one issue.
+  const afterFamilies = consumed.size === 0 ? located : located.filter(li => !consumed.has(li));
   for (const template of ROOT_CAUSE_TEMPLATES) {
-    const { consumed: templateConsumed, findings: templateFindings } = matchOverlapTemplate(template, located);
+    const { consumed: templateConsumed, findings: templateFindings } = template.mode === 'document'
+      ? matchDocumentTemplate(template, afterFamilies)
+      : matchOverlapTemplate(template, afterFamilies);
     for (const li of templateConsumed) consumed.add(li);
     findings.push(...templateFindings);
   }

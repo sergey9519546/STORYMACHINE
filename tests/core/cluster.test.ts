@@ -432,3 +432,234 @@ describe('clusterIssues — Wave 1189 corpus-level proof (real script, real pipe
     assert.ok(firedOn, 'expected at least one Wave 1189 root-cause template to fire on at least one real corpus sample');
   });
 });
+
+// ── Wave 1193 additions (Program v2, Type 4 — cross-pass duplicate-family
+// merging + 4 document-mode root-cause templates; adversarial-review
+// response) — see cluster.ts's own "Wave 1193 additions" comments (above the
+// duplicate-family registry and above the four new ROOT_CAUSE_TEMPLATES
+// entries) for the full audit trail of which rules were verified as real
+// duplicates/co-occurrences vs. rejected as overlapping with existing
+// coverage. Located issues in these tests use anchor 'document' with no
+// startLine/endLine, matching how locate.ts actually resolves every member
+// rule's free-form location text (verified against the pass source, not
+// assumed) — the plural "Scenes N–M" and whole-script summary strings none
+// of these rules ever produce a "Scene N" or "Lines N-M" match.
+
+describe('clusterIssues — duplicate-family merge: "Seeded threads carry no feeling"', () => {
+  it('merges 4 same-family rules (2 of them from the same intention.ts pass, matching real rulebook authorship) into one finding counting 4 issues across 3 distinct passes', () => {
+    const issues = [
+      // SEED_EMOTIONAL_DECOUPLED and PROACTIVE_EMOTION_DECOUPLED are both
+      // genuinely authored in intention.ts in the real rulebook (Waves 451
+      // and 339) — the family merge is keyed on member-rule identity, not on
+      // pass identity, so two members sharing a pass is still real evidence,
+      // just not a fourth independent pass. passCount below is 3 (intention,
+      // payoff, character-arc), matching that real authorship map.
+      located('SEED_EMOTIONAL_DECOUPLED', 'All 3 seed scene(s) — emotionally neutral', 'document', 'intention'),
+      located('CLUE_SEED_EMOTION_FLAT', 'Clue-seeding scenes — emotional register', 'document', 'payoff'),
+      located('PROACTIVE_EMOTION_DECOUPLED', 'Proactive scenes', 'document', 'intention'),
+      located('ARC_SEED_EMOTIONAL_AFTERMATH_VOID', '3 seed scene(s) — all followed by emotionally neutral scenes', 'document', 'character-arc'),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Seeded threads carry no feeling');
+    assert.ok(finding, 'expected the seed-scene-emotional-flatline family to merge');
+    assert.ok(finding!.id.startsWith('seed-scene-emotional-flatline-'));
+    assert.equal(finding!.memberCount, 4);
+    assert.match(finding!.explanation, /3 separate checks agree/);
+    assert.deepEqual(
+      [...finding!.memberRules].sort(),
+      ['ARC_SEED_EMOTIONAL_AFTERMATH_VOID', 'CLUE_SEED_EMOTION_FLAT', 'PROACTIVE_EMOTION_DECOUPLED', 'SEED_EMOTIONAL_DECOUPLED'],
+    );
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+    // Only ONE finding for these 4 issues — no leftover generic cluster.
+    assert.equal(findings.length, 1);
+  });
+
+  it('does not merge when only one family rule is present (no other member to duplicate)', () => {
+    const issues = [
+      located('SEED_EMOTIONAL_DECOUPLED', 'All 3 seed scene(s) — emotionally neutral', 'document', 'intention'),
+      located('UNRELATED_RULE', 'Some other observation', 'document', 'voice'),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+
+  it('does not merge two family rules fired by the SAME pass (not a cross-pass duplicate)', () => {
+    // Contrived — no real pass fires two family members itself — but proves
+    // the mechanism's cross-pass requirement rather than a same-pass count.
+    const issues = [
+      located('SEED_EMOTIONAL_DECOUPLED', 'All 3 seed scene(s) — emotionally neutral', 'document', 'intention'),
+      located('PROACTIVE_EMOTION_DECOUPLED', 'Proactive scenes', 'document', 'intention'),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — duplicate-family merge: dual-authorship rules', () => {
+  it('merges PAYOFF_EMOTION_DECOUPLED fired independently by intention.ts and payoff.ts', () => {
+    const issues = [
+      located('PAYOFF_EMOTION_DECOUPLED', '3 payoff scenes — all emotionally neutral', 'document', 'intention'),
+      located('PAYOFF_EMOTION_DECOUPLED', 'Payoff scenes — emotional register', 'document', 'payoff'),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Payoffs land with no feeling attached');
+    assert.ok(finding, 'expected the dual-authorship PAYOFF_EMOTION_DECOUPLED family to merge');
+    assert.equal(finding!.memberCount, 2);
+    assert.deepEqual(finding!.memberRules, ['PAYOFF_EMOTION_DECOUPLED']);
+    assert.match(finding!.explanation, /2 independent checks/);
+  });
+
+  it('merges REVELATION_RELATIONSHIP_DECOUPLED fired independently by belief.ts and intention.ts', () => {
+    const issues = [
+      located('REVELATION_RELATIONSHIP_DECOUPLED', 'Revelation scenes — relational impact', 'document', 'belief'),
+      located('REVELATION_RELATIONSHIP_DECOUPLED', '3 revelation scene(s) — none with a relationship shift', 'document', 'intention'),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Discoveries never change how anyone relates to anyone');
+    assert.ok(finding, 'expected the dual-authorship REVELATION_RELATIONSHIP_DECOUPLED family to merge');
+    assert.equal(finding!.memberCount, 2);
+  });
+
+  it('does not merge PAYOFF_RELATIONSHIP_DECOUPLED with an unrelated document-anchored issue from a different family', () => {
+    const issues = [
+      located('PAYOFF_RELATIONSHIP_DECOUPLED', 'Payoff scenes — relational impact', 'document', 'payoff'),
+      located('THEME_MUDDLED', 'Theme clarity', 'document', 'theme'),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — root-cause template (document mode): "The story has no turning mechanism" (static-spine)', () => {
+  it('fires when NO_REVERSALS, SUSPENSE_FLATLINE_RUN, and PURPOSE_MONOTONE_RUN all appear', () => {
+    const issues = [
+      located('NO_REVERSALS', 'Overall structure', 'document', 'structure', { severity: 'major' }),
+      located('SUSPENSE_FLATLINE_RUN', '6 consecutive scenes — suspense flatline', 'document', 'pacing', { severity: 'minor' }),
+      located('PURPOSE_MONOTONE_RUN', 'Scenes 2–7 (purpose: "setup")', 'document', 'structure', { severity: 'minor' }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'The story has no turning mechanism');
+    assert.ok(finding, 'expected the static-spine template to fire');
+    assert.ok(finding!.id.startsWith('static-spine-'));
+    assert.equal(finding!.memberCount, 3);
+    assert.equal(finding!.severity, 'major');
+    assert.equal(finding!.startLine, undefined);
+    assert.deepEqual(
+      [...finding!.memberRules].sort(),
+      ['NO_REVERSALS', 'PURPOSE_MONOTONE_RUN', 'SUSPENSE_FLATLINE_RUN'],
+    );
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not fire when only two of the three required rules are present', () => {
+    const issues = [
+      located('NO_REVERSALS', 'Overall structure', 'document', 'structure', { severity: 'major' }),
+      located('SUSPENSE_FLATLINE_RUN', '6 consecutive scenes — suspense flatline', 'document', 'pacing', { severity: 'minor' }),
+    ];
+    const findings = clusterIssues(issues);
+    assert.ok(!findings.some(f => f.title === 'The story has no turning mechanism'));
+  });
+});
+
+describe('clusterIssues — root-cause template (document mode): "Planted material never pays off" (promises-unkept)', () => {
+  it('fires when CHEKHOV_GUN_UNFIRED and SETUP_PAYOFF_IMBALANCE both appear', () => {
+    const issues = [
+      located('CHEKHOV_GUN_UNFIRED', 'Scenes 0–4 (setup zone)', 'document', 'causality', { severity: 'minor' }),
+      located('SETUP_PAYOFF_IMBALANCE', 'Setup/payoff distribution', 'document', 'causality', { severity: 'minor' }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'Planted material never pays off');
+    assert.ok(finding, 'expected the promises-unkept template to fire');
+    assert.ok(finding!.id.startsWith('promises-unkept-'));
+    assert.equal(finding!.memberCount, 2);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not fire when only SETUP_PAYOFF_IMBALANCE is present', () => {
+    const issues = [
+      located('SETUP_PAYOFF_IMBALANCE', 'Setup/payoff distribution', 'document', 'causality', { severity: 'minor' }),
+      located('UNRELATED_RULE', 'Some other observation', 'document', 'voice'),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — root-cause template (document mode): "The character changes, but nothing pushed them there" (unearned-change)', () => {
+  it('fires when UNMOTIVATED_TRANSFORMATION and ESCALATION_PLATEAU both appear', () => {
+    const issues = [
+      located('UNMOTIVATED_TRANSFORMATION', 'Mid-story character arc', 'document', 'character-arc', { severity: 'major' }),
+      located('ESCALATION_PLATEAU', 'Suspense escalation arc', 'document', 'causality', { severity: 'minor' }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'The character changes, but nothing pushed them there');
+    assert.ok(finding, 'expected the unearned-change template to fire');
+    assert.ok(finding!.id.startsWith('unearned-change-'));
+    assert.equal(finding!.memberCount, 2);
+    assert.equal(finding!.severity, 'major');
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not fire when only UNMOTIVATED_TRANSFORMATION is present', () => {
+    const issues = [
+      located('UNMOTIVATED_TRANSFORMATION', 'Mid-story character arc', 'document', 'character-arc', { severity: 'major' }),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — root-cause template (document mode): "The story is being told in conversation, not in action" (talk-over-action)', () => {
+  it('fires when DIALOGUE_DOMINANCE (whole-script ratio) and TALKING_HEADS (a local run) both appear', () => {
+    const issues = [
+      located('DIALOGUE_DOMINANCE', 'Script dialogue/action balance', 'document', 'originality', { severity: 'minor' }),
+      located('TALKING_HEADS', 'Lines 40–58', 'lines', 'dialogue', { severity: 'minor', startLine: 40, endLine: 58 }),
+    ];
+    const findings = clusterIssues(issues);
+    const finding = findings.find(f => f.title === 'The story is being told in conversation, not in action');
+    assert.ok(finding, 'expected the talk-over-action template to fire');
+    assert.ok(finding!.id.startsWith('talk-over-action-'));
+    assert.equal(finding!.memberCount, 2);
+    // A mixed-anchor group (one document, one lines) still reports the
+    // lines-bearing member's span rather than crashing on Math.min(undefined).
+    assert.equal(finding!.startLine, 40);
+    assert.equal(finding!.endLine, 58);
+    assert.doesNotMatch(finding!.title, /[A-Z]{3,}/);
+    assert.doesNotMatch(finding!.explanation, /[A-Z]{3,}/);
+  });
+
+  it('does not fire when only TALKING_HEADS is present without the script-wide ratio check', () => {
+    const issues = [
+      located('TALKING_HEADS', 'Lines 40–58', 'lines', 'dialogue', { severity: 'minor', startLine: 40, endLine: 58 }),
+    ];
+    assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — Wave 1193 corpus-level proof (real script, real pipeline)', () => {
+  it('runs the full pipeline over every calibration sample without throwing, and any family/template finding stays free of raw rule tokens', async () => {
+    // Named findings (duplicate families + templates, both spatial and
+    // document mode) carry hand-authored explanation text, unlike the
+    // generic clusterers' titles (which legitimately embed an ALL-CAPS
+    // character NAME via characterLabel — not a rule-token leak, so that
+    // mechanism is intentionally excluded from this guard). This checks the
+    // new Wave 1193 mechanisms specifically don't leak a rule constant.
+    const namedTitles = new Set([
+      'Seeded threads carry no feeling', 'Payoffs land with no feeling attached',
+      'Payoffs never move a relationship', 'Discoveries never change how anyone relates to anyone',
+      'The story has no turning mechanism', 'Planted material never pays off',
+      'The character changes, but nothing pushed them there',
+      'The story is being told in conversation, not in action',
+    ]);
+    for (const sample of REFERENCE_CORPUS) {
+      const report = await runScriptDoctor(sample.fountain);
+      const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
+      const located2 = locateIssues(issuesWithPass, sample.fountain);
+      const findings = clusterIssues(located2);
+      for (const finding of findings) {
+        if (!namedTitles.has(finding.title)) continue;
+        assert.doesNotMatch(finding.title, /[A-Z]{3,}/);
+        assert.doesNotMatch(finding.explanation, /[A-Z]{3,}/);
+      }
+    }
+  });
+});
