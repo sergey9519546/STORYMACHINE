@@ -600,6 +600,54 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
 
 
   // ── Wave 154: Payoff pass enhancements ────────────────────────────────────
+  describe('ORPHAN_CLUE cap + ORPHAN_CLUE_PERVASIVE rollup (real-script corpus fix, 2026-07-10)', async () => {
+    const structure1194 = {
+      actPosition: 'act3' as const, completionPercent: 85, totalClockPressure: 5,
+      midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
+      escalating: true, reversalDensity: 0.1, approachingClimax: true,
+      openClues: 0, revelationCount: 1,
+    };
+    const makeRec1194 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const blank1194 = (n: number) => Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+    const noAnn1194 = (n: number) => Array.from({ length: n }, () => ({ revelation: false } as any));
+    const runWithOrphans = async (orphanCount: number) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      const records = Array.from({ length: 10 }, (_, i) =>
+        i === 0
+          ? makeRec1194(0, { seededClueIds: Array.from({ length: orphanCount }, (_, k) => `clue-${k}`) })
+          : makeRec1194(i),
+      );
+      return payoffPass({
+        fountain: blank1194(10), original: blank1194(10), records: records as any,
+        structure: structure1194 as any, annotations: noAnn1194(10), approvedSpans: [],
+      });
+    };
+
+    it('fires: 30 orphan clues yield exactly 8 detailed ORPHAN_CLUE + 1 critical PERVASIVE rollup naming the remainder', async () => {
+      const result = await runWithOrphans(30);
+      const detailed = result.issues.filter(i => i.rule === 'ORPHAN_CLUE');
+      const rollup = result.issues.filter(i => i.rule === 'ORPHAN_CLUE_PERVASIVE');
+      assert.equal(detailed.length, 8, 'per-clue detail must cap at 8');
+      assert.equal(rollup.length, 1, 'everything past the cap folds into one rollup');
+      assert.equal(rollup[0].severity, 'critical');
+      assert.match(rollup[0].description, /22 more/, 'rollup must carry the exact remainder count');
+    });
+
+    it('no-fire: 8 orphan clues emit 8 detailed ORPHAN_CLUE and NO rollup (never padded)', async () => {
+      const result = await runWithOrphans(8);
+      assert.equal(result.issues.filter(i => i.rule === 'ORPHAN_CLUE').length, 8);
+      assert.equal(result.issues.filter(i => i.rule === 'ORPHAN_CLUE_PERVASIVE').length, 0,
+        'at or under the cap the rollup must stay silent');
+    });
+  });
+
   describe('Wave 154 — payoffPass: clustered payoffs, premature resolution, setup gap', async () => {
     const baseStructure = {
       actPosition: 'act3' as const, completionPercent: 85, totalClockPressure: 5,

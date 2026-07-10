@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Coraline",
+    "file": "Coraline.fountain.txt",
+    "contentHash": "9a2d37352eaa57c54e26373f5f32aba81575650c1c5b63e94cde80d8cf252ac8",
+    "health": 92.5,
+    "verdict": "RECOMMEND",
+    "sceneCount": 138
+  },
+  {
+    "name": "Frozen",
+    "file": "Frozen.fountain.txt",
+    "contentHash": "ec0d38c18dec8edb684657b8cdd340c71695b4b0de31a2275c26314121814c9e",
+    "health": 88.9,
+    "verdict": "RECOMMEND",
+    "sceneCount": 124
+  },
+  {
+    "name": "Kung Fu Panda",
+    "file": "Kung Fu Panda.fountain.txt",
+    "contentHash": "79d9688e78eb846484e34e0c8c939ff97d0dbeaa5e93214de0ba7538f6ef195a",
+    "health": 96,
+    "verdict": "RECOMMEND",
+    "sceneCount": 72
+  },
+  {
+    "name": "Ratatouille",
+    "file": "Ratatouille.fountain.txt",
+    "contentHash": "6a58f5e7d686229fc3af86bd681aff85158cc9e06d6626fef26cfa63d5b181e2",
+    "health": 98.3,
+    "verdict": "RECOMMEND",
+    "sceneCount": 127
+  },
+  {
+    "name": "Shrek",
+    "file": "Shrek.fountain.txt",
+    "contentHash": "297565ace70f6c60eecea9f563a4e6add4883ebd46de92850b780fb4e053952d",
+    "health": 89.2,
+    "verdict": "RECOMMEND",
+    "sceneCount": 13
+  },
+  {
+    "name": "The Incredibles",
+    "file": "The Incredibles.fountain.txt",
+    "contentHash": "63c87c731c11a464ad330799067cd0de64586ccddd8503b02c21925c9bd7ee63",
+    "health": 96.7,
+    "verdict": "RECOMMEND",
+    "sceneCount": 77
+  },
+  {
+    "name": "Up",
+    "file": "Up.fountain.txt",
+    "contentHash": "76e615a3bc8ef0ebf58306181197f08aadca407755598dfe0080749aefcfe3bf",
+    "health": 89.3,
+    "verdict": "RECOMMEND",
+    "sceneCount": 184
+  },
+  {
+    "name": "WALL-E",
+    "file": "WALL-E.fountain.txt",
+    "contentHash": "c6b69697144c144f5cd470596d9e8a47571f0fd12827da6f121dad80142388b2",
+    "health": 89.5,
+    "verdict": "RECOMMEND",
+    "sceneCount": 292
+  },
+  {
+    "name": "Wreck-It_Ralph",
+    "file": "Wreck-It_Ralph.fountain.txt",
+    "contentHash": "9ab6f5a53afc028b0adfae7924a813154d6aa24501f8b8a96e2a4d27c91ed6ff",
+    "health": 97.9,
+    "verdict": "RECOMMEND",
+    "sceneCount": 79
+  }
+]
