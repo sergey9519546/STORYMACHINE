@@ -1130,3 +1130,58 @@ describe('computeIronyMarkerCount', () => {
     assert.deepEqual(computeIronyMarkerCount([]), []);
   });
 });
+
+// Wave 1192 — the three Wave E1-c signals above are now WIRED onto
+// ScreenplaySceneRecord (betrayalSignal / powerDynamicsIntensity /
+// ironyMarkerCount); see fountain-analyzer.ts's Wave 1192 header comment.
+// Fire + no-fire coverage for the WIRING (the functions' own unit coverage
+// stays above): the record fields must equal what the standalone functions
+// report for the same per-scene text, populated on every scene.
+describe('analyzeFountainText — Wave 1192 wired lexicon signals (betrayalSignal / powerDynamicsIntensity / ironyMarkerCount)', () => {
+  it('fires: records carry per-scene values matching the scene text', () => {
+    const fountain = [
+      'INT. SAFEHOUSE - NIGHT',
+      '',
+      'Mara learns her handler is a traitor who betrayed the whole cell.',
+      '',
+      'MARA',
+      'Of course. Naturally. What could go wrong?',
+      '',
+      'INT. THRONE ROOM - DAY',
+      '',
+      'The regent commands the guards; the court obeys without question.',
+      '',
+      'REGENT',
+      'You will submit.',
+      '',
+      'INT. GARDEN - DAY',
+      '',
+      'Two old friends sit in silence, watching the fountain.',
+    ].join('\n');
+    const { records } = analyzeFountainText(fountain);
+    assert.equal(records.length, 3);
+    // Scene 0: betrayal-dominant ('traitor', 'betrayed') + 3 irony markers.
+    assert.equal(records[0].betrayalSignal, 2);
+    assert.equal(records[0].ironyMarkerCount, 3);
+    assert.equal(records[0].powerDynamicsIntensity, 0);
+    // Scene 1: control-charged ('commands', 'obeys', 'submit').
+    assert.equal(records[1].powerDynamicsIntensity, 3);
+    assert.equal(records[1].betrayalSignal, 0);
+    assert.equal(records[1].ironyMarkerCount, 0);
+  });
+
+  it('no-fire: a neutral scene reports 0 on all three fields (populated, not undefined)', () => {
+    const fountain = [
+      'INT. GARDEN - DAY',
+      '',
+      'Two old friends sit in silence, watching the fountain.',
+      '',
+      'FRIEND',
+      'The roses came in early this year.',
+    ].join('\n');
+    const { records } = analyzeFountainText(fountain);
+    assert.equal(records[0].betrayalSignal, 0);
+    assert.equal(records[0].powerDynamicsIntensity, 0);
+    assert.equal(records[0].ironyMarkerCount, 0);
+  });
+});

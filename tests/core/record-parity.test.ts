@@ -51,6 +51,11 @@
 // Every number pinned below was MEASURED first (see the comment above each
 // threshold) then set with headroom, per the standing instruction to measure
 // before pinning.
+//
+// Wave 1192 additions: betrayalSignal (SIGN), powerDynamicsIntensity
+// (PRESENCE), ironyMarkerCount (KNOWN_ASYMMETRY_TEXT_ONLY) — matrix 26 → 29;
+// see the "Wave 1192 lexicon signals" describe at the bottom for the measured
+// golden-story baselines and the BETRAYAL_PROBE/POWER_PROBE capability probes.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -383,6 +388,39 @@ const PARITY_MATRIX: Record<keyof ScreenplaySceneRecord, ParityTier> = {
   // charId is the belief-holder, not necessarily who spoke), so annotateCommit
   // never populates this (see memory.ts's Wave 1190 field comment).
   speakingCharacterCount: 'KNOWN_ASYMMETRY_TEXT_ONLY',
+  // Wave 1192 (Program v2, Type 1 signal channel, cycle 3): the three Wave
+  // E1-c lexicon signals, wired onto the record. Tiers MEASURED against the
+  // two golden stories (see the "Wave 1192 lexicon signals" describe below
+  // for the pinned per-scene numbers and the capability probes):
+  //
+  // betrayalSignal — SIGN. Both paths emit (text: BETRAYAL−LOYALTY lexicon
+  // hits; ops: −trust-shift amount + jealousy/rivalry-shift amount), and the
+  // BETRAYAL_PROBE below demonstrates sign agreement in both directions when
+  // the shift's reason prose carries the matching lexicon (exactly the
+  // relationshipShifts co-authoring discipline). MEASURED golden-story
+  // reality, pinned rather than papered over: the two paths' nonzero scenes
+  // are DISJOINT on these fixtures — the ops path lights up where trust
+  // shifts (A s6, B s5; loyalty-ward, negative) while the text path lights up
+  // where 'betrayed' appears in prose whose op-shift dimension is resentment,
+  // which the ops derivation deliberately does not read (A s8; B s7, s8).
+  // The SIGN contract therefore applies to jointly-nonzero scenes (probe-
+  // demonstrated), with the golden disjointness documented as the honest
+  // baseline, same structure as curiosityDelta's folded asymmetry above.
+  betrayalSignal: 'SIGN',
+  // powerDynamicsIntensity — PRESENCE. Text path counts dominance/submission
+  // verbs; ops path sums |amount| over respect/rivalry/dependency/obligation
+  // shifts. MEASURED: both paths are 0 on every scene of both golden stories
+  // (neither fixture stages a control contest — trivially agreeing), and the
+  // POWER_PROBE below demonstrates nonzero/nonzero presence agreement when a
+  // respect-dimension shift's reason carries dominance lexicon. Magnitudes
+  // are never compared (float |amount| sums vs integer verb counts).
+  powerDynamicsIntensity: 'PRESENCE',
+  // ironyMarkerCount — text-path-only, same tier as questionsRaised/
+  // powerHolder/speakingCharacterCount above: StoryOps carry no tonal stance
+  // (a belief proposition records WHAT is believed, not whether the line
+  // delivering it is sincere or sarcastic), so annotateCommit never populates
+  // it — see memory.ts's Wave 1192 field comment.
+  ironyMarkerCount: 'KNOWN_ASYMMETRY_TEXT_ONLY',
   createdAt: 'NOT_COMPARED_IDENTIFIER',       // ops path = real epoch ms; text path = scene index integer — never comparable
 };
 
@@ -746,7 +784,129 @@ describe('record parity — drift tripwire', () => {
     // this just guards against someone hand-editing PARITY_MATRIX's runtime
     // shape independently of the type. 22 through Wave 1182, +3 for Wave
     // 1186's powerHolder/powerBalance/powerFlipped, +1 for Wave 1190's
-    // speakingCharacterCount.
-    assert.equal(Object.keys(PARITY_MATRIX).length, 26);
+    // speakingCharacterCount, +3 for Wave 1192's betrayalSignal/
+    // powerDynamicsIntensity/ironyMarkerCount.
+    assert.equal(Object.keys(PARITY_MATRIX).length, 29);
   });
+});
+
+// ── TIER: SIGN / PRESENCE / KNOWN ASYMMETRY — Wave 1192 lexicon signals ─────
+// betrayalSignal (SIGN), powerDynamicsIntensity (PRESENCE), ironyMarkerCount
+// (KNOWN_ASYMMETRY_TEXT_ONLY). Every number below was MEASURED against the
+// golden stories before pinning, per this file's standing discipline. The
+// probes exist because the golden stories were authored before this channel
+// and (measured, honestly documented below) never light BOTH paths up on the
+// same scene — the probes demonstrate the agreement contract on inputs that
+// actually exercise it, exactly like PROBE/RICHNESS_PROBE above.
+
+// SHIFT_RELATIONSHIP renders its `reason` as an action-line sentence
+// (project/index.ts), so a reason co-authored with the matching lexicon is
+// visible to the text path with no accompanying belief text — the same
+// mechanism the compiler-richness probe relies on.
+const BETRAYAL_PROBE = runBothPaths(
+  [
+    [{ op: 'UPDATE_BELIEF', charId: 'filler', belief: belief('Nothing of note happens in this scene.') }],
+    // Betrayal-ward: trust falls (ops: -(-0.5) = +0.5) and the reason names
+    // the betrayal (text: 'betrayed' + 'traitor' = +2 betrayal hits).
+    [{ op: 'SHIFT_RELATIONSHIP', pair: ['mara', 'joss'], delta: { dimension: 'trust', amount: -0.5, reason: 'she betrayed him and turned traitor' } }],
+    // Loyalty-ward: trust rises (ops: -(+0.5) = -0.5) and the reason affirms
+    // the bond (text: 'loyal' + 'faithful' = -2, loyalty-dominant).
+    [{ op: 'SHIFT_RELATIONSHIP', pair: ['mara', 'joss'], delta: { dimension: 'trust', amount: 0.5, reason: 'they stayed loyal and faithful to each other' } }],
+  ],
+  'BETRAYAL PROBE',
+);
+
+const POWER_PROBE = runBothPaths(
+  [
+    [{ op: 'UPDATE_BELIEF', charId: 'filler', belief: belief('Nothing of note happens in this scene.') }],
+    // Control-charged: a respect-dimension shift (ops: |−0.4| = 0.4 > 0) whose
+    // reason carries dominance lexicon (text: 'overpowered' + 'dictated' = 2 > 0).
+    [{ op: 'SHIFT_RELATIONSHIP', pair: ['mara', 'joss'], delta: { dimension: 'respect', amount: -0.4, reason: 'he overpowered her objections and dictated the terms' } }],
+  ],
+  'POWER PROBE',
+);
+
+describe('record parity — Wave 1192 lexicon signals (betrayalSignal SIGN, powerDynamicsIntensity PRESENCE, ironyMarkerCount text-only)', () => {
+  // ── betrayalSignal: SIGN, probe-demonstrated in both directions ──────────
+  it('BETRAYAL_PROBE: betrayal-ward scene agrees in sign (+) on both paths', () => {
+    assert.equal(sign(BETRAYAL_PROBE.opsRecords[1].betrayalSignal ?? 0), 1);
+    assert.equal(sign(BETRAYAL_PROBE.textRecords[1].betrayalSignal ?? 0), 1);
+  });
+  it('BETRAYAL_PROBE: loyalty-ward scene agrees in sign (−) on both paths', () => {
+    assert.equal(sign(BETRAYAL_PROBE.opsRecords[2].betrayalSignal ?? 0), -1);
+    assert.equal(sign(BETRAYAL_PROBE.textRecords[2].betrayalSignal ?? 0), -1);
+  });
+  it('BETRAYAL_PROBE: the inert filler scene is 0 on both paths (no noise)', () => {
+    assert.equal(BETRAYAL_PROBE.opsRecords[0].betrayalSignal, 0);
+    assert.equal(BETRAYAL_PROBE.textRecords[0].betrayalSignal, 0);
+  });
+
+  // MEASURED golden-story baseline, pinned as the honest finding it is: the
+  // two paths' nonzero scenes are DISJOINT on these fixtures. The ops path is
+  // nonzero exactly where a trust shift lands (A s6: -(+0.3) = -0.3; B s5:
+  // -(+0.25) = -0.25 — both loyalty-ward, since both fixtures' trust shifts
+  // are positive) and reads 0 at A s8 / B s7 (those shifts are on the
+  // 'resentment' dimension, which the derivation deliberately excludes —
+  // resentment is generic hostility, not violated trust). The text path is
+  // nonzero exactly where 'betrayed' appears in rendered prose (A s8, B s7,
+  // B s8) and reads 0 at A s6 / B s5 (their warm prose uses valence
+  // vocabulary — grateful/warmth/trust — none of which is in LOYALTY_WORDS).
+  // No scene is nonzero on both paths, so the SIGN contract is exercised by
+  // the probe above, not the golden stories — pinned so any future fixture
+  // or lexicon change that closes this gap shows up as a failing assertion
+  // to re-measure, not silent drift.
+  it('golden stories (measured): ops-path betrayalSignal is nonzero exactly at the trust-shift scenes, loyalty-ward', () => {
+    const opsNonzeroA = A.opsRecords.filter(r => (r.betrayalSignal ?? 0) !== 0);
+    const opsNonzeroB = B.opsRecords.filter(r => (r.betrayalSignal ?? 0) !== 0);
+    assert.deepEqual(opsNonzeroA.map(r => r.sceneIdx), [6]);
+    assert.deepEqual(opsNonzeroB.map(r => r.sceneIdx), [5]);
+    assert.equal(sign(opsNonzeroA[0].betrayalSignal ?? 0), -1);
+    assert.equal(sign(opsNonzeroB[0].betrayalSignal ?? 0), -1);
+  });
+  it('golden stories (measured): text-path betrayalSignal is nonzero exactly at the betrayal-prose scenes, betrayal-ward, disjoint from the ops-path scenes', () => {
+    const textNonzeroA = A.textRecords.filter(r => (r.betrayalSignal ?? 0) !== 0);
+    const textNonzeroB = B.textRecords.filter(r => (r.betrayalSignal ?? 0) !== 0);
+    assert.deepEqual(textNonzeroA.map(r => r.sceneIdx), [8]);
+    assert.deepEqual(textNonzeroB.map(r => r.sceneIdx), [7, 8]);
+    for (const r of [...textNonzeroA, ...textNonzeroB]) {
+      assert.equal(sign(r.betrayalSignal ?? 0), 1, `scene ${r.sceneIdx} should be betrayal-ward`);
+    }
+    // The disjointness itself, asserted directly:
+    for (const pair of [A, B]) {
+      for (let i = 0; i < pair.opsRecords.length; i++) {
+        assert.ok(
+          !((pair.opsRecords[i].betrayalSignal ?? 0) !== 0 && (pair.textRecords[i].betrayalSignal ?? 0) !== 0),
+          `scene ${i} became jointly nonzero — the documented disjointness closed; re-measure and upgrade this block to a rate-pinned SIGN test`,
+        );
+      }
+    }
+  });
+
+  // ── powerDynamicsIntensity: PRESENCE ─────────────────────────────────────
+  it('POWER_PROBE: a respect-shift scene with dominance-lexicon reason is nonzero on both paths; the filler scene is 0 on both', () => {
+    assert.ok((POWER_PROBE.opsRecords[1].powerDynamicsIntensity ?? 0) > 0, 'ops path: |respect shift| registers');
+    assert.ok((POWER_PROBE.textRecords[1].powerDynamicsIntensity ?? 0) > 0, 'text path: dominance verbs register');
+    assert.equal(POWER_PROBE.opsRecords[0].powerDynamicsIntensity, 0);
+    assert.equal(POWER_PROBE.textRecords[0].powerDynamicsIntensity, 0);
+  });
+  it('golden stories (measured): powerDynamicsIntensity is 0 on every scene of both paths — neither fixture stages a control contest (trivially agreeing presence)', () => {
+    for (const pair of [A, B]) {
+      for (let i = 0; i < pair.opsRecords.length; i++) {
+        assert.equal(pair.opsRecords[i].powerDynamicsIntensity, 0, `ops scene ${i}`);
+        assert.equal(pair.textRecords[i].powerDynamicsIntensity, 0, `text scene ${i}`);
+      }
+    }
+  });
+
+  // ── ironyMarkerCount: KNOWN_ASYMMETRY_TEXT_ONLY ──────────────────────────
+  for (const [label, pair] of [['Story A', A], ['Story B', B]] as const) {
+    it(`${label}: ops-path records never populate ironyMarkerCount; text-path records always populate it as a number`, () => {
+      for (const r of pair.opsRecords) {
+        assert.equal(r.ironyMarkerCount, undefined, `ops-path scene ${r.sceneIdx} unexpectedly set ironyMarkerCount`);
+      }
+      for (const r of pair.textRecords) {
+        assert.equal(typeof r.ironyMarkerCount, 'number', `text-path scene ${r.sceneIdx} did not populate ironyMarkerCount`);
+      }
+    });
+  }
 });

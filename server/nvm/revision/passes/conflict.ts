@@ -575,6 +575,18 @@
 // this wave's powerHolder) catches one character always running the room even under direct
 // interrogation pressure. See the block comment immediately above these three rules for the full
 // distinctness rationale and guard conditions.
+// Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): BETRAYAL_WITHOUT_SETUP —
+// first consumer of the new per-scene betrayalSignal channel (fountain-analyzer.ts's
+// computeBetrayalSignals, wired onto ScreenplaySceneRecord this wave): a betrayal-vocabulary
+// spike with zero prior strain trajectory anywhere in the run-up. See the rule's own comment
+// for the measured threshold and the scope boundary against causality.ts's UNMOTIVATED_BETRAYAL.
+// (The wave's second check, POWER_STASIS, consumes the sibling powerDynamicsIntensity channel
+// in relationship-arc.ts. The chartered third check, IRONY_DESERT, was measured against the
+// 20-sample calibration corpus and DROPPED: ironyMarkerCount is 0 in every scene of every band,
+// and a strong-band sample ('Low Tide') has suspense variance 0 with 100% neutral emotionalShift
+// — so every earnestness-monotone formulation of the guard fires on known-good material. The
+// check cannot separate honest drama from defect with the data this engine exposes; shipping it
+// would violate guarantee item 2 (no rule fires on noise), so this wave honestly ships 2 checks.)
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -7069,6 +7081,68 @@ export async function conflictPass(input: PassInput): Promise<PassResult> {
           description: `${firstHolder1186c} controls the exchange in all ${interrogationDyadScenes1186c.length} scenes where a substantive question is raised AND a power dynamic can be measured — the same character is always the one asking, never the one made to answer. Interrogation is one of this story's best tools for testing a character under pressure, and it's never once turned on the person who dominates every other exchange.`,
           suggestedFix: `Stage at least one scene where ${firstHolder1186c} is the one being pressed with substantive questions and visibly loses control of the exchange — a reversal of who's interrogating whom is one of the clearest ways to dramatize a shift in power.`,
         });
+      }
+    }
+  }
+
+  // ── Wave 1192 addition (Program v2, Type 1 signal channel, cycle 3) ────────
+  // BETRAYAL_WITHOUT_SETUP — sequence/backward-cause mode over the NEW
+  // betrayalSignal channel (fountain-analyzer.ts's computeBetrayalSignals,
+  // wired onto ScreenplaySceneRecord this wave — net betrayal-minus-loyalty
+  // lexicon hits per scene; ops path derives it from trust/jealousy/rivalry
+  // relationship shifts, see memory.ts).
+  //
+  // Fires when a scene SPIKES with betrayal vocabulary (betrayalSignal >= 2)
+  // and NOTHING in the run-up planted strain: no earlier scene carries a
+  // negative relationship shift on any pair, and no earlier scene carries even
+  // one net betrayal-leaning word (betrayalSignal > 0). A betrayal the story
+  // never seeded reads as an authorial coin-flip — the audience is told trust
+  // was violated without ever having watched it fray.
+  //
+  // MEASURED THRESHOLD (Wave 1192 corpus measurement, 20 calibration samples /
+  // 196 scenes): betrayalSignal is 0 in every scene of every band — the corpus
+  // never uses this vocabulary — so ANY positive threshold is corpus-silent;
+  // >= 2 is chosen because it requires two net betrayal-dominant hits, i.e. a
+  // scene ABOUT a betrayal, not one stray "deceived" in passing (which a
+  // single co-present loyalty word would also cancel). Fire-rate audit:
+  // FIXTURE-ONLY against the calibration corpus (0/20), by construction of
+  // the corpus's controlled vocabulary, not by guard slack.
+  //
+  // DISTINCTNESS / SCOPE BOUNDARY — coordinated with causality.ts's
+  // UNMOTIVATED_BETRAYAL (Wave 1191, read-only for this wave): that rule is
+  // relationship-OP-driven — it needs an established-ally POSITIVE shift that
+  // later flips to a hostile-level negative shift (<= -0.6) on the SAME pair,
+  // plus suspicion-lexicon and revelation-naming guards over the run-up. This
+  // rule is lexicon-SIGNAL-driven at scene level: it needs no relationship
+  // pair at all (a betrayal narrated purely in action prose or single-speaker
+  // dialogue — invisible to relationshipShifts — still spikes betrayalSignal),
+  // and its no-setup guard reads the new channel itself plus any-pair negative
+  // shifts, not a per-pair ally→hostile trajectory. Either rule can fire where
+  // the other cannot: an op-authored ally flip with zero betrayal vocabulary
+  // reaches only theirs; a prose-narrated betrayal with no paired shifts
+  // reaches only this. Distinct from every other rule in this pass: no
+  // existing rule reads betrayalSignal (first consumer of the channel).
+  {
+    const BETRAYAL_SPIKE_MIN_1192 = 2;
+    const MIN_RUNUP_SCENES_1192 = 3;
+    if (records.length >= 8) {
+      for (let i = MIN_RUNUP_SCENES_1192; i < records.length; i++) {
+        const spike1192 = records[i].betrayalSignal ?? 0;
+        if (spike1192 < BETRAYAL_SPIKE_MIN_1192) continue;
+        const priorStrain1192 = records.slice(0, i).some(r =>
+          (r.betrayalSignal ?? 0) > 0 ||
+          (r.relationshipShifts ?? []).some(s => typeof s.amount === 'number' && s.amount < 0),
+        );
+        if (!priorStrain1192) {
+          issues.push({
+            location: `Scene ${i} (${records[i].slug})`,
+            rule: 'BETRAYAL_WITHOUT_SETUP',
+            severity: 'major',
+            description: `Scene ${i} spikes with betrayal language (net betrayal signal ${spike1192}) but the entire ${i}-scene run-up contains zero strain: no relationship sours even slightly, and not one earlier scene carries so much as a single net betrayal-leaning word. Trust is declared violated without the audience ever having watched it fray — the betrayal lands as an authorial coin-flip instead of a reveal of pressure that was already there.`,
+            suggestedFix: `Seed the fracture before Scene ${i}: an earlier scene where the eventual betrayer hedges, withholds, or quietly benefits from the other's blind spot — even one negative beat between the pair, or a stray note of disloyalty in the prose, converts the spike from arbitrary to inevitable-in-hindsight.`,
+          });
+        }
+        break; // audit only the FIRST spike — later spikes have this one as their setup
       }
     }
   }

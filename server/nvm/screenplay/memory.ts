@@ -150,6 +150,48 @@ export interface ScreenplaySceneRecord {
    *  consumers should treat absence as 0, matching the questionsRaised/
    *  powerHolder precedent above. */
   speakingCharacterCount?: number;
+  /** Betrayal/loyalty axis (Wave 1192 — Program v2 Type 1 signal channel,
+   *  cycle 3). Net betrayal-minus-loyalty signal for the scene: positive =
+   *  betrayal-dominant, negative = loyalty-affirming, zero = neither present
+   *  or balanced. TEXT PATH: fountain-analyzer.ts's computeBetrayalSignals —
+   *  integer net lexicon-hit count (BETRAYAL_WORDS minus LOYALTY_WORDS) over
+   *  the scene's full text. OPS PATH: derived from SHIFT_RELATIONSHIP ops on
+   *  the trust/loyalty-adjacent dimensions — a 'trust' shift contributes
+   *  -amount (trust falling = betrayal-ward, trust rising = loyalty-ward) and
+   *  a 'jealousy'/'rivalry' shift contributes +amount (those strains rising
+   *  = betrayal-adjacent, falling = reconciliation-ward) — so the ops value
+   *  is a float in the -1..1-per-shift range, NOT the text path's integer
+   *  word count. The two are comparable by SIGN only (see
+   *  record-parity.test.ts's measured tier). Optional only so legacy/test
+   *  fixtures predating the field still typecheck; both builders always
+   *  populate it — consumers treat absence as 0. */
+  betrayalSignal?: number;
+  /** Power-dynamics intensity (Wave 1192). How control-charged the scene is,
+   *  as a magnitude (never negative), independent of WHO holds control —
+   *  deliberately distinct from powerHolder/powerBalance (Wave 1186), which
+   *  identify a specific controlling character and need a two-speaker dyad;
+   *  this registers control-charged material even in action-only scenes.
+   *  TEXT PATH: computePowerDynamicsIntensity — dominance/submission verb
+   *  hit count over the scene text. OPS PATH: sum of |amount| over
+   *  SHIFT_RELATIONSHIP ops on the control-adjacent dimensions ('respect',
+   *  'rivalry', 'dependency', 'obligation' — the four axes that move who
+   *  defers to / owes / needs / contests whom; affection axes like love/
+   *  trust deliberately excluded, matching the text lexicon's control-not-
+   *  affection boundary). Float vs integer as above: comparable by PRESENCE
+   *  (nonzero vs zero) only. Optional for legacy fixtures; both builders
+   *  populate; absence reads as 0. */
+  powerDynamicsIntensity?: number;
+  /** Verbal-irony marker count (Wave 1192). TEXT PATH ONLY:
+   *  computeIronyMarkerCount — stock irony-flag phrase hits ("of course",
+   *  "what could go wrong", …) over the scene text. OPS PATH: never
+   *  populated (KNOWN_ASYMMETRY, same family as questionsRaised/powerHolder/
+   *  speakingCharacterCount above) — StoryOps carry no tonal stance: a
+   *  belief proposition records WHAT a character believes, not whether the
+   *  line delivering it is sincere or sarcastic, and scanning proposition
+   *  text for irony stock phrases here would just be a worse duplicate of
+   *  the text path, not an independent ops-derived signal. Consumers treat
+   *  absence as 0. */
+  ironyMarkerCount?: number;
   /** createdAt timestamp */
   createdAt: number;
 }
@@ -227,6 +269,22 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     relationshipShifts.push({ pairKey, dimension, amount });
   }
 
+  // ── Betrayal signal + power-dynamics intensity (Wave 1192) ────────────────
+  // Both derived from the SHIFT_RELATIONSHIP entries just collected — see the
+  // ScreenplaySceneRecord field comments above for the dimension mapping and
+  // why ironyMarkerCount has no honest ops-path counterpart. Derived from the
+  // sanitized `relationshipShifts` array (not raw ops) so malformed pairs /
+  // non-finite amounts are already guarded once, in one place.
+  let betrayalSignal = 0;
+  let powerDynamicsIntensity = 0;
+  for (const s of relationshipShifts) {
+    if (s.dimension === 'trust') betrayalSignal -= s.amount;
+    else if (s.dimension === 'jealousy' || s.dimension === 'rivalry') betrayalSignal += s.amount;
+    if (s.dimension === 'respect' || s.dimension === 'rivalry' || s.dimension === 'dependency' || s.dimension === 'obligation') {
+      powerDynamicsIntensity += Math.abs(s.amount);
+    }
+  }
+
   // ── Clock detection ───────────────────────────────────────────────────────
   const clockOpsLocal = ops.filter(o => o.op === 'RAISE_CLOCK');
   const clockRaised = clockOpsLocal.length > 0;
@@ -261,6 +319,10 @@ export function annotateCommit(commit: StoryCommit): ScreenplaySceneRecord {
     suspenseDelta,
     curiosityDelta,
     relationshipShifts,
+    betrayalSignal,
+    powerDynamicsIntensity,
+    // ironyMarkerCount deliberately omitted — KNOWN_ASYMMETRY_TEXT_ONLY, see
+    // the field comment above.
     createdAt: commit.createdAt,
   };
 }

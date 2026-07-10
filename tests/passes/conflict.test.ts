@@ -567,6 +567,79 @@ import { evaluateRewrite, REWRITE_MIN_LENGTH_RATIO } from '../../server/nvm/revi
 
 import { relationshipArcPass } from '../../server/nvm/revision/passes/relationship-arc.ts';
 
+// Wave 1192 (Program v2, Type 1 signal channel, cycle 3) — conflictPass's
+// first consumer of the new betrayalSignal channel (fountain-analyzer.ts's
+// computeBetrayalSignals, wired onto ScreenplaySceneRecord this wave). See
+// conflict.ts's Wave 1192 header comment for the measured threshold, the
+// scope boundary against causality.ts's UNMOTIVATED_BETRAYAL, and why the
+// chartered third check (IRONY_DESERT) was measured and dropped.
+describe('Wave 1192 — conflictPass (Program v2, Type 1 — signal channel): betrayal without setup', async () => {
+  const makeRec1192 = (idx: number, override: Partial<any> = {}): any => ({
+    commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+    purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+    clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+    dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+    payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+    betrayalSignal: 0, powerDynamicsIntensity: 0, ironyMarkerCount: 0,
+    ...override,
+  });
+  const blankFountain1192 = (n: number) =>
+    Array.from({ length: n }, (_, i) => `INT. SC${i} - DAY\nA.\n`).join('');
+  const makeInput1192 = (records: any[]) => ({
+    fountain: blankFountain1192(records.length), original: blankFountain1192(records.length),
+    records: records as any, structure: {} as any,
+    annotations: Array.from({ length: records.length }, () => ({ revelation: false } as any)),
+    approvedSpans: [],
+  });
+
+  it('conflictPass fires BETRAYAL_WITHOUT_SETUP when a betrayal-vocabulary spike has zero prior strain', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    // 8 scenes, spike (betrayalSignal 3) at scene 5; run-up scenes 0-4 carry no
+    // negative relationship shift and no betrayal-leaning vocabulary at all.
+    const records = Array.from({ length: 8 }, (_, i) =>
+      makeRec1192(i, i === 5 ? { betrayalSignal: 3 } : {}),
+    );
+    const result = await conflictPass(makeInput1192(records));
+    const fired = result.issues.filter((i: any) => i.rule === 'BETRAYAL_WITHOUT_SETUP');
+    assert.ok(fired.length >= 1, `Expected BETRAYAL_WITHOUT_SETUP, got: ${result.issues.map((i: any) => i.rule).join(', ')}`);
+    assert.equal(fired[0].severity, 'major');
+    assert.ok(fired[0].description.includes('Scene 5'), 'description names the spike scene');
+  });
+
+  it('conflictPass does NOT fire BETRAYAL_WITHOUT_SETUP when an earlier scene carries a negative relationship shift (strain planted)', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    const records = Array.from({ length: 8 }, (_, i) => {
+      if (i === 2) return makeRec1192(i, { relationshipShifts: [{ pairKey: 'alice|bob', dimension: 'trust', amount: -0.3 }] });
+      if (i === 5) return makeRec1192(i, { betrayalSignal: 3 });
+      return makeRec1192(i);
+    });
+    const result = await conflictPass(makeInput1192(records));
+    assert.ok(
+      !result.issues.some((i: any) => i.rule === 'BETRAYAL_WITHOUT_SETUP'),
+      'Should NOT fire when the run-up contains a souring relationship beat',
+    );
+  });
+
+  it('conflictPass does NOT fire BETRAYAL_WITHOUT_SETUP on a sub-threshold spike, an early-scene spike, or earlier betrayal-leaning vocabulary', async () => {
+    const { conflictPass } = await import('../../server/nvm/revision/passes/conflict.ts');
+    // Near-miss 1: spike of 1 (below the measured >= 2 threshold).
+    const sub = Array.from({ length: 8 }, (_, i) => makeRec1192(i, i === 5 ? { betrayalSignal: 1 } : {}));
+    // Near-miss 2: spike in scene 2 (< MIN_RUNUP_SCENES — a cold-open premise, not an unset-up turn).
+    const early = Array.from({ length: 8 }, (_, i) => makeRec1192(i, i === 2 ? { betrayalSignal: 3 } : {}));
+    // Near-miss 3: scene 1 already leans betrayal-ward (betrayalSignal 1) — vocabulary setup exists.
+    const seeded = Array.from({ length: 8 }, (_, i) =>
+      makeRec1192(i, i === 1 ? { betrayalSignal: 1 } : i === 5 ? { betrayalSignal: 3 } : {}),
+    );
+    for (const [label, records] of [['sub-threshold', sub], ['early-scene', early], ['vocab-seeded', seeded]] as const) {
+      const result = await conflictPass(makeInput1192(records));
+      assert.ok(
+        !result.issues.some((i: any) => i.rule === 'BETRAYAL_WITHOUT_SETUP'),
+        `Should NOT fire on the ${label} near-miss`,
+      );
+    }
+  });
+});
+
 // Wave 1186 (Program v2, Type 1 signal channel, closes cycle 1) —
 // conflictPass's first 3 consumers of fountain-analyzer.ts's new power-balance
 // signal (powerHolder/powerBalance/powerFlipped). See conflict.ts's Wave 1186

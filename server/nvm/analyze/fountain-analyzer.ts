@@ -143,6 +143,20 @@
 // ScreenplaySceneRecord — see the "Standalone lexicon-backed signals" section
 // below for why (record-parity.test.ts's matrix and types.ts's
 // FountainAnalysis shape are both outside this wave's file ownership).
+//
+// Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): the
+// three Wave E1-c standalone signals above (computeBetrayalSignals,
+// computePowerDynamicsIntensity, computeIronyMarkerCount) are now WIRED onto
+// ScreenplaySceneRecord as betrayalSignal / powerDynamicsIntensity /
+// ironyMarkerCount — this wave owns memory.ts and record-parity.test.ts, so
+// the exact structural blocker the E1-c section documents is lifted. The
+// functions themselves are untouched (still exported, still standalone-
+// callable, same lexicons); analyzeFountainText simply feeds them each
+// scene's rawText (the same per-scene text surface every other heuristic
+// reads) and copies the per-scene numbers onto the records. Ops-path
+// derivations and the parity tiers live in memory.ts / record-parity.test.ts
+// (see memory.ts's Wave 1192 field comments for what the StoryOp ledger can
+// and cannot honestly carry for each of the three).
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
@@ -1518,7 +1532,13 @@ function detectSpeakingCharacterCount(scene: SceneUnit): number {
   return speakers.size;
 }
 
-// ── Standalone lexicon-backed signals (Wave E1-c) — NOT wired to records ────
+// ── Standalone lexicon-backed signals (Wave E1-c; WIRED in Wave 1192) ───────
+// NOTE (Wave 1192): the ownership blocker described below is now resolved —
+// analyzeFountainText feeds each function sceneUnits[i].rawText and copies
+// the results onto ScreenplaySceneRecord (betrayalSignal /
+// powerDynamicsIntensity / ironyMarkerCount). The historical rationale is
+// kept verbatim for the audit trail; the functions remain exported and
+// standalone-callable exactly as shipped.
 // Three candidate per-scene signals from the E1-c charter: betrayalTrustDelta,
 // powerDynamicsIntensity, ironyMarkerCount. All three are genuinely new axes
 // (none restates an existing signal — see each function's own distinctness
@@ -1691,6 +1711,13 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const relationshipShiftsList = sceneUnits.map(s => detectRelationshipShifts(s.characters, s.dialogueLines));
   const powerBalances = sceneUnits.map(s => detectPowerBalance(s));
   const speakingCharacterCounts = sceneUnits.map(s => detectSpeakingCharacterCount(s));
+  // Wave 1192: the three Wave E1-c lexicon signals, wired (see file header).
+  // Each reads the scene's rawText — exactly the per-scene text surface the
+  // standalone functions were designed for (see the E1-c section's comment).
+  const sceneRawTexts = sceneUnits.map(s => s.rawText);
+  const betrayalSignals = computeBetrayalSignals(sceneRawTexts);
+  const powerDynamicsIntensities = computePowerDynamicsIntensity(sceneRawTexts);
+  const ironyMarkerCounts = computeIronyMarkerCount(sceneRawTexts);
 
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
   const { seedsByScene, payoffsByScene, unresolvedByScene } = detectClueLifecycle(sceneUnits);
@@ -1739,6 +1766,9 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
     powerBalance: powerBalances[idx].powerBalance,
     powerFlipped: powerBalances[idx].powerFlipped,
     speakingCharacterCount: speakingCharacterCounts[idx],
+    betrayalSignal: betrayalSignals[idx],
+    powerDynamicsIntensity: powerDynamicsIntensities[idx],
+    ironyMarkerCount: ironyMarkerCounts[idx],
     createdAt: idx,
   }));
 

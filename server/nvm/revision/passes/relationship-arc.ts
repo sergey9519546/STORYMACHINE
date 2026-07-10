@@ -552,6 +552,16 @@
 // naming convention used for RELATIONSHIP_CLOCK_AFTERMATH_VOID / RELATIONSHIP_REVELATION_
 // AFTERMATH_VOID (Wave 1127). RELATIONSHIP_PAYOFF_EMOTIONAL_AFTERMATH_VOID gives payoffSetupIds
 // its second channel (emotionalShift).
+// Wave 1192 additions (Program v2, Type 1 — signal channel, cycle 3): POWER_STASIS — first
+// consumer of the new per-scene powerDynamicsIntensity channel (fountain-analyzer.ts's
+// computePowerDynamicsIntensity, wired onto ScreenplaySceneRecord this wave), joined with Wave
+// 1186's powerHolder/powerFlipped: a control-CHARGED relationship thread (>=4 scenes whose
+// vocabulary is explicitly about domination/submission) where control nonetheless never moves —
+// same holder every time, no mid-scene flip. Domination without dramatic movement. See the
+// rule's own comment for the measured threshold and distinctness rationale. (This wave's sibling
+// check BETRAYAL_WITHOUT_SETUP lives in conflict.ts; the chartered third check IRONY_DESERT was
+// measured against the calibration corpus and honestly dropped — see conflict.ts's Wave 1192
+// header note for the evidence.)
 
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
@@ -6870,6 +6880,66 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
         description: `Every one of the story's ${r1169c.triggerCount} payoff scenes is followed by two scenes with no emotional shift, even though ${r1169c.aftermathCount} such shifts occur elsewhere. A resolved thread that never registers on any character's felt state right after it lands leaves the relational arc's payoffs reading as plot bookkeeping rather than moments that change how a relationship feels once an old promise is spent.`,
         suggestedFix: `In the two scenes following at least one payoff, let the resolution visibly shift a character's emotional register toward a relationship, so the payoff lands as something felt, not just a thread closed.`,
       });
+    }
+  }
+
+  // ── Wave 1192 addition (Program v2, Type 1 signal channel, cycle 3) ────────
+  // POWER_STASIS — average/aggregate mode joining the NEW powerDynamicsIntensity
+  // channel (fountain-analyzer.ts's computePowerDynamicsIntensity, wired onto
+  // ScreenplaySceneRecord this wave: dominance/submission verb density per
+  // scene, a magnitude independent of who holds control) with Wave 1186's
+  // powerHolder/powerFlipped. Fires on a two-hander relationship thread of >=4
+  // scenes that are BOTH control-charged (powerDynamicsIntensity >= 2 — the
+  // scene's vocabulary is explicitly about commanding/obeying/yielding) AND
+  // dyad-scored (powerHolder non-null), where the SAME character holds every
+  // one of those scenes and control never once flips mid-scene in any of them.
+  // That is domination WITHOUT dramatic movement: the story keeps writing
+  // scenes about control while refusing to ever contest it — the thread's
+  // central question is asked four-plus times and never once put in play.
+  //
+  // MEASURED THRESHOLD (Wave 1192 corpus measurement, 20 calibration samples /
+  // 196 scenes): powerDynamicsIntensity is 0 in 195/196 corpus scenes and 1 in
+  // exactly one ('Nine Minutes' scene 6), so >= 2 sits strictly above
+  // everything the controlled corpus produces — a scene needs two or more
+  // dominance/submission verbs to count as charged, i.e. control is what the
+  // scene is ABOUT, not a word it brushes past. Fire-rate audit: FIXTURE-ONLY
+  // against the calibration corpus (0/20 — no corpus sample has even one
+  // charged scene, let alone four same-holder ones).
+  //
+  // DISTINCTNESS: CONFLICT_POWER_STATIC_FLATLINE (conflict.ts, Wave 1186)
+  // fires only when EVERY dyad-scored scene in the story shares one holder,
+  // at any vocabulary intensity — it audits story-wide control monotony.
+  // This rule restricts to the control-CHARGED subset (>=2 dominance-verb
+  // hits, a channel that did not exist in Wave 1186) and adds the no-flip
+  // condition, so it fires on a story whose OTHER dyad scenes change hands
+  // freely (a FLATLINE no-fire) while its one domination thread never moves.
+  // POWER_DYNAMIC_UNCHANGED (this pass, Wave 147) reads relationshipShifts'
+  // dimension LABELS (affinity-vs-power op bookkeeping) and never touches
+  // powerHolder, powerFlipped, or any text-derived intensity. Not expressible
+  // with pre-existing signals: without powerDynamicsIntensity there is no way
+  // to distinguish "four scenes that happen to have a measurable dyad" from
+  // "four scenes explicitly ABOUT domination" — which is the entire premise.
+  {
+    const POWER_CHARGED_MIN_1192 = 2;
+    const MIN_CHARGED_SCENES_1192 = 4;
+    if (records.length >= 8) {
+      const chargedDyad1192 = records.filter(
+        r => (r.powerDynamicsIntensity ?? 0) >= POWER_CHARGED_MIN_1192 && r.powerHolder != null,
+      );
+      if (chargedDyad1192.length >= MIN_CHARGED_SCENES_1192) {
+        const holder1192 = chargedDyad1192[0].powerHolder as string;
+        const monotone1192 = chargedDyad1192.every(r => r.powerHolder === holder1192);
+        const neverFlips1192 = chargedDyad1192.every(r => r.powerFlipped !== true);
+        if (monotone1192 && neverFlips1192) {
+          issues.push({
+            location: `Scenes ${chargedDyad1192.map(r => r.sceneIdx).join(', ')} (holder: ${holder1192})`,
+            rule: 'POWER_STASIS',
+            severity: 'major',
+            description: `${chargedDyad1192.length} scenes are explicitly written in the vocabulary of domination and submission (power-dynamics intensity ${chargedDyad1192.map(r => r.powerDynamicsIntensity ?? 0).join(', ')}), and in every single one ${holder1192} holds control — never once out-maneuvered, never once losing the room even for half a scene. A relationship thread that keeps declaring itself to be about power while never letting power move is stasis wearing conflict's clothes: the audience is promised a contest four-plus times and never shown one.`,
+            suggestedFix: `Let control genuinely change hands in at least one of these scenes — give the dominated character a beat where ${holder1192} must yield, defer, or obey in turn, or stage one exchange whose control visibly flips midway. If the domination is meant to be absolute by design, cut its vocabulary from all but one or two scenes so the stasis reads as a settled fact rather than a contest the story keeps teasing and withholding.`,
+          });
+        }
+      }
     }
   }
 
