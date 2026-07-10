@@ -17,6 +17,18 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Release identity (README.md "Releases", server/lib/build-info.ts, GET
+# /health). release.yml passes these via --build-arg on a tagged release
+# build; a plain `docker build` with no --build-arg leaves both at their
+# defaults below, so local/dev builds still work unmodified — build-info.ts
+# treats "unknown"/"dev" as expected fallbacks, never a fatal condition.
+# ARG values don't survive into the running container by themselves, so each
+# is re-declared as ENV to make it visible to the Node process at runtime.
+ARG VERSION=unknown
+ARG GIT_SHA=dev
+ENV VERSION=${VERSION}
+ENV GIT_SHA=${GIT_SHA}
+
 COPY --from=builder /app/node_modules ./node_modules
 # dist/ is the Vite-built SPA; server/app.ts serves it statically from
 # path.join(process.cwd(), 'dist') when NODE_ENV=production — cwd here is

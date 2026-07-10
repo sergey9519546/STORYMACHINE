@@ -15,6 +15,22 @@ describe('routes/config — HTTP behavior', async () => {
     assert.equal(typeof body.sessions, 'number');
   });
 
+  it('GET /health includes version and commit, with safe fallback values in the keyless test env', async () => {
+    const res = await fetch(`${server.baseUrl}/health`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    // Additive/byte-compatible: prior fields still present alongside the new ones.
+    assert.equal(body.status, 'ok');
+    assert.equal(typeof body.uptime, 'number');
+    assert.equal(typeof body.sessions, 'number');
+    // version: package.json's version in this checkout (never empty/undefined).
+    assert.equal(typeof body.version, 'string');
+    assert.ok(body.version.length > 0, 'version must not be empty');
+    // commit: no GIT_SHA is set for this test run (no Docker build-arg
+    // plumbing in `npm test`), so build-info.ts's documented fallback applies.
+    assert.equal(body.commit, 'dev');
+  });
+
   it('GET /api/ai-config returns 200 and never leaks a key value, only boolean flags', async () => {
     const res = await fetch(`${server.baseUrl}/api/ai-config`);
     assert.equal(res.status, 200);
