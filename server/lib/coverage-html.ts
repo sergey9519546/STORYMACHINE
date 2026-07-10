@@ -110,8 +110,10 @@ function buildHeaderSection(
       <div class="meta-line">
         ${formatDate(analyzedAt)} &middot;
         ${formatNumber(report.sceneCount)} scene${report.sceneCount === 1 ? '' : 's'} &middot;
-        ${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}
-      </div>
+        ${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}${report.pageEstimate ? ` &middot;
+        ~${formatNumber(report.pageEstimate.pages)} page${report.pageEstimate.pages === 1 ? '' : 's'} / ~${formatNumber(report.pageEstimate.runtimeMinutes)} min (est.)` : ''}
+      </div>${report.excerptNote ? `
+      <div class="meta-line" style="font-style:italic;">${escapeHtml(report.excerptNote)}</div>` : ''}
       ${loglineLine}
     </div>
     <div class="stamp-wrap">

@@ -592,6 +592,33 @@ export function verdictFor(health: number, sceneCount: number): CoverageVerdict 
   return 'CONSIDER';
 }
 
+/** Deterministic page/runtime estimate from the analyzed Fountain text.
+ *  Pure arithmetic over the text the doctor already holds — no layout engine,
+ *  no new heuristics: non-blank rendered lines at the classic ~55 lines per
+ *  screenplay page, runtime at the 1-page-≈-1-minute convention. Constants
+ *  stay function-local per this file's standing TDZ note (doctor↔reference
+ *  circular import). Floors at 1 page for any non-empty text so a one-scene
+ *  excerpt never reports "0 pages"; returns null for empty/whitespace input
+ *  (degenerate reports carry no estimate rather than a fabricated one). */
+export function estimatePages(fountain: string): ScriptDoctorReport['pageEstimate'] | null {
+  const LINES_PER_PAGE = 55; // classic screenplay layout density
+  const lines = fountain.split(/\r?\n/).filter(l => l.trim().length > 0).length;
+  if (lines === 0) return null;
+  const pages = Math.max(1, Math.round(lines / LINES_PER_PAGE));
+  return { pages, runtimeMinutes: pages, basis: 'lines' };
+}
+
+/** One honest sentence when the input is thinner than the RECOMMEND verdict
+ *  floor (verdictFor's sceneCount >= 8) — the report is excerpt feedback,
+ *  not feature coverage, and saying so beats false precision. Returns
+ *  undefined at or above the floor: never padded onto full-length input. */
+export function excerptNoteFor(sceneCount: number): string | undefined {
+  if (sceneCount >= 8) return undefined;
+  return `This reads like an excerpt (${sceneCount} scene${sceneCount === 1 ? '' : 's'} analyzed): ` +
+    'scores and verdicts are computed the same way as for a full script, but with this ' +
+    'little material they should be read as feedback on the pages, not coverage of a feature.';
+}
+
 // ── Dimension rollup ──────────────────────────────────────────────────────────
 // The 14 passes, regrouped into the 5 writer-facing dimensions fixed by the
 // DimensionKey contract in types.ts. Each pass belongs to exactly one
@@ -1536,6 +1563,8 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     contentHash: computeContentHash(fountain),
     healthPercentile,
     metrics,
+    pageEstimate: estimatePages(fountain) ?? undefined,
+    excerptNote: excerptNoteFor(analysis.sceneCount),
   };
 }
 
