@@ -5,10 +5,120 @@
 // can include supplemental data without triggering a validation error).
 
 import { z } from 'zod';
+import net from 'net';
 import type { Request, Response, NextFunction } from 'express';
 import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
 import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
 import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
+
+// ── SSRF-safe outbound URL guard (audit finding S1-a-1, BLOCKER) ────────────
+// POST /api/ai-config lets an ANONYMOUS caller set baseUrl/imgBaseUrl/
+// ttsBaseUrl/embBaseUrl — server/lib/ai-config.ts's applyConfig()/wireProviders()
+// then store them process-globally, and server/lib/ai-providers/openai-compat.ts
+// later fetch()es them with the SERVER's own network identity (POST
+// /api/ai-config/test fires immediately; every subsequent LLM/embed/image/TTS
+// call fires against whatever was last configured, for every session). Without
+// a guard, a caller can point any of these at http://169.254.169.254/ (cloud
+// instance-metadata — often reachable without auth and a well-known SSRF path
+// to stealing cloud credentials) or any other internal-only host, using this
+// server as a network pivot, or can silently redirect every user's AI traffic
+// to an attacker-controlled endpoint.
+//
+// This is a LITERAL-FORM guard, not a DNS-aware one: it rejects http(s) URLs
+// whose host is already a loopback/link-local/RFC1918/unique-local/reserved
+// IP literal, or one of a handful of well-known non-public hostname forms
+// (localhost, *.localhost, *.local, *.internal — the last one covers GCP's
+// metadata.google.internal). It also rejects non-http(s) schemes and
+// userinfo-in-URL (user:pass@host — a classic parser-confusion vector, closed
+// here even though Node's URL parser itself extracts hostname correctly).
+//
+// Residual gap (documented, not silently assumed away): DNS rebinding. A
+// hostname that resolves to a public IP at validation time can be repointed
+// to a private IP by the time the fetch actually runs — this validator
+// operates on the URL string only and does not (and structurally cannot,
+// synchronously, at zod-validation time) resolve DNS to check where a
+// public-looking hostname currently points. Fully closing that requires
+// resolving DNS at the fetch site and pinning the connection to the resolved,
+// re-validated IP (a dns.lookup + custom `dispatcher`/agent override), which
+// is out of scope for this pass — see openai-compat.ts's belt-and-suspenders
+// assertFetchTargetSafe() for the second checkpoint this guard is paired with.
+const PRIVATE_HOSTNAME_EXACT = new Set(['localhost']);
+const PRIVATE_HOSTNAME_SUFFIXES = ['.localhost', '.local', '.internal'];
+
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(p => !Number.isInteger(p) || p < 0 || p > 255)) return true;
+  const [a, b, c] = parts;
+  if (a === 0) return true;                              // 0.0.0.0/8 ("this network")
+  if (a === 10) return true;                              // RFC1918
+  if (a === 127) return true;                             // loopback
+  if (a === 169 && b === 254) return true;                // link-local incl. cloud metadata (169.254.169.254)
+  if (a === 172 && b >= 16 && b <= 31) return true;        // RFC1918
+  if (a === 192 && b === 168) return true;                 // RFC1918
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // IETF protocol assignments / TEST-NET-1
+  if (a === 100 && b >= 64 && b <= 127) return true;       // CGNAT (RFC6598)
+  if (a === 198 && (b === 18 || b === 19)) return true;    // benchmarking (RFC2544)
+  if (a === 198 && b === 51 && c === 100) return true;     // TEST-NET-2
+  if (a === 203 && b === 0 && c === 113) return true;      // TEST-NET-3
+  if (a >= 224) return true;                                // multicast (224/4) + reserved (240/4) + broadcast
+  return false;
+}
+
+function isPrivateIPv6(ip: string): boolean {
+  const norm = ip.toLowerCase();
+  if (norm === '::1' || norm === '::') return true;        // loopback / unspecified
+  // fe80::/10 link-local: first hextet in 0xfe80–0xfebf.
+  if (/^fe[89ab]/.test(norm)) return true;
+  // fc00::/7 unique-local: first hextet in 0xfc00–0xfdff.
+  if (norm.startsWith('fc') || norm.startsWith('fd')) return true;
+  // IPv4-mapped (::ffff:a.b.c.d) — check the embedded IPv4 address.
+  const v4map = norm.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4map) return isPrivateIPv4(v4map[1]);
+  return false;
+}
+
+/** Returns null when `raw` is a safe public http(s) URL, else a human-readable rejection reason. */
+export function ssrfUnsafeUrlReason(raw: string): string | null {
+  let u: URL;
+  try { u = new URL(raw); } catch { return 'must be a valid URL'; }
+
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    return 'must use the http or https scheme';
+  }
+  if (u.username || u.password) {
+    return 'must not contain userinfo (user:pass@host)';
+  }
+
+  let hostname = u.hostname.toLowerCase();
+  if (hostname.startsWith('[') && hostname.endsWith(']')) hostname = hostname.slice(1, -1);
+
+  if (net.isIPv4(hostname)) {
+    return isPrivateIPv4(hostname) ? 'must not target a private/loopback/reserved IP address' : null;
+  }
+  if (net.isIPv6(hostname)) {
+    return isPrivateIPv6(hostname) ? 'must not target a private/loopback/reserved IP address' : null;
+  }
+  if (PRIVATE_HOSTNAME_EXACT.has(hostname) || PRIVATE_HOSTNAME_SUFFIXES.some(s => hostname.endsWith(s))) {
+    return 'must not target localhost or an internal/.local/.internal hostname';
+  }
+  // Alternate numeric-IP encodings (plain decimal, e.g. "2130706433" ==
+  // 127.0.0.1, or hex, e.g. "0x7f000001") that net.isIPv4 doesn't recognize as
+  // a literal but that some underlying resolvers/HTTP stacks still accept and
+  // resolve as an IP — reject outright rather than risk a resolver-dependent
+  // bypass of the checks above.
+  if (/^\d+$/.test(hostname) || /^0x[0-9a-f]+$/i.test(hostname)) {
+    return 'must not use a raw numeric/hex host address';
+  }
+  return null;
+}
+
+/** z.string().url().max(512) plus the SSRF guard above — shared by every *BaseUrl field on AiConfigSchema. */
+function ssrfSafeUrlField() {
+  return z.string().url().max(512).superRefine((v: string, ctx: z.RefinementCtx) => {
+    const reason = ssrfUnsafeUrlReason(v);
+    if (reason) ctx.addIssue({ code: 'custom', message: reason });
+  });
+}
 
 // ── Re-usable leaf schemas ───────────────────────────────────────────────────
 
@@ -142,21 +252,21 @@ export const ImportBodySchema = z
 
 export const AiConfigSchema = z.object({
   provider:    z.enum(['gemini', 'openai-compat']).optional(),
-  baseUrl:     z.string().url().max(512).optional(),
+  baseUrl:     ssrfSafeUrlField().optional(),
   apiKey:      z.string().max(512).optional(),
   model:       z.string().max(256).optional(),
   fastModel:   z.string().max(256).optional(),
   imgProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
-  imgBaseUrl:  z.string().url().max(512).optional(),
+  imgBaseUrl:  ssrfSafeUrlField().optional(),
   imgApiKey:   z.string().max(512).optional(),
   imgModel:    z.string().max(256).optional(),
   ttsProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
-  ttsBaseUrl:  z.string().url().max(512).optional(),
+  ttsBaseUrl:  ssrfSafeUrlField().optional(),
   ttsApiKey:   z.string().max(512).optional(),
   ttsModel:    z.string().max(256).optional(),
   ttsVoice:    z.string().max(64).optional(),
   embProvider: z.enum(['gemini', 'openai-compat', 'none']).optional(),
-  embBaseUrl:  z.string().url().max(512).optional(),
+  embBaseUrl:  ssrfSafeUrlField().optional(),
   embApiKey:   z.string().max(512).optional(),
   embModel:    z.string().max(256).optional(),
 });
@@ -187,6 +297,27 @@ export const OutlineBodySchema = z.object({
   beats: z.array(OutlineBeatSchema).max(50),
 });
 
+// POST /api/collab/token (audit finding S1-a-3, SHOULD) — mints a token for
+// ANY syntactically-valid room name, with no server-side notion of who
+// "owns" a room. This is intentional, not an oversight: real-time
+// collaboration (server/collab/yjs-server.ts) is explicitly designed so two
+// different browser sessions/users can join the SAME room to co-edit one
+// document — that is the feature, so a token-mint check that only allowed a
+// session to mint tokens for "its own" rooms would break the product's core
+// use case (there is no first-class concept of a room's creator/owner
+// anywhere in Stage/session-store — rooms are ephemeral Yjs docs created
+// lazily by yjs-server.ts's getRoom(), keyed only by name).
+//
+// The security model here is deliberately a BEARER-CAPABILITY one, the same
+// shape as a Google Docs "anyone with the link" share or a video-call room
+// code: knowledge of the room name is the authorization to join it. The
+// room name is the caller-chosen secret, generated client-side (see
+// src/components/ScriptIDE.tsx) — this schema only bounds its shape/length
+// (matches server/collab/yjs-server.ts's ROOM_RE exactly, so this validator
+// and the WebSocket-upgrade check can never accept/reject different sets of
+// room names). The route itself (server/routes/collab.ts) additionally
+// gates on COLLAB_SECRET being genuinely configured before minting in any
+// deployment that looks production-like — see that file's comment.
 export const CollabTokenBodySchema = z.object({
   room: roomIdField,
 });

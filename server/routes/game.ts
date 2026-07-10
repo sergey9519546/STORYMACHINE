@@ -242,7 +242,13 @@ router.post('/api/game/interview', aiLimiter, validate(InterviewBodySchema), asy
   }
 }));
 
-router.post('/api/run-room', gameLimiter, validate(RunRoomBodySchema), asyncHandler(async (req, res) => {
+// aiLimiter (not gameLimiter — audit finding S1-a-4, SHOULD): a single call
+// fans out to up to maxTurns (12) agent turns, each of which can trigger its
+// own LLM call deep inside the orchestrator — the same unbounded-per-request
+// LLM fan-out rationale /api/run-scene and /api/game/interview already use
+// aiLimiter for above, just not previously applied here or to its SSE
+// sibling below.
+router.post('/api/run-room', aiLimiter, validate(RunRoomBodySchema), asyncHandler(async (req, res) => {
   const sid = sessionId(req);
   const nodeId = requireString(req.body?.nodeId, 'nodeId', 128);
   const lockKey = `${sid}:${nodeId}`;
@@ -275,7 +281,10 @@ router.post('/api/run-room', gameLimiter, validate(RunRoomBodySchema), asyncHand
 }));
 
 // ── SSE streaming endpoint for run-room ─────────────────────────────────────
-router.get('/api/run-room-stream', gameLimiter, async (req, res) => {
+// aiLimiter — same fan-out rationale as POST /api/run-room above; this is
+// its streaming twin and drives the identical orchestrator.runRoomSimulation
+// call with the same maxTurns budget.
+router.get('/api/run-room-stream', aiLimiter, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
