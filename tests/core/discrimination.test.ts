@@ -32,39 +32,71 @@
 // existing calibration/length-invariance guarantee, is untouched (that
 // branch of densityPenalty is byte-identical code).
 //
-// Current measured state (5 of 6 axes now discriminate; 1 blind spot
-// worsened, root cause explained below):
+// Current measured state (P6: all 6 axes now discriminate on plain ordering;
+// only the stricter composite minimum-gap guard remains a todo):
 //
 //   escalation-vs-flat-repetition:    good 76.1 > bad 70.0  (gap +6.1) PASS
 //   setup-payoff-vs-orphaned-setups:  good 74.6 > bad 70.0  (gap +4.6) PASS
-//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS (flipped this wave)
-//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS (flipped this wave)
 //   composite-reviewer-scenario:      good 72.2 > bad 70.0  (gap +2.2) PASS ordering; 5.0-pt min-gap still FAILS
-//   active-vs-passive-protagonist:    good 75.8 < bad 77.7  (gap -1.9) FAIL — WORSE than the prior tie
+//   subtext-vs-on-the-nose:           good 79.1 > bad 77.7  (gap +1.4) PASS
+//   dramatized-vs-told-exposition:    good 74.0 > bad 72.6  (gap +1.4) PASS
+//   active-vs-passive-protagonist:    good 76.6 > bad 75.3  (gap +1.3) PASS (flipped this wave, P6)
 //
-// active-vs-passive-protagonist is not a compression artifact: measured
-// weighted-issue counts show the "good" (active-protagonist) half already
-// fires MORE weighted issues than the "bad" (passive-protagonist) half (38
-// vs 35) under the CURRENT rule set — some other axis (unrelated to
-// protagonist agency) happens to fire more on the good sample. Sharpening
-// the density curve's sensitivity (this wave's whole point) necessarily
-// makes that existing wrong-direction gap MORE visible, not less — no
-// density-curve reshaping can fix a case where the underlying issue-count
-// signal itself disagrees with the desired ordering. This is the
-// BLIND_SPOT_NOTE's "no signal distinguishes active from passive" finding
-// confirmed at the measurement level, not a new defect.
+// active-vs-passive-protagonist flipped by closing BOTH diagnosed causes,
+// principled fix in each case (P6, discrimination-harness hardening — see
+// server/nvm/revision/passes/intention.ts for both changes):
+//   (1) residual false positive: INTENTION_REACTIVE_CLIMAX's climax-zone
+//       "proactive" check only recognized NEW initiative (a clock raised or
+//       a clue planted), so a protagonist whose climax scene delivers/pays
+//       off an earlier-seeded clue — precisely what an active protagonist's
+//       climax usually looks like — read as passive. Scoped fix: the
+//       climax-zone check (only) now also counts a payoff landing in the
+//       zone as decisive follow-through; the shared isProactive258 helper
+//       used by every OTHER proactive-timing rule in the file is untouched.
+//       This alone removed 0.5 weighted points from the active half.
+//   (2) missing true positive: no existing signal distinguished a
+//       protagonist who drives decisions from one to whom decisions happen —
+//       every driver field in ScreenplaySceneRecord (clockRaised,
+//       seededClueIds, payoffSetupIds, relationshipShifts, suspenseDelta) is
+//       scene-level, not attributed to a specific character, so a coworker
+//       making every call for the nominal lead was invisible to the rule
+//       set. New detector PROTAGONIST_DECISION_VACUUM reads dialogue
+//       directly off the raw fountain text (same ALL-CAPS-cue scan every
+//       DIALOGUE_* rule already uses): a clear top speaker (>=40% of lines)
+//       whose own dialogue is pure deferral ("okay", "whatever you think is
+//       best") with zero first-person commitment language, while another
+//       character's dialogue explicitly decides and acts on their behalf
+//       ("let me handle it", "you don't need to worry about that"), is a
+//       protagonist in name only. Fires on the passive half (+1.5 weighted
+//       points there), does not fire on the active half (Dana's own lines —
+//       "I'll testify to all of it", "I already made copies" — clear the
+//       zero-commitment guard).
+// The remaining residual false positives on the active half diagnosed
+// pre-wave (ACTION_WITHOUT_CONSEQUENCE, GOAL_WITHOUT_OPPOSITION — both
+// causality.ts) were re-measured and left AS-IS on principle: both are
+// signal-desert artifacts (the confrontation scenes they miss register zero
+// relationshipShift/suspenseDelta reversal anywhere in the fixture, a
+// fountain-analyzer.ts detection gap out of this wave's file ownership, not
+// a causality.ts guard bug) — see the D2-a comments at each rule for the
+// full prior diagnosis, unchanged. The rhythm.ts density-family fires
+// (RUN_ON_ACTION, SET_DRESSING_DOMINANCE, TRIADIC_LIST_OVERLOAD,
+// ACTION_CONSECUTIVE_LONG_RUN, ACTION_DENSITY_PEAK_EARLY,
+// ACTION_COMMA_DENSE_FLOOD) were audited and left as honest fires: the
+// active-protagonist fixture's prose is genuinely denser (more physical
+// staging, more texture) than the passive fixture's mostly-dialogue scenes —
+// that is a real property of the text, not a rule defect, and weakening
+// density rules to flatter one fixture's prose style would be tuning the
+// judge, not fixing a bug.
 //
-// 5 of 6 pairs' plain good > bad ORDERING are now hard (non-todo)
-// assertions — a regression there must fail CI immediately. Only
-// active-vs-passive-protagonist's ordering stays `todo` (it measurably
-// worsened — see above). The separate, stricter composite minimum-gap
-// guard (COMPOSITE_MIN_GAP=5.0, below) also stays `todo`: composite's
-// ordering passes but its margin (+2.2) doesn't clear that floor yet. Each
-// remaining todo is a standing invitation to flip to a hard assertion the
-// moment a Wave Program v2 detector (excellence detectors and root-cause
-// templates are the most directly relevant wave types) closes that gap. Do
-// NOT delete a todo without first re-running this file and confirming the
-// gap actually closed.
+// All 6 pairs' plain good > bad ORDERING are now hard (non-todo) assertions —
+// a regression on any of them must fail CI immediately. Only the separate,
+// stricter composite minimum-gap guard (COMPOSITE_MIN_GAP=5.0, below) stays
+// `todo`: composite's ordering passes but its margin (+2.2) doesn't clear
+// that floor yet. That remaining todo is a standing invitation to flip to a
+// hard assertion the moment a Wave Program v2 detector (excellence detectors
+// and root-cause templates are the most directly relevant wave types) closes
+// the gap. Do NOT delete a todo without first re-running this file and
+// confirming the gap actually closed.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -91,6 +123,12 @@ const KNOWN_DISCRIMINATING = new Set<string>([
   // minimum-gap regression guard below (COMPOSITE_MIN_GAP=5.0) still does
   // not clear, so that second, stricter assertion stays `todo`.
   'composite-reviewer-scenario',
+  // Flipped by P6 (discrimination-harness hardening): INTENTION_REACTIVE_
+  // CLIMAX's climax-zone false positive fixed + new PROTAGONIST_DECISION_
+  // VACUUM true-positive detector added to intention.ts — see the ledger
+  // above for the full before/after and the two rules' own comments for the
+  // measurement each fix is based on. Gap moved from -1.9 to +1.3.
+  'active-vs-passive-protagonist',
 ]);
 
 /** Per-pair blind-spot note surfaced in the todo reason and, on a rare
@@ -98,11 +136,6 @@ const KNOWN_DISCRIMINATING = new Set<string>([
  *  it inline via the message argument below rather than having to go dig up
  *  this comment block. */
 const BLIND_SPOT_NOTE: Record<string, string> = {
-  'active-vs-passive-protagonist':
-    'no signal distinguishes a protagonist who drives decisions from one things merely happen to — and (measured '
-    + 'by the W1 health-formula wave) the "active" half already fires MORE weighted issues than the "passive" '
-    + 'half under the current rule set (38 vs 35), so this is a missing-detector gap, not a formula-sensitivity '
-    + 'one; no density-curve change can close it',
   'composite-reviewer-scenario':
     "reproduces the reviewer's original finding directly: an overall well-crafted script and an overall "
     + 'poorly-crafted one of matched size scores only a modest gap (+2.2 as of the W1 health-formula wave, up '

@@ -1644,11 +1644,30 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
   // acts rather than reacts. A passive climax squanders all the agency built
   // through the arc. Requires 6+ records and 2+ proactive scenes before the
   // climax zone.
+  //
+  // P6 discrimination-harness fix: isProactive258 ("clock raised or clue
+  // planted") is the right definition of initiative for rules that ask
+  // whether the protagonist STARTS something — but the climax is structurally
+  // where a story's earlier plants get DELIVERED, not where new ones get
+  // seeded. A protagonist who spends the climax handing over the evidence
+  // they gathered, testifying, or closing the case they built is not passive
+  // — they're paying off their own setup, which the pre-climax-only
+  // isProactive258 definition can never see because it only recognizes
+  // planting. Measured false positive: an active-protagonist fixture whose
+  // climax scene pays off its own earlier-seeded clue (payoffSetupIds
+  // non-empty) fired this rule anyway, because a payoff carries no
+  // seededClueIds/clockRaised of its own. Scoped narrowly to THIS rule's
+  // climax-zone check only (not folded into the shared isProactive258, which
+  // stays plant-only for the many other rules — proactive midpoint void,
+  // proactive desert run, etc. — that specifically measure NEW initiative
+  // and would be diluted by counting payoffs as initiation there).
+  const isProactiveOrPayoff286 = (r: any): boolean =>
+    isProactive258(r) || (r.payoffSetupIds?.length ?? 0) > 0;
   if (n >= 6) {
     const climaxStart286 = Math.max(n - Math.ceil(n * 0.15), n - 2);
     const preClimaxProactive286 = records.slice(0, climaxStart286).filter(isProactive258).length;
     if (preClimaxProactive286 >= 2) {
-      const climaxProactive286 = records.slice(climaxStart286).filter(isProactive258).length;
+      const climaxProactive286 = records.slice(climaxStart286).filter(isProactiveOrPayoff286).length;
       if (climaxProactive286 === 0) {
         issues.push({
           location: `Climax zone (scene ${climaxStart286}+) — no protagonist initiative`,
@@ -6949,6 +6968,98 @@ export async function intentionPass(input: PassInput): Promise<PassResult> {
         description: `${Math.round((r1179c.matchingHalfCount / r1179c.count) * 100)}% of the story's scenes carrying a standout line of dialogue (${r1179c.matchingHalfCount} of ${r1179c.count}) fall in the second half, leaving the first half with only ${r1179c.otherHalfCount}. The first half of the story voices the character's intentions in forgettable dialogue, with nearly every memorable line saved for the back half.`,
         suggestedFix: `Give at least one scene in the first half a standout line of dialogue — a memorable articulation of intention early on gives the audience something to hold onto before the back half's highlights arrive.`,
       });
+    }
+  }
+
+  // ── P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM ────────────────
+  // Every proactive/entropy/payoff check above measures initiative from the
+  // SCENE-level driver fields (clockRaised, seededClueIds, payoffSetupIds) —
+  // none of them are attributed to a specific character, so none can tell a
+  // protagonist who drives the plot from a protagonist to whom the plot merely
+  // happens (the discrimination harness's measured blind spot: "no signal
+  // distinguishes a protagonist who drives decisions from one things merely
+  // happen to"). This check closes that gap the only way available without
+  // touching fountain-analyzer.ts: it reads dialogue directly off the raw
+  // fountain text (the same ALL-CAPS-cue scan every DIALOGUE_* rule in this
+  // codebase already uses) and asks who speaks the most, then asks two
+  // narrower questions about what THAT character says: do their own lines
+  // ever commit to a decision, and does anyone else's dialogue explicitly
+  // make decisions on their behalf?
+  //
+  // Fires when ALL of:
+  //   - a clear top speaker exists (>=40% of dialogue lines, so an ensemble
+  //     piece with no single lead never qualifies — genuinely distributed
+  //     dialogue has no "the protagonist" to judge)
+  //   - the top speaker's own lines contain 2+ deferral/acquiescence markers
+  //     ("okay", "whatever you think is best", "if that's what needs to
+  //     happen", "I guess", "sounds good", "I appreciate you taking care of
+  //     it") and ZERO commitment markers ("I'll", "I'm going to", "I need
+  //     to", "I've decided", "I won't", "I demand") — the guard the task
+  //     calls "don't fire when the protagonist has even 2 proactive beats",
+  //     applied at the level this check can actually see: the protagonist's
+  //     OWN decisive speech, not a generic scene marker that (as measured on
+  //     the pair 2 fixtures) can be satisfied by another character's action
+  //     and would wrongly disqualify the exact case this rule exists to catch
+  //   - at least one OTHER character's dialogue contains 2+ decides-for-them
+  //     markers ("let me handle it", "I'll take care of it", "you don't need
+  //     to worry about", "I've already handled it", "no need for you to")
+  // Requires 10+ total dialogue lines and 2+ distinct speakers so the check
+  // never fires on a single-character piece or a fragment too short to judge.
+  {
+    type Speech728 = { speaker: string; text: string };
+    const speeches728: Speech728[] = [];
+    let curSpeaker728: string | null = null;
+    let curText728 = '';
+    const flush728 = () => {
+      if (curSpeaker728 && curText728.trim()) speeches728.push({ speaker: curSpeaker728, text: curText728.trim() });
+      curText728 = '';
+    };
+    for (const line of linesInFountain) {
+      const t = line.trim();
+      if (!t) { flush728(); curSpeaker728 = null; continue; }
+      if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i.test(t)) { flush728(); curSpeaker728 = null; continue; }
+      if (/^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\(.*\))?$/.test(t)) {
+        flush728();
+        curSpeaker728 = t.replace(/\s*\(.*\)\s*$/, '').trim();
+        continue;
+      }
+      if (t.startsWith('(')) continue;
+      if (!curSpeaker728) continue;
+      curText728 += (curText728 ? ' ' : '') + t;
+    }
+    flush728();
+
+    const lineCounts728 = new Map<string, number>();
+    for (const s of speeches728) lineCounts728.set(s.speaker, (lineCounts728.get(s.speaker) ?? 0) + 1);
+    const totalLines728 = speeches728.length;
+
+    if (totalLines728 >= 10 && lineCounts728.size >= 2) {
+      const [topSpeaker728, topCount728] = [...lineCounts728.entries()].sort((a, b) => b[1] - a[1])[0];
+      const topShare728 = topCount728 / totalLines728;
+
+      if (topShare728 >= 0.4) {
+        const DEFERRAL_RE_728 = /\bokay\b|\bwhatever (you|makes)\b|\bif that'?s what\b|\bsounds good\b|\bi guess\b|\bi appreciate you\b|\bi wouldn'?t have known\b|\bi'?ll (just )?wait\b/i;
+        const COMMIT_RE_728 = /\bi'?ll\b|\bi'?m going to\b|\bi need to\b|\bi'?ve decided\b|\bi won'?t\b|\bi demand\b|\bi insist\b|\bi'?m not\b/i;
+        const DECIDES_FOR_RE_728 = /\blet me handle\b|\bi'?ll (take care of|handle)\b|\byou don'?t need to\b|\bdon'?t worry about\b|\bi'?ve (already )?(got|handled) (it|this)\b|\bi already (called|reported|handled|told|know exactly)\b|\bno need for you to\b/i;
+
+        const topSpeeches728 = speeches728.filter(s => s.speaker === topSpeaker728);
+        const deferralHits728 = topSpeeches728.filter(s => DEFERRAL_RE_728.test(s.text)).length;
+        // A line that matches BOTH regexes ("I'll just wait...") is deferral wearing
+        // "I'll" as a false commitment flag — the deferral phrasing wins so a hedge
+        // dressed in first-person-future grammar can't launder itself into agency.
+        const commitHits728 = topSpeeches728.filter(s => COMMIT_RE_728.test(s.text) && !DEFERRAL_RE_728.test(s.text)).length;
+        const othersDecideHits728 = speeches728.filter(s => s.speaker !== topSpeaker728 && DECIDES_FOR_RE_728.test(s.text)).length;
+
+        if (deferralHits728 >= 2 && commitHits728 === 0 && othersDecideHits728 >= 2) {
+          issues.push({
+            location: `${topSpeaker728} — ${topCount728}/${totalLines728} dialogue lines, ${deferralHits728} deferral line(s), 0 commitment lines`,
+            rule: 'PROTAGONIST_DECISION_VACUUM',
+            severity: 'major',
+            description: `${topSpeaker728} carries ${Math.round(topShare728 * 100)}% of the script's dialogue (${topCount728}/${totalLines728} lines) but never once commits to a decision in their own words — ${deferralHits728} of their lines are pure deferral ("okay", "whatever you think is best") and none contain a decisive first-person commitment ("I'll...", "I need to..."). Meanwhile another character's dialogue explicitly decides and acts on ${topSpeaker728}'s behalf ${othersDecideHits728} time(s) ("let me handle it", "you don't need to worry about that"). The lead voice of the script is a passenger in their own story: they speak the most but choose the least.`,
+            suggestedFix: `Give ${topSpeaker728} at least one line where they commit to a decision in their own voice — a plan they state, a risk they choose to take, a refusal they voice themselves — rather than deferring to or being managed by another character. Agency has to be spoken, not just implied by screen time.`,
+          });
+        }
+      }
     }
   }
 

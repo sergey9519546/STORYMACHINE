@@ -1,18 +1,23 @@
 # Pass: `intention`
 
-Founding wave: 39. Total distinct rules: 224 (174 attributed to a specific wave, 50 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 225 (179 attributed to a specific wave, 46 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1179
 
-Wave 1179 additions (distinct-mode pivot — see Waves 1176/1177/1178 in dialogue.ts/character-arc.ts/conflict.ts): reconnaissance found every one of the ten analytical modes represented somewhere in this file's checkAftermathVoid (42 uses), checkZoneCluster (22), checkZoneImbalance (23), checkDroughtRun (22), checkPeakUncaused (10 + 12 hand-rolled), and ~24 co-occurrence/ decoupling rules — but checkHalfLoaded (binary front/back-half distribution) had zero uses via the shared helper. The half-partition *concept* is not new to this file (AGENCY_FRONTLOADED, PROACTIVE_FRONTLOADED/BACKLOADED, SEED_FRONTLOADED/BACKLOADED, REVELATION_FRONTLOADED, PAYOFF_BACK_LOADED all hand-roll it), but none of those seven prior checks anchor on clockDelta, relationshipShifts, or dialogueHighlights — each of which already has zone-cluster/zone-imbalance/ drought-run/peak-uncaused coverage but no half-partition check. This wave fills that empty cell for three channels via the shared helper: INTENTION_CLOCK_DELTA_BACK_LOADED, INTENTION_RELATIONSHIP_FRONT_LOADED, and INTENTION_HIGHLIGHT_BACK_LOADED. Thresholds (minRecords 9, minCount 3) are matched to this file's own zone-cluster precedent for each channel (Waves 717, 745, 759); ratioThreshold 0.70 matches the file's existing half-partition family (PROACTIVE_*, PAYOFF_BACK_LOADED all use >70%).
+Wave 1179 additions (distinct-mode pivot — see Waves 1176/1177/1178 in dialogue.ts/character-arc.ts/conflict.ts): reconnaissance found every one of the ten analytical modes represented somewhere in this file's checkAftermathVoid (42 uses), checkZoneCluster (22), checkZoneImbalance (23), checkDroughtRun (22), checkPeakUncaused (10 + 12 hand-rolled), and ~24 co-occurrence/ decoupling rules — but checkHalfLoaded (binary front/back-half distribution) had zero uses via the shared helper. The half-partition *concept* is not new to this file (AGENCY_FRONTLOADED, PROACTIVE_FRONTLOADED/BACKLOADED, SEED_FRONTLOADED/BACKLOADED, REVELATION_FRONTLOADED, PAYOFF_BACK_LOADED all hand-roll it), but none of those seven prior checks anchor on clockDelta, relationshipShifts, or dialogueHighlights — each of which already has zone-cluster/zone-imbalance/ drought-run/peak-uncaused coverage but no half-partition check. This wave fills that empty cell for three channels via the shared helper: INTENTION_CLOCK_DELTA_BACK_LOADED, INTENTION_RELATIONSHIP_FRONT_LOADED, and INTENTION_HIGHLIGHT_BACK_LOADED. Thresholds (minRecords 9, minCount 3) are matched to this file's own zone-cluster precedent for each channel (Waves 717, 745, 759); ratioThreshold 0.70 matches the file's existing half-partition family (PROACTIVE_*, PAYOFF_BACK_LOADED all use >70%). Discrimination-harness guard pass (D2-b): the harness in calibration/discrimination-pairs.ts + tests/core/discrimination.test.ts pairs well- and poorly-crafted scripts on one isolated craft axis each (same premise, same length) and asserts good.health > bad.health. Five rules in this file inverted that ordering — they fired MORE on the well-crafted half than the poorly-crafted half of a pair, because they are all "X is absent" checks whose only evidence channels are the loud, lexicon-triggered signals (explicit emotion words, ops-derived relationship shifts, suspense spikes) that quiet/subtextual/procedural writing deliberately avoids tripping. Fixed by widening each rule's evidence to existing-but-previously-unread channels (payoffSetupIds, revelation, curiosityDelta) or existing-but-too-narrow windows/gates (PASSIVE_ESCALATION's structure.reversalCount, which only counts suspense-drop reversals) rather than by loosening thresholds — see the guard comment at each of ZERO_ENTROPY_SCENE, ENTROPY_CLUSTER, PASSIVE_ESCALATION, GOAL_INVERSION_ABSENT, and AGENCY_WITHOUT_CONSEQUENCE.
 
 Rules named in this wave's header:
 
 - `AGENCY_FRONTLOADED`
+- `AGENCY_WITHOUT_CONSEQUENCE`
+- `ENTROPY_CLUSTER`
+- `GOAL_INVERSION_ABSENT`
 - `INTENTION_CLOCK_DELTA_BACK_LOADED`
 - `INTENTION_HIGHLIGHT_BACK_LOADED`
 - `INTENTION_RELATIONSHIP_FRONT_LOADED`
+- `PASSIVE_ESCALATION`
 - `PROACTIVE_FRONTLOADED`
+- `ZERO_ENTROPY_SCENE`
 
 ## Wave 1165
 
@@ -552,15 +557,12 @@ Rules named in this wave's header:
 These rule constants exist in this pass but were not found, by exact-name match, inside any "Wave N —" / "Wave N additions:" header entry in the file — typically because they predate that convention hardening, or the header describes the check descriptively rather than by constant name (e.g. "talking heads" rather than `TALKING_HEADS`). Listed here honestly rather than guessed into a wave, with the nearest preceding in-code "── section title ──" comment as the best-available substitute context where one exists.
 
 - `AGENCY_ENTROPY_COLLAPSE` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
-- `AGENCY_WITHOUT_CONSEQUENCE` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
 - `CLIMAX_WITHOUT_CHOICE` — Act 3 without a character making the climactic choice
 - `CLOCK_REVELATION_AFTERMATH_VOID` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
 - `COMMITMENT_RAMP_INVERSION` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
 - `ENTROPY_CLIFF` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
-- `ENTROPY_CLUSTER` — Wave 142: Scene Entropy — scenes that don't advance story
 - `ENTROPY_SPIKE_MISPLACED` — Wave 171: ENTROPY_SPIKE_MISPLACED
 - `ESCALATION_ENTROPY_FLAT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
-- `GOAL_INVERSION_ABSENT` — Wave 171: GOAL_INVERSION_ABSENT
 - `GOAL_PIVOT_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
 - `INTENTION_CONVERGENCE_ABSENT` — Wave 188: Entropy arc flat, intention convergence absent, entropy cliff
 - `INTENTION_DISCOVERY_ABSENT` — Wave 244: Proactive Act 3 void, intention discovery absent, goal pivot absent
@@ -569,7 +571,6 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `INTENTION_PURPOSE_MONOTONE` — Wave 286: INTENTION_PURPOSE_MONOTONE
 - `INTENTION_REACTIVE_CLIMAX` — Wave 286: INTENTION_REACTIVE_CLIMAX
 - `PASSIVE_ACT3_INTENTION` — Wave 171: PASSIVE_ACT3_INTENTION
-- `PASSIVE_ESCALATION` — Escalation without character agency
 - `PAYOFF_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
 - `PAYOFF_RUN` — Wave 493: PAYOFF_CURIOSITY_FLAT, SEED_ACT1_VOID, PAYOFF_RUN
 - `PAYOFF_WITHOUT_EFFORT` — Wave 272: PAYOFF_WITHOUT_EFFORT
@@ -588,6 +589,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `PROACTIVE_PAYOFF_COINCIDENCE_ABSENT` — Wave 367: PROACTIVE_ADVERSITY_ABSENT, PROACTIVE_BACKLOADED, PROACTIVE_PAYOFF_COINCIDENCE_ABSENT
 - `PROACTIVE_RELATIONSHIP_VOID` — Wave 339: PROACTIVE_EMOTION_DECOUPLED, PROACTIVE_REVELATION_ABSENT, PROACTIVE_RELATIONSHIP_VOID
 - `PROACTIVE_REVELATION_COINCIDENCE_ABSENT` — Wave 381: PROACTIVE_ACT2B_VOID, PROACTIVE_FRONTLOADED, PROACTIVE_REVELATION_COINCIDENCE_ABSENT
+- `PROTAGONIST_DECISION_VACUUM` — P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM
 - `PROTAGONIST_REACTIVE_DOMINANCE` — Wave 156: Protagonist reactive dominance
 - `REACTIVE_GOAL_ADOPTION` — Wave 230: Secondary intention vacuum, proactive overclustering, reactive goal adoption
 - `REVELATION_RELATIONSHIP_DECOUPLED` — Wave 549: REVELATION_SUSPENSE_FLAT, REVELATION_EMOTION_DECOUPLED, REVELATION_CAUSE_VOID
@@ -600,5 +602,4 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `SEEDING_CURIOSITY_FLAT` — Wave 300: SEEDING_CURIOSITY_FLAT
 - `STAKES_NEVER_PERSONAL` — Wave 205: Proactive opening absent, agency frontloaded, stakes never personal
 - `WANT_FEAR_COLLISION_ABSENT` — WANT_FEAR_COLLISION_ABSENT
-- `ZERO_ENTROPY_SCENE` — Wave 142: Scene Entropy — scenes that don't advance story
 

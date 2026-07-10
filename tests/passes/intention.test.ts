@@ -6200,6 +6200,27 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
       assert.ok(!res.issues.some((i: any) => i.rule === 'INTENTION_REACTIVE_CLIMAX'), 'INTENTION_REACTIVE_CLIMAX should not fire');
     });
 
+    // P6 discrimination-harness fix: a climax scene that pays off an earlier-
+    // seeded clue (no fresh clockRaised/seededClueIds of its own) is decisive
+    // follow-through, not passivity — the false positive measured on the
+    // active-vs-passive-protagonist discrimination pair (see discrimination.
+    // test.ts's ledger).
+    it('INTENTION_REACTIVE_CLIMAX does not fire when the climax zone pays off an earlier-seeded clue (no fresh plant/clock of its own)', async () => {
+      // 8 scenes: proactive at 0,1 (seeded clues); climax zone = last 2
+      // scenes (6,7) — scene 7 pays off scene 0's clue but plants/raises
+      // nothing new itself.
+      const recs286pc = Array.from({ length: 8 }, (_, i) => {
+        if (i === 0 || i === 1) return makeRec286(i, { seededClueIds: [`clue-${i}`] });
+        if (i === 7) return makeRec286(i, { payoffSetupIds: ['clue-0'] });
+        return makeRec286(i);
+      });
+      const res = await runI286(recs286pc);
+      assert.ok(
+        !res.issues.some((i: any) => i.rule === 'INTENTION_REACTIVE_CLIMAX'),
+        'INTENTION_REACTIVE_CLIMAX should not fire when the climax scene delivers a payoff',
+      );
+    });
+
     it('INTENTION_SEED_GRAVEYARD fires when first-half has 3+ seeds and second-half has no payoffs', async () => {
       const recs286sg = Array.from({ length: 8 }, (_, i) =>
         makeRec286(i, {
@@ -7079,6 +7100,162 @@ describe('D2-b — intentionPass discrimination-harness guards: PASSIVE_ESCALATI
     assert.ok(
       !result.issues.some(i => i.rule === 'ENTROPY_CLUSTER'),
       'Should NOT fire when a revelation interrupts the low-suspense run',
+    );
+  });
+});
+
+// ── P6 (discrimination-harness): PROTAGONIST_DECISION_VACUUM ────────────────
+// Closes the active-vs-passive-protagonist discrimination pair's missing-
+// true-positive gap (see tests/core/discrimination.test.ts's ledger): no
+// prior signal distinguished a top-billed character who never commits to a
+// decision in their own dialogue from one who genuinely drives the plot.
+describe('P6 — intentionPass: PROTAGONIST_DECISION_VACUUM', () => {
+  const runVacuum = async (fountain: string) => {
+    const { intentionPass } = await import('../../server/nvm/revision/passes/intention.ts');
+    return intentionPass({
+      fountain, original: fountain, records: [], structure: {} as any,
+      annotations: [], approvedSpans: [],
+    });
+  };
+
+  it('fires when the top speaker (58% of dialogue) is pure deferral with zero commitment while another character decides for them', async () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ANNA',
+      'Okay.',
+      '',
+      'ANNA',
+      'Whatever you think is best.',
+      '',
+      "ANNA",
+      "If that's what needs to happen, okay.",
+      '',
+      'ANNA',
+      'Sounds good.',
+      '',
+      'ANNA',
+      'I guess so.',
+      '',
+      'ANNA',
+      'I appreciate you handling that.',
+      '',
+      'ANNA',
+      "I wouldn't have known what to do.",
+      '',
+      'BOB',
+      'Let me handle it.',
+      '',
+      'BOB',
+      "You don't need to worry about this.",
+      '',
+      'BOB',
+      'I already told them everything.',
+      '',
+      'BOB',
+      "It's fine, really.",
+      '',
+      'BOB',
+      "I've got this handled.",
+    ].join('\n');
+    const res = await runVacuum(fountain);
+    assert.ok(
+      res.issues.some(i => i.rule === 'PROTAGONIST_DECISION_VACUUM'),
+      `PROTAGONIST_DECISION_VACUUM should fire; got: ${res.issues.map(i => i.rule).join(', ')}`,
+    );
+  });
+
+  it('does not fire when the top speaker has even one first-person commitment line', async () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ANNA',
+      'Okay.',
+      '',
+      'ANNA',
+      'Whatever you think is best.',
+      '',
+      "ANNA",
+      "If that's what needs to happen, okay.",
+      '',
+      'ANNA',
+      'Sounds good.',
+      '',
+      'ANNA',
+      'I guess so.',
+      '',
+      'ANNA',
+      "I'll handle this part myself.",
+      '',
+      'ANNA',
+      "I wouldn't have known what to do.",
+      '',
+      'BOB',
+      'Let me handle it.',
+      '',
+      'BOB',
+      "You don't need to worry about this.",
+      '',
+      'BOB',
+      'I already told them everything.',
+      '',
+      'BOB',
+      "It's fine, really.",
+      '',
+      'BOB',
+      "I've got this handled.",
+    ].join('\n');
+    const res = await runVacuum(fountain);
+    assert.ok(
+      !res.issues.some(i => i.rule === 'PROTAGONIST_DECISION_VACUUM'),
+      'PROTAGONIST_DECISION_VACUUM should not fire once the top speaker commits to even one decision',
+    );
+  });
+
+  it('does not fire on an ensemble piece with no clear top speaker (three-way even split)', async () => {
+    const fountain = [
+      'INT. OFFICE - DAY',
+      '',
+      'ANNA',
+      'Okay.',
+      '',
+      'ANNA',
+      'Whatever you think is best.',
+      '',
+      "ANNA",
+      "If that's what needs to happen, okay.",
+      '',
+      'ANNA',
+      'Sounds good.',
+      '',
+      'BOB',
+      'Let me handle it.',
+      '',
+      'BOB',
+      "You don't need to worry about this.",
+      '',
+      'BOB',
+      'I already told them everything.',
+      '',
+      'BOB',
+      "It's fine, really.",
+      '',
+      'CAROL',
+      'I have another idea.',
+      '',
+      'CAROL',
+      'Let me check the file.',
+      '',
+      'CAROL',
+      'This changes things.',
+      '',
+      'CAROL',
+      'We should move fast.',
+    ].join('\n');
+    const res = await runVacuum(fountain);
+    assert.ok(
+      !res.issues.some(i => i.rule === 'PROTAGONIST_DECISION_VACUUM'),
+      'PROTAGONIST_DECISION_VACUUM should not fire when no single speaker holds >=40% of dialogue',
     );
   });
 });
