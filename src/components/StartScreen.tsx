@@ -270,19 +270,19 @@ export default function StartScreen({
                   type="button"
                   onClick={handleSample}
                   disabled={isGenerating}
-                  className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
+                  className={`group relative flex min-h-[44px] flex-col gap-3 border-4 border-ink bg-paper px-8 py-9 text-left text-ink transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-11 sm:py-11 ${FOCUS_RING}`}
                 >
                   <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-courier text-[10px] uppercase tracking-[0.25em] text-stamp">
                     Reader&rsquo;s Pick
                   </span>
-                  <span className="font-courier text-[11px] uppercase tracking-[0.3em] text-paper/60">
-                    Fastest way in
+                  <span className="flex items-center gap-1.5 font-courier text-xs font-bold uppercase tracking-[0.3em] text-stamp">
+                    Fastest Way In <span aria-hidden="true">&#9656;</span>
                   </span>
-                  <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
-                    <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
+                  <span className="flex items-center gap-3 font-display text-3xl uppercase tracking-wide sm:text-4xl">
+                    <Sparkles className="h-7 w-7 shrink-0 text-ink" aria-hidden="true" />
                     Try The Sample Script
                   </span>
-                  <span className="max-w-[52ch] font-sans text-sm text-paper/70">
+                  <span className="max-w-[56ch] font-sans text-sm text-ink/70">
                     See a full coverage read on a script that&rsquo;s already loaded — no setup required.
                   </span>
                 </button>
