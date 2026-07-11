@@ -286,16 +286,22 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
     const es = new EventSource(withSession(`/api/nvm/converge-stream?${params}`));
     esRef.current = es;
 
+    // Local to this run() invocation — not a stale closure like `running`,
+    // which is always false here (the button is disabled while running).
+    let finished = false;
+
     es.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data);
         if (data.type === 'converge_step') {
           setLiveSteps(prev => [...prev, data.step as ConvergeStep]);
         } else if (data.type === 'converge_complete') {
+          finished = true;
           setResult(data.result as ConvergeResult);
           setRunning(false);
           es.close();
         } else if (data.type === 'converge_error') {
+          finished = true;
           setError(data.error ?? 'Unknown error');
           setRunning(false);
           es.close();
@@ -304,7 +310,8 @@ export function ConvergePanel({ onClose, onCommitted }: ConvPanelProps) {
     };
 
     es.onerror = () => {
-      if (running) setError('Connection lost — try again');
+      if (!finished) setError('Connection lost — try again');
+      finished = true;
       setRunning(false);
       es.close();
     };
