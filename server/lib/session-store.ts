@@ -31,8 +31,12 @@ export const asyncHandler = (fn: express.RequestHandler): express.RequestHandler
   };
 
 export const requireString = (val: unknown, name: string, maxLen = 20_000): string => {
-  if (typeof val !== 'string' || val.trim() === '') throw new Error(`${name} is required`);
-  if (val.length > maxLen) throw new Error(`${name} exceeds maximum length`);
+  // ValidationError, not plain Error: app.ts's global error handler only maps
+  // ValidationError to a 400 with the message; a plain Error falls through to
+  // the generic 500 "Internal Server Error" branch, masking a caller's bad
+  // input as a server fault (same bug class as the 413-vs-500 body-size fix).
+  if (typeof val !== 'string' || val.trim() === '') throw new ValidationError(`${name} is required`);
+  if (val.length > maxLen) throw new ValidationError(`${name} exceeds maximum length`);
   return val.trim();
 };
 
