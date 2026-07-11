@@ -1545,7 +1545,37 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     { critical: 0, major: 0, minor: 0 },
   );
 
-  const health = computeHealthScore(bySeverity, analysis.sceneCount, analysis.wordCount);
+  const baseHealth = computeHealthScore(bySeverity, analysis.sceneCount, analysis.wordCount);
+
+  // ── Structural-integrity deduction (health-formula wave, 2026-07-10) ─────
+  // MEASURED MOTIVATION (degradation harness, tests/core/real-script-corpus
+  // .test.ts): craftPenalty reads only severity COUNTS as a density against
+  // script size, so at feature-scale issue volume (~600 issues) even a dozen
+  // majors plus a critical from ONE rule family moves displayed health by
+  // ~0.1 — scrambled features scored within 1.2 points of their intact
+  // originals (AUC 0.677) even after SCENE_CONTINUITY_COLLAPSE landed and
+  // fired correctly. Document-scale structural collapse is a different KIND
+  // of finding from accumulated line-level craft defects: it is one verdict
+  // about the whole scene ORDER, and averaging it into a density erases it
+  // by construction. So it gets a direct, bounded, named deduction here —
+  // NOT a craftPenalty change: the density formula, its calibration-band
+  // monotonicity, and its length-invariance regression are untouched
+  // (structural rules carry feature-scale floors, so the calibration corpus
+  // and every fixture are structurally exempt and score byte-identically).
+  // Bounded at 12 points: enough to separate a scrambled feature from its
+  // intact original by more than the whole pre-wave gap, small enough that
+  // an otherwise-excellent draft with a genuinely mosaic structure lands in
+  // CONSIDER territory rather than being executed on one axis.
+  const STRUCTURAL_ROLLUP_DEDUCTION = 8;
+  const STRUCTURAL_INSTANCE_DEDUCTION = 0.5; // per detailed break, capped below
+  const sccInstances = passes.reduce(
+    (n, p) => n + p.issues.filter(i => i.rule === 'SCENE_CONTINUITY_COLLAPSE').length, 0);
+  const sccPervasive = passes.some(p => p.issues.some(i => i.rule === 'SCENE_CONTINUITY_PERVASIVE'));
+  const structuralDeduction = Math.min(
+    12,
+    (sccPervasive ? STRUCTURAL_ROLLUP_DEDUCTION : 0) + sccInstances * STRUCTURAL_INSTANCE_DEDUCTION,
+  );
+  const health = Math.max(0, Math.round((baseHealth - structuralDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────

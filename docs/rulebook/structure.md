@@ -1,6 +1,6 @@
 # Pass: `structure`
 
-Founding wave: 139. Total distinct rules: 235 (164 attributed to a specific wave, 71 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 139. Total distinct rules: 237 (164 attributed to a specific wave, 73 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1191
 
@@ -616,6 +616,8 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `PURPOSE_MONOTONE_RUN` — Wave 429: INCITING_AFTERMATH_STALL, CLIMAX_UNPREPARED, PURPOSE_MONOTONE_RUN
 - `REVELATION_AFTERMATH_SUSPENSE_VOID` — Wave 541: REVELATION_AFTERMATH_SUSPENSE_VOID, TURN_AFTERMATH_CURIOSITY_VOID, EMOTIONAL_NEUTRAL_RUN
 - `REVELATION_SUSPENSE_DECOUPLED` — Wave 457: REVELATION_SUSPENSE_DECOUPLED, NEGATIVE_SCENE_DROUGHT, DRAMATIC_TURN_CAUSELESS
+- `SCENE_CONTINUITY_COLLAPSE` — SCENE_CONTINUITY_COLLAPSE (structural-AUC wave, 2026-07-10)
+- `SCENE_CONTINUITY_PERVASIVE` — SCENE_CONTINUITY_COLLAPSE (structural-AUC wave, 2026-07-10)
 - `SECOND_ACT_INVERSION` — Wave 186: Act 2 inversion, midpoint reversal absent, inciting incident late
 - `STRUCTURE_CURIOSITY_VOID` — Wave 250: Curiosity void, Act 3 purpose monotone, Act 2b suspense decay
 - `TENSION_DROP_ABRUPT` — Wave 198: Act 3 excess, tension abrupt drop, Act 1 revelation absent

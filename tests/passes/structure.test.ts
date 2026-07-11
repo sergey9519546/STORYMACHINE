@@ -572,7 +572,41 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
 
 
   // ── Wave 152: Structure pass enhancements ─────────────────────────────────
-  describe('Wave 152 — structurePass: revelation drought, false climax, act symmetry', async () => {
+  describe('SCENE_CONTINUITY_COLLAPSE (structural-AUC wave)', async () => {
+  const recsSCC = (n: number): any[] => Array.from({ length: n }, (_, i) => ({
+    commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`, purpose: 'dialogue',
+    dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+    emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [], unresolvedClues: [],
+    seededClueIds: [], payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+  }));
+  const scene = (i: number, who: string, tod: string) =>
+    `INT. PLACE${i} - ${tod}\n\nSomething happens here.\n\n${who}\nA line of dialogue for this scene.\n\n`;
+  it('fires per double-break cut on a scrambled feature (no shared character + day/night flip, gate open)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    // 18 scenes: every adjacent pair changes speaker AND flips DAY/NIGHT.
+    const fountain = Array.from({ length: 18 }, (_, i) => scene(i, `CHAR${i}`, i % 2 ? 'NIGHT' : 'DAY')).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsSCC(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'SCENE_CONTINUITY_COLLAPSE');
+    const roll = result.issues.filter(i => i.rule === 'SCENE_CONTINUITY_PERVASIVE');
+    assert.ok(hits.length >= 10, `expected many per-cut issues, got ${hits.length}`);
+    assert.equal(roll.length, 1, 'breaks beyond the cap must fold into one pervasive rollup');
+  });
+  it('no-fire on an ordered feature (characters carry over, day/night in blocks)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const fountain = Array.from({ length: 18 }, (_, i) => scene(i, 'LEAD', i < 9 ? 'DAY' : 'NIGHT')).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsSCC(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => /SCENE_CONTINUITY/.test(i.rule)).length, 0,
+      'an ordered feature must never trip the continuity rules');
+  });
+});
+
+describe('Wave 152 — structurePass: revelation drought, false climax, act symmetry', async () => {
     const baseStructure = {
       actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,
       midpointPressure: 2, reversalCount: 1, tightestScene: 6, avgSuspensePerScene: 1.5,
