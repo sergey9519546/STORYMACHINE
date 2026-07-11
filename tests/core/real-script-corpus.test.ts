@@ -77,12 +77,18 @@ describe('real-script corpus — produced features through the full doctor', () 
 // surface craft identical, global structure destroyed. FIRST MEASUREMENT
 // (2026-07-10, 12-script subset): meanGood 92.3 vs meanBad 91.1, AUC 0.677
 // — the rule set is largely LOCAL and barely notices wholesale structural
-// scrambling at feature length (Bee Movie's shuffle scored HIGHER). That is
-// the honest state of the art, recorded here as a ratchet: the hard floor
-// asserts we never get worse; the todo names the target (0.9) that
-// feature-scale structural detectors (setup-before-payoff ordering, act
-// shape, escalation coherence) must reach. This is the north-star
-// separation metric made executable.
+// scrambling at feature length (Bee Movie's shuffle scored HIGHER).
+// UPDATED (2026-07-10, same subset, after widening SCENE_CONTINUITY_COLLAPSE
+// with a location-run corroboration axis — see structure.ts's header at that
+// rule): AUC 0.684. The wider gate was swept over all 69 intact/degraded
+// corpus pairs and holds zero false positives on every intact script while
+// catching 29/42 floor-eligible degraded scripts (up from 20/42 at the
+// original single-axis threshold); the 12-script AUC subset moves less
+// because several of its scripts don't meet the rule's floors. Recorded
+// here as a ratchet: the hard floor asserts we never get worse; the todo
+// names the target (0.9) that feature-scale structural detectors
+// (setup-before-payoff ordering, act shape, escalation coherence) must
+// reach. This is the north-star separation metric made executable.
 describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
   const SUBSET = 12;
   async function measure() {
@@ -109,7 +115,7 @@ describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DI
     assert.ok(measured.auc >= 0.6,
       `structural-degradation AUC ${measured.auc.toFixed(3)} fell below the 0.6 ratchet — a change made the doctor MORE structure-blind`);
   });
-  it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.677 at introduction — needs feature-scale structural detectors (see header)' }, async () => {
+  it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.684 (was 0.677) after the SCENE_CONTINUITY_COLLAPSE widening — still needs feature-scale structural detectors (see header)' }, async () => {
     const m = measured ?? await measure();
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target`);
   });
