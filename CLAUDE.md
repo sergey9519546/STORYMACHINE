@@ -4,7 +4,7 @@ Orientation: `ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
 `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` (binding quality spec for
 revision-engine work) · `ULTRAPLAN.md` (consolidated post-corpus state) ·
 `docs/research-audit/MASTER_RESEARCH_AUDIT.md` (research-archive incorporation
-map).
+map) · `docs/research-archive/` (vendored canonical-shelf source docs).
 
 ## Quality bar
 
