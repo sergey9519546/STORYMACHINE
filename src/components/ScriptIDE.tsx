@@ -1245,10 +1245,6 @@ export default function ScriptIDE({
             ref={editorRef}
             value={scriptText}
             onChange={handleScriptChange}
-            onCharacterEnter={(charName, cursor) => {
-              setActionModal({ show: true, charName, cursor });
-              setActionInput("");
-            }}
             onUserEdit={handleUserEdit}
             characters={characters.map(c => c.name)}
             completionCtx={{

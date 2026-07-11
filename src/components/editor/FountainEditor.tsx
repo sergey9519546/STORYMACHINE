@@ -17,12 +17,13 @@ import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap, standardKeymap } from '@codemirror/commands';
 import { highlightActiveLine, lineNumbers, drawSelection } from '@codemirror/view';
-import { closeBrackets } from '@codemirror/autocomplete';
+import { closeBrackets, autocompletion } from '@codemirror/autocomplete';
 
 import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
 import { screenplayFormat, screenplayFormatTheme } from './screenplay-format.ts';
 import { inlineComplete, CompletionContext } from './inline-complete.ts';
-import { fountainKeymap, FountainKeymapOptions } from './fountain-keymap.ts';
+import { fountainKeymap } from './fountain-keymap.ts';
+import { screenplayComplete } from './screenplay-complete.ts';
 import { createCollabSession, CollabSession } from './collab.ts';
 import { scriptDiagnostics } from './diagnostics.ts';
 
@@ -36,7 +37,6 @@ export interface FountainEditorHandle {
 export interface FountainEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onCharacterEnter?: FountainKeymapOptions['onCharacterEnter'];
   characters?: string[];
   completionCtx?: CompletionContext;
   isDarkMode?: boolean;
@@ -137,7 +137,6 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     {
       value,
       onChange,
-      onCharacterEnter,
       characters = [],
       completionCtx = {},
       isDarkMode = false,
@@ -154,11 +153,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     const viewRef = useRef<EditorView | null>(null);
     // Store latest callbacks in a ref so the closure inside EditorView doesn't go stale
     const onChangeRef = useRef(onChange);
-    const onCharEnterRef = useRef(onCharacterEnter);
     const onUserEditRef = useRef(onUserEdit);
     const charactersRef = useRef(characters);
     useEffect(() => { onChangeRef.current = onChange; });
-    useEffect(() => { onCharEnterRef.current = onCharacterEnter; });
     useEffect(() => { onUserEditRef.current = onUserEdit; });
     useEffect(() => { charactersRef.current = characters; });
 
@@ -216,9 +213,20 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
 
       const fountainKm = fountainKeymap({
         get characters() { return charactersRef.current; },
-        onCharacterEnter(name, cursor) {
-          onCharEnterRef.current?.(name, cursor);
-        },
+      });
+
+      // Context-aware element autocomplete (scene-heading prefixes,
+      // locations, time-of-day, transitions, character cues) — see
+      // screenplay-complete.ts. `characters` is read live via the same
+      // ref-backed getter as fountainKm above, so prop changes don't require
+      // rebuilding this extension. Enter/click accept, arrows navigate; Tab
+      // is deliberately left to inline-complete's ghost-text accept below —
+      // the default completionKeymap in this CodeMirror version only binds
+      // Enter, so there's no collision to guard against.
+      const screenplayCompletion = autocompletion({
+        activateOnTyping: true,
+        icons: false,
+        override: [screenplayComplete({ get characters() { return charactersRef.current; } })],
       });
 
       const state = EditorState.create({
@@ -241,6 +249,8 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           ]),
           // ── Inline completions (Tab=accept sits inside this) ─────────────────
           completionCompartment.current.of(completionExt),
+          // ── Screenplay element autocomplete (Enter/click accept) ─────────────
+          screenplayCompletion,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
           diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
           // ── Fountain highlighting ───────────────────────────────────────────

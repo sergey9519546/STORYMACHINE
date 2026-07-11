@@ -1,121 +1,105 @@
 // Fountain-specific keybindings for CodeMirror 6.
-// Ports the i/e slug shortcuts, Tab character-autocomplete + spacing, and
-// Enter-after-character-cue → action-modal trigger from the old textarea
-// handleKeyDown to proper CM6 keybindings.
+//
+// Stage 2: the old i/e-on-empty-line slug shortcuts, the Tab
+// character-cycle/space-indent hacks, and the Enter-after-cue modal trigger
+// are GONE:
+//   - i/e shortcuts → replaced by the real autocomplete dropdown in
+//     screenplay-complete.ts (typing "int"/"ext"/... anywhere now offers the
+//     scene-heading prefixes instead of hijacking every i/e keystroke).
+//   - Tab space-indent/character-cycle → indentation is a pure view
+//     decoration now (screenplay-format.ts never touches the buffer), and
+//     character-name cycling is superseded by the same autocomplete dropdown.
+//     Tab is intentionally left unbound here so it falls through to
+//     inline-complete's Tab-accept binding.
+//   - Enter-after-cue → onCharacterEnter modal → replaced below by Final
+//     Draft's actual behavior: Enter always inserts a normal newline (via
+//     defaultKeymap's insertNewlineAndIndent, which runs immediately after
+//     this binding since it always returns `false`), and Fountain treats
+//     whatever non-blank text follows an uppercase cue as dialogue on its
+//     own — no modal needed.
+//
+// What's left: Enter's "commit" auto-uppercase. When the cursor is about to
+// leave a scene heading / transition / character cue, uppercase that line's
+// real text (a normal undoable, collab-safe `view.dispatch`) before the
+// newline is inserted — mirroring Final Draft's on-commit capitalization.
+// Action and dialogue text is never touched.
 
-import { KeyBinding } from '@codemirror/view';
-import { EditorView } from '@codemirror/view';
+import { KeyBinding, EditorView } from '@codemirror/view';
+import { SCENE_PREFIX_RE, TRANSITIONS, dedupeUpper, harvestCueNames } from './screenplay-complete.ts';
 
 export interface FountainKeymapOptions {
-  /** Character names for Tab autocomplete — updated via compartment.reconfigure */
+  /** Character names for cue-commit detection — read live via a getter so a mutable ref can back it without rebuilding the keymap. */
   characters: string[];
-  /** Called when Enter is pressed after a character cue — shows the action modal */
-  onCharacterEnter: (charName: string, cursor: number) => void;
 }
 
-function currentLineText(view: EditorView): string {
+const TRANSITIONS_UPPER = new Set(TRANSITIONS.map((t) => t.toUpperCase()));
+// Generic "ends in ` TO:`" transitions (e.g. "REVERSE ANGLE TO:") that aren't
+// in the fixed TRANSITIONS list but are still unambiguously transitions.
+const GENERIC_TRANSITION_RE = /^[a-z ]+ to:$/i;
+
+function isBlankOrDocStart(view: EditorView, lineNumber: number): boolean {
+  return lineNumber === 1 || view.state.doc.line(lineNumber - 1).text.trim() === '';
+}
+
+// Decides whether the line the cursor is currently on should be uppercased
+// as part of an Enter "commit". Returns the line's range + its uppercased
+// text, or null if nothing should happen (including: already uppercase).
+function uppercaseCommitTarget(
+  view: EditorView,
+  opts: FountainKeymapOptions,
+): { from: number; to: number; upper: string } | null {
   const cursor = view.state.selection.main.head;
   const line = view.state.doc.lineAt(cursor);
-  return view.state.doc.sliceString(line.from, cursor);
-}
+  const lineText = view.state.doc.sliceString(line.from, line.to);
+  const trimmed = lineText.trim();
+  if (!trimmed) return null;
 
-function insertAtCursor(view: EditorView, text: string, moveCursor = text.length): boolean {
-  const cursor = view.state.selection.main.head;
-  view.dispatch({
-    changes: { from: cursor, to: cursor, insert: text },
-    selection: { anchor: cursor + moveCursor },
-  });
-  return true;
-}
+  const upper = lineText.toUpperCase();
+  if (lineText === upper) return null; // nothing to commit — already uppercase
 
-// Regex: uppercase-only line that looks like a character cue
-const CHAR_CUE_RE = /^[A-Z][A-Z0-9 '\-\.]+$/;
+  // Scene headings, transitions, and character cues are only legal
+  // immediately after a blank line (or at doc start) per Fountain's own
+  // grammar — the same gate screenplay-complete.ts uses to offer them.
+  if (!isBlankOrDocStart(view, line.number)) return null;
+
+  const isSceneHeading = SCENE_PREFIX_RE.test(trimmed);
+  const isTransition = TRANSITIONS_UPPER.has(trimmed.toUpperCase()) || GENERIC_TRANSITION_RE.test(trimmed);
+
+  let isCue = false;
+  if (!isSceneHeading && !isTransition) {
+    // Conservative: only uppercase a plain-typed line as a character cue
+    // when it (minus a trailing (V.O.)/(O.S.)/(CONT'D)-style extension)
+    // matches a KNOWN character — from the `characters` prop or a cue
+    // already used elsewhere in the script. This is what keeps ordinary
+    // action-paragraph first lines ("Sarah walks in.") from being
+    // mistaken for a cue and shouted into caps.
+    const bareName = trimmed.replace(/\s*\(.*?\)\s*$/, '').trim().toUpperCase();
+    if (bareName) {
+      const known = dedupeUpper([...opts.characters, ...harvestCueNames(view.state, line.number)]);
+      isCue = known.includes(bareName);
+    }
+  }
+
+  if (!isSceneHeading && !isTransition && !isCue) return null;
+  return { from: line.from, to: line.to, upper };
+}
 
 export function fountainKeymap(opts: FountainKeymapOptions): KeyBinding[] {
   return [
-    // 'i' on an empty line → "INT. "
-    {
-      key: 'i',
-      run(view) {
-        const lineText = currentLineText(view);
-        if (lineText !== '') return false;
-        return insertAtCursor(view, 'INT. ');
-      },
-    },
-    // 'e' on an empty line → "EXT. "
-    {
-      key: 'e',
-      run(view) {
-        const lineText = currentLineText(view);
-        if (lineText !== '') return false;
-        return insertAtCursor(view, 'EXT. ');
-      },
-    },
-    // Enter after a character cue → fire the action modal
+    // Enter: commit-time auto-uppercase, then fall through (always returns
+    // `false`) so defaultKeymap's insertNewlineAndIndent — or the
+    // autocomplete dropdown's own Prec.highest Enter-accept, if a dropdown is
+    // open — handles the actual keystroke.
     {
       key: 'Enter',
       run(view) {
-        const lineText = currentLineText(view).trim();
-        if (!CHAR_CUE_RE.test(lineText)) return false;
-        const cursor = view.state.selection.main.head;
-        opts.onCharacterEnter(lineText, cursor);
-        return true;
-      },
-    },
-    // Tab: (1) character autocomplete, (2) dialogue indent, (3) action de-indent
-    {
-      key: 'Tab',
-      run(view) {
-        const cursor = view.state.selection.main.head;
-        const line = view.state.doc.lineAt(cursor);
-        const lineText = view.state.doc.sliceString(line.from, cursor);
-        const trimmed = lineText.trim();
-
-        // 1) Character name autocomplete: uppercase-only prefix
-        if (
-          trimmed.length > 0 &&
-          trimmed === trimmed.toUpperCase() &&
-          !trimmed.startsWith('INT') &&
-          !trimmed.startsWith('EXT')
-        ) {
-          const match = opts.characters.find(
-            (c) => c.toUpperCase().startsWith(trimmed) && c.toUpperCase() !== trimmed,
-          );
-          if (match) {
-            const insertStart = line.from + (lineText.length - trimmed.length);
-            view.dispatch({
-              changes: { from: insertStart, to: cursor, insert: match.toUpperCase() },
-              selection: { anchor: insertStart + match.length },
-            });
-            return true;
-          }
-        }
-
-        // 2) Empty line → dialogue indent (10 spaces)
-        if (trimmed === '') {
-          return insertAtCursor(view, '          ');
-        }
-
-        // 3) Already at dialogue indent (10 spaces, not 12) → action indent (6 spaces)
-        if (lineText.startsWith('          ') && !lineText.startsWith('            ')) {
+        const target = uppercaseCommitTarget(view, opts);
+        if (target) {
           view.dispatch({
-            changes: { from: line.from, to: line.from + 10, insert: '      ' },
-            selection: { anchor: line.from + 6 },
+            changes: { from: target.from, to: target.to, insert: target.upper },
           });
-          return true;
         }
-
-        // 4) Action indent → no indent (strip leading spaces)
-        if (lineText.startsWith('      ')) {
-          const stripped = lineText.replace(/^ +/, '');
-          view.dispatch({
-            changes: { from: line.from, to: cursor, insert: stripped },
-            selection: { anchor: line.from + stripped.length },
-          });
-          return true;
-        }
-
-        return false; // let the default Tab handler (e.g. inline-complete accept) run
+        return false;
       },
     },
   ];
