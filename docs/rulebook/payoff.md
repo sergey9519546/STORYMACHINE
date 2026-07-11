@@ -1,6 +1,6 @@
 # Pass: `payoff`
 
-Founding wave: 39. Total distinct rules: 229 (171 attributed to a specific wave, 58 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 230 (171 attributed to a specific wave, 59 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1182
 
@@ -593,6 +593,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `PAYOFF_SEED_DECOUPLED` — Wave 580:
 - `PAYOFF_SINGLE_SCENE_DUMP` — Wave 247: Setup Act 3 surge, payoff single-scene dump, setup desert Act 2b
 - `PAYOFF_TOO_QUICK` — Clue paid off too quickly (same scene or very next scene)
+- `REINCORPORATION_VOID` — REINCORPORATION_VOID
 - `SEED_CLOCK_AFTERMATH_ABSENT` — Wave 524 checks
 - `SEED_EMOTIONAL_AFTERMATH_ABSENT` — Wave 468: PAYOFF_REVELATION_AFTERMATH_ABSENT, SEED_SUSPENSE_AFTERMATH_ABSENT, SEED_EMOTIONAL_AFTERMATH_ABSENT
 - `SEED_OPENING_ZONE_ABSENT` — Wave 580:

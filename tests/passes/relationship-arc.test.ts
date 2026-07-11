@@ -1376,6 +1376,48 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1350 — relationshipArcPass: RELATIONSHIP_REPAIR_UNEARNED', () => {
+    const mkShift1350 = (pairKey: string, amount: number) => [{ pairKey, dimension: 'trust', amount }];
+    const makeRec1350 = (idx: number, overrides: any = {}): any => ({
+      sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      emotionalShift: 'neutral', suspenseDelta: 0, curiosityDelta: 0,
+      clockRaised: false, clockDelta: 0, revelation: null,
+      dialogueHighlights: [], visualBeats: [], relationshipShifts: [],
+      seededClueIds: [], payoffSetupIds: [],
+      unresolvedClues: [], purpose: 'development', dramaticTurn: 'nothing',
+      ...overrides,
+    });
+    const runRA1350 = async (records: any[]) => {
+      const { relationshipArcPass } = await import('../../server/nvm/revision/passes/relationship-arc.ts');
+      return relationshipArcPass({
+        fountain: '', original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: [], approvedSpans: [],
+      });
+    };
+
+    it('fires when a hard rupture flips back to warm within the window with no apology, cost, or acknowledgement', async () => {
+      const records = Array.from({ length: 6 }, (_, i) => makeRec1350(i,
+        i === 1 ? { relationshipShifts: mkShift1350('Alice|Bob', -0.8) } :
+        i === 3 ? { relationshipShifts: mkShift1350('Alice|Bob', 0.6) } : {},
+      ));
+      const res = await runRA1350(records);
+      const fired = res.issues.filter((i: any) => i.rule === 'RELATIONSHIP_REPAIR_UNEARNED');
+      assert.ok(fired.length >= 1, `should fire RELATIONSHIP_REPAIR_UNEARNED; got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when an apology appears in the window between rupture and repair', async () => {
+      const records = Array.from({ length: 6 }, (_, i) => makeRec1350(i,
+        i === 1 ? { relationshipShifts: mkShift1350('Alice|Bob', -0.8) } :
+        i === 2 ? { dialogueHighlights: ["I'm sorry, I was wrong to say that."] } :
+        i === 3 ? { relationshipShifts: mkShift1350('Alice|Bob', 0.6) } : {},
+      ));
+      const res = await runRA1350(records);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'RELATIONSHIP_REPAIR_UNEARNED'), 'an on-page apology should suppress the fire');
+    });
+  });
+
   // Wave 1192 (Program v2, Type 1 signal channel, cycle 3) — first consumer of
   // the new powerDynamicsIntensity channel, joined with Wave 1186's
   // powerHolder/powerFlipped. See relationship-arc.ts's Wave 1192 header

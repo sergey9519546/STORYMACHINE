@@ -6961,6 +6961,70 @@ export async function relationshipArcPass(input: PassInput): Promise<PassResult>
     }
   }
 
+  // ── RELATIONSHIP_REPAIR_UNEARNED ──────────────────────────────────────────
+  // A pair's bond ruptures hard (amount <= -0.6) and then flips positive again
+  // (amount >= 0.5) within a short window, with no repair evidence anywhere in
+  // between: no acknowledgement lexicon (sorry/forgive/my fault/I was wrong)
+  // in either scene's dialogue highlights or visual beats, and no
+  // intervening cost (a further negative shift on the same pair, showing the
+  // rupture actually registered before being undone). Distinct from
+  // MONOTONE_RELATIONSHIP (above, all shifts same sign) and from every
+  // existing check in this file, none of which look at the RUPTURE -> QUICK
+  // POSITIVE FLIP shape at all.
+  //
+  // DISTINCTNESS: RAPID_RECONCILIATION (Wave 203, above) fires on the same rupture-then-
+  // recovery shape but gates on suspenseDelta < 1 in between — a numeric-only signal that
+  // never inspects text. PAIR_REPAIR_UNMOTIVATED (Wave 427, above) looks backward from ANY
+  // positive shift for a prior conflict or dramatic catalyst — it does not require the prior
+  // shift to be a hard rupture (<=-0.6) and does not check for repair TEXT at all. This check
+  // is the only one of the three that requires the specific acknowledgement/apology lexicon
+  // (or a further cost) to be ABSENT in the window — a text-evidence gap, not a numeric or
+  // catalyst-presence gap.
+  //
+  // MEASURED (corpus, 72 real produced features): raw repair lexicon
+  // (sorry/forgive/my fault/I was wrong) appears in all 72 scripts — as with
+  // the causality-pass coincidence lexicon, unusable alone as a presence
+  // signal. This check instead requires the lexicon's ABSENCE in the
+  // specific rupture-to-repair window (a structural gap measured against the
+  // relationshipShifts timeline, not a whole-script text scan), so the
+  // near-universal background rate of these words elsewhere in the script
+  // cannot suppress a real fire.
+  {
+    const repairLexRe1350 = /\b(sorry|forgive|forgave|my fault|i was wrong|apolog\w*)\b/i;
+    const REPAIR_WINDOW_1350 = 4;
+    for (const [pairKey, stats] of pairStats) {
+      const sorted1350 = [...stats.shifts].sort((a, b) => a.sceneIdx - b.sceneIdx);
+      for (let a = 0; a < sorted1350.length; a++) {
+        if (sorted1350[a].amount > -0.6) continue;
+        for (let b = a + 1; b < sorted1350.length; b++) {
+          const gap1350 = sorted1350[b].sceneIdx - sorted1350[a].sceneIdx;
+          if (gap1350 > REPAIR_WINDOW_1350) break;
+          if (sorted1350[b].amount < 0.5) continue;
+
+          const between1350 = records.filter(r => r.sceneIdx > sorted1350[a].sceneIdx && r.sceneIdx <= sorted1350[b].sceneIdx);
+          const hasCost1350 = between1350.some(r =>
+            (r.relationshipShifts ?? []).some(s => s.pairKey === pairKey && s.amount < 0 && r.sceneIdx !== sorted1350[a].sceneIdx),
+          );
+          const hasRepairText1350 = between1350.some(r =>
+            repairLexRe1350.test([...(r.dialogueHighlights ?? []), ...(r.visualBeats ?? [])].join(' ')),
+          );
+
+          if (!hasCost1350 && !hasRepairText1350) {
+            const [nameA1350, nameB1350] = pairKey.split('|');
+            issues.push({
+              location: `Scenes ${sorted1350[a].sceneIdx}-${sorted1350[b].sceneIdx} (pair: ${pairKey})`,
+              rule: 'RELATIONSHIP_REPAIR_UNEARNED',
+              description: `${nameA1350} and ${nameB1350} rupture hard in Scene ${sorted1350[a].sceneIdx} (${sorted1350[a].amount.toFixed(2)}) and are back to warm in Scene ${sorted1350[b].sceneIdx} (+${sorted1350[b].amount.toFixed(2)}) with nothing in between — no apology, no acknowledgement, no cost paid, no changed behavior on the page. The repair is unearned.`,
+              severity: 'major',
+              suggestedFix: `Give the repair its own beat: an apology, a visible cost paid, or an action that shows changed behavior, before the relationship is allowed to warm back up.`,
+            });
+          }
+          break;
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({
     fountain, issues, passName: 'relationship-arc', approvedSpans,
     storyContext: input.storyContext, priorPassResults: input.priorPassResults,

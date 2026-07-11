@@ -6712,6 +6712,63 @@ export async function payoffPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── REINCORPORATION_VOID ──────────────────────────────────────────────────
+  // The final third of the story is measured for how much of its distinctive
+  // vocabulary (proper-noun-like capitalized tokens pulled from dialogue
+  // highlights, visual beats, and revelations) is NEW versus REUSED from the
+  // first two-thirds. A healthy ending reincorporates: it closes with
+  // people, places, and objects the story already spent its first two acts
+  // establishing. An ending that mostly introduces brand-new names/objects
+  // in its last third is structurally disconnected from its own setup — the
+  // audience's investment in Act 1/2 material has nowhere to land.
+  //
+  // NOTE (excellence twin, not built here): the mirror case — a final third
+  // that reuses almost nothing but earlier tokens, i.e. a tightly closed-loop
+  // ending — would make a strong candidate excellence detector for a future
+  // Program v2 Type-2 wave; out of scope for this defect-only wave.
+  //
+  // MEASURED (corpus, 72 real produced features; tokens = capitalized words
+  // length>=3 excluding common sentence-initial stopwords, drawn from
+  // dialogueHighlights/visualBeats/revelation only, not a full-fountain
+  // scan): the large majority of produced scripts reuse well over half their
+  // final-third distinctive vocabulary from earlier acts. This check is set
+  // well above that floor — fires only when >=75% of the final third's
+  // tokens are brand new AND reused tokens are <=15% of the total — plus an
+  // absolute floor of >=6 distinctive final-third tokens and >=12 scenes, to
+  // keep the rule off ordinary endings and reserved for endings that are
+  // almost entirely new material.
+  {
+    const STOP_1350 = new Set(['The', 'A', 'An', 'He', 'She', 'They', 'It', 'We', 'You', 'I', 'But', 'And', 'So', 'Then', 'Now', 'This', 'That', 'His', 'Her', 'Their', 'Int', 'Ext', 'Cut', 'Fade']);
+    const tokens1350 = (r: (typeof records)[number]): string[] => {
+      const text = [...(r.dialogueHighlights ?? []), ...(r.visualBeats ?? []), r.revelation ?? ''].join(' ');
+      return (text.match(/\b[A-Z][a-z]{2,}\b/g) ?? []).filter(w => !STOP_1350.has(w));
+    };
+    const n1350 = records.length;
+    if (n1350 >= 12) {
+      const thirdStart1350 = Math.floor((n1350 * 2) / 3);
+      const earlySet1350 = new Set<string>();
+      for (let i = 0; i < thirdStart1350; i++) for (const t of tokens1350(records[i])) earlySet1350.add(t);
+      const finalTokens1350: string[] = [];
+      for (let i = thirdStart1350; i < n1350; i++) finalTokens1350.push(...tokens1350(records[i]));
+
+      if (finalTokens1350.length >= 6) {
+        const newCount1350 = finalTokens1350.filter(t => !earlySet1350.has(t)).length;
+        const reuseRatio1350 = 1 - newCount1350 / finalTokens1350.length;
+        const newRatio1350 = newCount1350 / finalTokens1350.length;
+
+        if (newRatio1350 >= 0.75 && reuseRatio1350 <= 0.15) {
+          issues.push({
+            location: `Scenes ${thirdStart1350}-${n1350 - 1} (final third)`,
+            rule: 'REINCORPORATION_VOID',
+            severity: 'minor',
+            description: `The final third of the story (scenes ${thirdStart1350}-${n1350 - 1}) introduces ${newCount1350} of its ${finalTokens1350.length} distinctive tokens as brand new — only ${Math.round(reuseRatio1350 * 100)}% of the ending's vocabulary reuses anything established in the first two-thirds. The ending reads disconnected from its own setup.`,
+            suggestedFix: `Bring back at least a few names, places, or objects the story already spent Acts 1-2 establishing — let the ending close using material the audience already recognizes, not a wave of new material.`,
+          });
+        }
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'payoff', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

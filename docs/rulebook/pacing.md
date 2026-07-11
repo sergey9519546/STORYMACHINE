@@ -1,6 +1,6 @@
 # Pass: `pacing`
 
-Founding wave: 39. Total distinct rules: 228 (155 attributed to a specific wave, 73 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 229 (155 attributed to a specific wave, 74 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1184
 
@@ -533,6 +533,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `ACT2_PAGE_WEIGHT` — Wave 274: ACT2_PAGE_WEIGHT
 - `ACT3_PAGE_OVERRUN` — Wave 274: ACT3_PAGE_OVERRUN
 - `ACT3_TOO_SHORT` — Act-level pacing: Act 1 too long, Act 3 too short
+- `CLIMAX_NO_AFTERMATH` — CLIMAX_NO_AFTERMATH
 - `CLIMAX_RUNWAY_OVERLONG` — Wave 189: Velocity drop, climax runway, resolution bloat
 - `CLIMAX_SCENE_UNDERSIZED` — Wave 246: Act 2 pacing valley, climax scene undersized, midpoint bloat
 - `CLIMAX_SCENE_UNDERWEIGHT` — Wave 157: Climax underweight, midpoint collapse, resolution brevity

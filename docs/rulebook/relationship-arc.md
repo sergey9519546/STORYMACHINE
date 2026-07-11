@@ -1,6 +1,6 @@
 # Pass: `relationship-arc`
 
-Founding wave: 134. Total distinct rules: 225 (164 attributed to a specific wave, 61 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 134. Total distinct rules: 226 (164 attributed to a specific wave, 62 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1192
 
@@ -585,6 +585,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `RELATIONSHIP_PAYOFF_ABANDONED` — Wave 203: Third-act void, rapid reconciliation, payoff abandoned
 - `RELATIONSHIP_PEAK_CLOCK_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
 - `RELATIONSHIP_PEAK_DRAMATIC_TURN_ABSENT` — Wave 539: PAIR_SEED_FLAT, PAIR_PAYOFF_FLAT, PAIR_SHIFT_RUN
+- `RELATIONSHIP_REPAIR_UNEARNED` — RELATIONSHIP_REPAIR_UNEARNED
 - `RELATIONSHIP_RESOLUTION_VOID` — Wave 234: Pair dimension monotone, first-impression contradiction, resolution void
 - `RELATIONSHIP_REVELATION_EMOTION_DECOUPLED` — Wave 399: PAIR_SUSPENSE_FLAT, PAIR_CURIOSITY_FLAT, RELATIONSHIP_REVELATION_EMOTION_DECOUPLED
 - `RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID` — Wave 497: RELATIONSHIP_SHIFT_CLOCK_AFTERMATH_VOID, RELATIONSHIP_WARMTH_CLUSTER, RELATIONSHIP_DIMENSION_RUN

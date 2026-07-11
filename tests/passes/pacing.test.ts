@@ -1036,6 +1036,40 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
     });
   });
 
+  describe('Wave 1350 — pacingPass: CLIMAX_NO_AFTERMATH', () => {
+    const runP1350 = async (records: ScreenplaySceneRecord[]) => {
+      const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');
+      return pacingPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('fires when the peak-intensity scene is the final scene of a 16+ scene story', async () => {
+      const records = Array.from({ length: 16 }, (_, i) =>
+        i === 15
+          ? makeSharedRecord(i, { suspenseDelta: 5, clockDelta: 2, dramaticTurn: 'reversal' })
+          : makeSharedRecord(i, { suspenseDelta: 1 }),
+      );
+      const res = await runP1350(records);
+      const fired = res.issues.filter((i: any) => i.rule === 'CLIMAX_NO_AFTERMATH');
+      assert.ok(fired.length >= 1, `should fire CLIMAX_NO_AFTERMATH; got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when the peak-intensity scene is followed by an aftermath scene', async () => {
+      const records = Array.from({ length: 16 }, (_, i) =>
+        i === 14
+          ? makeSharedRecord(i, { suspenseDelta: 5, clockDelta: 2, dramaticTurn: 'reversal' })
+          : makeSharedRecord(i, { suspenseDelta: 1 }),
+      );
+      const res = await runP1350(records);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'CLIMAX_NO_AFTERMATH'), 'a post-peak scene should suppress the fire');
+    });
+  });
+
   describe('Wave 1181 — pacingPass (distinct-mode pivot): pacing payoff back-loaded, pacing open-thread front-loaded, pacing highlight back-loaded', async () => {
     const runP1181 = async (records: ScreenplaySceneRecord[]) => {
       const { pacingPass } = await import('../../server/nvm/revision/passes/pacing.ts');

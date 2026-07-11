@@ -1413,6 +1413,49 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 
 
+  describe('Wave 1350 — payoffPass: REINCORPORATION_VOID', () => {
+    const makeRec1350 = (idx: number, override: Partial<any> = {}): any => ({
+      commitId: `c${idx}`, sceneIdx: idx, slug: `INT. SC${idx} - DAY`,
+      purpose: 'dialogue', dramaticTurn: 'nothing', revelation: null,
+      clockRaised: false, clockDelta: 0, emotionalShift: 'neutral', suspenseDelta: 1,
+      dialogueHighlights: [], unresolvedClues: [], seededClueIds: [],
+      payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+      ...override,
+    });
+    const runPY1350 = async (records: any[]) => {
+      const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
+      return payoffPass({
+        fountain: buildPlainFountain(records.length), original: '', records,
+        structure: { escalating: true, avgSuspensePerScene: 0, completionPercent: 50,
+          approachingClimax: false, revelationCount: 1, actBreaks: [] } as any,
+        annotations: Array.from({ length: records.length }, () => ({} as any)),
+        approvedSpans: [],
+      });
+    };
+
+    it('fires when the final third introduces almost entirely new distinctive tokens', async () => {
+      // 15 scenes: first 10 establish Marcus/Elena/Denver repeatedly; final 5 are all
+      // brand-new names never mentioned earlier — final third is almost entirely new.
+      const records = Array.from({ length: 15 }, (_, i) => {
+        if (i < 10) {
+          return makeRec1350(i, { visualBeats: ['Marcus and Elena argue about Denver again.'] });
+        }
+        return makeRec1350(i, { visualBeats: [`Zephyr and Octavia meet Bramblewood in scene ${i}.`] });
+      });
+      const res = await runPY1350(records);
+      const fired = res.issues.filter((i: any) => i.rule === 'REINCORPORATION_VOID');
+      assert.ok(fired.length >= 1, `should fire REINCORPORATION_VOID; got: ${res.issues.map((i: any) => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when the final third reuses earlier-established names', async () => {
+      const records = Array.from({ length: 15 }, (_, i) =>
+        makeRec1350(i, { visualBeats: ['Marcus and Elena argue about Denver again.'] }),
+      );
+      const res = await runPY1350(records);
+      assert.ok(!res.issues.some((i: any) => i.rule === 'REINCORPORATION_VOID'), 'reused vocabulary should suppress the fire');
+    });
+  });
+
   describe('Wave 1182 — payoffPass: unanswered question flood, instant gratification pattern, dead question zone', async () => {
     const runPY1182 = async (records: ScreenplaySceneRecord[]) => {
       const { payoffPass } = await import('../../server/nvm/revision/passes/payoff.ts');
