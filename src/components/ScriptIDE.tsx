@@ -483,8 +483,20 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    // Zero-allocation word count: `.trim().split(/\s+/)` allocates a full
+    // intermediate array on every keystroke-driven recompute (this useMemo
+    // reruns on every scriptText change), which shows up as real GC pressure
+    // on feature-length (90-120pp) scripts. A single char-code scan needs no
+    // intermediate array and has no empty-string special case to get wrong.
+    let wordCount = 0;
+    let inWord = false;
+    for (let i = 0; i < scriptText.length; i++) {
+      if (scriptText.charCodeAt(i) > 32) {
+        if (!inWord) { wordCount++; inWord = true; }
+      } else {
+        inWord = false;
+      }
+    }
 
     blocks.forEach((block) => {
       if (block.type === "character") {
@@ -758,11 +770,18 @@ export default function ScriptIDE({
   // ── Export ───────────────────────────────────────────────────────────────────
   const exportFountain = () => {
     // Prepend a Fountain title page if the script doesn't already have one.
+    // Sourced from the `titlePage` state the "Title" tab actually edits — a
+    // local `const titlePage = ...` here previously SHADOWED that state and
+    // silently hardcoded "Untitled Script"/"Author" on every export, no matter
+    // what the user typed into the Title tab's title/author/contact fields.
     let content = scriptText;
     if (!content.trimStart().startsWith('Title:')) {
       const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const titlePage = `Title: Untitled Script\nCredit: Written by\nAuthor: Author\nDraft date: ${today}\n\n`;
-      content = titlePage + content;
+      const titleStr = titlePage.title.trim() || 'Untitled Script';
+      const authorStr = titlePage.author.trim() || 'Author';
+      const contactStr = titlePage.contact.trim() ? `\nContact: ${titlePage.contact.trim()}` : '';
+      const titlePageBlock = `Title: ${titleStr}\nCredit: Written by\nAuthor: ${authorStr}\nDraft date: ${today}${contactStr}\n\n`;
+      content = titlePageBlock + content;
     }
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
