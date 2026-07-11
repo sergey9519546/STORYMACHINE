@@ -152,6 +152,55 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
   });
 });
 
+// Unknown-/api-path 404 guard (server/app.ts). Without it, any /api request
+// that matches no router falls through to the SPA fallback — Vite's dev
+// middleware (appType 'spa') or the production `app.get('*')` catch-all —
+// and returns index.html with HTTP 200, so a typo'd or removed endpoint
+// looks like success until the caller's res.json() blows up on HTML. The
+// guard sits after the six routers and before static serving, so real
+// routes must keep matching first (the no-fire tests below).
+describe('hardening — unknown /api paths return a JSON 404, not the SPA fallback', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('GET to an unknown /api path returns 404 with a JSON error body', async () => {
+    const res = await fetch(`${server.baseUrl}/api/definitely-not-a-route`);
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /application\/json/);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('POST to an unknown /api path returns 404 too — the guard is method-agnostic, unlike the GET-only SPA catch-all', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nope/nested/deeper`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anything: true }),
+    });
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /application\/json/);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('does not shadow real /api routes — GET /api/ai-config still answers 200 (no-fire)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/ai-config`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    // llmReady is the route's own contract (see server/routes/config.ts) —
+    // asserting on it confirms the real handler ran, not some other fallback.
+    assert.equal(typeof body.llmReady, 'boolean');
+  });
+
+  it('does not touch non-/api paths — /health (no /api prefix, no limiter by design) still answers 200 (no-fire)', async () => {
+    const res = await fetch(`${server.baseUrl}/health`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'ok');
+  });
+});
+
 // S1-c — process-level crash safety net (BLOCKER finding). server.ts had
 // SIGTERM/SIGINT graceful shutdown but no uncaughtException/unhandledRejection
 // handlers, so a rejected promise anywhere in the process (a session-store

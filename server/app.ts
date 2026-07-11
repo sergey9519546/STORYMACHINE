@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { logger, requestLogger } from './lib/logger.ts';
-import { ValidationError } from './lib/session-store.ts';
+import { ValidationError, gameLimiter } from './lib/session-store.ts';
 import configRouter    from './routes/config.ts';
 import gameRouter      from './routes/game.ts';
 import scriptideRouter from './routes/scriptide.ts';
@@ -170,6 +170,23 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   app.use(nvmRouter);
   app.use(exportRouter);
   app.use(collabRouter);
+
+  // ── Unknown-/api-path 404 guard ──────────────────────────────────────────────
+  // Terminal handler for any request (all methods) whose path starts with /api
+  // but matched none of the routers above. Every real route in server/routes/*
+  // is /api/-prefixed (verified repo-wide), so anything reaching this point is a
+  // typo'd, removed, or probed endpoint. It MUST sit before the SPA fallback:
+  // both Vite's dev middleware (appType 'spa') and the production `app.get('*')`
+  // catch-all below answer any unmatched GET with index.html + 200, so without
+  // this guard an unknown /api GET returns HTML with a success status and the
+  // caller's res.json() parse fails far from the real cause. gameLimiter applies
+  // per the repo-wide "every route takes a limiter" rule (CLAUDE.md) — this can
+  // never trigger an LLM call, so the general tier (not aiLimiter) is correct,
+  // and metering it keeps endpoint enumeration from being the one unthrottled
+  // /api surface.
+  app.use('/api', gameLimiter, (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
 
   // ── Global error handler ───────────────────────────────────────────────────
   // Always log full error + stack server-side; never expose internals to client.
