@@ -201,6 +201,17 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
       res.status(400).json({ error: err.message });
       return;
     }
+    // Body over express.json()'s 1mb cap — body-parser throws a
+    // PayloadTooLargeError (status 413, type 'entity.too.large') before any
+    // route or zod validation runs. This is a routine client mistake, not a
+    // server fault: without this branch it falls through to the generic 500
+    // below and gets logged as unhandled_error, which is both the wrong
+    // status code for an oversized request and log noise for something the
+    // client — not this server — got wrong.
+    if (('status' in err && (err as { status?: unknown }).status === 413) || (err as { type?: unknown }).type === 'entity.too.large') {
+      res.status(413).json({ error: 'Request body too large' });
+      return;
+    }
     logger.error('unhandled_error', {
       message: err.message,
       stack: err.stack,

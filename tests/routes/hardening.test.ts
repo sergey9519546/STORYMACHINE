@@ -201,6 +201,67 @@ describe('hardening — unknown /api paths return a JSON 404, not the SPA fallba
   });
 });
 
+// express.json({limit:'1mb'}) request-body cap (server/app.ts). body-parser
+// throws a PayloadTooLargeError (status 413, type 'entity.too.large') before
+// any route handler or zod validation runs; without a dedicated branch in the
+// global error handler it fell through to the generic 500 path and got
+// logged as unhandled_error — wrong status for a routine client mistake, and
+// log noise. These tests hit a real /api route (POST /api/scriptide/doctor)
+// rather than a synthetic handler so the assertion covers the whole
+// middleware chain body-parser sits in front of.
+describe('hardening — 413 for request bodies over express.json()\'s 1mb cap', () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('POST body over 1mb returns 413 with a JSON error body (fire)', async () => {
+    // DoctorBodySchema's own fountain max (900_000 chars) is well under
+    // express.json()'s 1mb cap, so this has to pad past 1mb some other way:
+    // a second, schema-unconstrained field. zod object() ignores unknown
+    // keys by default, so this would validate fine if it ever reached the
+    // route — it never does, because body-parser rejects it first.
+    const oversized = JSON.stringify({ fountain: 'x', padding: 'y'.repeat(1_100_000) });
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: oversized,
+    });
+    assert.equal(res.status, 413);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('a just-under-1mb body that fails zod validation still gets a normal 400, not 413 (no-fire)', async () => {
+    // DoctorBodySchema caps `fountain` at 900_000 chars — one over that
+    // fails zod's max() while the whole JSON payload stays comfortably under
+    // express.json()'s 1mb cap, so this exercises the ordinary validation
+    // path (zod's `validate` middleware, server/lib/validation.ts) without
+    // ever tripping the new 413 branch. Confirms the new branch doesn't
+    // hijack errors it shouldn't.
+    const justUnder = JSON.stringify({ fountain: 'x'.repeat(900_001) });
+    assert.ok(Buffer.byteLength(justUnder, 'utf8') < 1_048_576, 'fixture must stay under the 1mb cap');
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: justUnder,
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('malformed JSON still gets its existing 400 (unaffected by the new 413 branch)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ this is not valid json',
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.error, 'Invalid JSON in request body');
+  });
+});
+
 // S1-c — process-level crash safety net (BLOCKER finding). server.ts had
 // SIGTERM/SIGINT graceful shutdown but no uncaughtException/unhandledRejection
 // handlers, so a rejected promise anywhere in the process (a session-store
