@@ -1507,7 +1507,16 @@ export default function ScriptDoctorPanel({
 
     // 14 LLM-backed passes over a full script can run long — generous timeout,
     // scaled up from the 60s single-scene-analysis pattern in services/director.ts.
-    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+    // `timedOut` distinguishes a real timeout-abort from a teardown/superseded
+    // abort (e.g. StrictMode's synchronous double-invoke of effects, which
+    // aborts an in-flight request via the unmount-cleanup effect below before
+    // immediately re-running the setup effect) — only the former should ever
+    // paint the "timed out" error onto the screen.
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 120_000);
 
     setStatus("loading");
     setErrorMessage(null);
@@ -1616,8 +1625,15 @@ export default function ScriptDoctorPanel({
       .catch((err: unknown) => {
         if (myGeneration !== generationRef.current) return; // superseded — ignore
         if (err instanceof DOMException && err.name === "AbortError") {
-          setStatus("error");
-          setErrorMessage("Diagnosis timed out (120s) or was cancelled — try again.");
+          // A non-timeout abort (teardown, or a newer call already handled
+          // above via the generation guard) is not a diagnosis failure — it's
+          // this run being cancelled out from under itself, most commonly by
+          // StrictMode's synchronous unmount/remount of effects in dev. Only
+          // the 120s watchdog firing counts as a real, user-facing timeout.
+          if (timedOut) {
+            setStatus("error");
+            setErrorMessage("Diagnosis timed out (120s) or was cancelled — try again.");
+          }
           return;
         }
         setStatus("error");
@@ -1648,13 +1664,24 @@ export default function ScriptDoctorPanel({
 
   // StartScreen one-click entry: run the sample flow once on mount when the
   // host asked for it. Ref-gated (not dep-gated) so a parent re-render with
-  // the prop still true can never re-fire a second diagnosis.
+  // the prop still true can never re-fire a second diagnosis — deps are
+  // unchanged across a re-render, so the cleanup below never runs and the
+  // ref stays true. The cleanup DOES run on a genuine unmount/remount
+  // (notably React 18 StrictMode's synchronous double-invoke of this effect
+  // in dev), and that's exactly when re-firing is correct: StrictMode's
+  // teardown also aborts the first run's in-flight request (see the
+  // unmount-abort effect below), so without resetting the ref here, the
+  // second setup would see it already true and skip loadSample — leaving
+  // the aborted first run's request as the only one ever made.
   const autoSampleFiredRef = useRef(false);
   useEffect(() => {
     if (autoLoadSample && !autoSampleFiredRef.current) {
       autoSampleFiredRef.current = true;
       loadSample();
     }
+    return () => {
+      autoSampleFiredRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoadSample]);
 
