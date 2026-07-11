@@ -1562,26 +1562,88 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   // monotonicity, and its length-invariance regression are untouched
   // (structural rules carry feature-scale floors, so the calibration corpus
   // and every fixture are structurally exempt and score byte-identically).
-  // Bounded at 12 points: enough to separate a scrambled feature from its
-  // intact original by more than the whole pre-wave gap, small enough that
-  // an otherwise-excellent draft with a genuinely mosaic structure lands in
-  // CONSIDER territory rather than being executed on one axis.
-  const STRUCTURAL_ROLLUP_DEDUCTION = 8;
-  const STRUCTURAL_INSTANCE_DEDUCTION = 0.5; // per detailed break, capped below
+  // Bounded at 20 points (see AUC-conversion wave below for how that bound
+  // and the per-instance weight were chosen): enough to separate a scrambled
+  // feature from its intact original by well more than the whole pre-wave
+  // gap, small enough that an otherwise-excellent draft with a genuinely
+  // mosaic structure lands in CONSIDER territory rather than being executed
+  // on one axis.
+  //
+  // AUC-conversion wave (2026-07-10, follow-on to PR #193's two-tier gate).
+  // MEASURED MOTIVATION: PR #193 widened SCENE_CONTINUITY_COLLAPSE's firing
+  // condition (tight CI<0.05 unconditional OR wide CI<0.30-with-locRun<0.015)
+  // and it now catches 29/42 floor-eligible degraded scripts with zero intact
+  // false positives -- but the deduction those catches fed into stayed at the
+  // OLD per-instance weight (0.5) and cap (12), so wider DETECTION never
+  // converted into wider SEPARATION: AUC-12 (real-script-corpus.test.ts's
+  // original subset) measured 0.684, but AUC-71 (the full 71-script corpus
+  // this wave added instrumentation for) measured only 0.603 -- barely above
+  // a coin flip once averaged over the whole manifest.
+  //
+  // FIRST CANDIDATE TRIED AND REJECTED, measured not guessed: raising the cap
+  // only when SCENE_CONTINUITY_PERVASIVE fires (the critical rollup issue).
+  // Direct instrumentation of all 71 degraded scripts (seeded shuffle-drop,
+  // same recipe as the test harness) showed PERVASIVE never fires at this
+  // degradation intensity -- SCENE_CONTINUITY_COLLAPSE instance counts across
+  // the corpus range 0-12 (median 0, max 12, exactly structure.ts's own
+  // SCC_DETAIL_CAP=12 detail-issue cap), and PERVASIVE's own gate requires
+  // MORE unlisted breaks beyond that cap, which no script in the corpus
+  // reaches. A PERVASIVE-gated-only change is therefore a documented
+  // zero-effect no-op against this corpus -- verified directly (identical
+  // health, digit for digit, before/after) rather than left as a
+  // plausible-sounding but unmeasured guess.
+  //
+  // FIX SHIPPED, measured against a full grid of (weight, cap) pairs by
+  // reconstructing baseHealth (= old health + old deduction) for all 71
+  // degraded scripts and recomputing AUC-12/24/71 for each candidate without
+  // rerunning the pipeline: weight 0.5->2.0 (4x) and cap 12->20 (on the
+  // instance-count-driven path, not the still-dormant PERVASIVE rollup)
+  // moved AUC-71 from 0.603 to 0.652 (AUC-12 0.684->0.712, AUC-24
+  // 0.622->0.672) -- see real-script-corpus.test.ts's own header comment for
+  // the exact shipped numbers. Weight was not pushed further (weight 4/cap 24
+  // measured AUC-71 0.669, a smaller marginal gain per unit of aggressiveness)
+  // to keep the deduction's per-instance meaning legible: 2.0 points per
+  // corroborated double-break cut, capped at 20 total, stays in the same
+  // order of magnitude as the original 0.5/12 design rather than becoming a
+  // different formula in disguise. PERVASIVE keeps its own (now-matching)
+  // rollup=14/cap=20 terms for the day a degradation recipe or a real
+  // submission DOES clear SCC_DETAIL_CAP -- dormant today, but zero cost to
+  // leave wired in, since it structurally cannot fire on any intact script
+  // (verified: zero PERVASIVE fires anywhere across the 71 intact-corpus
+  // healths, so this is provably a no-op on every currently-passing manifest
+  // entry either way).
+  const STRUCTURAL_ROLLUP_DEDUCTION = 14;
+  const STRUCTURAL_ROLLUP_DEDUCTION_CAP = 20;
+  const STRUCTURAL_INSTANCE_DEDUCTION = 2.0; // per detailed break, capped below
+  const STRUCTURAL_INSTANCE_DEDUCTION_CAP = 20;
   const sccInstances = passes.reduce(
     (n, p) => n + p.issues.filter(i => i.rule === 'SCENE_CONTINUITY_COLLAPSE').length, 0);
   const sccPervasive = passes.some(p => p.issues.some(i => i.rule === 'SCENE_CONTINUITY_PERVASIVE'));
-  const structuralDeduction = Math.min(
-    12,
-    (sccPervasive ? STRUCTURAL_ROLLUP_DEDUCTION : 0) + sccInstances * STRUCTURAL_INSTANCE_DEDUCTION,
-  );
+  const structuralDeduction = sccPervasive
+    ? Math.min(STRUCTURAL_ROLLUP_DEDUCTION_CAP, STRUCTURAL_ROLLUP_DEDUCTION + sccInstances * STRUCTURAL_INSTANCE_DEDUCTION)
+    : Math.min(STRUCTURAL_INSTANCE_DEDUCTION_CAP, sccInstances * STRUCTURAL_INSTANCE_DEDUCTION);
   const health = Math.max(0, Math.round((baseHealth - structuralDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
   const dimensionBuilds = buildDimensions(passes, analysis.sceneCount, analysis.wordCount);
   const dimensions = dimensionBuilds.map(d => d.score);
-  const verdict = verdictFor(health, analysis.sceneCount);
+  // Verdict cap (AUC-conversion wave, 2026-07-10): a script whose scene ORDER
+  // has collapsed pervasively (SCENE_CONTINUITY_PERVASIVE -- the rollup that
+  // only fires once BOTH gate tiers above have corroborated document-scale
+  // collapse, never a single anomalous cut) cannot honestly be a RECOMMEND
+  // regardless of how healthy its density-based score reads: a structurally
+  // scrambled feature is not a feature worth shooting, whatever its
+  // line-level craft. Downgrading RECOMMEND->CONSIDER here is deliberately
+  // narrower than a health-score change -- it touches only the one verdict
+  // tier where "ship it" is the actual claim being made, leaves CONSIDER and
+  // PASS untouched (a scrambled script that already scored below RECOMMEND
+  // needs no further downgrade), and cannot fire on intact scripts (verified:
+  // PERVASIVE never fires on any of the 71 real-corpus intact scripts, so
+  // this is a zero-effect no-op for every currently-passing manifest entry).
+  const verdict = sccPervasive && verdictFor(health, analysis.sceneCount) === 'RECOMMEND'
+    ? 'CONSIDER'
+    : verdictFor(health, analysis.sceneCount);
   const anyClueSeeded = analysis.records.some(r => r.seededClueIds.length > 0);
   const strengths = buildStrengths({
     structure: analysis.structure,
