@@ -606,6 +606,104 @@ import { relationshipArcPass } from '../../server/nvm/revision/passes/relationsh
   });
 });
 
+describe('GLOBAL_ARC_INCOHERENCE (global-arc wave)', async () => {
+  const recsGAI = (n: number): any[] => Array.from({ length: n }, (_, i) => ({
+    commitId: `c${i}`, sceneIdx: i, slug: `INT. SC${i} - DAY`, purpose: 'dialogue',
+    dramaticTurn: 'nothing', revelation: null, clockRaised: false, clockDelta: 0,
+    emotionalShift: 'neutral', suspenseDelta: 1, dialogueHighlights: [], unresolvedClues: [],
+    seededClueIds: [], payoffSetupIds: [], visualBeats: [], relationshipShifts: [],
+  }));
+  const quietScene = (i: number) =>
+    `INT. PLACE${i} - DAY\n\nA calm moment passes.\n\nLEAD\nWe should talk about this quietly.\n\n`;
+  const loudScene = (i: number) =>
+    `INT. PLACE${i} - DAY\n\nEverything explodes!\n\nLEAD\nRun! Get down! Now!\n\n`;
+
+  it('fires when the opening third reads far louder than the finale (climax-moved-to-front shape)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    // 18 scenes: first third packed with "!" (moved climax), final third quiet (moved setup).
+    const fountain =
+      Array.from({ length: 6 }, (_, i) => loudScene(i)).join('') +
+      Array.from({ length: 6 }, (_, i) => quietScene(6 + i)).join('') +
+      Array.from({ length: 6 }, (_, i) => quietScene(12 + i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    const hits = result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE');
+    assert.equal(hits.length, 1, 'expected exactly one document-level global-arc finding');
+    assert.equal(hits[0].severity, 'major');
+  });
+
+  it('no-fire on an escalating feature (finale louder than the opening, the produced-script shape)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const fountain =
+      Array.from({ length: 6 }, (_, i) => quietScene(i)).join('') +
+      Array.from({ length: 6 }, (_, i) => quietScene(6 + i)).join('') +
+      Array.from({ length: 6 }, (_, i) => loudScene(12 + i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE').length, 0,
+      'an escalating feature must never trip the global-arc rule');
+  });
+
+  it('no-fire under the 16-scene floor even with an extreme inversion', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const fountain =
+      Array.from({ length: 4 }, (_, i) => loudScene(i)).join('') +
+      Array.from({ length: 4 }, (_, i) => quietScene(4 + i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(8) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE').length, 0,
+      'short fixtures (< 16 scenes) are structurally exempt, same floor as SCENE_CONTINUITY_COLLAPSE');
+  });
+
+  it('no-fire when exclamation totals are too sparse to be a stable ratio (< 6 marks document-wide)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const barelyLoud = (i: number) =>
+      `INT. PLACE${i} - DAY\n\nA moment passes.\n\nLEAD\nWatch out!\n\n`;
+    const fountain =
+      Array.from({ length: 2 }, (_, i) => barelyLoud(i)).join('') +
+      Array.from({ length: 16 }, (_, i) => quietScene(2 + i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE').length, 0,
+      'a document with too few exclamation marks total must not fire on ratio noise alone');
+  });
+
+  it('no-fire on a flat/uniform feature (no exclamation asymmetry either direction)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const fountain = Array.from({ length: 18 }, (_, i) => quietScene(i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE').length, 0,
+      'a uniformly quiet feature has no ratio to speak of and must not fire');
+  });
+
+  it('no-fire when the finale has zero exclamation marks but the opening also has none (0/0, not a ratio)', async () => {
+    const { structurePass } = await import('../../server/nvm/revision/passes/structure.ts');
+    const midLoud = (i: number) =>
+      `INT. PLACE${i} - DAY\n\nSudden chaos!\n\nLEAD\nGo! Go! Go!\n\n`;
+    const fountain =
+      Array.from({ length: 6 }, (_, i) => quietScene(i)).join('') +
+      Array.from({ length: 6 }, (_, i) => midLoud(6 + i)).join('') +
+      Array.from({ length: 6 }, (_, i) => quietScene(12 + i)).join('');
+    const result = await structurePass({
+      fountain, original: fountain, records: recsGAI(18) as any,
+      structure: {} as any, annotations: [], approvedSpans: [],
+    });
+    assert.equal(result.issues.filter(i => i.rule === 'GLOBAL_ARC_INCOHERENCE').length, 0,
+      'intensity concentrated in the MIDDLE third (a healthy midpoint spike, not a moved climax) must not fire');
+  });
+});
+
 describe('Wave 152 — structurePass: revelation drought, false climax, act symmetry', async () => {
     const baseStructure = {
       actPosition: 'act2a' as const, completionPercent: 50, totalClockPressure: 5,

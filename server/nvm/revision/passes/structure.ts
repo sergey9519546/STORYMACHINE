@@ -6963,6 +6963,76 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── GLOBAL_ARC_INCOHERENCE (global-arc wave, 2026-07-10) ─────────────────
+  // WHY: tests/core/real-script-corpus.test.ts's act-swap recipe (thirds
+  // reordered 3rd-1st-2nd -- every scene keeps its local neighbors, only the
+  // document's global arc position changes) measured AUC ~0.48-0.49 across
+  // every subset size: chance level. SCENE_CONTINUITY_COLLAPSE cannot see
+  // this damage by construction (it reads only adjacent-scene axes, and
+  // act-swap preserves every one of them). This is the first detector that
+  // reads a GLOBAL, position-in-document signal instead of a local one.
+  //
+  // SIGNAL CHOSEN (measured, not guessed): exclamation-mark density (count
+  // of "!" per word of scene text) is the ONLY one of five candidate
+  // signals prototyped on all 71 corpus scripts (intact vs act-swapped
+  // pair, each) that showed any separation at all. Escalation-shape via
+  // suspenseDelta (mean, peak-position, and position/intensity Pearson
+  // correlation), clock-monotonicity via clockDelta (uninformative by
+  // construction: clockDelta only ever counts hits >= 0, so its cumulative
+  // trajectory is trivially non-decreasing on EVERY script, intact or not),
+  // character-introduction-fraction-by-third, and CONTINUOUS-slugline
+  // location-chain breaks were all measured within one point of chance
+  // separation (see PR description for the full table) -- this codebase's
+  // lexicon-based suspense/clue signals turn out to correlate with SCENE
+  // content, not with a script's ACT position, so none of them detect
+  // "climax content moved to the front." Exclamation density does, weakly:
+  // produced climaxes read louder on the page (more "!") than produced
+  // setups, so when the climactic third becomes the document's own first
+  // third (exactly what act-swap does), the first-third/last-third
+  // exclamation ratio inverts relative to every intact script measured.
+  //
+  // THRESHOLD (measured, zero-intact-FP swept over all 67 floor-eligible
+  // intact scripts, n >= 16): max intact first-third/last-third ratio was
+  // 2.124; gate set to 2.15 (a small measured margin, not a round number
+  // pulled from nowhere) and never fires on any of the 67. Recall is
+  // honest and modest -- 2/67 act-swapped scripts cross the gate (Isle of
+  // Dogs, The Incredibles) -- consistent with the honest AUC lift recorded
+  // in real-script-corpus.test.ts's own header: this is a genuinely hard
+  // detection problem for a lexicon-density signal, not a threshold-tuning
+  // problem. A minimum total-exclamation-mark floor (>= 6 across the
+  // document) keeps the ratio from being noise-driven on scripts that
+  // barely use "!" at all.
+  {
+    const scenesGAI = fountain.split(/^(?=INT\.|EXT\.)/mi).filter(x => /^(INT\.|EXT\.)/i.test(x));
+    if (scenesGAI.length >= 16) {
+      const a = Math.ceil(scenesGAI.length / 3);
+      const b = Math.ceil((scenesGAI.length / 3) * 2);
+      const thirdsGAI = [scenesGAI.slice(0, a), scenesGAI.slice(a, b), scenesGAI.slice(b)];
+      const exclDensity = (chunk: string[]): number => {
+        if (chunk.length === 0) return 0;
+        let excl = 0, words = 0;
+        for (const s of chunk) {
+          excl += (s.match(/!/g) ?? []).length;
+          words += (s.match(/\S+/g) ?? []).length;
+        }
+        return words > 0 ? excl / words : 0;
+      };
+      const totalExcl = thirdsGAI.reduce((s, c) => s + c.reduce((s2, x) => s2 + (x.match(/!/g) ?? []).length, 0), 0);
+      const firstDensity = exclDensity(thirdsGAI[0]);
+      const lastDensity = exclDensity(thirdsGAI[2]);
+      const ratioGAI = lastDensity > 0 ? firstDensity / lastDensity : (firstDensity > 0 ? Infinity : 0);
+      if (totalExcl >= 6 && ratioGAI > 2.15) {
+        issues.push({
+          location: 'Overall structure (first third vs. final third)',
+          rule: 'GLOBAL_ARC_INCOHERENCE',
+          severity: 'major',
+          description: `The opening third reads louder on the page than the finale -- its exclamation-mark density is ${ratioGAI === Infinity ? 'many times' : `${ratioGAI.toFixed(1)}x`} the final third's. Produced screenplays' loudest, most exclamatory material is overwhelmingly the climax, not the setup; a document that peaks this early and never returns to that intensity reads like its climax has been moved to the front -- an act-order problem, not a scene-level one.`,
+          suggestedFix: "Check whether the document's scene order tracks the story's actual escalation -- setup, complication, climax. If the opening genuinely earns this intensity, the finale likely needs to top it, not fall short of it.",
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'structure', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

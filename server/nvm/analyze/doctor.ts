@@ -1619,9 +1619,29 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const sccInstances = passes.reduce(
     (n, p) => n + p.issues.filter(i => i.rule === 'SCENE_CONTINUITY_COLLAPSE').length, 0);
   const sccPervasive = passes.some(p => p.issues.some(i => i.rule === 'SCENE_CONTINUITY_PERVASIVE'));
-  const structuralDeduction = sccPervasive
+  const sccDeduction = sccPervasive
     ? Math.min(STRUCTURAL_ROLLUP_DEDUCTION_CAP, STRUCTURAL_ROLLUP_DEDUCTION + sccInstances * STRUCTURAL_INSTANCE_DEDUCTION)
     : Math.min(STRUCTURAL_INSTANCE_DEDUCTION_CAP, sccInstances * STRUCTURAL_INSTANCE_DEDUCTION);
+
+  // ── Global-arc deduction (global-arc wave, 2026-07-10) ───────────────────
+  // GLOBAL_ARC_INCOHERENCE (structure.ts) is a single document-level finding
+  // (fires 0 or 1 time -- there is no per-instance count to scale against,
+  // unlike SCENE_CONTINUITY_COLLAPSE's per-cut emission), so its deduction is
+  // a flat, bounded amount rather than an instance-weighted one. Measured
+  // zero-intact-FP by construction (see the rule's own header at its firing
+  // site) across all 67 floor-eligible real-corpus scripts, so this is a
+  // zero-effect no-op on every currently-passing manifest entry. Combined
+  // with the SCC deduction under one outer cap (20 -> 24) so a script that
+  // trips BOTH a local-adjacency collapse and a global-arc inversion can be
+  // separated further than either alone, while staying in the same order of
+  // magnitude as the pre-existing structural-deduction design.
+  const GLOBAL_ARC_DEDUCTION = 6;
+  const STRUCTURAL_TOTAL_DEDUCTION_CAP = 24;
+  const globalArcFires = passes.some(p => p.issues.some(i => i.rule === 'GLOBAL_ARC_INCOHERENCE'));
+  const structuralDeduction = Math.min(
+    STRUCTURAL_TOTAL_DEDUCTION_CAP,
+    sccDeduction + (globalArcFires ? GLOBAL_ARC_DEDUCTION : 0),
+  );
   const health = Math.max(0, Math.round((baseHealth - structuralDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
