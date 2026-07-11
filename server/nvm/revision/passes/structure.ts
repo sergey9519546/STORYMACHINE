@@ -6831,29 +6831,56 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     }
   }
 
-  // ── SCENE_CONTINUITY_COLLAPSE (structural-AUC wave, 2026-07-10) ────────────
+  // ── SCENE_CONTINUITY_COLLAPSE (structural-AUC wave, 2026-07-10; widened
+  // 2026-07-10 with a third corroborating axis) ──────────────────────────
   // WHY: the real-corpus degradation harness (tests/core/real-script-corpus
   // .test.ts) measured the rule set nearly blind to wholesale scene-order
   // destruction at feature length (AUC 0.677 intact-vs-scrambled) — every
   // structural signal that existed was either scene-local or derived from
   // first-occurrence bookkeeping that is shuffle-invariant by construction.
-  // This rule reads two adjacency signals that scrambling measurably breaks
-  // (12-pair intact-vs-degraded measurement, thresholds set from that data,
-  // not intuition): (a) character continuity — the fraction of adjacent
-  // scene pairs sharing at least one speaking character (intact features
-  // median 0.55; scrambled 0.39) — and (b) day/night thrash — the toggle
-  // rate of DAY/NIGHT across sluglines (intact 0.17; scrambled 0.40). The
-  // composite index (continuity − thrash) separates at median 0.34 vs 0.05;
-  // firing below 0.05 caught 5/12 scrambled features and 1/12 intact (an
-  // anthology-shaped outlier), so the threshold is conservative by design —
-  // an excellence-grade "never fire on ordinary craft" posture for a MAJOR
-  // defect claim. Floors (>= 16 scenes, >= 10 speaker-bearing scenes,
-  // >= 10 DAY/NIGHT-bearing slugs) keep every short fixture and the whole
-  // calibration corpus structurally exempt: this is a feature-scale rule.
+  // This rule reads three adjacency signals that scrambling measurably
+  // breaks. Measured over the full 69-script produced corpus (intact +
+  // seeded-shuffle/drop-every-3rd degraded pair per script, floors applied
+  // to both bands identically): (a) character continuity — the fraction of
+  // adjacent scene pairs sharing at least one speaking character; (b)
+  // day/night thrash — the toggle rate of DAY/NIGHT across sluglines; (c)
+  // location-run rate — the fraction of adjacent sluglines that share the
+  // same location after stripping INT./EXT. and the time-of-day suffix.
+  // Degradation collapses (c) almost everywhere (adjacent-same-location
+  // pairs are near-impossible to preserve under a scene shuffle), but many
+  // INTACT scripts also legitimately run near-zero location-run (scripts
+  // that hop locations every scene by design) — so axis (c) alone is not
+  // safe as a standalone gate and is used only as a CORROBORATING signal
+  // that widens the primary composite index (continuity − thrash) gate.
+  // Two-tier gate, swept over all 69 intact/degraded pairs with floors
+  // applied to require zero false positives on every intact script
+  // (0Meet_the_Robinsons through Zootopia, 9_2009's anthology shape
+  // included — its intact CI 0.045/-0.045 sits near the tight tier but
+  // never crosses it, and its own location-run 0.38 is nowhere near the
+  // corroboration floor, so it never trips the wide tier either):
+  //   TIGHT:  CI = continuity − thrash < 0.05 fires unconditionally
+  //           (the original, most-conservative threshold; catches 20/42
+  //           floor-eligible degraded scripts alone, 0/49 intact).
+  //   WIDE:   CI < 0.30 AND locRun < 0.015 fires (composite index alone
+  //           would false-positive past 0.05, but requiring the
+  //           location-run axis to ALSO be near-zero corroborates that the
+  //           adjacency structure, not just one index, has collapsed).
+  //           Together the two tiers catch 29/42 floor-eligible degraded
+  //           scripts, still 0/49 intact — a 45% recall improvement on the
+  //           degraded band with the zero-false-positive bar unchanged.
+  // Floors (>= 16 scenes, >= 10 speaker-bearing scenes, >= 10 DAY/NIGHT-
+  // bearing slugs) keep every short fixture and the whole calibration
+  // corpus structurally exempt: this is a feature-scale rule.
   {
     const CUE_RE_SCC = /^[A-Z][A-Z0-9\s\-'\.]{2,}(\s*\([A-Za-z.\s']+\))?$/;
+    const normLocSCC = (slug: string): string => {
+      let s = slug.replace(/^(INT\.\/EXT\.|INT\/EXT\.|I\/E\.|INT\.|EXT\.)\s*/i, '');
+      s = s.replace(/\s*-\s*(DAY|NIGHT|CONTINUOUS|LATER|MOMENTS LATER|DAWN|DUSK|MORNING|EVENING|AFTERNOON|NIGHTTIME|SAME TIME)\s*$/i, '');
+      return s.trim().toUpperCase();
+    };
     const speakersByScene: Array<Set<string>> = [];
     const todByScene: number[] = [];
+    const slugsSCC: string[] = [];
     let cur = new Set<string>(); let started = false;
     for (const raw of fountain.split(/\r?\n/)) {
       const l = raw.trim();
@@ -6861,6 +6888,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
         if (started) speakersByScene.push(cur);
         cur = new Set(); started = true;
         todByScene.push(/ NIGHT/i.test(l) ? 1 : / DAY/i.test(l) ? 0 : -1);
+        slugsSCC.push(l);
         continue;
       }
       if (started && CUE_RE_SCC.test(l) && !/^(INT\.|EXT\.|CUT|FADE|SMASH|THE END)/.test(l)) {
@@ -6879,7 +6907,17 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
       let toggles = 0;
       for (let i = 1; i < tod.length; i++) if (tod[i] !== tod[i - 1]) toggles++;
       const thrash = toggles / (tod.length - 1);
-      if (charCont - thrash < 0.05) {
+      const ci = charCont - thrash;
+      let locRun: number | null = null;
+      if (slugsSCC.length >= 2) {
+        const locs = slugsSCC.map(normLocSCC);
+        let runs = 0;
+        for (let i = 1; i < locs.length; i++) if (locs[i] === locs[i - 1]) runs++;
+        locRun = runs / (locs.length - 1);
+      }
+      const tightFire = ci < 0.05;
+      const wideFire = ci < 0.30 && locRun !== null && locRun < 0.015;
+      if (tightFire || wideFire) {
         // Under the (conservative, measured) global gate, every adjacent
         // scene pair that BOTH shares no speaking character AND flips
         // day/night is an individually locatable continuity break — emitted
