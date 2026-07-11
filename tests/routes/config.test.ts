@@ -231,3 +231,91 @@ describe('routes/config — HTTP behavior', async () => {
     assert.equal(cfg.character_arc_mode, 'descent', 'imported character_arc_mode must be readable');
   });
 });
+
+// ── ADMIN_TOKEN gate for AI config writes ─────────────────────────────────
+// Own describe block (fresh server, own env-var lifecycle) so it can't bleed
+// ADMIN_TOKEN state into the tests above, which all assume it's unset.
+describe('routes/config — ADMIN_TOKEN gate for AI config writes', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => {
+    delete process.env.ADMIN_TOKEN;
+    await server.close();
+  });
+
+  it('POST /api/ai-config succeeds from loopback with ADMIN_TOKEN unset (no-fire: default dev/test behavior preserved)', async () => {
+    delete process.env.ADMIN_TOKEN;
+    const res = await fetch(`${server.baseUrl}/api/ai-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'gemini' }),
+    });
+    assert.equal(res.status, 200);
+  });
+
+  it('GET /api/ai-config stays open regardless of ADMIN_TOKEN (no-fire: the read route is never gated)', async () => {
+    process.env.ADMIN_TOKEN = 'test-admin-token-abc';
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config`);
+      assert.equal(res.status, 200);
+    } finally {
+      delete process.env.ADMIN_TOKEN;
+    }
+  });
+
+  it('POST /api/ai-config rejects a loopback caller with no bearer token once ADMIN_TOKEN is set (fire)', async () => {
+    process.env.ADMIN_TOKEN = 'test-admin-token-abc';
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: 'gemini' }),
+      });
+      assert.equal(res.status, 401);
+      const body = await res.json();
+      assert.equal(typeof body.error, 'string');
+    } finally {
+      delete process.env.ADMIN_TOKEN;
+    }
+  });
+
+  it('POST /api/ai-config rejects a wrong bearer token once ADMIN_TOKEN is set (fire)', async () => {
+    process.env.ADMIN_TOKEN = 'test-admin-token-abc';
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong-token' },
+        body: JSON.stringify({ provider: 'gemini' }),
+      });
+      assert.equal(res.status, 401);
+    } finally {
+      delete process.env.ADMIN_TOKEN;
+    }
+  });
+
+  it('POST /api/ai-config succeeds with the correct bearer token once ADMIN_TOKEN is set (no-fire)', async () => {
+    process.env.ADMIN_TOKEN = 'test-admin-token-abc';
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-admin-token-abc' },
+        body: JSON.stringify({ provider: 'gemini' }),
+      });
+      assert.equal(res.status, 200);
+    } finally {
+      delete process.env.ADMIN_TOKEN;
+    }
+  });
+
+  it('POST /api/ai-config/test is gated the same way once ADMIN_TOKEN is set (fire)', async () => {
+    process.env.ADMIN_TOKEN = 'test-admin-token-abc';
+    try {
+      const res = await fetch(`${server.baseUrl}/api/ai-config/test`, { method: 'POST' });
+      assert.equal(res.status, 401);
+      const body = await res.json();
+      assert.equal(typeof body.error, 'string');
+    } finally {
+      delete process.env.ADMIN_TOKEN;
+    }
+  });
+});

@@ -98,6 +98,40 @@ router.get('/metrics', (req, res) => {
   res.json({ sessions: sessions.size, ...metrics.snapshot() });
 });
 
+// Write-gate for the AI provider config routes below (GET stays open — it
+// only ever returns booleans, never key material, so there's nothing to
+// protect there; see getPublicConfig()'s own contract). Without this, ANY
+// remote caller could POST new provider config — including a baseUrl — and
+// silently redirect the server's AI traffic (and any key it's given) to an
+// attacker-controlled endpoint. Same default posture as /metrics above:
+// loopback-only until an operator opts into remote config by setting
+// ADMIN_TOKEN, at which point the token is required from every caller,
+// loopback included (a set token means "only holders of this token", not
+// "holders of this token, OR loopback").
+//
+// Uses req.ip rather than /metrics' req.socket.remoteAddress: a config WRITE
+// is a more sensitive operation than a metrics read, and req.socket always
+// reports the immediate peer — behind a reverse proxy (this repo already
+// supports TRUST_PROXY) that peer is the proxy itself, not the real client,
+// which would misidentify a remote attacker as loopback. req.ip resolves the
+// real client through X-Forwarded-For once trust proxy is configured, and
+// falls back to the same raw peer address when it isn't.
+function checkAdminAuth(req: express.Request, res: express.Response): boolean {
+  const adminToken = process.env.ADMIN_TOKEN;
+  if (adminToken) {
+    const auth = req.headers.authorization ?? '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!provided || !timingSafeStringEqual(provided, adminToken)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return false;
+    }
+  } else if (!isLoopbackAddress(req.ip)) {
+    res.status(401).json({ error: 'Unauthorized: set ADMIN_TOKEN to configure AI providers remotely' });
+    return false;
+  }
+  return true;
+}
+
 // ── AI provider config routes ─────────────────────────────────────────────
 router.get('/api/ai-config', (_req, res) => {
   const pub = getPublicConfig();
@@ -115,13 +149,15 @@ router.get('/api/ai-config', (_req, res) => {
 });
 
 router.post('/api/ai-config', gameLimiter, validate(AiConfigSchema), asyncHandler(async (req, res) => {
+  if (!checkAdminAuth(req, res)) return;
   const { apiKey, imgApiKey, ttsApiKey, embApiKey, ...cfg } = req.body as Record<string, string>;
   applyConfig(cfg, { apiKey, imgApiKey, ttsApiKey, embApiKey });
   res.json({ ok: true, config: getPublicConfig() });
 }));
 
 // Connection test — fires a minimal generate call so the Settings UI can verify credentials.
-router.post('/api/ai-config/test', gameLimiter, asyncHandler(async (_req, res) => {
+router.post('/api/ai-config/test', gameLimiter, asyncHandler(async (req, res) => {
+  if (!checkAdminAuth(req, res)) return;
   try {
     const result = await generateContent({
       model: getModel('fast'),
