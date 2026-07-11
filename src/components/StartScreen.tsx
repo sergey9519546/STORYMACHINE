@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload } from "lucide-react";
+import { Sparkles, Settings, FileText, X, ChevronRight, ChevronLeft, Cpu, Upload, FilePlus2 } from "lucide-react";
 import { StoryConfig } from "../types";
 import { EXPLAINERS } from "./startscreen/explainers.config";
 import { ExplainerCard } from "./startscreen/ExplainerCard";
 import { StoryConfigForm, UploadedFile } from "./startscreen/StoryConfigForm";
+import { SlugLineIntro, usePrefersReducedMotion } from "./startscreen/SlugLineIntro";
 
 interface StartScreenProps {
   onStart: (config: StoryConfig) => void;
@@ -34,6 +35,20 @@ const DEFAULT_STORY_CONFIG: StoryConfig = {
 const OPEN_FILE_EXTS = /\.(fountain|txt|fdx)$/i;
 const MAX_OPEN_FILE_SIZE = 5 * 1024 * 1024; // 5 MB — generous for a feature-length script
 
+// Motion grammar: one easing, two durations, sitewide (brief's "Reading
+// Room" spec). These mirror index.css's --ease-out-expo / --dur-micro /
+// --dur-reveal token values exactly — kept as JS constants because Framer
+// Motion's `transition` prop needs numbers/arrays, not CSS custom
+// properties. CSS-only hover transitions below reference the tokens
+// directly via arbitrary values (e.g. `ease-[var(--ease-out-expo)]`).
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const DUR_MICRO = 0.2; // var(--dur-micro), seconds
+const DUR_REVEAL = 0.7; // var(--dur-reveal), seconds
+
+const MICRO_TRANSITION = "duration-[var(--dur-micro)] ease-[var(--ease-out-expo)]";
+const FOCUS_RING =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-stamp focus-visible:outline-offset-4";
+
 export default function StartScreen({
   onStart,
   isGenerating,
@@ -50,10 +65,30 @@ export default function StartScreen({
   const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   // "Open a script file" (finding D): a second, always-available entry point
-  // on step 1 that goes straight into the editor — distinct from the
-  // "Ingested Files" uploads above, which only ever become hidden AI context.
+  // — now on the entrance itself — that goes straight into the editor,
+  // distinct from the "Ingested Files" uploads inside the wizard, which only
+  // ever become hidden AI context.
   const [openFileError, setOpenFileError] = useState<string | null>(null);
   const openFileInputRef = useRef<HTMLInputElement>(null);
+
+  // The restructure: entrance (script-first front door) vs. the original
+  // 5-step wizard, now a deliberate secondary path reached via "Start a new
+  // story from scratch". Nothing about the wizard's own step machinery
+  // changes — this just gates whether it's mounted.
+  const [view, setView] = useState<"entrance" | "wizard">("entrance");
+
+  // Second half of the signature move: the slug line "resolves into the
+  // tool" — the primary actions fade/lift in only once typing completes.
+  // Reduced-motion users get isIntroResolved=true from first paint (see
+  // usePrefersReducedMotion / SlugLineIntro's own instant-render branch), so
+  // this reveal never animates for them — main renders already-visible.
+  const reducedMotion = usePrefersReducedMotion();
+  const [isIntroResolved, setIsIntroResolved] = useState(reducedMotion);
+  React.useEffect(() => {
+    // If the OS setting flips mid-visit, don't leave the primary actions
+    // stuck invisible waiting on an animation that will no longer run.
+    if (reducedMotion) setIsIntroResolved(true);
+  }, [reducedMotion]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -169,95 +204,107 @@ export default function StartScreen({
   const nextStep = () => setStep((s) => Math.min(s + 1, 5));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
+  const handleSample = () => {
+    // One-click sample: hand off to ScriptIDE via the same sessionStorage
+    // idiom as the .fdx pending flag. The IDE opens Script Doctor and
+    // triggers its existing "Try a sample script" flow, so provenance stays
+    // "sample" end to end (draft history is never polluted — see
+    // ScriptDoctorPanel's isSampleRun).
+    try { sessionStorage.setItem("sm_sample_pending", "1"); } catch { /* still opens the editor */ }
+    onStart(DEFAULT_STORY_CONFIG);
+  };
+
   return (
-    <div className="min-h-screen bg-white text-black flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-      {/* Brutalist Grid Background */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, #000 2px, transparent 2px)', backgroundSize: '32px 32px' }}></div>
+    <div className="relative min-h-screen overflow-hidden bg-paper text-ink font-sans">
+      <div className="film-grain" aria-hidden="true" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="z-10 max-w-4xl w-full space-y-8 py-12"
-      >
-        <div className="space-y-6 border-b-[8px] border-black pb-8">
-          <h1 className="text-5xl md:text-7xl font-display uppercase tracking-tighter text-black leading-[0.85]">
-            STORY MACHINE
-          </h1>
-          <div className="flex items-center justify-between">
-            <p className="text-lg md:text-xl text-black font-semibold tracking-tight max-w-2xl leading-snug">
-              Step {step} of 5
-            </p>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className={`h-4 w-10 border-4 border-black transition-all duration-300 ${i <= step ? 'bg-[#FF4444] shadow-[2px_2px_0px_0px_#000000]' : 'bg-transparent'}`} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white brutal-border-thick brutal-shadow p-8 md:p-12 min-h-[500px] flex flex-col">
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-10 flex-1"
+      <AnimatePresence mode="wait">
+        {view === "entrance" ? (
+          <motion.div
+            key="entrance"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+            className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-14 px-6 py-14 sm:gap-16 sm:px-10 sm:py-20"
+          >
+            {/* ---- The entrance: wordmark + the one signature move ---- */}
+            <header className="flex flex-col gap-6 sm:gap-8">
+              <p className="hidden font-courier text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
+                Coverage Report — Reader&rsquo;s Copy
+              </p>
+              <h1
+                className="font-display uppercase leading-[0.82] text-ink"
+                style={{ fontSize: "clamp(3.25rem, 12vw, 9.5rem)" }}
               >
-                <StoryConfigForm
-                  theme={theme}
-                  onThemeChange={setTheme}
-                  backstory={backstory}
-                  onBackstoryChange={setBackstory}
-                  uploadedFiles={uploadedFiles}
-                  onUploadedFilesChange={setUploadedFiles}
-                  onPreviewFile={setPreviewFile}
-                  isGenerating={isGenerating}
-                  isDragging={isDragging}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                />
+                Story Machine
+              </h1>
+              <SlugLineIntro onComplete={() => setIsIntroResolved(true)} />
+            </header>
 
-                {/* Finding C/D: the wizard is mandatory for nobody. Both paths
-                    below skip straight to the editor with a default config —
-                    Next (below) stays theme-gated for the wizard itself, but
-                    these are always available regardless of theme. */}
-                <div className="pt-2 border-t-4 border-black flex flex-col sm:flex-row gap-4">
+            {/* ---- Primary act: the three script-entry paths ----
+                The "resolves into the tool" half of the signature move:
+                held invisible until the slug line finishes typing, then
+                lifted in on the one sitewide easing/duration pair. Reduced-
+                motion users never see this — isIntroResolved starts true,
+                so initial===animate and Framer renders it already visible. */}
+            <motion.main
+              initial={{ opacity: 0, y: 12 }}
+              animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+              transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
+              className="flex flex-col gap-10 sm:gap-12"
+              inert={!isIntroResolved || undefined}
+            >
+              <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
+                <h2
+                  id="entrance-actions-heading"
+                  className="font-courier text-xs uppercase tracking-[0.3em] text-ink/50"
+                >
+                  Bring A Script
+                </h2>
+
+                {/* Grid, broken once: the sample gets a full-width, quietly
+                    stamped block instead of sitting equal-weight in a row —
+                    it's the best first taste, so it reads first. */}
+                <button
+                  type="button"
+                  onClick={handleSample}
+                  disabled={isGenerating}
+                  className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
+                >
+                  <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-courier text-[10px] uppercase tracking-[0.25em] text-stamp">
+                    Reader&rsquo;s Pick
+                  </span>
+                  <span className="font-courier text-[11px] uppercase tracking-[0.3em] text-paper/60">
+                    Fastest way in
+                  </span>
+                  <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
+                    <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    Try The Sample Script
+                  </span>
+                  <span className="max-w-[52ch] font-sans text-sm text-paper/70">
+                    See a full coverage read on a script that&rsquo;s already loaded — no setup required.
+                  </span>
+                </button>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <button
                     type="button"
                     onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                     disabled={isGenerating}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
+                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
-                    <FileText className="w-4 h-4" /> I Have A Script — Open The Editor
+                    <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    I Have A Script — Open The Editor
                   </button>
                   <button
                     type="button"
                     onClick={() => openFileInputRef.current?.click()}
                     disabled={isGenerating}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
+                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
-                    <Upload className="w-4 h-4" /> Open A Script File
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // One-click sample: hand off to ScriptIDE via the same
-                      // sessionStorage idiom as the .fdx pending flag. The
-                      // IDE opens Script Doctor and triggers its existing
-                      // "Try a sample script" flow, so provenance stays
-                      // "sample" end to end (draft history is never
-                      // polluted — see ScriptDoctorPanel's isSampleRun).
-                      try { sessionStorage.setItem("sm_sample_pending", "1"); } catch { /* still opens the editor */ }
-                      onStart(DEFAULT_STORY_CONFIG);
-                    }}
-                    disabled={isGenerating}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none text-sm"
-                  >
-                    <Sparkles className="w-4 h-4" /> Try The Sample Script
+                    <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    Open A Script File
                   </button>
                   <input
                     type="file"
@@ -265,151 +312,257 @@ export default function StartScreen({
                     ref={openFileInputRef}
                     onChange={handleOpenScriptFile}
                     className="hidden"
+                    aria-label="Open a script file"
                   />
                 </div>
+
                 {openFileError && (
-                  <div className="text-xs font-mono text-red-600 border-2 border-red-600 bg-red-50 px-3 py-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-courier text-xs text-ink">
                     <span>{openFileError}</span>
                     <button
+                      type="button"
                       onClick={() => setOpenFileError(null)}
-                      aria-label="Dismiss"
-                      className="font-bold leading-none hover:opacity-70"
+                      aria-label="Dismiss error"
+                      className={`min-h-[44px] min-w-[44px] font-bold leading-none text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
                     >
-                      ✕
+                      <X className="mx-auto h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                 )}
-              </motion.div>
-            )}
+              </section>
 
-            {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1"
-              >
-                <ExplainerCard
-                  title="Format"
-                  icon={Settings}
-                  options={EXPLAINERS.format}
-                  selectedValue={format}
-                  onSelect={(val) => setFormat(val as StoryConfig["format"])}
-                />
-              </motion.div>
-            )}
+              {/* ---- Secondary act: the wizard, clearly de-emphasized ---- */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setView("wizard")}
+                  disabled={isGenerating}
+                  className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-courier text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                >
+                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                  Start a new story from scratch
+                  <ChevronRight
+                    className={`h-4 w-4 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </motion.main>
 
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1"
-              >
-                <ExplainerCard
-                  title="Structure"
-                  icon={Settings}
-                  options={EXPLAINERS.structure}
-                  selectedValue={structure}
-                  onSelect={(val) => setStructure(val as StoryConfig["structure"])}
-                />
-              </motion.div>
-            )}
-
-            {step === 4 && (
-              <motion.div
-                key="step4"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1"
-              >
-                <ExplainerCard
-                  title="Director Style"
-                  icon={Settings}
-                  options={EXPLAINERS.directorStyle}
-                  selectedValue={directorStyle}
-                  onSelect={(val) => setDirectorStyle(val as StoryConfig["directorStyle"])}
-                />
-              </motion.div>
-            )}
-
-            {step === 5 && (
-              <motion.div
-                key="step5"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="flex-1"
-              >
-                <ExplainerCard
-                  title="Emotional Arc"
-                  icon={Settings}
-                  options={EXPLAINERS.emotionalArc}
-                  selectedValue={emotionalArc}
-                  onSelect={(val) => setEmotionalArc(val as StoryConfig["emotionalArc"])}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="flex justify-between items-center mt-12 pt-8 border-t-[8px] border-black">
-            {step > 1 ? (
+            {/* ---- OASIS entry + footer meta, restyled but reachable ---- */}
+            <footer className="mt-auto flex flex-col items-center gap-5 border-t border-ink/15 pt-10 text-center">
               <button
-                onClick={prevStep}
-                disabled={isGenerating}
-                className="flex items-center gap-2 px-6 py-4 bg-white text-black brutal-border-thick hover:bg-gray-100 font-bold uppercase tracking-widest brutal-shadow-hover disabled:opacity-50 disabled:pointer-events-none"
+                type="button"
+                onClick={() => onOpenStoryMachine?.()}
+                className={`inline-flex min-h-[44px] items-center gap-2 border border-ink px-5 py-2.5 font-courier text-xs uppercase tracking-[0.25em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper ${FOCUS_RING}`}
               >
-                <ChevronLeft className="w-5 h-5" /> Back
+                <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+                Open OASIS Story Machine
               </button>
-            ) : (
-              <div></div>
-            )}
-
-            {step < 5 ? (
-              <button
-                onClick={nextStep}
-                disabled={isGenerating || (step === 1 && !theme)}
-                className="flex items-center gap-2 px-8 py-4 bg-black text-white brutal-border-thick hover:bg-[#FF4444] hover:border-[#FF4444] disabled:opacity-50 font-bold uppercase tracking-widest brutal-shadow-hover disabled:pointer-events-none"
-              >
-                Next <ChevronRight className="w-5 h-5" />
-              </button>
-            ) : (
-              <button
-                onClick={handleStart}
-                disabled={isGenerating}
-                className="flex items-center gap-2 px-8 py-4 bg-black text-white brutal-border-thick hover:bg-[#FF4444] hover:border-[#FF4444] disabled:opacity-50 font-bold uppercase tracking-widest brutal-shadow-hover disabled:pointer-events-none"
-              >
-                {isGenerating ? (
-                  <>
-                    <Sparkles className="w-5 h-5 animate-spin" />
-                    Initializing...
-                  </>
-                ) : (
-                  <>
-                    Begin Sequence <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="text-sm md:text-base text-black font-mono uppercase tracking-widest space-y-2 border-t-[8px] border-black pt-8 flex flex-col items-center">
-          <button
-            onClick={() => onOpenStoryMachine?.()}
-            className="mb-8 px-6 py-2 bg-black text-white font-mono text-sm uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border-thick brutal-shadow-hover flex items-center gap-2"
+              <div className="space-y-1 font-courier text-[11px] uppercase tracking-[0.2em] text-ink/45">
+                <p className="font-semibold text-ink/60">Powered by Gemini 2.5 Pro</p>
+                <p>Experience Management • Dynamic Generation • Psychological Modeling</p>
+              </div>
+            </footer>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="wizard"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
+            className="relative z-10 mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 px-6 py-12 sm:px-10 sm:py-16"
           >
-            <Cpu className="w-4 h-4" /> Open OASIS Story Machine
-          </button>
-          <p className="font-bold">Powered by Gemini 2.5 Pro</p>
-          <p className="text-gray-600">
-            Experience Management • Dynamic Generation • Psychological Modeling
-          </p>
-        </div>
-      </motion.div>
+            <div className="flex flex-col gap-6 border-b border-ink/15 pb-8">
+              <button
+                type="button"
+                onClick={() => setView("entrance")}
+                disabled={isGenerating}
+                className={`inline-flex w-fit min-h-[44px] items-center gap-2 font-courier text-xs uppercase tracking-[0.25em] text-ink/60 transition-colors ${MICRO_TRANSITION} hover:text-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                Back to entrance
+              </button>
+              <div className="flex items-end justify-between gap-6">
+                <div>
+                  <p className="font-courier text-xs uppercase tracking-[0.3em] text-ink/50">
+                    New Story — Configuration
+                  </p>
+                  <h2 className="mt-2 font-display text-3xl uppercase leading-none text-ink sm:text-4xl">
+                    Step {step} of 5
+                  </h2>
+                </div>
+                <div className="flex gap-2" role="list" aria-label="Wizard progress">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <span
+                      key={i}
+                      role="listitem"
+                      aria-current={i === step ? "step" : undefined}
+                      className={`h-2 w-8 border transition-colors duration-[var(--dur-micro)] sm:w-10 ${
+                        i <= step ? "border-stamp bg-stamp" : "border-ink/40 bg-transparent"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex min-h-[500px] flex-1 flex-col border border-ink/15 bg-paper-edge/40 p-6 sm:p-10">
+              <AnimatePresence mode="wait">
+                {step === 1 && (
+                  <motion.div
+                    key="step1"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+                    className="flex-1"
+                  >
+                    <StoryConfigForm
+                      theme={theme}
+                      onThemeChange={setTheme}
+                      backstory={backstory}
+                      onBackstoryChange={setBackstory}
+                      uploadedFiles={uploadedFiles}
+                      onUploadedFilesChange={setUploadedFiles}
+                      onPreviewFile={setPreviewFile}
+                      isGenerating={isGenerating}
+                      isDragging={isDragging}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    />
+                  </motion.div>
+                )}
+
+                {step === 2 && (
+                  <motion.div
+                    key="step2"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+                    className="flex-1"
+                  >
+                    <ExplainerCard
+                      title="Format"
+                      icon={Settings}
+                      options={EXPLAINERS.format}
+                      selectedValue={format}
+                      onSelect={(val) => setFormat(val as StoryConfig["format"])}
+                    />
+                  </motion.div>
+                )}
+
+                {step === 3 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+                    className="flex-1"
+                  >
+                    <ExplainerCard
+                      title="Structure"
+                      icon={Settings}
+                      options={EXPLAINERS.structure}
+                      selectedValue={structure}
+                      onSelect={(val) => setStructure(val as StoryConfig["structure"])}
+                    />
+                  </motion.div>
+                )}
+
+                {step === 4 && (
+                  <motion.div
+                    key="step4"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+                    className="flex-1"
+                  >
+                    <ExplainerCard
+                      title="Director Style"
+                      icon={Settings}
+                      options={EXPLAINERS.directorStyle}
+                      selectedValue={directorStyle}
+                      onSelect={(val) => setDirectorStyle(val as StoryConfig["directorStyle"])}
+                    />
+                  </motion.div>
+                )}
+
+                {step === 5 && (
+                  <motion.div
+                    key="step5"
+                    initial={{ opacity: 0, x: 16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -16 }}
+                    transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+                    className="flex-1"
+                  >
+                    <ExplainerCard
+                      title="Emotional Arc"
+                      icon={Settings}
+                      options={EXPLAINERS.emotionalArc}
+                      selectedValue={emotionalArc}
+                      onSelect={(val) => setEmotionalArc(val as StoryConfig["emotionalArc"])}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-12 flex items-center justify-between border-t border-ink/15 pt-8">
+                {step > 1 ? (
+                  <button
+                    type="button"
+                    onClick={prevStep}
+                    disabled={isGenerating}
+                    className={`flex min-h-[44px] items-center gap-2 border border-ink px-6 py-4 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  >
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                    Back
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                {step < 5 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={isGenerating || (step === 1 && !theme)}
+                    className={`flex min-h-[44px] items-center gap-2 border border-ink bg-ink px-8 py-4 font-courier text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleStart}
+                    disabled={isGenerating}
+                    className={`flex min-h-[44px] items-center gap-2 border border-stamp bg-stamp px-8 py-4 font-courier text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:border-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Sparkles className="h-5 w-5 animate-spin" aria-hidden="true" />
+                        Initializing...
+                      </>
+                    ) : (
+                      <>
+                        Begin Sequence
+                        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* File Preview Modal */}
       <AnimatePresence>
@@ -418,27 +571,38 @@ export default function StartScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm"
+            transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 p-6"
             onClick={() => setPreviewFile(null)}
           >
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white brutal-border-thick brutal-shadow w-full max-w-3xl max-h-[80vh] flex flex-col"
+              className="flex max-h-[80vh] w-full max-w-3xl flex-col border border-ink bg-paper"
             >
-              <div className="flex items-center justify-between p-4 border-b-4 border-black bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-[#FF4444]" />
-                  <h3 className="font-bold uppercase tracking-widest text-sm truncate max-w-[300px]">{previewFile.name}</h3>
-                  <span className="text-[10px] font-mono bg-black text-white px-2 py-1 uppercase">{previewFile.category}</span>
+              <div className="flex items-center justify-between gap-4 border-b border-ink/15 bg-paper-edge px-5 py-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <FileText className="h-4 w-4 shrink-0 text-stamp" aria-hidden="true" />
+                  <h3 className="max-w-[300px] truncate font-courier text-sm uppercase tracking-[0.15em] text-ink">
+                    {previewFile.name}
+                  </h3>
+                  <span className="shrink-0 border border-ink/30 px-2 py-0.5 font-courier text-[10px] uppercase tracking-[0.15em] text-ink/70">
+                    {previewFile.category}
+                  </span>
                 </div>
-                <button onClick={() => setPreviewFile(null)} className="p-1 hover:bg-gray-200 transition-colors brutal-border">
-                  <X className="w-4 h-4" />
+                <button
+                  type="button"
+                  onClick={() => setPreviewFile(null)}
+                  aria-label="Close preview"
+                  className={`flex min-h-[44px] min-w-[44px] items-center justify-center text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-              <div className="p-6 overflow-y-auto font-mono text-sm whitespace-pre-wrap text-gray-800 flex-1">
+              <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-6 font-courier text-sm text-ink/80">
                 {previewFile.content}
               </div>
             </motion.div>
