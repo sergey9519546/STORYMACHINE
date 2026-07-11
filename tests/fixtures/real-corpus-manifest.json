@@ -550,5 +550,21 @@
     "health": 97.7,
     "verdict": "RECOMMEND",
     "sceneCount": 105
+  },
+  {
+    "name": "Pulp_Fiction",
+    "file": "Pulp_Fiction.fountain.txt",
+    "contentHash": "11132b83622793ebec7b1580477dc50e84db5c2a9a9524d76f9229768a3bb290",
+    "health": 98.7,
+    "verdict": "RECOMMEND",
+    "sceneCount": 117
+  },
+  {
+    "name": "Jaws",
+    "file": "Jaws.fountain.txt",
+    "contentHash": "cbb9c4443839e1ed8abbd5f1fea786067f88115f721887b6b2c21e152865d96f",
+    "health": 96.2,
+    "verdict": "RECOMMEND",
+    "sceneCount": 159
   }
 ]
