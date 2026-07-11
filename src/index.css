@@ -1,5 +1,103 @@
-@import url("https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap");
 @import "tailwindcss";
+
+/*
+ * Self-hosted web fonts.
+ *
+ * Previously loaded via an `@import url(...)` of Google Fonts' hosted CSS,
+ * which production's CSP (server/app.ts, `style-src 'self' 'unsafe-inline'`
+ * + `font-src 'self'`) blocks outright: the external stylesheet never loads,
+ * so every non-system face silently fell back to system fonts in prod.
+ * Fixed by vendoring the woff2 files under public/fonts/ (Vite serves
+ * public/ at the site root) and declaring @font-face rules locally.
+ *
+ * Only the families + weights/styles actually referenced in src/** are
+ * hosted:
+ *   - Anton 400 (--font-display, font-display class) — only weight used.
+ *   - Inter 400/500/600 (--font-sans, body default + font-medium/font-semibold)
+ *     — weight 800 is declared in --font-* nowhere consumed (no
+ *     font-extrabold / fontWeight:800 usage found) and is intentionally not
+ *     hosted; the token itself is untouched.
+ *   - JetBrains Mono 400/700 (--font-mono, pervasive font-mono + font-bold
+ *     combinations).
+ *   - Courier Prime 400 normal, 700 normal, 400 italic (--font-courier, the
+ *     ScriptIDE title-page: body text, bold title field, italic "written by")
+ *     — 700 italic is unused and not hosted.
+ *   - Cormorant Garamond (--font-serif) is NOT hosted: no component
+ *     references font-serif or "Cormorant" anywhere in src/**. The
+ *     --font-serif token is left in place for the redesign wave that will
+ *     consume it.
+ */
+@font-face {
+  font-family: "Anton";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/anton-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/courier-prime-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/courier-prime-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Courier Prime";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/courier-prime-400-italic.woff2") format("woff2");
+}
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -12,6 +110,26 @@
   --color-brutal-white: #ffffff;
   --color-brutal-gray: #f4f4f4;
   --color-accent: #FF4444;
+
+  /*
+   * Redesign token layer ("reading room / screenplay page" language) —
+   * warm ink on production paper, one stamped accent. Foundation wave for
+   * the StartScreen redesign; a later agent consumes these to restyle
+   * components. Legacy brutal-* / --color-accent tokens above are left
+   * untouched — un-migrated panels keep using them until they're moved
+   * over individually.
+   *
+   * Contrast: --color-ink (#14110D) on --color-paper (#F4F0E6) is ~14.8:1,
+   * comfortably clearing the WCAG AA text minimum of 4.5:1.
+   */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 200ms;
+  --dur-reveal: 700ms;
+
+  --color-ink: #14110D;
+  --color-paper: #F4F0E6;
+  --color-paper-edge: #E7E1D2;
+  --color-stamp: #C8341E;
 
   --color-black: var(--color-brutal-black);
   --color-white: var(--color-brutal-white);
