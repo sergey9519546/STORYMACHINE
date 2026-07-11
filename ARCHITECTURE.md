@@ -175,13 +175,94 @@ The health score is an **opportunity-normalized, length-invariant** formula:
 Read `craftPenalty`'s shape in `doctor.ts` rather than trusting constants
 here — they're deliberately function-local (a doctor↔`reference.ts` circular
 import creates a temporal-dead-zone hazard for module-level consts) and
-recalibrate as waves add rules.
+recalibrate as waves add rules. Feature-scale structural findings are then
+layered on as a separate bounded deduction (see the ground-truth layer
+section above) — never folded into `craftPenalty` itself.
+
+Two feature-scale structural passes live in `structure.ts`, both floored to
+exempt short/synthetic fixtures and the calibration corpus:
+- **`SCENE_CONTINUITY_COLLAPSE`** (major, per-instance, detail-capped at 12)
+  / **`SCENE_CONTINUITY_PERVASIVE`** (critical rollup once instances exceed
+  the cap) — a two-tier adjacency gate over three signals: character
+  continuity (do adjacent scenes share a speaking character), day/night
+  thrash (how often adjacent sluglines flip time-of-day), and location-run
+  rate (do adjacent sluglines repeat location) as a corroborating axis that
+  widens the primary composite-index gate without becoming a standalone
+  trigger. Floors at ≥16 scenes, ≥10 speaker-bearing scenes, ≥10 DAY/NIGHT-
+  bearing slugs; zero false positives across the full real-corpus intact
+  set by construction.
+- **`GLOBAL_ARC_INCOHERENCE`** — the first act-swap-aware detector (a
+  first-third/last-third exclamation-density ratio), shipped after
+  prototyping five candidate signals against all 71 corpus scripts. Honest
+  note: this is a weak signal — act-swap damage is mostly unsolved (AUC
+  ~0.48, near chance) and fires on only 2/67 floor-eligible corpus scripts;
+  a genuinely strong detector for "which third of the document does this
+  scene belong in" needs deep-read (setup-before-payoff ordering, act
+  shape), not a lexical proxy. Zero-intact-FP by construction, same as
+  `SCENE_CONTINUITY_COLLAPSE`.
+
+The doctor report also carries `pageEstimate` (`{ pages, runtimeMinutes,
+basis }`, pure arithmetic — non-blank lines at 55/page, 1 page ≈ 1 runtime
+minute, floored at 1 page for any non-empty input, `null` for empty text —
+no layout engine) and `excerptNote` (one honest sentence, only below the
+RECOMMEND verdict's `sceneCount >= 8` floor, saying the report is excerpt
+feedback rather than feature coverage — never padded onto full-length
+input).
 
 Each pass accumulates rules (`RevisionIssue`s) built from
 `ScreenplaySceneRecord[]` — one record per scene, carrying signals like
 `emotionalShift`, `suspenseDelta`, `curiosityDelta`, `clockRaised`,
 `seededClueIds`, `payoffSetupIds`, `relationshipShifts`, `dramaticTurn`, and
 `purpose` (a fixed `ScenePurpose` enum — see `server/nvm/screenplay/memory.ts`).
+
+## The ground-truth layer: real-script corpus + degradation harnesses
+
+Through wave 1193 every rule test ran on synthetic fixtures and the 20
+controlled calibration samples — no professionally produced screenplay had
+ever gone through the 14 passes in a test. `tests/core/real-script-corpus
+.test.ts` closes that gap. Copyright boundary: the scripts themselves are
+never in the repo — `tests/fixtures/real-corpus-manifest.json` (committed)
+carries only facts (filename, `contentHash`, expected health/verdict/
+sceneCount); the text lives in a local directory pointed at by the
+`REAL_SCRIPT_CORPUS_DIR` env var, and every assertion honest-skips when it's
+unset (e.g. CI). Per script: byte-identical input asserts health/verdict/
+sceneCount EXACTLY; a differing hash (re-extraction, different source) falls
+back to floor assertions — health ≥ 80 (`PRODUCED_FLOOR`) and verdict
+RECOMMEND, since a professionally produced feature scoring below the floor
+is, by this project's own premise, a product bug until proven otherwise.
+
+Two deterministic degradation recipes turn the same corpus into a north-star
+separation metric (AUC: does the doctor score an intact script above its own
+damaged self?):
+- **Shuffle-drop** — seeded scene shuffle + every 3rd scene dropped;
+  destroys local adjacency, keeps scene count/density intact. Carries a
+  **hard ratchet floor of AUC ≥ 0.622** (24-script subset) — a regression
+  below it means a change made the doctor MORE structure-blind. Current
+  measured value sits above the floor after the AUC-conversion re-tune
+  (0.622 → 0.672); the todo target is 0.9, still open.
+- **Act-swap** — thirds reordered 3rd-1st-2nd, no scenes dropped; preserves
+  everything local (character continuity, day/night runs) and only breaks
+  which third of the document a scene belongs to. No hard floor — measured
+  AUC sits at ~0.48 (near chance), recorded as an honest todo-only baseline
+  rather than a ratchet, since the signal is real but too small to graduate
+  (bar is 0.55) and a floor this close to 0.5 would either be meaningless or
+  immediately flapping.
+
+Both recipes feed a **bounded, named structural-integrity deduction** in
+`doctor.ts`, applied AFTER `computeHealthScore`'s `craftPenalty` and
+deliberately kept OUT of it: `craftPenalty` reads only severity COUNTS as a
+density against script size, so at feature-scale issue volume (~600 issues)
+even a dozen majors from one rule family moves displayed health by ~0.1 —
+document-scale scene-order collapse is one verdict about the whole ORDER,
+and averaging it into a density erases it by construction. The deduction
+combines two sources under one outer cap (24 points): `SCENE_CONTINUITY_
+COLLAPSE`/`PERVASIVE` (2.0 pts/instance, cap 20; a 14-point rollup + same
+per-instance rate, same cap, once `PERVASIVE` fires) and `GLOBAL_ARC_
+INCOHERENCE` (flat 6 points, fires 0/1 times). A `SCENE_CONTINUITY_PERVASIVE`
+finding also caps the verdict at CONSIDER even when the density-based health
+would otherwise clear RECOMMEND — a structurally scrambled feature isn't a
+"ship it," whatever its line-level craft — narrower than a health-score
+change since it touches only the one verdict tier where that claim is made.
 
 ## The two record producers
 
@@ -217,6 +298,17 @@ latency) was the first. The rotation cursor is recorded per commit in
 `ROADMAP.md` (e.g. "Wave 1182 was Type 1 — next up is Type 2"), not here;
 full acceptance criteria per type live in
 `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` § "Program v2".
+
+Program v2 waves are additionally gated by the ground-truth layer above:
+a wave that touches rule firing must re-run the real-corpus shuffle-drop AUC
+and confirm it hasn't dropped below the 0.622 ratchet floor, and any wave
+whose rule changes shift a produced script's health/verdict/sceneCount must
+re-lock `real-corpus-manifest.json` rather than let the test silently drift
+to floor-only assertions. Measure-before-threshold — prototype a candidate
+signal against the full corpus, keep only what shows separation, as
+`GLOBAL_ARC_INCOHERENCE` did against five candidates — is now standing
+practice for any new structural or discrimination-facing rule, not just
+Program v2's rotation.
 
 Two things keep the wave process cheap as it continues: **`passes/lib/checks.ts`**
 — typed, tested detection functions for the recurring analytical shapes a wave
@@ -270,3 +362,28 @@ own file only, inserted before the previous wave's `describe` block
   runtime input-field prop bindings, not embedded secrets.
 - See `tests/routes/*.test.ts` for HTTP-level coverage of the above (limiter
   behavior, validation, key redaction) against a real in-process server.
+
+## Test surfaces beyond unit tests
+
+`tests/e2e/journeys.test.ts` (Run 17-A) is an env-gated (`RUN_E2E=1`)
+full-stack smoke test: spawns the real server as a child process (keyless,
+no `GEMINI_API_KEY`) and drives it over real HTTP against a fixed ephemeral
+port, exercising 7 keyless journeys — doctor report shape, determinism
+(identical text twice yields identical `contentHash`/health), `/scriptide/fix`
+degrading honestly (200, `usedLLM:false`, never a 500), `/game/interview`
+grounding receipts, `/export/coverage` HTML, the `gameLimiter` 429 behavior
+under rapid requests, and `/api/ai-config` reporting `llmReady:false`
+keyless. Same honest-skip pattern as the real-corpus harness — expensive and
+occasionally flaky, so it doesn't run by default.
+
+## Design-asset and research-incorporation locations
+
+`docs/owne/` — vendor truth-registry and design-default assets fed into the
+engine (`TRUTH_REGISTRY.md`, design-defaults/promise-template specs, fixture
+notes) rather than ad hoc in-code comments. `docs/research-audit/
+MASTER_RESEARCH_AUDIT.md` — the incorporation map from the ~130-file research
+archive read: canonical documents in reading order, a tiered incorporation
+queue (deterministic rules ready to spec, signal channels for Type-1 waves,
+architecture-level items needing dedicated design docs first) ranked by fit
+with the live wave program, and standing warnings inherited from the
+archive.
