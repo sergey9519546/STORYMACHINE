@@ -478,8 +478,8 @@ export default function ScriptIDE({
     const locCounts: Record<string, number> = {};
     let dialogueLines = 0;
     let actionLines = 0;
-    let wordCount = scriptText.trim().split(/\s+/).length;
-    if (scriptText.trim() === "") wordCount = 0;
+    // Faster word counting without .trim().split() which avoids some string allocations
+    let wordCount = (scriptText.match(/\S+/g) || []).length;
 
     blocks.forEach((block) => {
       if (block.type === "character") {
