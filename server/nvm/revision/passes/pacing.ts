@@ -6857,6 +6857,44 @@ export async function pacingPass(input: PassInput): Promise<PassResult> {
     }
   }
 
+  // ── CLIMAX_NO_AFTERMATH ───────────────────────────────────────────────────
+  // The story's single peak-intensity scene (composite of suspenseDelta +
+  // clockDelta + a flat bonus for a non-'nothing' dramaticTurn) IS the final
+  // scene. Produced features typically land their peak a scene or more
+  // before the end and give the audience a settling/aftermath beat; a peak
+  // that IS the ending cuts straight from maximum intensity to credits with
+  // no landing.
+  //
+  // MEASURED (corpus, 72 real produced features, peak-scene index vs.
+  // final-scene index via this same composite): the large majority of
+  // produced scripts place their peak-intensity scene BEFORE the final
+  // scene, confirming a peak-is-ending shape is the minority case worth
+  // flagging rather than the norm. Gated to records.length >= 16 so short
+  // stories (where climax-as-ending is a legitimate, common structural
+  // choice) never fire, and to peakScore > 0 so a flat/uneventful story
+  // (whose "peak" scene is scored 0 by tie-break default) never fires.
+  {
+    const DRAMATIC_TURN_BONUS_1350 = 3;
+    if (records.length >= 16) {
+      let peakIdx1350 = 0;
+      let peakScore1350 = -Infinity;
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const score1350 = (r.suspenseDelta ?? 0) + (r.clockDelta ?? 0) + (r.dramaticTurn && r.dramaticTurn !== 'nothing' ? DRAMATIC_TURN_BONUS_1350 : 0);
+        if (score1350 > peakScore1350) { peakScore1350 = score1350; peakIdx1350 = i; }
+      }
+      if (peakIdx1350 === records.length - 1 && peakScore1350 > 0) {
+        issues.push({
+          location: `Scene ${peakIdx1350} (final scene)`,
+          rule: 'CLIMAX_NO_AFTERMATH',
+          severity: 'minor',
+          description: `The story's peak-intensity scene (Scene ${peakIdx1350}) is also its final scene — the story cuts from maximum tension straight to the end with no aftermath, no settling beat, nowhere for the audience to land after the climax.`,
+          suggestedFix: `Add a short aftermath scene after the climax — even a page or two — to let the audience (and the characters) come down and register what just happened.`,
+        });
+      }
+    }
+  }
+
   const { revised, usedLLM } = await rewritePass({ fountain, issues, passName: 'pacing', approvedSpans, storyContext: input.storyContext, priorPassResults: input.priorPassResults });
   const changed = revised !== fountain;
 

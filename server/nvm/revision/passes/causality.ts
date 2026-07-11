@@ -7157,6 +7157,55 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       }
     }
 
+    // ── COINCIDENCE_RESOLVES_PROBLEM ────────────────────────────────────────────────
+    // Coincidence lexicon co-occurring with a standing problem's RESOLUTION — as
+    // opposed to a coincidence CREATING a problem, which is dramatically fine (the
+    // "Pixar rule": coincidence may get characters INTO trouble, never OUT of it).
+    // Distinct from COINCIDENCE_RESOLUTION (above, Wave 1191): that check requires
+    // payoffSetupIds AND a brand-new proper noun in the same scene. This check fires
+    // on two independent, payoff-id-free resolution signals — a sharp suspense drop
+    // or a clock clearing — so it also catches coincidence resolving tension that was
+    // never tracked as a formal payoff/clue thread (a chase, a standoff, an untracked
+    // deadline).
+    //
+    // MEASURED (corpus, 72 real produced features, real-script-corpus/): raw
+    // coincidence lexicon (suddenly/happens to/by chance/luckily/coincidentally/just
+    // then) appears in all 72 scripts — near-universal, confirming lexicon presence
+    // alone is unusable as a signal (matches Wave 1191's finding for the same lexicon
+    // family). This check therefore requires the lexicon hit to land in a scene that
+    // ALSO carries a structural resolution signal derived from analyzed records
+    // rather than raw text — suspenseDelta <= -2 (a sharp drop) or a clock clearing
+    // (clockDelta < 0 with no new clock raised that scene, after an earlier clock was
+    // raised) — and requires a standing problem to have existed beforehand (suspense
+    // raised or a clock raised earlier in the story), so the drop reads as an actual
+    // resolution rather than a flat scene.
+    {
+      const coincidenceRe1350 = /\b(suddenly|just then|happen(?:s|ed)? to|by (?:sheer )?chance|luckily|coincidentally|against all odds)\b/;
+      let sawRaisedTension1350 = false;
+      let sawClockRaised1350 = false;
+
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const suspenseDrop1350 = (r.suspenseDelta ?? 0) <= -2;
+        const clockClears1350 = sawClockRaised1350 && (r.clockDelta ?? 0) < 0 && !r.clockRaised;
+        const isResolution1350 = suspenseDrop1350 || clockClears1350;
+        const standingProblemExisted1350 = sawRaisedTension1350 || sawClockRaised1350;
+
+        if (isResolution1350 && standingProblemExisted1350 && coincidenceRe1350.test(sceneTextLower1191[i])) {
+          issues.push({
+            location: `Scene ${i} (${r.slug})`,
+            rule: 'COINCIDENCE_RESOLVES_PROBLEM',
+            description: `Scene ${i} uses lucky-arrival phrasing exactly where a standing problem resolves (${suspenseDrop1350 ? `suspense drops by ${Math.abs(r.suspenseDelta ?? 0)}` : 'the clock clears'}) — the story gets its characters OUT of trouble by coincidence, which reads as a cheat. Coincidence is fine for getting characters INTO trouble; it undercuts the story when it gets them out.`,
+            severity: 'major',
+            suggestedFix: `Replace the lucky-arrival phrasing with a resolution that follows from something the characters did or that was already set up — let them earn the way out, or let the earlier setup (not chance) be what closes it.`,
+          });
+        }
+
+        if ((r.suspenseDelta ?? 0) > 0) sawRaisedTension1350 = true;
+        if (r.clockRaised) sawClockRaised1350 = true;
+      }
+    }
+
     // ── UNMOTIVATED_BETRAYAL ───────────────────────────────────────────────────────
     // An established-ally relationship flips to hostile with zero prior strain anywhere
     // in the run-up, zero suspicion/deception vocabulary, and no earlier revelation

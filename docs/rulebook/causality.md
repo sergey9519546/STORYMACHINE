@@ -1,6 +1,6 @@
 # Pass: `causality`
 
-Founding wave: 39. Total distinct rules: 235 (184 attributed to a specific wave, 51 unattributed — see docs/rulebook/README.md's methodology note).
+Founding wave: 39. Total distinct rules: 236 (184 attributed to a specific wave, 52 unattributed — see docs/rulebook/README.md's methodology note).
 
 ## Wave 1191
 
@@ -586,6 +586,7 @@ These rule constants exist in this pass but were not found, by exact-name match,
 - `CLOCK_RAISED_NO_EMOTION` — Wave 349: CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_SUSPENSE, SUSPENSE_SPIKE_NO_FALLOUT
 - `CLOCK_RAISED_WITHOUT_PAYOFF` — Wave 180: Revelation without reaction, reaction without cause, clock without payoff
 - `CLOCK_RELIEF_UNEXPLAINED` — Wave 310: CLOCK_RELIEF_UNEXPLAINED
+- `COINCIDENCE_RESOLVES_PROBLEM` — COINCIDENCE_RESOLVES_PROBLEM
 - `CONSEQUENCE_CHAIN_BREAK` — Wave 187: Consequence chain break, clock ghost, positive shift orphan
 - `CONSEQUENCE_DELAY_EXCESSIVE` — Wave 166: Chekhov's gun, consequence delay, revelation front-loading
 - `CURIOSITY_OPEN_LOOP` — Wave 240: CURIOSITY_OPEN_LOOP

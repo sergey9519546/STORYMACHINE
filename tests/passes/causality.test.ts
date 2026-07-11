@@ -6588,6 +6588,46 @@ Not today.
     });
   });
 
+  // ── COINCIDENCE_RESOLVES_PROBLEM ──────────────────────────────────────────────
+  describe('COINCIDENCE_RESOLVES_PROBLEM', () => {
+    const plainFountain6 = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
+
+    it('fires when a sharp suspense drop uses lucky-arrival phrasing after tension was raised', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY', { suspenseDelta: 3 }),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY', {
+          suspenseDelta: -3,
+          visualBeats: ['Suddenly the guards turn away and the alarm falls silent.'],
+        }),
+        makeRec1191(5, 'INT. SC5 - DAY'),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      const fired = result.issues.filter(i => i.rule === 'COINCIDENCE_RESOLVES_PROBLEM');
+      assert.ok(fired.length >= 1, `should fire COINCIDENCE_RESOLVES_PROBLEM; got: ${result.issues.map(i => i.rule).join(', ')}`);
+    });
+
+    it('does NOT fire when no standing problem was ever raised before the coincidental drop', async () => {
+      const { causalityPass } = await import('../../server/nvm/revision/passes/causality.ts');
+      const records = [
+        makeRec1191(0, 'INT. SC0 - DAY'),
+        makeRec1191(1, 'INT. SC1 - DAY'),
+        makeRec1191(2, 'INT. SC2 - DAY'),
+        makeRec1191(3, 'INT. SC3 - DAY'),
+        makeRec1191(4, 'INT. SC4 - DAY', {
+          suspenseDelta: -3,
+          visualBeats: ['Suddenly the guards turn away and the alarm falls silent.'],
+        }),
+        makeRec1191(5, 'INT. SC5 - DAY'),
+      ];
+      const result = await causalityPass(makeInput1191(records, plainFountain6));
+      assert.ok(!result.issues.some(i => i.rule === 'COINCIDENCE_RESOLVES_PROBLEM'), 'no prior standing problem means the drop is not a resolution');
+    });
+  });
+
   // ── UNMOTIVATED_BETRAYAL ──────────────────────────────────────────────────────
   describe('UNMOTIVATED_BETRAYAL', () => {
     const plainFountain6 = Array.from({ length: 6 }, (_, i) => `INT. SC${i} - DAY\n\nSomething happens.`).join('\n\n');
