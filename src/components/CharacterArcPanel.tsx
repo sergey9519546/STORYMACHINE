@@ -83,13 +83,15 @@ export function CharacterArcPanel({ onClose }: Props) {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
       const d: ArcData = await res.json();
       setData(d);
-      if (!selectedChar && d.characters.length > 0) setSelectedChar(d.characters[0].charId);
+      // Functional update so this doesn't depend on (and re-create on) selectedChar —
+      // character selection below is a pure client-side switch, not a re-fetch trigger.
+      setSelectedChar(prev => (!prev && d.characters.length > 0) ? d.characters[0].charId : prev);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [selectedChar]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

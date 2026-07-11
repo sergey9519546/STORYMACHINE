@@ -17,11 +17,13 @@ import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
 import { history, defaultKeymap, historyKeymap, standardKeymap } from '@codemirror/commands';
 import { highlightActiveLine, lineNumbers, drawSelection } from '@codemirror/view';
-import { closeBrackets } from '@codemirror/autocomplete';
+import { closeBrackets, autocompletion } from '@codemirror/autocomplete';
 
 import { fountainHighlight, fountainTheme } from './fountain-highlight.ts';
+import { screenplayFormat, screenplayFormatTheme } from './screenplay-format.ts';
 import { inlineComplete, CompletionContext } from './inline-complete.ts';
-import { fountainKeymap, FountainKeymapOptions } from './fountain-keymap.ts';
+import { fountainKeymap } from './fountain-keymap.ts';
+import { screenplayComplete } from './screenplay-complete.ts';
 import { createCollabSession, CollabSession } from './collab.ts';
 import { scriptDiagnostics } from './diagnostics.ts';
 
@@ -35,7 +37,6 @@ export interface FountainEditorHandle {
 export interface FountainEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onCharacterEnter?: FountainKeymapOptions['onCharacterEnter'];
   characters?: string[];
   completionCtx?: CompletionContext;
   isDarkMode?: boolean;
@@ -61,15 +62,45 @@ export interface FountainEditorProps {
 }
 
 // ── Shared base theme ─────────────────────────────────────────────────────────
+// Centered screenplay page: `.cm-content` IS the page (paper-colored, fixed
+// text-column width, shadow); `.cm-scroller` is the muted canvas it floats
+// on. Sizing is derived from screenplay-layout.ts, not invented: 60ch below
+// equals SPEC.action.widthChars (the same Courier 12pt/10cpi text band the
+// PDF export wraps to) — `ch` keeps that exact regardless of font-size — and
+// the 1in padding matches TOP_MARGIN/BOTTOM_MARGIN there, giving an overall
+// page width of ~816px @ 96dpi (60ch ≈ 624px text column + 2×1in margins),
+// same US-Letter proportions the export uses.
 const baseTheme = EditorView.baseTheme({
   '&': {
     fontFamily: "'Courier New', Courier, monospace",
-    fontSize: '18px',
+    // Tuned so 60 monospace characters (SPEC's action/scene-heading band)
+    // fill roughly the ~624px text column described above, instead of an
+    // arbitrary UI font size.
+    fontSize: '17px',
     lineHeight: '1.65',
     height: '100%',
   },
-  '.cm-scroller': { overflow: 'auto', padding: '2rem' },
-  '.cm-content': { padding: 0, caretColor: '#000' },
+  '.cm-scroller': {
+    overflow: 'auto',
+    padding: '3rem 1.5rem',
+    background: '#E7E1D2', // muted canvas the page sits on (light default)
+  },
+  '.cm-content': {
+    // content-box so `width` is the 60ch TEXT column and the 1in page margins
+    // add AROUND it — CM6's default border-box would subtract the padding from
+    // the 60ch, collapsing the writable band to ~41ch and wrapping every line
+    // short of the industry measure.
+    boxSizing: 'content-box',
+    width: '60ch',
+    maxWidth: '60ch',
+    flexGrow: '0',
+    flexShrink: '0',
+    margin: '0 auto',
+    padding: '1in', // industry-standard 1in top/bottom/left/right page margins
+    background: '#F4F0E6', // paper (light default)
+    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
+    caretColor: '#000',
+  },
   '.cm-line': { padding: '0' },
   '.cm-placeholder': { color: '#9ca3af', fontStyle: 'normal' },
   // Remove the border CM6 adds by default
@@ -81,7 +112,13 @@ const baseTheme = EditorView.baseTheme({
 
 const darkTheme = EditorView.theme({
   '&': { background: '#1a1a1a', color: '#e4e4e7' },
-  '.cm-content': { caretColor: '#e4e4e7' },
+  '.cm-scroller': { background: '#141414' },
+  '.cm-content': {
+    background: '#242424',
+    color: '#e4e4e7',
+    caretColor: '#e4e4e7',
+    boxShadow: '0 2px 16px rgba(0,0,0,0.6)',
+  },
   '.cm-selectionBackground': { background: '#374151 !important' },
   '.cm-activeLine': { background: '#2a2a2a' },
   '.cm-placeholder': { color: '#6b7280' },
@@ -89,7 +126,9 @@ const darkTheme = EditorView.theme({
 
 const lightTheme = EditorView.theme({
   '&': { background: '#ffffff', color: '#18181b' },
-  '.cm-activeLine': { background: '#f9f9f9' },
+  '.cm-scroller': { background: '#E7E1D2' },
+  '.cm-content': { background: '#F4F0E6', color: '#18181b' },
+  '.cm-activeLine': { background: 'rgba(0, 0, 0, 0.04)' },
 });
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -98,7 +137,6 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     {
       value,
       onChange,
-      onCharacterEnter,
       characters = [],
       completionCtx = {},
       isDarkMode = false,
@@ -115,11 +153,9 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
     const viewRef = useRef<EditorView | null>(null);
     // Store latest callbacks in a ref so the closure inside EditorView doesn't go stale
     const onChangeRef = useRef(onChange);
-    const onCharEnterRef = useRef(onCharacterEnter);
     const onUserEditRef = useRef(onUserEdit);
     const charactersRef = useRef(characters);
     useEffect(() => { onChangeRef.current = onChange; });
-    useEffect(() => { onCharEnterRef.current = onCharacterEnter; });
     useEffect(() => { onUserEditRef.current = onUserEdit; });
     useEffect(() => { charactersRef.current = characters; });
 
@@ -177,9 +213,20 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
 
       const fountainKm = fountainKeymap({
         get characters() { return charactersRef.current; },
-        onCharacterEnter(name, cursor) {
-          onCharEnterRef.current?.(name, cursor);
-        },
+      });
+
+      // Context-aware element autocomplete (scene-heading prefixes,
+      // locations, time-of-day, transitions, character cues) — see
+      // screenplay-complete.ts. `characters` is read live via the same
+      // ref-backed getter as fountainKm above, so prop changes don't require
+      // rebuilding this extension. Enter/click accept, arrows navigate; Tab
+      // is deliberately left to inline-complete's ghost-text accept below —
+      // the default completionKeymap in this CodeMirror version only binds
+      // Enter, so there's no collision to guard against.
+      const screenplayCompletion = autocompletion({
+        activateOnTyping: true,
+        icons: false,
+        override: [screenplayComplete({ get characters() { return charactersRef.current; } })],
       });
 
       const state = EditorState.create({
@@ -202,11 +249,22 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           ]),
           // ── Inline completions (Tab=accept sits inside this) ─────────────────
           completionCompartment.current.of(completionExt),
+          // ── Screenplay element autocomplete (Enter/click accept) ─────────────
+          screenplayCompletion,
           // ── Live Notes: in-editor narrative diagnostics (squiggles + hover) ──
           diagnosticsCompartment.current.of(liveDiagnostics ? scriptDiagnostics() : []),
           // ── Fountain highlighting ───────────────────────────────────────────
           fountainHighlight,
           fountainTheme,
+          // ── Screenplay page formatting (view-only — CSS padding/alignment
+          // decorations derived from screenplay-layout.ts's SPEC; never
+          // touches the buffer). Composes with fountainHighlight's color
+          // classes above via distinct `.cm-sp-*` class names on the same
+          // line. lineWrapping lets long action/dialogue lines soft-wrap
+          // inside the page column instead of scrolling horizontally. ──────
+          screenplayFormat,
+          screenplayFormatTheme,
+          EditorView.lineWrapping,
           // ── Visual ─────────────────────────────────────────────────────────
           drawSelection(),
           highlightActiveLine(),

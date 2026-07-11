@@ -152,6 +152,116 @@ describe('hardening — request-log query-string hygiene (regression guard)', as
   });
 });
 
+// Unknown-/api-path 404 guard (server/app.ts). Without it, any /api request
+// that matches no router falls through to the SPA fallback — Vite's dev
+// middleware (appType 'spa') or the production `app.get('*')` catch-all —
+// and returns index.html with HTTP 200, so a typo'd or removed endpoint
+// looks like success until the caller's res.json() blows up on HTML. The
+// guard sits after the six routers and before static serving, so real
+// routes must keep matching first (the no-fire tests below).
+describe('hardening — unknown /api paths return a JSON 404, not the SPA fallback', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('GET to an unknown /api path returns 404 with a JSON error body', async () => {
+    const res = await fetch(`${server.baseUrl}/api/definitely-not-a-route`);
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /application\/json/);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('POST to an unknown /api path returns 404 too — the guard is method-agnostic, unlike the GET-only SPA catch-all', async () => {
+    const res = await fetch(`${server.baseUrl}/api/nope/nested/deeper`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anything: true }),
+    });
+    assert.equal(res.status, 404);
+    assert.match(res.headers.get('content-type') ?? '', /application\/json/);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('does not shadow real /api routes — GET /api/ai-config still answers 200 (no-fire)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/ai-config`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    // llmReady is the route's own contract (see server/routes/config.ts) —
+    // asserting on it confirms the real handler ran, not some other fallback.
+    assert.equal(typeof body.llmReady, 'boolean');
+  });
+
+  it('does not touch non-/api paths — /health (no /api prefix, no limiter by design) still answers 200 (no-fire)', async () => {
+    const res = await fetch(`${server.baseUrl}/health`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'ok');
+  });
+});
+
+// express.json({limit:'1mb'}) request-body cap (server/app.ts). body-parser
+// throws a PayloadTooLargeError (status 413, type 'entity.too.large') before
+// any route handler or zod validation runs; without a dedicated branch in the
+// global error handler it fell through to the generic 500 path and got
+// logged as unhandled_error — wrong status for a routine client mistake, and
+// log noise. These tests hit a real /api route (POST /api/scriptide/doctor)
+// rather than a synthetic handler so the assertion covers the whole
+// middleware chain body-parser sits in front of.
+describe('hardening — 413 for request bodies over express.json()\'s 1mb cap', () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  it('POST body over 1mb returns 413 with a JSON error body (fire)', async () => {
+    // DoctorBodySchema's own fountain max (900_000 chars) is well under
+    // express.json()'s 1mb cap, so this has to pad past 1mb some other way:
+    // a second, schema-unconstrained field. zod object() ignores unknown
+    // keys by default, so this would validate fine if it ever reached the
+    // route — it never does, because body-parser rejects it first.
+    const oversized = JSON.stringify({ fountain: 'x', padding: 'y'.repeat(1_100_000) });
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: oversized,
+    });
+    assert.equal(res.status, 413);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('a just-under-1mb body that fails zod validation still gets a normal 400, not 413 (no-fire)', async () => {
+    // DoctorBodySchema caps `fountain` at 900_000 chars — one over that
+    // fails zod's max() while the whole JSON payload stays comfortably under
+    // express.json()'s 1mb cap, so this exercises the ordinary validation
+    // path (zod's `validate` middleware, server/lib/validation.ts) without
+    // ever tripping the new 413 branch. Confirms the new branch doesn't
+    // hijack errors it shouldn't.
+    const justUnder = JSON.stringify({ fountain: 'x'.repeat(900_001) });
+    assert.ok(Buffer.byteLength(justUnder, 'utf8') < 1_048_576, 'fixture must stay under the 1mb cap');
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: justUnder,
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(typeof body.error, 'string');
+  });
+
+  it('malformed JSON still gets its existing 400 (unaffected by the new 413 branch)', async () => {
+    const res = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{ this is not valid json',
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.error, 'Invalid JSON in request body');
+  });
+});
+
 // S1-c — process-level crash safety net (BLOCKER finding). server.ts had
 // SIGTERM/SIGINT graceful shutdown but no uncaughtException/unhandledRejection
 // handlers, so a rejected promise anywhere in the process (a session-store

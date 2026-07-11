@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Settings2, Layers, Layers3, Download, Loader2, Stethoscope, SpellCheck, Sparkles } from "lucide-react";
+import { BookOpen, Settings2, Layers, Layers3, Download, Loader2, Stethoscope, SpellCheck, Sparkles, PanelRight } from "lucide-react";
 
 interface ToolbarProps {
   isSaving: boolean;
@@ -8,14 +8,20 @@ interface ToolbarProps {
   directorsLayer: boolean;
   showScriptDoctor: boolean;
   showSlate: boolean;
+  /** Docked right-side panels (Production/Analysis/Engine/Codex/Research/Title
+   *  tabs + Script Snapshots) — hidden by default so the writing page centers. */
+  showPanels: boolean;
   liveDiagnostics: boolean;
   wordCount: number;
+  /** Live page count from layoutScreenplay() — the same pagination the PDF exporter uses. */
+  pageCount: number;
   isTypewriterSound: boolean;
   isSimulating: boolean;
   onToggleHUD: () => void;
   onToggleDirectorsLayer: () => void;
   onToggleScriptDoctor: () => void;
   onToggleSlate: () => void;
+  onTogglePanels: () => void;
   onToggleLiveDiagnostics: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
@@ -33,14 +39,17 @@ export default function Toolbar({
   directorsLayer,
   showScriptDoctor,
   showSlate,
+  showPanels,
   liveDiagnostics,
   wordCount,
+  pageCount,
   isTypewriterSound,
   isSimulating,
   onToggleHUD,
   onToggleDirectorsLayer,
   onToggleScriptDoctor,
   onToggleSlate,
+  onTogglePanels,
   onToggleLiveDiagnostics,
   onToggleTypewriterSound,
   onExportFountain,
@@ -51,11 +60,11 @@ export default function Toolbar({
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
-    <div className="p-4 border-b-4 border-black bg-black text-white flex justify-between items-center z-20">
+    <div className="p-4 border-b-4 border-black bg-black text-white flex flex-wrap justify-between items-center gap-y-2 z-20">
       <h1 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
         <BookOpen className="w-4 h-4" /> The Ingest Engine (Script)
       </h1>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {isSaving && (
           <div className="text-[10px] font-bold text-yellow-400 animate-pulse uppercase tracking-widest">
             Auto-saving...
@@ -72,7 +81,7 @@ export default function Toolbar({
           )}
         </div>
         <div className="text-[10px] font-mono text-gray-400 hidden sm:block">
-          {wordCount} words
+          {wordCount} words &middot; {pageCount} pp.
         </div>
         <button
           onClick={onToggleTypewriterSound}
@@ -137,6 +146,19 @@ export default function Toolbar({
           }`}
         >
           <Layers3 className="w-3 h-3" aria-hidden="true" /> Slate
+        </button>
+        <button
+          onClick={onTogglePanels}
+          aria-label={showPanels ? "Hide side panels" : "Show side panels"}
+          aria-pressed={showPanels}
+          title="Toggle Production/Analysis/Engine/Codex/Research/Title panels and Script Snapshots"
+          className={`min-h-[44px] px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
+            showPanels
+              ? "bg-purple-600 text-white"
+              : "bg-white text-black hover:bg-gray-200"
+          }`}
+        >
+          <PanelRight className="w-3 h-3" aria-hidden="true" /> Panels
         </button>
         <button
           onClick={onToggleLiveDiagnostics}

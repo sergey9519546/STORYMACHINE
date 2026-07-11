@@ -26,7 +26,10 @@ export const LINES_PER_PAGE = Math.floor(
 ); // = 54
 
 // ── Element layout spec (indent from left edge in inches, width in characters) ─
-interface ElementSpec {
+// Exported so view-layer consumers (e.g. the editor's screenplay-format.ts
+// indentation decorations) can derive on-screen proportions from the SAME
+// numbers the PDF/export pipeline uses, instead of duplicating them.
+export interface ElementSpec {
   indentInches: number;
   widthChars: number;
   uppercase?: boolean;
@@ -35,7 +38,7 @@ interface ElementSpec {
 }
 
 // Standard US screenplay indents (measured from the left paper edge).
-const SPEC: Partial<Record<FountainBlockType, ElementSpec>> = {
+export const SPEC: Partial<Record<FountainBlockType, ElementSpec>> = {
   scene_heading: { indentInches: 1.5, widthChars: 60, uppercase: true, blankBefore: 1 },
   action:        { indentInches: 1.5, widthChars: 60, blankBefore: 1 },
   character:     { indentInches: 3.7, widthChars: 38, uppercase: true, blankBefore: 1 },

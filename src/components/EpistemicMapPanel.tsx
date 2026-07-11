@@ -63,13 +63,15 @@ export function EpistemicMapPanel({ onClose }: Props) {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
       const data: EpistemicState = await res.json();
       setState(data);
-      if (!selectedChar && data.characters.length > 0) setSelectedChar(data.characters[0]);
+      // Functional update so this doesn't depend on (and re-create on) selectedChar —
+      // character selection below is a pure client-side switch, not a re-fetch trigger.
+      setSelectedChar(prev => (!prev && data.characters.length > 0) ? data.characters[0] : prev);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [selectedChar]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
