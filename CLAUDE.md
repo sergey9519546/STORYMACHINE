@@ -2,7 +2,9 @@
 
 Orientation: `ARCHITECTURE.md` (system map) · `README.md` (setup, env vars) ·
 `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` (binding quality spec for
-revision-engine work).
+revision-engine work) · `ULTRAPLAN.md` (consolidated post-corpus state) ·
+`docs/research-audit/MASTER_RESEARCH_AUDIT.md` (research-archive incorporation
+map).
 
 ## Quality bar
 
@@ -61,6 +63,19 @@ before every push. CI runs lint + test + build on every branch, plus a
   (documented at the site — it cost a real bug hunt).
 - Wave rotation order ≠ revision pipeline execution order — two different
   14-pass orderings that are easy to conflate.
+- OneDrive hazard: direct file-tool writes to the mounted repo can truncate
+  files and introduce CRLF diff inflation. Edit in a clone, copy back with
+  byte verification, commit via Windows-side git.
+- The real-corpus harness (`tests/core/real-script-corpus.test.ts`) is
+  env-gated (`REAL_SCRIPT_CORPUS_DIR`); its manifest must be re-locked
+  whenever a rule change shifts a produced script's health/verdict/
+  sceneCount.
+- Structural findings at feature scale must go through the bounded
+  deduction path in `doctor.ts` — never rely on issue-count density, which
+  is provably blind to document-scale scene-order collapse at feature-scale
+  issue volume.
+- Parallel sessions ship concurrently: pull `main` and check `git log`
+  before starting any wave.
 
 ## Standing task — Wave Program v2
 
@@ -87,5 +102,9 @@ but rotate through four wave TYPES with genuine headroom:
 
 Rotation: cycle 1 → 2 → 3 → 4 → repeat, one type per wave. Full procedure
 and per-type acceptance criteria: `WAVE_QUALITY_GUARANTEE.md` § "Program v2".
-Commit to the branch designated for the current session — never a branch
-name hardcoded here.
+Waves are additionally gated by the corpus ratchets: the real-corpus
+shuffle-drop AUC hard floor (0.622) must not regress, and measure-before-
+threshold on the REAL corpus — prototype a candidate signal against the full
+corpus, ship only what shows measured separation — is mandatory for every
+new rule, not just structural ones. Commit to the branch designated for the
+current session — never a branch name hardcoded here.
