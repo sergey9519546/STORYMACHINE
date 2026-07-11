@@ -161,15 +161,27 @@ describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DI
 // HONEST BASELINE (2026-07-10, no hard floor by design): measured AUC-12
 // 0.455, AUC-24 0.477, AUC-71 0.494 — statistically indistinguishable from
 // chance across every subset size. This is the expected, correctly-diagnosed
-// result: doctor.ts has no detector for act-level/global-arc ordering (the
-// gap this file's own header names as the 0.9-target's remaining work), and
-// SCENE_CONTINUITY_COLLAPSE's whole gate is local-adjacency-based by
-// construction, so it structurally CANNOT see this recipe's damage. Recorded
-// as a todo-only regression guard (not a hard floor — an AUC this close to
-// 0.5 would make a floor either meaningless or immediately flapping) so a
-// future feature-scale structural detector (act shape, setup-before-payoff
-// ordering) has an honest, already-measured baseline to improve against
-// instead of discovering this gap cold.
+// result: doctor.ts had no detector for act-level/global-arc ordering.
+//
+// GLOBAL-ARC WAVE (2026-07-10, same day, follow-on): shipped the first
+// global-arc detector, GLOBAL_ARC_INCOHERENCE (structure.ts), reading a
+// first-third/last-third exclamation-density ratio — the only one of five
+// candidate signals prototyped against all 71 corpus scripts (escalation
+// shape via suspenseDelta, clock monotonicity via clockDelta, character-
+// introduction distribution, CONTINUOUS-slugline chains) that showed any
+// separation at all under this recipe. Re-measured after shipping: AUC-24
+// 0.477 -> 0.480. Recorded honestly as a real but small measured lift, not
+// a solved problem: the rule is deliberately conservative (zero-intact-FP
+// swept over all 67 floor-eligible scripts, n >= 16) and fires on only
+// 2 of 67 act-swapped scripts, so its effect on the AUC statistic — which
+// averages over the full goods×bads grid — is necessarily small. No hard
+// floor is added: 0.480 remains well short of the 0.55 bar this wave's own
+// brief set for graduating to a ratchet, and an AUC this close to 0.5 would
+// make a floor either meaningless or immediately flapping. Still recorded
+// as a todo-only regression guard so a future, stronger global-arc signal
+// (act shape, setup-before-payoff ordering, or a less lexicon-noisy
+// escalation measure than suspenseDelta) has an honest, already-measured
+// baseline to improve against instead of discovering this gap cold.
 describe('real-script corpus — act-swap-degradation AUC (second recipe)', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
   const SUBSET = 24;
   function actSwap(t: string): string {
@@ -194,8 +206,8 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
     for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
     return { auc: (wins + ties / 2) / (goods.length * bads.length) };
   }
-  it("AUC baseline (todo, no hard floor — act-swap damage is invisible to today's local-adjacency-based structural gate)", {
-    todo: "measured 0.477 (24-script subset) — act-swap preserves everything SCENE_CONTINUITY_COLLAPSE reads (local adjacency, day/night runs) and only breaks global act ordering, which no current rule measures",
+  it("AUC baseline (todo, no hard floor — GLOBAL_ARC_INCOHERENCE moved this from 0.477 to 0.480, still far from the 0.55 ratchet bar)", {
+    todo: "measured 0.480 (24-script subset, up from 0.477 pre-GLOBAL_ARC_INCOHERENCE) — the new global-arc detector fires on only 2/67 act-swapped corpus scripts (zero-intact-FP, deliberately conservative); SCENE_CONTINUITY_COLLAPSE still can't see this recipe's damage at all (local-adjacency-based by construction)",
   }, async () => {
     const m = await measure();
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target (informational until a global-arc detector exists)`);
