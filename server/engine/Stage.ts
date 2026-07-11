@@ -456,7 +456,22 @@ export class Stage {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       agent.char_id,
-      agent.current_location_id,
+      // Bug found in Run 17-A's e2e journeys: current_location_id has a FK
+      // reference to Locations(location_id) (schema above). Callers that omit
+      // a location — e.g. POST /api/init with no `nodes`, or a bare
+      // char_id/name/public_mask/hidden_motive agent — arrive here with ''
+      // (game.ts's `typeof a.current_location_id === 'string' ? ... : ''`
+      // default), and '' is not a real location_id, so SQLite rejected the
+      // INSERT with SQLITE_CONSTRAINT_FOREIGNKEY. Because game.ts's registration
+      // loop wraps this call in a bare try/catch ("skip malformed agent"), the
+      // failure was entirely silent: /api/init still returned 200, but the
+      // agent was never persisted, so every subsequent route (turn, interview,
+      // run-room, ...) 404'd with "does not exist in this session". Normalizing
+      // the empty-string sentinel to NULL here — which the nullable FK column
+      // already allows — is the minimal fix: no caller/route/schema change
+      // needed, and an agent with a real location still round-trips exactly
+      // as before.
+      agent.current_location_id === '' ? null : agent.current_location_id,
       agent.suspicion_score,
       agent.is_alive ? 1 : 0,
       JSON.stringify(allBeliefs),
@@ -493,7 +508,10 @@ export class Stage {
       name: row.name as string,
       public_mask: row.public_mask as string,
       hidden_motive: row.hidden_motive as string,
-      current_location_id: row.current_location_id as string,
+      // NULL round-trips to '' here (the CharacterSheet contract's empty-
+      // location sentinel) — see addAgent's comment on why NULL is what's
+      // actually stored for an agent registered without a location.
+      current_location_id: (row.current_location_id as string | null) ?? '',
       suspicion_score: row.base_suspicion_score as number,
       is_alive: (row.is_alive as number) === 1,
       knowledge_vector: knowledgeFacts,
