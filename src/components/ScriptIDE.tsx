@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspens
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
 import { parseFountain, FountainBlock } from "../lib/fountain";
+import { layoutScreenplay } from "../lib/screenplay-layout";
 import { buildScenarioFromScript } from "../lib/scenario-from-script";
 // fdx/pdf/docx exporters are dynamic-imported at their call sites below
 // (exportFDX/exportPDF/exportDOCX) — each is a one-shot user action (a
@@ -154,6 +155,10 @@ export default function ScriptIDE({
   >("production");
   const [showDirectorHUD, setShowDirectorHUD] = useState(false);
   const [showScriptDoctor, setShowScriptDoctor] = useState(false);
+  // Docked right-side panels (Production/Analysis/Engine/Codex/Research/Title
+  // tabs + Script Snapshots) — hidden by default so the writing page owns the
+  // center of the IDE. Toggled via the Toolbar's "Panels" button.
+  const [showPanels, setShowPanels] = useState(false);
   // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
   // idiom as sm_fdx_import_pending below): when set, the doctor overlay opens
   // on mount and auto-runs the built-in sample through its own loadSample
@@ -515,6 +520,19 @@ export default function ScriptIDE({
       estimatedMinutes,
     };
   }, [scriptText, parsedBlocks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live page count — same layoutScreenplay() the PDF exporter uses, so the
+  // Toolbar number always matches what .PDF actually produces. Debounced
+  // (like the AI-analysis trigger below, just shorter) rather than run in
+  // the `stats` memo above: layoutScreenplay re-parses AND paginates the
+  // whole script, which is unnecessary work on every single keystroke.
+  const [pageCount, setPageCount] = useState(1);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPageCount(layoutScreenplay(scriptText).length);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [scriptText]);
 
   // handleScroll removed — CM6 editor manages its own scroll internally
 
@@ -1001,7 +1019,10 @@ export default function ScriptIDE({
       />
 
       {/* CENTER PANEL: INGEST (Script Editor) */}
-      <div className="flex-1 h-full border-r-4 border-black flex flex-col bg-white relative">
+      {/* min-w-0: without it this flex-1 column refuses to shrink below the
+          toolbar's intrinsic (non-wrapping) width, overflowing the viewport and
+          pushing the centered page off to the right. */}
+      <div className="flex-1 min-w-0 h-full border-r-4 border-black flex flex-col bg-white relative">
         {cleanError && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
             {cleanError}
@@ -1021,14 +1042,17 @@ export default function ScriptIDE({
           directorsLayer={directorsLayer}
           showScriptDoctor={showScriptDoctor}
           showSlate={showSlate}
+          showPanels={showPanels}
           liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
+          pageCount={pageCount}
           isTypewriterSound={isTypewriterSound}
           isSimulating={isSimulating}
           onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
           onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
           onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
           onToggleSlate={() => setShowSlate((prev) => !prev)}
+          onTogglePanels={() => setShowPanels((prev) => !prev)}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleTypewriterSound={() => {
             setIsTypewriterSound(prev => {
@@ -1301,7 +1325,10 @@ export default function ScriptIDE({
         </div>
       </div>
 
-      {/* RIGHT PANEL: VIRTUAL PRODUCTION & DIRECTOR DASHBOARD */}
+      {/* RIGHT PANEL: VIRTUAL PRODUCTION & DIRECTOR DASHBOARD — hidden by
+          default (showPanels) so the centered writing page owns the layout;
+          toggled via the Toolbar's "Panels" button. */}
+      {showPanels && (
       <div className="w-[400px] shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto">
         <div className="flex bg-black text-white overflow-x-auto">
           {(
@@ -1641,6 +1668,7 @@ export default function ScriptIDE({
           )}
         </div>
       </div>
+      )}
 
       {/* ── DIRECTOR HUD OVERLAY ── */}
       <AnimatePresence>
@@ -1734,19 +1762,26 @@ export default function ScriptIDE({
         )}
       </AnimatePresence>
 
-      {/* ── Snapshot modals (delegated to SnapshotManager) ── */}
-      <SnapshotManager
-        snapshots={snapshots}
-        snapshotModal={snapshotModal}
-        restoreModal={restoreModal}
-        onTakeSnapshot={takeSnapshot}
-        onConfirmSnapshot={confirmSnapshot}
-        onRestoreSnapshot={restoreSnapshot}
-        onConfirmRestore={confirmRestore}
-        onDeleteSnapshot={deleteSnapshot}
-        onSetSnapshotModal={setSnapshotModal}
-        onSetRestoreModal={setRestoreModal}
-      />
+      {/* ── Script Snapshots panel + its modals (delegated to SnapshotManager) ──
+          SnapshotManager renders its snapshot list as an un-widthed flex child
+          (its modals are `fixed` overlays and unaffected), so it was a second
+          permanently-docked right-side column stealing width from the centered
+          writing page. Gated behind showPanels along with the tabs panel above
+          so both hide together by default. */}
+      {showPanels && (
+        <SnapshotManager
+          snapshots={snapshots}
+          snapshotModal={snapshotModal}
+          restoreModal={restoreModal}
+          onTakeSnapshot={takeSnapshot}
+          onConfirmSnapshot={confirmSnapshot}
+          onRestoreSnapshot={restoreSnapshot}
+          onConfirmRestore={confirmRestore}
+          onDeleteSnapshot={deleteSnapshot}
+          onSetSnapshotModal={setSnapshotModal}
+          onSetRestoreModal={setRestoreModal}
+        />
+      )}
     </div>
   );
 }
