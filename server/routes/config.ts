@@ -91,7 +91,7 @@ router.get('/metrics', (req, res) => {
       res.status(404).end();
       return;
     }
-  } else if (!isLoopbackAddress(req.socket.remoteAddress)) {
+  } else if (!isLoopbackAddress(req.ip)) {
     res.status(404).end();
     return;
   }
@@ -109,13 +109,12 @@ router.get('/metrics', (req, res) => {
 // loopback included (a set token means "only holders of this token", not
 // "holders of this token, OR loopback").
 //
-// Uses req.ip rather than /metrics' req.socket.remoteAddress: a config WRITE
-// is a more sensitive operation than a metrics read, and req.socket always
-// reports the immediate peer — behind a reverse proxy (this repo already
-// supports TRUST_PROXY) that peer is the proxy itself, not the real client,
-// which would misidentify a remote attacker as loopback. req.ip resolves the
-// real client through X-Forwarded-For once trust proxy is configured, and
-// falls back to the same raw peer address when it isn't.
+// Uses req.ip for IP validation. req.socket always reports the immediate
+// peer — behind a reverse proxy (this repo already supports TRUST_PROXY)
+// that peer is the proxy itself, not the real client, which would misidentify
+// a remote attacker as loopback. req.ip resolves the real client through
+// X-Forwarded-For once trust proxy is configured, and falls back to the same
+// raw peer address when it isn't.
 function checkAdminAuth(req: express.Request, res: express.Response): boolean {
   const adminToken = process.env.ADMIN_TOKEN;
   if (adminToken) {
