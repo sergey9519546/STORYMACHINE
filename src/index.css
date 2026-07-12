@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));  /* gate dark: behind explicit .dark class so the paper theme always shows */
 @import "./styles/design-system.css";
 
 /*
@@ -107,10 +108,15 @@
   --font-display: "Anton", sans-serif;
   --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
   
-  --color-brutal-black: #000000;
-  --color-brutal-white: #ffffff;
-  --color-brutal-gray: #f4f4f4;
-  --color-accent: #FF4444;
+  /* Unified "paper · ink · stamp" redesign: the legacy brutal-* tokens are
+     remapped from pure black/white/#FF4444 to warm ink / production paper /
+     one stamp-red. Every panel already renders through .brutal-border /
+     .brutal-shadow / these colors, so this single remap re-skins the whole
+     app in place (no per-component black borders left). */
+  --color-brutal-black: #211d15;  /* warm ink (was #000) */
+  --color-brutal-white: #f4efe2;  /* panel paper (was #fff) */
+  --color-brutal-gray: #efe8d7;   /* inset paper (was #f4f4f4) */
+  --color-accent: #c1301c;        /* stamp-red (was #FF4444) */
 
   /*
    * Redesign token layer ("reading room / screenplay page" language) —
@@ -137,8 +143,8 @@
 }
 
 body {
-  background-color: var(--color-brutal-white);
-  color: var(--color-brutal-black);
+  background-color: #e6dfcf; /* production paper ground */
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -167,7 +173,7 @@ body {
 }
 
 .brutal-shadow-focus:focus {
-  box-shadow: 8px 8px 0px 0px #FF4444;
+  box-shadow: 8px 8px 0px 0px var(--color-accent);
   transform: translate(-2px, -2px);
 }
 
@@ -193,14 +199,4 @@ body {
   pointer-events: none;
   z-index: 9999;
   opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-}
-
-/* Terminal Cursor Blink */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-.animate-blink {
-  animation: blink 1s step-end infinite;
-}
+  
