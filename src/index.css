@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));  /* gate dark: behind explicit .dark class so the paper theme always shows */
+@custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/design-system.css";
 
 /*
@@ -14,16 +14,16 @@
  *
  * Only the families + weights/styles actually referenced in src/** are
  * hosted:
- *   - Anton 400 (--font-display, font-display class) — only weight used.
+ *   - Anton 400 (--font-display, font-display class) ΓÇö only weight used.
  *   - Inter 400/500/600 (--font-sans, body default + font-medium/font-semibold)
- *     — weight 800 is declared in --font-* nowhere consumed (no
+ *     ΓÇö weight 800 is declared in --font-* nowhere consumed (no
  *     font-extrabold / fontWeight:800 usage found) and is intentionally not
  *     hosted; the token itself is untouched.
  *   - JetBrains Mono 400/700 (--font-mono, pervasive font-mono + font-bold
  *     combinations).
  *   - Courier Prime 400 normal, 700 normal, 400 italic (--font-courier, the
  *     ScriptIDE title-page: body text, bold title field, italic "written by")
- *     — 700 italic is unused and not hosted.
+ *     ΓÇö 700 italic is unused and not hosted.
  *   - Cormorant Garamond (--font-serif) is NOT hosted: no component
  *     references font-serif or "Cormorant" anywhere in src/**. The
  *     --font-serif token is left in place for the redesign wave that will
@@ -108,22 +108,17 @@
   --font-display: "Anton", sans-serif;
   --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
   
-  /* Unified "paper · ink · stamp" redesign: the legacy brutal-* tokens are
-     remapped from pure black/white/#FF4444 to warm ink / production paper /
-     one stamp-red. Every panel already renders through .brutal-border /
-     .brutal-shadow / these colors, so this single remap re-skins the whole
-     app in place (no per-component black borders left). */
-  --color-brutal-black: #211d15;  /* warm ink (was #000) */
-  --color-brutal-white: #f4efe2;  /* panel paper (was #fff) */
-  --color-brutal-gray: #efe8d7;   /* inset paper (was #f4f4f4) */
-  --color-accent: #c1301c;        /* stamp-red (was #FF4444) */
+  --color-brutal-black: #211d15;  /* warm ink */
+  --color-brutal-white: #f4efe2;  /* panel paper */
+  --color-brutal-gray: #efe8d7;  /* inset paper */
+  --color-accent: #c1301c;  /* stamp-red */
 
   /*
-   * Redesign token layer ("reading room / screenplay page" language) —
+   * Redesign token layer ("reading room / screenplay page" language) ΓÇö
    * warm ink on production paper, one stamped accent. Foundation wave for
    * the StartScreen redesign; a later agent consumes these to restyle
    * components. Legacy brutal-* / --color-accent tokens above are left
-   * untouched — un-migrated panels keep using them until they're moved
+   * untouched ΓÇö un-migrated panels keep using them until they're moved
    * over individually.
    *
    * Contrast: --color-ink (#14110D) on --color-paper (#F4F0E6) is ~14.8:1,
@@ -143,8 +138,8 @@
 }
 
 body {
-  background-color: #e6dfcf; /* production paper ground */
-  color: var(--color-ink);
+  background-color: #e6dfcf; /* production paper */
+  color: var(--color-brutal-black);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -199,4 +194,14 @@ body {
   pointer-events: none;
   z-index: 9999;
   opacity: 0.04;
-  
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Terminal Cursor Blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
