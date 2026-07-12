@@ -230,7 +230,7 @@ export default function StartScreen({
           >
             {/* ---- The entrance: wordmark + the one signature move ---- */}
             <header className="flex flex-col gap-6 sm:gap-8">
-              <p className="hidden font-courier text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
+              <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
                 Coverage Report — Reader&rsquo;s Copy
               </p>
               <h1
@@ -258,7 +258,7 @@ export default function StartScreen({
               <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
                 <h2
                   id="entrance-actions-heading"
-                  className="font-courier text-xs uppercase tracking-[0.3em] text-ink/50"
+                  className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50"
                 >
                   Bring A Script
                 </h2>
@@ -272,10 +272,10 @@ export default function StartScreen({
                   disabled={isGenerating}
                   className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
                 >
-                  <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-courier text-[10px] uppercase tracking-[0.25em] text-stamp">
+                  <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
                     Reader&rsquo;s Pick
                   </span>
-                  <span className="font-courier text-[11px] uppercase tracking-[0.3em] text-paper/60">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">
                     Fastest way in
                   </span>
                   <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
@@ -292,7 +292,7 @@ export default function StartScreen({
                     type="button"
                     onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                     disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
                     I Have A Script — Open The Editor
@@ -301,7 +301,7 @@ export default function StartScreen({
                     type="button"
                     onClick={() => openFileInputRef.current?.click()}
                     disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
                     Open A Script File
@@ -317,7 +317,7 @@ export default function StartScreen({
                 </div>
 
                 {openFileError && (
-                  <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-courier text-xs text-ink">
+                  <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-mono text-xs text-ink">
                     <span>{openFileError}</span>
                     <button
                       type="button"
@@ -337,7 +337,7 @@ export default function StartScreen({
                   type="button"
                   onClick={() => setView("wizard")}
                   disabled={isGenerating}
-                  className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-courier text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-mono text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                 >
                   <FilePlus2 className="h-4 w-4" aria-hidden="true" />
                   Start a new story from scratch
@@ -354,14 +354,14 @@ export default function StartScreen({
               <button
                 type="button"
                 onClick={() => onOpenStoryMachine?.()}
-                className={`inline-flex min-h-[44px] items-center gap-2 border border-ink px-5 py-2.5 font-courier text-xs uppercase tracking-[0.25em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper ${FOCUS_RING}`}
+                className={`inline-flex min-h-[44px] items-center gap-2 border border-ink px-5 py-2.5 font-mono text-xs uppercase tracking-[0.25em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper ${FOCUS_RING}`}
               >
                 <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
                 Open OASIS Story Machine
               </button>
-              <div className="space-y-1 font-courier text-[11px] uppercase tracking-[0.2em] text-ink/45">
-                <p className="font-semibold text-ink/60">Powered by Gemini 2.5 Pro</p>
-                <p>Experience Management • Dynamic Generation • Psychological Modeling</p>
+              <div className="space-y-1 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45">
+                <p className="font-semibold text-ink/60">3,216 deterministic rules · keyless-first</p>
+                <p>Every verdict inspectable · reproducible · no LLM in the verdict path</p>
               </div>
             </footer>
           </motion.div>
@@ -379,14 +379,14 @@ export default function StartScreen({
                 type="button"
                 onClick={() => setView("entrance")}
                 disabled={isGenerating}
-                className={`inline-flex w-fit min-h-[44px] items-center gap-2 font-courier text-xs uppercase tracking-[0.25em] text-ink/60 transition-colors ${MICRO_TRANSITION} hover:text-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                className={`inline-flex w-fit min-h-[44px] items-center gap-2 font-mono text-xs uppercase tracking-[0.25em] text-ink/60 transition-colors ${MICRO_TRANSITION} hover:text-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
               >
                 <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
                 Back to entrance
               </button>
               <div className="flex items-end justify-between gap-6">
                 <div>
-                  <p className="font-courier text-xs uppercase tracking-[0.3em] text-ink/50">
+                  <p className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50">
                     New Story — Configuration
                   </p>
                   <h2 className="mt-2 font-display text-3xl uppercase leading-none text-ink sm:text-4xl">
@@ -519,7 +519,7 @@ export default function StartScreen({
                     type="button"
                     onClick={prevStep}
                     disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center gap-2 border border-ink px-6 py-4 font-courier text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`flex min-h-[44px] items-center gap-2 border border-ink px-6 py-4 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                     Back
@@ -533,7 +533,7 @@ export default function StartScreen({
                     type="button"
                     onClick={nextStep}
                     disabled={isGenerating || (step === 1 && !theme)}
-                    className={`flex min-h-[44px] items-center gap-2 border border-ink bg-ink px-8 py-4 font-courier text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`flex min-h-[44px] items-center gap-2 border border-ink bg-ink px-8 py-4 font-mono text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     Next
                     <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -543,7 +543,7 @@ export default function StartScreen({
                     type="button"
                     onClick={handleStart}
                     disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center gap-2 border border-stamp bg-stamp px-8 py-4 font-courier text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:border-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`flex min-h-[44px] items-center gap-2 border border-stamp bg-stamp px-8 py-4 font-mono text-sm uppercase tracking-[0.15em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:border-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
                     {isGenerating ? (
                       <>
@@ -586,10 +586,10 @@ export default function StartScreen({
               <div className="flex items-center justify-between gap-4 border-b border-ink/15 bg-paper-edge px-5 py-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <FileText className="h-4 w-4 shrink-0 text-stamp" aria-hidden="true" />
-                  <h3 className="max-w-[300px] truncate font-courier text-sm uppercase tracking-[0.15em] text-ink">
+                  <h3 className="max-w-[300px] truncate font-mono text-sm uppercase tracking-[0.15em] text-ink">
                     {previewFile.name}
                   </h3>
-                  <span className="shrink-0 border border-ink/30 px-2 py-0.5 font-courier text-[10px] uppercase tracking-[0.15em] text-ink/70">
+                  <span className="shrink-0 border border-ink/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-ink/70">
                     {previewFile.category}
                   </span>
                 </div>
@@ -602,7 +602,7 @@ export default function StartScreen({
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-6 font-courier text-sm text-ink/80">
+              <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-6 font-mono text-sm text-ink/80">
                 {previewFile.content}
               </div>
             </motion.div>

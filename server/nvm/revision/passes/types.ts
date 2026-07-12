@@ -37,6 +37,14 @@ export interface RevisionIssue {
   severity: 'critical' | 'major' | 'minor';
   /** Optional inline fix hint fed to the LLM rewriter */
   suggestedFix?: string;
+  /** W1 (confidence.ts, D.3). Epistemic basis of this finding. Optional +
+   *  additive: absent ⇒ treated exactly as legacy. Only `deterministic`/
+   *  `structured_only` findings may be `critical` (hard-block); a `heuristic`
+   *  finding that is `critical` is a gate violation (assertSeverityLegal). */
+  determinism?: import('./confidence.ts').Determinism;
+  /** How strongly current evidence supports this finding, kept separate from
+   *  severity (TRACE §17.3). Absent ⇒ full legacy weight in the health formula. */
+  confidenceTier?: import('./confidence.ts').ConfidenceTier;
 }
 
 export interface StoryContext {

@@ -1,0 +1,7 @@
+# Dialogue as action: line -> hidden intent -> tactic -> state change.
+schema_version: "1.0.0"
+surface_functions: [question, answer, command, threat, joke, confession, reframe, evasion, bargain]
+tactics: [comfort, test, reframe, threaten, confess, evade, counterattack, bargain, withdraw, misdirect]
+response_modes: [answer, evade, counterattack, misunderstand, threaten, confess, withdraw, silence]
+# A line that changes no state (belief/emotion/relationship/power/object/clue/audience_knowledge)
+# is "decorative" — flagged by the dialogue state-change test.

@@ -1,0 +1,27 @@
+# Scene functions — what a scene DOES (not what it says). A scene must change at
+# least one tracked state or it is a candidate "no state change" finding.
+schema_version: "1.0.0"
+functions:
+  - id: setup
+    changes: [audience_knowledge, expectation]
+  - id: pressure
+    changes: [mechanism_pressure, emotion, relationship]
+  - id: discovery
+    changes: [belief, clue_status, audience_knowledge]
+  - id: reversal
+    changes: [power, plan, belief]
+  - id: reveal
+    changes: [audience_knowledge, belief]
+    reveal_modes: [mystery, suspense, surprise, dramatic_irony, recognition, reversal]
+  - id: rupture
+    changes: [relationship, power]
+  - id: repair
+    changes: [relationship]
+    requires: sufficient_cost   # repair without cost = hard-gate failure
+  - id: escalation
+    changes: [mechanism_pressure, danger, stakes]
+  - id: payoff
+    changes: [clue_status, setup_resolution]
+  - id: aftermath
+    changes: [emotion, theme_argument]
+tracked_states: [belief, relationship, power, emotion, object_meaning, clue_status, audience_knowledge, mechanism_pressure, theme_argument]

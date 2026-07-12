@@ -1,0 +1,20 @@
+# Genre Training Profiles — genre GRAMMAR, not imitation of any studio/writer.
+schema_version: "1.0.0"
+profiles:
+  - id: animation_family_feature
+    format: feature_screenplay
+    length_target: 90-110_pages
+    primary_genre: animated_family
+    subgenres: [coming_of_age, adventure_quest, fable, buddy]
+    tone: [sincere, heightened, emotionally_earnest, comic_relief]
+    production_scale: studio_animation
+    audience_rating: family
+    core_pleasures: [wonder, earned_emotion, transformation, found_family, comic_escalation]
+    core_mechanisms: [object_burden, family_law, relationship_externalization, identity_performance]
+    ending_contract: [want_gives_way_to_need, relationship_permanently_changed, world_restored_at_a_cost]
+    avoid: [invincible_protagonist, arbitrary_twist_villain, exposition_monologues, dream_explanations]
+    evaluation_rubric:
+      hard_gates: [state_change_per_scene, reveal_has_setup, repair_pays_cost, knowledge_legal]
+      soft_dimensions: [want_need_opposition, emotional_truth, setup_payoff_strength, originality, filmability]
+# Dimensions kept separate (do not conflate): format, genre, subgenre, story_scale,
+# tone, mechanism, audience_promise, production_profile.

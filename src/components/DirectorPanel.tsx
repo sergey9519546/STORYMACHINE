@@ -1367,8 +1367,10 @@ export default function DirectorPanel({
                   <div className="flex gap-2">
                     <button
                       onClick={async () => {
-                        await fetch("/api/outline", { method: "DELETE" });
-                        setOutlineBeats([]);
+                        try {
+                          await fetch("/api/outline", { method: "DELETE" });
+                          setOutlineBeats([]);
+                        } catch { /* delete failed — keep beats so the UI matches server state */ }
                         setConfirmClearBeats(false);
                       }}
                       className="flex-1 py-1.5 bg-[#FF4444] text-white brutal-border hover:bg-red-700 transition-colors uppercase font-bold tracking-widest text-[10px]"

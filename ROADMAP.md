@@ -300,3 +300,115 @@ NICE: 4 transitive dev-dep CVEs (`npm audit fix`), ai-config/test error
 snippet. Clean at last audit: session capability model, HTML export
 escaping, prompt-injection boundary, secrets never in bundle/logs, body/
 rate limits.
+
+---
+
+## 7. Research integration — 2026-07-11 intake (TRACE / MAESTRO-S / ref-engine)
+
+Four new artifacts read in full: the Master Research Document, the **MAESTRO-S
+v2** generation blueprint, the **TRACE** product white paper, and a runnable
+Python **Reference Engine 0.2.0**. Full adopt/defer/reject verdict map with
+reasons: `docs/research-audit/RESEARCH_INTEGRATION_2026-07-11.md`. They
+*ratify* NORTH_STAR (deterministic canon, no LLM-judge, sparse specialists,
+proof-before-prose) and sharpen specific mechanisms — no rewrite implied.
+
+**Adopt, sequenced (details in the companion doc):**
+
+1. **Change-Impact surface** — first-class, page-linked "what breaks if I change
+   this?" over the existing dependency graph. Highest leverage, deterministic,
+   low theory cost. The product wedge TRACE argues for.
+2. **Confidence tiers + evidence clamp** — port the ref-engine `CraftFinding`
+   split (severity `blocker/major/minor/positive/info` × confidence
+   `strong_evidence/worth_a_look/pattern_to_watch`); a low-confidence extracted
+   fact may not support a high-certainty finding. Codifies the existing
+   "blockers assert only encoded facts" law.
+3. **Extraction-confirmation loop + author locks** (TRACE T4) — ask only
+   high-value confirmations at import; writer corrections outrank model
+   inference; locks let soft detectors graduate to blockers honestly.
+4. **Real-literary calibration band** — port the ref-engine corpus (public-domain
+   Ibsen/Chekhov/Wilde "great" vs "broken"/"middle") + `fixtures.json` gate as an
+   added controlled band alongside the 72-script corpus (match band budgets).
+5. **Repair Portfolio: three validated modes** — minimal / bold-structural /
+   production-cheap, each validated against current state before it is shown.
+   Productizes converge/revision without MAP-Elites cost.
+6. **Abstention** as a first-class finding outcome (trust return, honest degrade).
+7. **Sparse-critic conversion + MAESTRO gates** for the generation track: convert
+   the always-on 12-critic room to evidence-triggered capability calls; before
+   any "agents are better" claim, require matched-budget (accelerator-seconds),
+   role-placebo/permutation controls, revision-homogenization measurement, and
+   explicit falsification conditions.
+8. **Maturity ladder** as release gates: M0 extraction → M1 audit → M2
+   change-impact → M3 repair → M4 faithful patch → M5 collaborative.
+
+**Deliberately deferred / rejected (do not re-litigate — reasons in companion):**
+autonomous full-script generation *as the wedge* (keep behind the engine, never
+the front door); permanent multi-agent swarm (→ sparse); graph DB / MAP-Elites /
+learned routing / RL at launch (JSON state wins below a measured complexity
+threshold); LLM-as-judge scoring (already rejected by NORTH_STAR); treating
+MAESTRO flash-fiction wins as screenplay transfer; any citation from the
+fabricated-source "Ernie" lineage (adopt mechanisms, never citations).
+
+**One real duplication to resolve:** TS `server/nvm` vs the Python Reference
+Engine 0.2.0 both implement the proof kernel. Decision: **TypeScript is the
+single production engine; Python 0.2.0 is a conformance oracle/spec** — mine it
+for the four assets above and treat its 56 tests as a behavior spec, do not run
+two engines.
+
+> Verbatim formulas, algorithms, and schemas extracted from these sources
+> (MAESTRO-S objectives, TRACE data model + algorithms, the 0.2.0 proof kernel
+> and JSON schemas, FactTrack pipeline) live in
+> `docs/research-audit/RESEARCH_FORMULAS_ALGORITHMS_SCHEMAS_2026-07-11.md` —
+> the implementable contract layer, with a source→TS-engine mapping table.
+
+---
+
+## 8. Emotional-arc + anti-slop integration — 2026-07-11B intake
+
+Second research drop (~30 docs) triaged by 5 readers; 25 files archived to
+`STORYMACHINE V1 REPO/_superseded_2026-07-11B/` (RNE V8 reroute, multi-agent
+swarm, infra-defer). Verdict map: `docs/research-audit/RESEARCH_INTAKE_2026-07-11B_EMOTIONAL_RNE.md`.
+Needed source preserved in `docs/research-audit/2026-07-11B-needed/`. **Rejected:
+RNE V8** (swaps proof gates for a single-scalar Transportation score + LLM debate
+— violates proof-before-preference + no-single-scalar). Three deterministic,
+law-compliant waves adopted:
+
+- **EA — Emotional-arc signal channel [P1, highest research value].** Port a
+  deterministic per-scene VAD (valence[-1,1] / arousal[0,1] / dominance[0,1]) +
+  tension[0–100] trajectory into `fountain-analyzer.ts` as a new signal channel
+  (Wave Program v2 type 1), fitted to Reagan-2016 arc shapes; soft constraints
+  (climax tension high, resolution low; VAD drift >0.3 with no causal trigger).
+  **Why first:** an emotional arc is inherently POSITION-AWARE → the first
+  credible attack on the act-swap AUC ≈0.48 blind spot (§5.1) AND a real signal
+  for the dead theme/emotion dimension. **Measure-before-threshold:** prototype
+  against the real 45-film corpus; **accept** only if act-swap AUC moves
+  materially above chance (>~0.55) or shuffle-drop AUC rises, with NO regression
+  to the 0.622 floor or 6/6 discrimination. Source: `2026-07-11B-needed/uvm_state_tensor.py`,
+  `escp_protocol.py`, `emotion_as_structural_mechanic_research.md`. Strip the
+  CrewAI/agent wrapper — the core is ~150 lines, deterministic, no LLM.
+  **STATUS (2026-07-11): diagnostic signal LANDED** — `server/nvm/analyze/
+  emotional-arc.ts` on a real 12,142-word VAD lexicon (VADER + NRC EmoLex) with
+  Reagan-2016 six-arc fitting; wired into the doctor report as a diagnostic
+  field (NOT health). Measured act-swap AUC **0.647** (engine ~0.48). Full suite
+  green (9,039 tests, 0 fail). Remaining: feed into the health scalar — gated on
+  doctor-level AUC gain + zero calibration regression.
+- **AS — Anti-slop detectors + verbosity-bias fix [P1].** Replace/augment the
+  raw word-count density normalization (the confirmed **+6 verbosity bias**,
+  Phase-B metamorphic `empty_verbosity`) with **deviation-from-corpus-mean**
+  scoring; add heuristic-tier (`pattern_to_watch`, per W1) detectors for
+  negated-statement clichés ("it's not X, it's Y"), generic emotion descriptors,
+  and vocabulary-freshness. **Accept:** `evals/scoring` `empty_verbosity` flips
+  to PASS (padding no longer raises health) with no calibration/discrimination
+  regression. Source: `2026-07-11B-needed/ai-slop-storytelling-research.md`.
+- **ABST — Abstention + human-label rubric [P1, feeds scoring-kernel Phases F/G].**
+  Ship the abstention finding outcome (already planned), triggered by critic
+  **disagreement**; adopt **TS-SF** (Green & Brock 2000) + NVAR as the Phase-G
+  human-labeling rubric — as **diagnostics, never a gate** (no single scalar).
+  Source: `2026-07-11B-needed/ts_sf_scorer.py`, `creative-ai-multiagent-evaluation-research.md`,
+  `evals/scoring/human/HUMAN_LABELING_TASK.md`.
+
+**Rejected/deferred (do not re-litigate):** RNE V8 reroute; permanent multi-agent
+swarm / CrewAI / LangGraph / ESC-P bus / MAD-debate-as-gate; TS-SF-as-gate;
+event-store/saga migration; MCP connectors; graph DB. **Citation caution:** the
+drop's arXiv flags were mis-read (YYMM: `2601`=2026-01, `2604`=2026-04 are REAL —
+verified 2026-07-11: NVAR eval + 100-Endings tension). Still unverified: an
+"Anthropic 2026 Emotion" paper + `arXiv 2508.02132` — flag, don't assert fabricated. `stage-plans/*` copies are STALE; this file is canon.

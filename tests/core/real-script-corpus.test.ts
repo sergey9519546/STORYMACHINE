@@ -139,7 +139,7 @@ describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DI
     assert.ok(measured.auc >= 0.622,
       `structural-degradation AUC ${measured.auc.toFixed(3)} fell below the 0.622 ratchet — a change made the doctor MORE structure-blind`);
   });
-  it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.672 (24-script subset) after the AUC-conversion deduction re-tune — still needs feature-scale structural detectors (see header)' }, async () => {
+  it('AUC target: intact features should dominate their scrambled selves (>= 0.9)', { todo: 'measured 0.731 (24-script subset) — up from 0.672 after the continuous arc-incoherence structural deduction (health re-architecture, 2026-07-11B); still short of the 0.9 target' }, async () => {
     const m = measured ?? await measure();
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target`);
   });
@@ -207,7 +207,7 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
     return { auc: (wins + ties / 2) / (goods.length * bads.length) };
   }
   it("AUC baseline (todo, no hard floor — GLOBAL_ARC_INCOHERENCE moved this from 0.477 to 0.480, still far from the 0.55 ratchet bar)", {
-    todo: "measured 0.480 (24-script subset, up from 0.477 pre-GLOBAL_ARC_INCOHERENCE) — the new global-arc detector fires on only 2/67 act-swapped corpus scripts (zero-intact-FP, deliberately conservative); SCENE_CONTINUITY_COLLAPSE still can't see this recipe's damage at all (local-adjacency-based by construction)",
+    todo: "measured 0.615 (24-script subset) — up from 0.480 after the continuous arc-incoherence structural deduction (health re-architecture, 2026-07-11B) graduated the arc signal past the 0.55 bar; the deduction reads emotional-arc rampCorrelation/peakPosition as a bounded feature-scale structural deduction, giving the doctor genuine scene-ORDER detection (act-swap holds scene count constant, so scarcity cannot see it)",
   }, async () => {
     const m = await measure();
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target (informational until a global-arc detector exists)`);

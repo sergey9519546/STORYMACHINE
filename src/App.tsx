@@ -5,6 +5,7 @@ import { StoryConfig } from './types';
 const StartScreen  = lazy(() => import('./components/StartScreen'));
 const ScriptIDE    = lazy(() => import('./components/ScriptIDE'));
 const StoryMachine = lazy(() => import('./components/StoryMachine'));
+const DesignPreview = lazy(() => import('./components/DesignPreview'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen bg-white flex items-center justify-center font-mono">
@@ -115,6 +116,21 @@ export default function App() {
     setShowStoryMachine(false);
     try { localStorage.removeItem(APP_VIEW_KEY); } catch { /* best-effort */ }
   }, []);
+
+  // Design-system preview: open the app with `#design-preview` in the URL to
+  // render the paper·ink·stamp primitive gallery instead of the normal flow.
+  // A dev-only affordance — untouched by any persisted view state.
+  const isDesignPreview = typeof window !== 'undefined'
+    && window.location.hash.replace(/^#/, '') === 'design-preview';
+  if (isDesignPreview) {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <DesignPreview />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>

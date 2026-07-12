@@ -11,7 +11,7 @@
     "name": "9_2009",
     "file": "9_2009.fountain.txt",
     "contentHash": "c3283d3a7085e6e8878811d5fe34459acec7db35270e28512fe64a4d4107ee96",
-    "health": 97.5,
+    "health": 98.2,
     "verdict": "RECOMMEND",
     "sceneCount": 80
   },
@@ -19,7 +19,7 @@
     "name": "9_Matched",
     "file": "9_Matched.fountain.txt",
     "contentHash": "aa30e0a59bd2c7f1f22feafa9a668b1add5b4c2badc2c573d8ed3c6522ea703f",
-    "health": 89,
+    "health": 91.7,
     "verdict": "RECOMMEND",
     "sceneCount": 112
   },
@@ -27,15 +27,15 @@
     "name": "A_Scanner_Darkly_Matched",
     "file": "A_Scanner_Darkly_Matched.fountain.txt",
     "contentHash": "8faee46580babef2e192d7b1dc0a8b2139f72ce2ef5ed49c2309ef024d3d70b9",
-    "health": 89.1,
-    "verdict": "RECOMMEND",
+    "health": 84.6,
+    "verdict": "CONSIDER",
     "sceneCount": 152
   },
   {
     "name": "Anastasia",
     "file": "Anastasia.fountain.txt",
     "contentHash": "5c9895b7b32629fc0075846e788dda7f45f5076c7a319a2f0cd611dda76669d6",
-    "health": 90.9,
+    "health": 95.3,
     "verdict": "RECOMMEND",
     "sceneCount": 130
   },
@@ -43,7 +43,7 @@
     "name": "Anastasia_Matched",
     "file": "Anastasia_Matched.fountain.txt",
     "contentHash": "dd91e61aef9568610f5c9873938256c661434986a56b6f6dbb446d34b4a5709e",
-    "health": 89,
+    "health": 87.6,
     "verdict": "RECOMMEND",
     "sceneCount": 134
   },
@@ -59,7 +59,7 @@
     "name": "Antz_Matched",
     "file": "Antz_Matched.fountain.txt",
     "contentHash": "fd8bb548a77616b7981a616a22588960633dad3cae86bc6039bdea565022ba96",
-    "health": 96.4,
+    "health": 94.1,
     "verdict": "RECOMMEND",
     "sceneCount": 96
   },
@@ -83,7 +83,7 @@
     "name": "Bee_Movie",
     "file": "Bee_Movie.fountain.txt",
     "contentHash": "0ce688cb06d1894d870df86682f36a4df3d4a848c078e7c5fa8dab95fea759d5",
-    "health": 89.4,
+    "health": 89.2,
     "verdict": "RECOMMEND",
     "sceneCount": 135
   },
@@ -115,7 +115,7 @@
     "name": "Coco_Matched",
     "file": "Coco_Matched.fountain.txt",
     "contentHash": "8d31dbc5c122ce861a2d996f2bfbc5406ea771bac1029041c506f3c8d9bcfdc0",
-    "health": 92,
+    "health": 95.1,
     "verdict": "RECOMMEND",
     "sceneCount": 115
   },
@@ -123,7 +123,7 @@
     "name": "Coco_Script",
     "file": "Coco_Script.fountain.txt",
     "contentHash": "c83b88126a8f89f06bdf600bda2f986fbefa89925ad24901db79d1009525928e",
-    "health": 90.9,
+    "health": 91.8,
     "verdict": "RECOMMEND",
     "sceneCount": 120
   },
@@ -131,7 +131,7 @@
     "name": "Coraline",
     "file": "Coraline.fountain.txt",
     "contentHash": "9a2d37352eaa57c54e26373f5f32aba81575650c1c5b63e94cde80d8cf252ac8",
-    "health": 94.5,
+    "health": 97.4,
     "verdict": "RECOMMEND",
     "sceneCount": 138
   },
@@ -139,7 +139,7 @@
     "name": "Coraline_Matched",
     "file": "Coraline_Matched.fountain.txt",
     "contentHash": "d40b90b0ce5da9fb83206e2db9bd1c3a125ad23703bc230704acf64308aed000",
-    "health": 89.6,
+    "health": 88.1,
     "verdict": "RECOMMEND",
     "sceneCount": 143
   },
@@ -147,7 +147,7 @@
     "name": "corpse-bride-2005",
     "file": "corpse-bride-2005.fountain.txt",
     "contentHash": "bb72b6ebcbf98b859b852b354656942712782283ec83ec78939db6d46f77b793",
-    "health": 96.8,
+    "health": 96,
     "verdict": "RECOMMEND",
     "sceneCount": 66
   },
@@ -163,7 +163,7 @@
     "name": "dARKYMIND.html",
     "file": "dARKYMIND.html.fountain.txt",
     "contentHash": "dff1935e8a953c05ebcbd129cf403cc1985ba249ce38693ffe9d29f905e2f9c2",
-    "health": 98.4,
+    "health": 96.9,
     "verdict": "RECOMMEND",
     "sceneCount": 121
   },
@@ -187,7 +187,7 @@
     "name": "Elemental (2023)",
     "file": "Elemental (2023).fountain.txt",
     "contentHash": "eb453b33f90f650bc50b663bcae7d765e28685f9606a2650c578523b6f53be41",
-    "health": 94.5,
+    "health": 98.7,
     "verdict": "RECOMMEND",
     "sceneCount": 136
   },
@@ -195,7 +195,7 @@
     "name": "Encanto (2021)",
     "file": "Encanto (2021).fountain.txt",
     "contentHash": "4002711a5a44ef67caeb4e137d17a2c42684d0448aaeb84644ef7402e92a41d6",
-    "health": 88.2,
+    "health": 88.4,
     "verdict": "RECOMMEND",
     "sceneCount": 72
   },
@@ -203,7 +203,7 @@
     "name": "Frankenweenie",
     "file": "Frankenweenie.fountain.txt",
     "contentHash": "3a140d6d5c7ac74a81ca12ba6e073cc7a01b03916f57c34e8e973254ee491b17",
-    "health": 89.2,
+    "health": 89,
     "verdict": "RECOMMEND",
     "sceneCount": 140
   },
@@ -235,7 +235,7 @@
     "name": "inside-out-screenplay",
     "file": "inside-out-screenplay.fountain.txt",
     "contentHash": "b11cb8ba18911311b0e9fc6acf0b4a7af1499df6d1391bb9e772b703f52e5398",
-    "health": 95.8,
+    "health": 95.1,
     "verdict": "RECOMMEND",
     "sceneCount": 387
   },
@@ -243,7 +243,7 @@
     "name": "Isle of Dogs (2018)",
     "file": "Isle of Dogs (2018).fountain.txt",
     "contentHash": "0e294e155bd0740d645f42bc7c0175911d2485b1edd166d2a75f62c740a9c15c",
-    "health": 97.6,
+    "health": 94.2,
     "verdict": "RECOMMEND",
     "sceneCount": 59
   },
@@ -259,7 +259,7 @@
     "name": "Kung Fu Panda",
     "file": "Kung Fu Panda.fountain.txt",
     "contentHash": "79d9688e78eb846484e34e0c8c939ff97d0dbeaa5e93214de0ba7538f6ef195a",
-    "health": 96.1,
+    "health": 97.4,
     "verdict": "RECOMMEND",
     "sceneCount": 72
   },
@@ -267,7 +267,7 @@
     "name": "Looney_Tunes_Back_In_Action",
     "file": "Looney_Tunes_Back_In_Action.fountain.txt",
     "contentHash": "7744ba284f4c5a92623f280c6b8522fdc431dff24c7b497be371d57169731df6",
-    "health": 96.1,
+    "health": 93.2,
     "verdict": "RECOMMEND",
     "sceneCount": 175
   },
@@ -275,7 +275,7 @@
     "name": "Luca (2021)",
     "file": "Luca (2021).fountain.txt",
     "contentHash": "a3f15e36cb53e9cb112db71d0bbeace1f162bc567f69793e024339eb6460076d",
-    "health": 91.3,
+    "health": 92.6,
     "verdict": "RECOMMEND",
     "sceneCount": 116
   },
@@ -283,7 +283,7 @@
     "name": "Monsters_University",
     "file": "Monsters_University.fountain.txt",
     "contentHash": "92dfa4733df8872931fb4c3e0d01933278558cd6f8214210de10149810d1e243",
-    "health": 97.6,
+    "health": 91.4,
     "verdict": "RECOMMEND",
     "sceneCount": 139
   },
@@ -307,7 +307,7 @@
     "name": "ParaNorman",
     "file": "ParaNorman.fountain.txt",
     "contentHash": "b39ca9745d007da8f0b29cf5dd2db75791aa222a31308d0b824c10cb8c67540c",
-    "health": 98.6,
+    "health": 98.7,
     "verdict": "RECOMMEND",
     "sceneCount": 119
   },
@@ -315,7 +315,7 @@
     "name": "Ratatouille",
     "file": "Ratatouille.fountain.txt",
     "contentHash": "6a58f5e7d686229fc3af86bd681aff85158cc9e06d6626fef26cfa63d5b181e2",
-    "health": 98.6,
+    "health": 98.9,
     "verdict": "RECOMMEND",
     "sceneCount": 127
   },
@@ -323,7 +323,7 @@
     "name": "Raya and the Last Dragon (2021)",
     "file": "Raya and the Last Dragon (2021).fountain.txt",
     "contentHash": "b3ad0112b486412ae713804b82708cf78abfe671397bdfd81334f4db015ddf37",
-    "health": 95.4,
+    "health": 94.7,
     "verdict": "RECOMMEND",
     "sceneCount": 98
   },
@@ -331,7 +331,7 @@
     "name": "Sausage Party (2016)",
     "file": "Sausage Party (2016).fountain.txt",
     "contentHash": "c22a328d1747f9dbd6885b29e7d5cf26920d489cc205d9c928fd337675306e17",
-    "health": 97.5,
+    "health": 97.4,
     "verdict": "RECOMMEND",
     "sceneCount": 55
   },
@@ -347,7 +347,7 @@
     "name": "Shrek_The_Third",
     "file": "Shrek_The_Third.fountain.txt",
     "contentHash": "905afb08bfb67c7cd0c8b0bda939f5b2de6c83e18275136b90b4eab613a0219e",
-    "health": 98.4,
+    "health": 98.5,
     "verdict": "RECOMMEND",
     "sceneCount": 95
   },
@@ -355,7 +355,7 @@
     "name": "Sing (2016)",
     "file": "Sing (2016).fountain.txt",
     "contentHash": "091599fdfa767137c10f7a0ea2443648ddda0d10563fdf8bda8e64d7ab2fda64",
-    "health": 89.3,
+    "health": 89.5,
     "verdict": "RECOMMEND",
     "sceneCount": 202
   },
@@ -363,7 +363,7 @@
     "name": "soul_script",
     "file": "soul_script.fountain.txt",
     "contentHash": "4171ddde58eebf5f77b85a40eab227ce9752a10e7657327b4ae45bba126b53ae",
-    "health": 98.4,
+    "health": 97.7,
     "verdict": "RECOMMEND",
     "sceneCount": 94
   },
@@ -379,7 +379,7 @@
     "name": "Spider-Man Across the Spider-Verse (2023)",
     "file": "Spider-Man Across the Spider-Verse (2023).fountain.txt",
     "contentHash": "da04b6efa490ddc25fff1e18b57f402ef11d80283c8c040b93486f14d9f164a7",
-    "health": 96.3,
+    "health": 98.9,
     "verdict": "RECOMMEND",
     "sceneCount": 129
   },
@@ -387,7 +387,7 @@
     "name": "Spider-Man Into the Spider-Verse (2018)",
     "file": "Spider-Man Into the Spider-Verse (2018).fountain.txt",
     "contentHash": "988f56a39e1d2a44a4b4630cc570d469f0cc1b74083759c6df19a9c58190daf9",
-    "health": 89.4,
+    "health": 94.4,
     "verdict": "RECOMMEND",
     "sceneCount": 188
   },
@@ -395,7 +395,7 @@
     "name": "SpiyDER RACE (2011) html",
     "file": "SpiyDER RACE (2011) html.fountain.txt",
     "contentHash": "264cf9db98eea392a7e6cbb1e9d5b93a8ae2379db27d2556bdaf376df85b1307",
-    "health": 97.5,
+    "health": 98.4,
     "verdict": "RECOMMEND",
     "sceneCount": 120
   },
@@ -403,7 +403,7 @@
     "name": "Teenage Mutant Ninja Turtles Mutant Mayhem (2023)",
     "file": "Teenage Mutant Ninja Turtles Mutant Mayhem (2023).fountain.txt",
     "contentHash": "00af88d2217e3f6377527bce01ccabb60b0b9679a5099d0b9223eeac4704f1ee",
-    "health": 97.1,
+    "health": 98.1,
     "verdict": "RECOMMEND",
     "sceneCount": 83
   },
@@ -411,7 +411,7 @@
     "name": "The Boss Baby Family Business (2021)",
     "file": "The Boss Baby Family Business (2021).fountain.txt",
     "contentHash": "3f8a49195ed21a1820dc418685b198e651655455290e0c81c02e1725e5308b15",
-    "health": 97.2,
+    "health": 91.4,
     "verdict": "RECOMMEND",
     "sceneCount": 52
   },
@@ -427,7 +427,7 @@
     "name": "The Incredibles",
     "file": "The Incredibles.fountain.txt",
     "contentHash": "63c87c731c11a464ad330799067cd0de64586ccddd8503b02c21925c9bd7ee63",
-    "health": 97.5,
+    "health": 92,
     "verdict": "RECOMMEND",
     "sceneCount": 77
   },
@@ -451,7 +451,7 @@
     "name": "The Secret Life of Pets (2016)",
     "file": "The Secret Life of Pets (2016).fountain.txt",
     "contentHash": "ae11aa8b969dbd22bc88efd0b22b4c224cd3f618f569d6e2e57f041c37a315ee",
-    "health": 94.6,
+    "health": 96.9,
     "verdict": "RECOMMEND",
     "sceneCount": 107
   },
@@ -459,7 +459,7 @@
     "name": "The Wild Robot (2024)",
     "file": "The Wild Robot (2024).fountain.txt",
     "contentHash": "63e6775d7539b8f3f8b522321efb6fff0c4f1e31277b1a9657f94307e0aa1f53",
-    "health": 89,
+    "health": 89.1,
     "verdict": "RECOMMEND",
     "sceneCount": 145
   },
@@ -467,7 +467,7 @@
     "name": "the-adventures-of-tintin-2011",
     "file": "the-adventures-of-tintin-2011.fountain.txt",
     "contentHash": "b3e75886ebcdf4e43b63ca40753691a289b1bf9a448825b13a97cdc107b3128a",
-    "health": 89.4,
+    "health": 87.1,
     "verdict": "RECOMMEND",
     "sceneCount": 141
   },
@@ -475,7 +475,7 @@
     "name": "the-iron-giant-1999",
     "file": "the-iron-giant-1999.fountain.txt",
     "contentHash": "fc8f27925e2cce2a93a49d8935925317639770d9cf716f38ac4cf343e159abc4",
-    "health": 89.8,
+    "health": 94.3,
     "verdict": "RECOMMEND",
     "sceneCount": 139
   },
@@ -483,7 +483,7 @@
     "name": "Toy Story 4 (2019)",
     "file": "Toy Story 4 (2019).fountain.txt",
     "contentHash": "015c94e954da7de8e27ff61a7ef3889b5d7c16c6e9ca2ce085d2ba9e7152c39f",
-    "health": 89,
+    "health": 89.2,
     "verdict": "RECOMMEND",
     "sceneCount": 138
   },
@@ -491,7 +491,7 @@
     "name": "Toy_Story_3",
     "file": "Toy_Story_3.fountain.txt",
     "contentHash": "1f5a50f8726601cae5b2f151d30ea2768a7680ca18b0fe344ddb56eb01d11fbd",
-    "health": 93.1,
+    "health": 98.5,
     "verdict": "RECOMMEND",
     "sceneCount": 163
   },
@@ -507,7 +507,7 @@
     "name": "Up",
     "file": "Up.fountain.txt",
     "contentHash": "76e615a3bc8ef0ebf58306181197f08aadca407755598dfe0080749aefcfe3bf",
-    "health": 89.3,
+    "health": 86.6,
     "verdict": "RECOMMEND",
     "sceneCount": 184
   },
@@ -515,7 +515,7 @@
     "name": "up-2009",
     "file": "up-2009.fountain.txt",
     "contentHash": "70badd2d4f588d57464ca6285426902081e2085768c427b7a39850f28326648d",
-    "health": 89.3,
+    "health": 86.1,
     "verdict": "RECOMMEND",
     "sceneCount": 187
   },
@@ -531,7 +531,7 @@
     "name": "Who Framed Roger Rabbit",
     "file": "Who Framed Roger Rabbit.fountain.txt",
     "contentHash": "590ff8d39c6b1b84cd5d781d40d8263874f44dd13c2483130d09c68853aea01e",
-    "health": 98,
+    "health": 98.6,
     "verdict": "RECOMMEND",
     "sceneCount": 111
   },
@@ -539,7 +539,7 @@
     "name": "Wreck-It_Ralph",
     "file": "Wreck-It_Ralph.fountain.txt",
     "contentHash": "9ab6f5a53afc028b0adfae7924a813154d6aa24501f8b8a96e2a4d27c91ed6ff",
-    "health": 98,
+    "health": 98.1,
     "verdict": "RECOMMEND",
     "sceneCount": 79
   },
@@ -547,7 +547,7 @@
     "name": "Zootopia (2016)",
     "file": "Zootopia (2016).fountain.txt",
     "contentHash": "69a64b0256e47e4d84914fa19b1d1fde955c93e91e95032d6cb314c824d3ec3b",
-    "health": 97.7,
+    "health": 98.5,
     "verdict": "RECOMMEND",
     "sceneCount": 105
   },
@@ -555,7 +555,7 @@
     "name": "Pulp_Fiction",
     "file": "Pulp_Fiction.fountain.txt",
     "contentHash": "11132b83622793ebec7b1580477dc50e84db5c2a9a9524d76f9229768a3bb290",
-    "health": 98.7,
+    "health": 96.8,
     "verdict": "RECOMMEND",
     "sceneCount": 117
   },
@@ -563,8 +563,16 @@
     "name": "Jaws",
     "file": "Jaws.fountain.txt",
     "contentHash": "cbb9c4443839e1ed8abbd5f1fea786067f88115f721887b6b2c21e152865d96f",
-    "health": 96.2,
+    "health": 87.4,
     "verdict": "RECOMMEND",
     "sceneCount": 159
+  },
+  {
+    "name": "the-lion-king-1994",
+    "file": "the-lion-king-1994.fountain.txt",
+    "contentHash": "52d12536802f8ac773578f47879209e97ff479ea12da974d66b3f688ec89c576",
+    "health": 87.7,
+    "verdict": "RECOMMEND",
+    "sceneCount": 46
   }
 ]

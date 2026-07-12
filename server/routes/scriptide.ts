@@ -1,6 +1,7 @@
 import express from 'express';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getImageProvider, getTTSProvider } from '../engine/ai.ts';
+import { getPublicConfig } from '../lib/ai-config.ts';
 import { logger } from '../lib/logger.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { instantiatePreset, STRUCTURE_NAMES, ARC_TENSION_CURVES, STYLE_MODIFIERS } from '../lib/structure-presets.ts';
@@ -741,7 +742,19 @@ const sessionStyleGenreBlock = (req: import('express').Request): string => {
   return block ? `\n${block}\n` : '';
 };
 
+// ── Keyless guard for the six generation-only ScriptIDE routes ─────────────
+// The server's front door is analysis-only (no AI key). These routes call the
+// LLM directly, so with no key configured generateContent throws and the route
+// 500s — a NORTH_STAR "honest degradation" violation. Degrade to a labeled
+// response instead (mirrors game.ts interview). Readiness ORs BOTH key sources
+// (see config.ts llmReady — checking only one is a documented trap).
+const KEYLESS_AI_NOTE =
+  'This AI feature needs a model key — add one in Settings to enable it.';
+const llmReady = (): boolean =>
+  Boolean(process.env.GEMINI_API_KEY) || getPublicConfig().keySet;
+
 router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }
   const beat = requireString(req.body?.beat, 'beat');
   const scriptContext = scriptContextOf(req.body);
   const contextBlock = scriptContext
@@ -767,6 +780,7 @@ router.post('/api/scriptide/world-build', aiLimiter, validate(WorldBuildBodySche
 }));
 
 router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogueBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }
   const dialogue = requireString(req.body?.dialogue, 'dialogue');
 
   // Validate profiles array — each element sanitized and capped
@@ -813,6 +827,7 @@ router.post('/api/scriptide/refine-dialogue', aiLimiter, validate(RefineDialogue
 }));
 
 router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTensionBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }
   const scene = requireString(req.body?.scene, 'scene');
   const tnContext = scriptContextOf(req.body);
   const tnContextBlock = tnContext
@@ -838,6 +853,7 @@ router.post('/api/scriptide/analyze-tension', aiLimiter, validate(AnalyzeTension
 }));
 
 router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }
   const text = requireString(req.body?.text, 'text');
   // P8: use full composed modifier (synergy override when available) instead of a simple genre hint string.
   const genreHint = sessionStyleGenreBlock(req);
@@ -852,6 +868,7 @@ router.post('/api/scriptide/clean-action', aiLimiter, validate(CleanActionBodySc
 }));
 
 router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterProfileBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.json({ result: '', usedLLM: false, note: KEYLESS_AI_NOTE }); return; }
   const profile = req.body.profile;
   const name  = sanitizeForPrompt(requireString(profile.name,  'profile.name', 256), 256);
   const ghost = sanitizeForPrompt(requireString(profile.ghost, 'profile.ghost'), 1000);
@@ -881,6 +898,7 @@ router.post('/api/scriptide/character-profile', aiLimiter, validate(CharacterPro
 
 // ── Comprehensive script analysis (replaces frontend director.ts AI calls) ──
 router.post('/api/analyze-script', aiLimiter, validate(AnalyzeScriptBodySchema), asyncHandler(async (req, res) => {
+  if (!llmReady()) { res.status(503).json({ error: KEYLESS_AI_NOTE }); return; }
   const scriptText = requireString(req.body?.scriptText, 'scriptText');
   const engineState = req.body?.engineState ?? {};
   const storyConfig = engineState?.config as Record<string, unknown> ?? {};

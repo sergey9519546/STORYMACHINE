@@ -2420,31 +2420,36 @@ export default function ScriptDoctorPanel({
                 (report.verdict), else the original health/grade box — so older
                 doctor responses (verdict absent) still render exactly as before. */}
             {report.verdict ? (
-              <div
-                className={`p-4 brutal-border-thick ${VERDICT_META[report.verdict].bg} ${
-                  VERDICT_META[report.verdict].text
-                }`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl font-bold">{Math.round(report.health)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xl font-display uppercase tracking-widest">
+              /* 1c Coverage — the honest read: paper card, rotated verdict
+                 stamp, big ink health number, decomposition, determinism line. */
+              <div className="sm-panel p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="sm-sub">Verdict</div>
+                    <div className="sm-stamp mt-1.5" style={{ fontSize: 17 }}>
                       {VERDICT_META[report.verdict].label}
                     </div>
-                    <div className="text-[10px] font-mono opacity-80 mt-1">
-                      {GRADE_META[report.grade].label} draft &middot; {report.sceneCount} scene
-                      {report.sceneCount === 1 ? "" : "s"} &middot;{" "}
-                      {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
-                      {report.totalIssues === 1 ? "" : "s"}
+                  </div>
+                  <div className="text-right">
+                    <div className="sm-sub">Health</div>
+                    <div className="font-mono font-bold leading-none text-ink" style={{ fontSize: 40 }}>
+                      {Math.round(report.health)}
+                      <span className="text-[15px] text-ink/50">/100</span>
                     </div>
-                    {typeof report.healthPercentile === "number" && (
-                      <div className="text-[10px] font-mono opacity-80 mt-0.5">
-                        Stronger than {Math.round(report.healthPercentile)}% of the reference set
-                      </div>
-                    )}
                   </div>
                 </div>
-                <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-white/30">
+                <div className="text-[10px] font-mono text-ink/70 mt-3">
+                  {GRADE_META[report.grade].label} draft &middot; {report.sceneCount} scene
+                  {report.sceneCount === 1 ? "" : "s"} &middot;{" "}
+                  {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
+                  {report.totalIssues === 1 ? "" : "s"}
+                </div>
+                {typeof report.healthPercentile === "number" && (
+                  <div className="text-[10px] font-mono text-ink/60 mt-0.5">
+                    Stronger than {Math.round(report.healthPercentile)}% of the reference set
+                  </div>
+                )}
+                <p className="text-xs font-mono leading-relaxed mt-3 pt-3 border-t border-ink/15 text-ink/80">
                   {VERDICT_META[report.verdict].explainer}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
@@ -2458,10 +2463,13 @@ export default function ScriptDoctorPanel({
                     <SeverityChip severity="minor" count={report.bySeverity.minor} />
                   )}
                   {report.totalIssues === 0 && (
-                    <span className="text-[10px] font-mono uppercase font-bold">
+                    <span className="text-[10px] font-mono uppercase font-bold text-ink">
                       Zero issues found across all 14 passes.
                     </span>
                   )}
+                </div>
+                <div className="sm-slug mt-4" style={{ letterSpacing: ".1em" }}>
+                  Deterministic · reproducible · no LLM judge
                 </div>
               </div>
             ) : (

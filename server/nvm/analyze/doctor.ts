@@ -39,6 +39,15 @@ import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.t
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
 import { deepReadRecords } from './deep-read.ts';
+import { computeEmotionalArc, scenesFromFountain } from './emotional-arc.ts';
+import { detectSlop } from './anti-slop.ts';
+import { extractTheme } from './theme-extract.ts';
+import { analyzeInteriority } from './interiority.ts';
+import { detectMirrorScenes } from './mirror-scene.ts';
+import { detectSilence } from './silence-signal.ts';
+import { detectBonding } from './bonding-signal.ts';
+import { detectColdOpenPromise } from './cold-open-promise.ts';
+import { detectPatternEstablishment } from './pattern-establishment.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
@@ -1642,7 +1651,37 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     STRUCTURAL_TOTAL_DEDUCTION_CAP,
     sccDeduction + (globalArcFires ? GLOBAL_ARC_DEDUCTION : 0),
   );
-  const health = Math.max(0, Math.round((baseHealth - structuralDeduction) * 10) / 10);
+
+  // ── Continuous arc-incoherence deduction (health re-architecture, 2026-07-11B) ──
+  // MEASURED MOTIVATION (rule_channel_probe / arc_rule_sim, docs/scoring/
+  // SATURATION_ROOT_CAUSE): the doctor's shuffle-drop "structural discrimination"
+  // is almost entirely a scene-COUNT artifact (scarcity term AUC 0.938; the
+  // weightedIssues rule channel AUC is 0.076 — rules fire LESS on shuffled
+  // scripts because scenes were dropped). With scene count held constant
+  // (act-swap recipe), the doctor cannot detect reordering at all (AUC ~0.48).
+  // The emotional-arc rampCorrelation/peakPosition signal separates act-swap at
+  // AUC ~0.82 but was diagnostic-only. This term converts that continuous signal
+  // into a bounded structural deduction — the re-architecture's rule-channel
+  // order-detection — WITHOUT touching baseHealth/density/calibration. Gated to
+  // feature scale (ARC_DED_MIN_SCENES) so the 20-sample calibration corpus and
+  // the 6 discrimination fixtures (all <15 scenes) score byte-identically and
+  // need no re-lock; only the 71-feature corpus manifest re-locks. Simulated
+  // act-swap AUC 0.48→0.62, shuffle 0.67→0.79, produced-anchor held ≥80.
+  const ARC_DED_MIN_SCENES = 15;      // feature-scale floor — excludes all calibration/discrimination fixtures
+  const ARC_DED_REF = 1.2;            // arcHealth below this = incoherent trajectory
+  const ARC_DED_K = 8;                // points per unit of incoherence
+  const ARC_DED_CAP = 15;             // bounded, like the other structural deductions
+  let arcIncoherenceDeduction = 0;
+  if (analysis.sceneCount >= ARC_DED_MIN_SCENES) {
+    const arcForDeduction = computeEmotionalArc(scenesFromFountain(fountain));
+    if (arcForDeduction.scored) {
+      arcIncoherenceDeduction = Math.min(
+        ARC_DED_CAP,
+        ARC_DED_K * Math.max(0, ARC_DED_REF - arcForDeduction.arcHealth),
+      );
+    }
+  }
+  const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction) * 10) / 10);
   const topPriorities = buildTopPriorities(passes);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
@@ -1784,6 +1823,15 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     metrics,
     pageEstimate: estimatePages(fountain) ?? undefined,
     excerptNote: excerptNoteFor(analysis.sceneCount),
+    emotionalArc: computeEmotionalArc(scenesFromFountain(fountain)),
+    antiSlop: detectSlop(fountain),
+    theme: extractTheme(fountain),
+    interiority: analyzeInteriority(fountain),
+    mirrorScenes: detectMirrorScenes(fountain),
+    silence: detectSilence(fountain),
+    bonding: detectBonding(fountain),
+    coldOpenPromise: detectColdOpenPromise(fountain),
+    patternEstablishment: detectPatternEstablishment(fountain),
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),

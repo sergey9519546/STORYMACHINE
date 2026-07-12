@@ -159,6 +159,7 @@
 // and cannot honestly carry for each of the three).
 
 import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile.ts';
@@ -1838,7 +1839,12 @@ const ANALYZER_SCENE_CEILING = 1000;
 export function analyzeFountainText(fountain: string): FountainAnalysis {
   if (!fountain || !fountain.trim()) return emptyAnalysis();
 
-  const blocks = parseFountain(fountain);
+  // Import comprehension (2026-07-11B): reconstruct clean Fountain from messy /
+  // scraped / OCR'd input so cues, dialogue, and speakers are recognized rather
+  // than collapsed into action. Idempotent on already-clean Fountain (the live
+  // engine's own output), so this only changes messy imports — see
+  // screenplay-normalizer.ts and docs/scoring/IMPORT_COMPREHENSION_2026-07-11.md.
+  const blocks = parseFountain(normalizeScreenplay(fountain));
   const allRawScenes = segmentScenes(blocks);
   const totalSceneCount = allRawScenes.length;
   const truncatedForAnalysis = totalSceneCount > ANALYZER_SCENE_CEILING;

@@ -299,11 +299,12 @@ export function extractPassFile(filePath: string): PassExtraction {
   return { pass, file: filePath, foundingWave, rules };
 }
 
-/** All 14 pass files (types.ts excluded — it has no `rule:` literals; it's
- *  the shared type contract, not a pass), in stable alphabetical order. */
+/** All 14 pass files (types.ts and confidence.ts excluded — they have no
+ *  `rule:` literals; they're shared contract modules, not passes), in stable
+ *  alphabetical order. */
 export function listPassFiles(passesDir: string = PASSES_DIR): string[] {
   return readdirSync(passesDir)
-    .filter(f => f.endsWith('.ts') && f !== 'types.ts')
+    .filter(f => f.endsWith('.ts') && f !== 'types.ts' && f !== 'confidence.ts')
     .sort()
     .map(f => path.join(passesDir, f));
 }

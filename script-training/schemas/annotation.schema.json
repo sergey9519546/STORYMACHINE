@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StoryMachine derived annotation (reference-only; no verbatim text)",
+  "type": "object",
+  "required": ["source_id", "level", "rights_tier"],
+  "properties": {
+    "source_id": { "type": "string" },
+    "rights_tier": { "const": "reference_only" },
+    "level": { "enum": ["script", "scene", "beat", "dialogue"] },
+    "script": {
+      "type": "object",
+      "properties": {
+        "genre": { "type": "array", "items": { "type": "string" } },
+        "format": { "type": "string" },
+        "tone": { "type": "array", "items": { "type": "string" } },
+        "dramatic_question": { "type": "string" },
+        "primary_mechanisms": { "type": "array", "items": { "type": "string" } },
+        "ending_contract": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "properties": {
+        "scene_id": { "type": "string" },
+        "ordinal": { "type": "integer" },
+        "int_ext": { "enum": ["INT", "EXT", "INT_EXT", "UNKNOWN"] },
+        "time_of_day": { "type": "string" },
+        "scene_function": { "type": "string" },
+        "active_mechanism": { "type": "string" },
+        "participant_count": { "type": "integer" },
+        "dialogue_line_count": { "type": "integer" },
+        "action_line_count": { "type": "integer" },
+        "state_change_signals": { "type": "array", "items": { "type": "string" } },
+        "reveal_mode": { "type": ["string", "null"] },
+        "note": { "const": "derived features only — no verbatim screenplay text stored" }
+      }
+    }
+  }
+}

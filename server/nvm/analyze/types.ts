@@ -253,6 +253,21 @@ export interface ScriptDoctorReport {
   /** 2–4 template-built sentences summarizing the whole report for a reader
    *  with no film-school vocabulary. Deterministic — no LLM. */
   plainSummary?: string;
+  /** ROADMAP §8 EA: deterministic emotional-arc signal (VAD+tension → shape).
+   *  Diagnostic only — surfaced in the report, NOT fed into `health`. */
+  emotionalArc?: import('./emotional-arc.ts').EmotionalArc;
+  /** Diagnostic-only (does NOT affect health/verdict — additive report fields).
+   *  Surfaced so the product can show anti-slop, theme, and interiority readings
+   *  alongside the deterministic verdict without any scoring coupling. */
+  antiSlop?: import('./anti-slop.ts').SlopReport;
+  theme?: import('./theme-extract.ts').ThemeExtract;
+  interiority?: import('./interiority.ts').InteriorityReport;
+  /** Additional diagnostic-only excellence readings (no health coupling). */
+  mirrorScenes?: import('./mirror-scene.ts').MirrorReport;
+  silence?: import('./silence-signal.ts').SilenceReport;
+  bonding?: import('./bonding-signal.ts').BondingReport;
+  coldOpenPromise?: import('./cold-open-promise.ts').ColdOpenReport;
+  patternEstablishment?: import('./pattern-establishment.ts').PatternReport;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
   /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).

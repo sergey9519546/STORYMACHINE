@@ -1,0 +1,104 @@
+/*
+ * Story Machine — unified "paper · ink · stamp" design system.
+ *
+ * Ported from the Claude Design handoff (Story Machine - Rebuild Wireframes).
+ * This is the shared foundation every restyled panel consumes: the editorial
+ * token set (cream paper, near-black ink, one stamp-red accent), the four
+ * type roles, and the reusable primitives (panel frame, button, chip/tag,
+ * stamp, card, bar/gauge). Screens compose these — they do not redefine them.
+ *
+ * Fonts: Anton + JetBrains Mono are already self-hosted (see index.css).
+ * Archivo (body) and Caveat (margin hand) are declared here with graceful
+ * fallbacks to the already-hosted Inter/system + cursive until their woff2
+ * files are vendored under public/fonts/ (follow-up — needs the font binaries).
+ */
+
+:root {
+  /* ---- palette ---- */
+  --sm-paper:      #e6dfcf;  /* app background (document mode) */
+  --sm-panel:      #f4efe2;  /* raised panel surface */
+  --sm-panel-2:    #efe8d7;  /* inset / card surface */
+  --sm-bar:        #e8e0cf;  /* panel title bar */
+  --sm-ink:        #211d15;  /* primary ink / borders */
+  --sm-ink-soft:   #4a4436;  /* body ink */
+  --sm-ink-mute:   #6b6152;  /* secondary text */
+  --sm-ink-faint:  #857c68;  /* labels / captions */
+  --sm-hair:       #d3cab3;  /* hairline borders on cards */
+  --sm-line:       #d6cdb7;  /* skeleton line fill */
+  --sm-stamp:      #c1301c;  /* the one accent — verdicts, live, alerts */
+  --sm-stamp-dk:   #a0281a;
+  --sm-cream:      #f2ecdd;  /* text on ink */
+  --sm-night:      #1a1712;  /* dark chrome (page tops, cinematic) */
+  --sm-ok:         #4b7a4e;  /* pass / clean */
+  --sm-warn:       #b58a2e;  /* major */
+  --sm-cool:       #3f5c86;  /* voice / cool accent */
+
+  /* ---- type roles ---- */
+  --sm-font-display: 'Anton', system-ui, sans-serif;
+  --sm-font-body:    'Archivo', 'Inter', system-ui, sans-serif;
+  --sm-font-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --sm-font-hand:    'Caveat', 'Segoe Script', cursive;
+
+  /* ---- elevation ---- */
+  --sm-shadow:    6px 6px 0 rgba(33,29,21,.15);
+  --sm-shadow-sm: 3px 3px 0 rgba(33,29,21,.12);
+  --sm-shadow-lg: 9px 9px 0 rgba(33,29,21,.18);
+}
+
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo'),url('/fonts/archivo-var.woff2') format('woff2')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat'),url('/fonts/caveat-var.woff2') format('woff2')}
+
+/* ============================ primitives ============================ */
+
+/* panel frame */
+.sm-panel{background:var(--sm-panel);border:1.5px solid var(--sm-ink);box-shadow:var(--sm-shadow);position:relative}
+.sm-panel-top{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1.5px solid var(--sm-ink);background:var(--sm-bar)}
+.sm-panel-body{padding:16px;display:flex;flex-direction:column;gap:11px}
+.sm-slug{font:600 9.5px var(--sm-font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--sm-ink-soft)}
+.sm-title{font:700 10px var(--sm-font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sm-ink)}
+.sm-x{margin-left:auto;font:600 8px var(--sm-font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--sm-ink-faint)}
+
+/* dark page-top chrome */
+.sm-pagetop{display:flex;align-items:center;gap:10px;padding:11px 15px;background:var(--sm-night);color:var(--sm-cream);border-bottom:1.5px solid var(--sm-ink)}
+
+/* section heading + sub */
+.sm-h{font:700 9px var(--sm-font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--sm-ink-faint)}
+.sm-sub{font:500 10px var(--sm-font-body);color:var(--sm-ink-faint)}
+
+/* buttons */
+.sm-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 14px;border:1.5px solid var(--sm-ink);background:var(--sm-panel);font:700 9.5px var(--sm-font-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--sm-ink);cursor:pointer;transition:background .18s,color .18s;white-space:nowrap}
+.sm-btn:hover{background:var(--sm-ink);color:var(--sm-cream)}
+.sm-btn--ink{background:var(--sm-ink);color:var(--sm-cream)}
+.sm-btn--stamp{background:var(--sm-stamp);border-color:var(--sm-stamp);color:#fff}
+.sm-btn--stamp:hover{background:var(--sm-stamp-dk)}
+.sm-btn--off{opacity:.38;pointer-events:none}
+
+/* chip / tag */
+.sm-chip{display:inline-flex;align-items:center;gap:5px;font:700 8px var(--sm-font-mono);letter-spacing:.09em;text-transform:uppercase;padding:3px 7px;border:1.2px solid var(--sm-ink);color:var(--sm-ink);background:var(--sm-panel)}
+.sm-chip--stamp{border-color:var(--sm-stamp);color:var(--sm-stamp)}
+.sm-chip--ok{border-color:var(--sm-ok);color:var(--sm-ok)}
+.sm-chip--warn{border-color:var(--sm-warn);color:var(--sm-warn)}
+
+/* verdict stamp */
+.sm-stamp{font:700 15px var(--sm-font-mono);letter-spacing:.13em;text-transform:uppercase;border:2.5px solid currentColor;padding:6px 14px;display:inline-block;transform:rotate(-5deg);color:var(--sm-stamp)}
+
+/* card / option */
+.sm-card{border:1.5px solid var(--sm-hair);background:var(--sm-panel-2);padding:11px}
+.sm-card--sel{border-color:var(--sm-ink);background:#f7f2e6;box-shadow:-3px 0 0 var(--sm-stamp)}
+
+/* bar + gauge */
+.sm-bar{height:9px;background:#d9d0bb;position:relative;overflow:hidden}
+.sm-bar > i{position:absolute;top:0;bottom:0;left:0;display:block;background:var(--sm-ink)}
+.sm-gauge{height:12px;border:1.5px solid var(--sm-ink);background:var(--sm-panel-2);position:relative;overflow:hidden}
+.sm-gauge > i{position:absolute;top:0;bottom:0;left:0;display:block;transition:width .6s cubic-bezier(.16,1,.3,1),background .3s}
+
+/* skeleton line + dashed placeholder */
+.sm-line{height:8px;border-radius:2px;background:var(--sm-line)}
+.sm-ph{border:1.5px dashed #a89e85;background:repeating-linear-gradient(45deg,transparent,transparent 7px,rgba(33,29,21,.05) 7px,rgba(33,29,21,.05) 8px);display:flex;align-items:center;justify-content:center;text-align:center;font:600 9px var(--sm-font-mono);letter-spacing:.12em;text-transform:uppercase;color:#8a8069;padding:6px}
+
+/* live indicator + margin note */
+.sm-live{display:inline-flex;align-items:center;gap:7px;font:600 9px var(--sm-font-mono);letter-spacing:.15em;color:var(--sm-stamp);text-transform:uppercase}
+.sm-live > i{width:7px;height:7px;border-radius:50%;background:var(--sm-stamp);animation:sm-pulse 1.6s ease-in-out infinite}
+@keyframes sm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
+.sm-note{font:600 18px/1.02 var(--sm-font-hand);color:var(--sm-stamp)}
+.sm-note--ink{color:#6a6350}

@@ -1,0 +1,21 @@
+# Story mechanisms — the engines that generate scene obligations.
+schema_version: "1.0.0"
+mechanisms:
+  - id: clue_cascade
+    genre_affinity: [mystery, thriller]
+  - id: relationship_externalization
+    genre_affinity: [drama, family]
+  - id: institutional_gatekeeping
+    genre_affinity: [thriller, drama]
+  - id: predatory_wish_trap
+    genre_affinity: [horror, family]
+  - id: object_burden
+    genre_affinity: [drama, family, fantasy]
+  - id: family_law
+    genre_affinity: [family, drama]
+  - id: legitimacy_split
+    genre_affinity: [drama, political]
+  - id: false_purpose
+    genre_affinity: [mystery, thriller]
+  - id: identity_performance
+    genre_affinity: [drama, comedy]

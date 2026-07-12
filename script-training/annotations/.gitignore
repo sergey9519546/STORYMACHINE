@@ -1,0 +1,4 @@
+# Derived from copyrighted reference scripts — conservative: keep out of git.
+*.jsonl
+*.json
+!.gitignore
