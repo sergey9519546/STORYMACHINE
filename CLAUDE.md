@@ -99,8 +99,10 @@ The current spine is **demand-first**, sequenced and gated in `ROADMAP.md`:
    Bet). A legally distributable benchmark of real drafts running in CI,
    independently blind-labeled by >=3 experienced readers, with a
    pre-registered split, held-out evaluation, and uncertainty reporting.
-   Rebuild around the smallest signal set that actually separates; rule count
-   stays frozen at the ~2,300 distinct checks.
+   Rebuild around the smallest signal set that actually separates. Add no
+   entries to the current 8,917 generated catalog; treat ~2,300 distinct rule
+   concepts as the maintained conceptual set. Removal is a separate approved
+   migration, never implied by "freeze."
 3. **P2 — Collapse the surface to Doctor + Editor.** Everything else
    (OASIS, the ~38 research panels) behind a Labs flag.
 4. **P3 — Ship a shareable, third-party-verifiable coverage report.**

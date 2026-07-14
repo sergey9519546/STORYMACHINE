@@ -48,9 +48,11 @@ Measured proof points (honest, as of 2026-07-14):
   against a 0.622 ratchet floor; AUC-71 ~0.652; act-swap 0.48→0.62. A ~0.65
   AUC is barely above chance — treat these as work-in-progress baselines,
   not proof the score discriminates.
-- **Rulebook**: 8,917 rules by generated count (~2,300 distinct),
-  staleness-tested against the live pass code. The count is frozen — see
-  the roadmap's freeze list; growing it further is retired work.
+- **Rulebook**: 8,917 entries by generated count (~2,300 distinct rule
+  concepts), staleness-tested against the live pass code. Freeze means **add
+  no entries to the current catalog** and maintain the distinct conceptual
+  set — not delete 6,600 entries by implication. Any removal is a separately
+  approved migration with dependency review.
 
 ## 1. Non-negotiables (the constitution proper)
 
@@ -148,11 +150,12 @@ historical quality reference; its wave cadence is retired.
   mechanical field × mode × position permutation of 7 template functions
   (`passes/lib/checks.ts`), and by the doctor's own measurement the whole
   weighted-rule channel contributes AUC ~0.076 to discrimination while the
-  scene-count scarcity term carries AUC ~0.938. The count is frozen at the
-  ~2,300 genuinely distinct checks; the claim is now a score that
-  demonstrably separates strong from weak REAL writing, not a big number.
-  (See ROADMAP.md — the wave cadence that manufactured the permutations is
-  retired.)
+  scene-count scarcity term carries AUC ~0.938. Add no entries to the
+  current 8,917-entry catalog; maintain ~2,300 distinct rule concepts unless
+  a separately approved migration removes generated permutations. The claim
+  is now a score that demonstrably separates strong from weak real writing,
+  not a big number. (See ROADMAP.md — the wave cadence that manufactured the
+  permutations is retired.)
 - Not adopting AI-generated "research" mechanisms on the strength of their
   citations — `v35_integration_plan.md`'s fabrication audit stands: adopt
   mechanisms, never citations, from anything in the research archive.
