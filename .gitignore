@@ -9,3 +9,13 @@ coverage/
 *.wav
 .claude/
 data/
+
+# The `data/` rule above is for the root runtime dir (per-visitor SQLite
+# session DBs, gitignored for good reason). But it also matches any nested
+# `data/` dir by name — including `server/nvm/analyze/data/`, which holds a
+# required runtime asset: the emotional-arc lexicon read synchronously via
+# readFileSync at module-import time in emotional-arc.ts / inflection-tension.ts
+# / theme-extract.ts. Without it, CI's clean checkout throws ENOENT on import
+# and 38 server/analyzer/export tests fail. Re-include that one dir explicitly.
+!server/nvm/analyze/data/
+!server/nvm/analyze/data/**
