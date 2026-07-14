@@ -206,6 +206,25 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showRoom, setShowRoom]                 = useState(false);
   /** Expert tools live in Inspect ▾ — not as peer header buttons. */
   const [inspectOpen, setInspectOpen] = useState(false);
+  const inspectRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!inspectOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (inspectRef.current && !inspectRef.current.contains(e.target as Node)) {
+        setInspectOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInspectOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [inspectOpen]);
 
   // ── Overlay mutual exclusion ────────────────────────────────────────────────
   // QA finding P0-3: each tool owned its own `fixed inset-0 z-50` backdrop, and
@@ -675,7 +694,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             </>
           )}
 
-          <div className="relative">
+          <div className="relative" ref={inspectRef}>
             <button
               type="button"
               aria-haspopup="menu"
@@ -763,6 +782,27 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <h2 className="text-xl font-bold mb-4 uppercase text-black border-b-2 border-black pb-2">
               The Stage
             </h2>
+            {nodes.length === 0 && (
+              <div className="border-2 border-dashed border-black bg-white p-6">
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-gray-500">
+                  Setup
+                </p>
+                <h3 className="mt-2 text-lg font-bold uppercase tracking-wider">
+                  No scenario yet
+                </h3>
+                <p className="mt-2 font-mono text-xs uppercase tracking-wider text-gray-600">
+                  Build a scenario, then run dialogue on a location.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openOverlay("Builder")}
+                  disabled={loading}
+                  className="mt-4 bg-black px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#FF4444] disabled:opacity-50 brutal-border"
+                >
+                  Build scenario
+                </button>
+              </div>
+            )}
             <div className="space-y-4">
               {nodes.map((node) => {
                 const here = agents.filter(a => a.current_location_id === node.location_id);

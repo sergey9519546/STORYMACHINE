@@ -3,9 +3,11 @@ import {
   BookOpen,
   ChevronDown,
   Download,
+  Home,
   Layers,
   Layers3,
   Loader2,
+  Menu,
   MoreHorizontal,
   PanelRight,
   Settings2,
@@ -46,8 +48,10 @@ interface ToolbarProps {
   onSimulateScript?: () => void;
   onOpenStoryMachine?: () => void;
   onNewStory?: () => void;
+  onGoHome?: () => void;
   onOpenCollab?: () => void;
   onOpenCopilot?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 const TASKS: Array<{ id: IdeTask; label: string; title: string }> = [
@@ -84,8 +88,10 @@ export default function Toolbar({
   onSimulateScript,
   onOpenStoryMachine,
   onNewStory,
+  onGoHome,
   onOpenCollab,
   onOpenCopilot,
+  onToggleSidebar,
 }: ToolbarProps) {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -132,16 +138,31 @@ export default function Toolbar({
   return (
     <header className="z-20 border-b-2 border-black bg-black text-white">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
-        {/* Location / artifact */}
+        {/* Location / artifact + room identity */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <BookOpen className="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              aria-label="Open scenes and characters"
+              className="flex min-h-[40px] min-w-[40px] items-center justify-center border border-white/30 md:hidden"
+            >
+              <Menu className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+          <BookOpen className="hidden h-4 w-4 shrink-0 opacity-80 sm:block" aria-hidden="true" />
           <div className="min-w-0">
-            <h1 className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
-              {title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <span className="hidden rounded border border-white/25 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/70 sm:inline">
+                Script
+              </span>
+              <h1 className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
+                {title}
+              </h1>
+            </div>
             <p className="hidden font-mono text-[10px] uppercase tracking-widest text-white/50 sm:block">
-              Script desk
-              {provenance !== "user" ? ` · ${provenance}` : ""}
+              {provenance !== "user" ? provenance : "desk"}
+              <span className="text-white/35"> · {wordCount}w · {pageCount}pp</span>
             </p>
           </div>
         </div>
@@ -174,18 +195,15 @@ export default function Toolbar({
 
         {/* Status + compact actions */}
         <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/55 md:flex">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/55">
             <span className={statusTone} role="status" aria-live="polite">
               {statusLabel}
             </span>
             {saveStatusLabel ? (
-              <span className="max-w-[9rem] truncate text-white/45" title={saveStatusLabel}>
+              <span className="hidden max-w-[9rem] truncate text-white/45 sm:inline" title={saveStatusLabel}>
                 {saveStatusLabel}
               </span>
             ) : null}
-            <span>
-              {wordCount}w · {pageCount}pp
-            </span>
           </div>
 
           {/* Export menu — primary in Ship, available always */}
@@ -357,16 +375,28 @@ export default function Toolbar({
                     }}
                   />
                 )}
-                {onNewStory && (
+                {(onGoHome || onNewStory) && (
                   <>
                     <div className="my-1 border-t border-black/15" />
-                    <OverflowItem
-                      label="New story…"
-                      onClick={() => {
-                        onNewStory();
-                        setOverflowOpen(false);
-                      }}
-                    />
+                    {onGoHome && (
+                      <OverflowItem
+                        icon={<Home className="h-3.5 w-3.5" />}
+                        label="Home"
+                        onClick={() => {
+                          onGoHome();
+                          setOverflowOpen(false);
+                        }}
+                      />
+                    )}
+                    {onNewStory && (
+                      <OverflowItem
+                        label="New story…"
+                        onClick={() => {
+                          onNewStory();
+                          setOverflowOpen(false);
+                        }}
+                      />
+                    )}
                   </>
                 )}
               </div>

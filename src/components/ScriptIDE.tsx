@@ -22,7 +22,6 @@ import {
   Sparkles,
   Camera,
   Layers,
-  Menu,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -1138,12 +1137,23 @@ export default function ScriptIDE({
   );
 
   // ── Guard ────────────────────────────────────────────────────────────────────
-  if (!engineState) return <div className="p-8">Initializing Studio...</div>;
+  if (!engineState) {
+    return (
+      <div className="flex h-dvh w-full items-center justify-center bg-[#f4f4f0] font-mono text-sm uppercase tracking-widest text-black">
+        <div className="flex items-center gap-3 border-2 border-black bg-white px-6 py-4">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Opening script desk…
+        </div>
+      </div>
+    );
+  }
+
+  const isEmptyDraft = scriptText.trim().length === 0;
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
-      className={`flex h-dvh w-full bg-[#f4f4f0] text-ink font-sans overflow-hidden ${isDarkMode ? "dark" : ""}`}
+      className="flex h-dvh w-full bg-[#f4f4f0] text-black font-sans overflow-hidden"
     >
       <Sidebar
         characters={characters}
@@ -1156,19 +1166,11 @@ export default function ScriptIDE({
         onCloseMobile={() => setSidebarOpen(false)}
       />
 
-      {/* CENTER PANEL: INGEST (Script Editor) */}
+      {/* CENTER: page stage */}
       {/* min-w-0: without it this flex-1 column refuses to shrink below the
           toolbar's intrinsic (non-wrapping) width, overflowing the viewport and
           pushing the centered page off to the right. */}
       <div className="flex-1 min-w-0 h-full border-r-4 border-black flex flex-col bg-white relative">
-        {/* Mobile-only sidebar toggle — the Sidebar is a drawer below md. */}
-        <button
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open scenes and characters sidebar"
-          className="md:hidden absolute top-2 left-2 z-30 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
-        >
-          <Menu className="w-4 h-4" />
-        </button>
         {cleanError && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
             {cleanError}
@@ -1214,6 +1216,8 @@ export default function ScriptIDE({
           onSimulateScript={handleSimulateScript}
           onOpenStoryMachine={onOpenStoryMachine}
           onNewStory={onNewStory ? () => setNewStoryConfirm(true) : undefined}
+          onGoHome={onNewStory ? () => setNewStoryConfirm(true) : undefined}
+          onToggleSidebar={() => setSidebarOpen(true)}
           onOpenCollab={() => {
             setCollabNameInput(collabUserName);
             setPrefsOpen("collab");
@@ -1222,7 +1226,7 @@ export default function ScriptIDE({
         />
 
         {/* Action strip — one next step; secondary chrome stays quiet */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-black/20 bg-[#f7f3ea] px-3 py-2 font-mono text-[11px] text-black">
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/20 bg-[#f7f3ea] px-3 py-2.5 font-mono text-[11px] text-black">
           {simulateStatus ? (
             <>
               <span
@@ -1256,7 +1260,22 @@ export default function ScriptIDE({
                 Leave
               </button>
             </>
-          ) : coverageStale && scriptText.trim().length > 0 ? (
+          ) : isEmptyDraft && task === "write" ? (
+            <>
+              <span className="text-black/70">Empty page</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDoctorAutoSample(true);
+                  handleTaskChange("coverage");
+                }}
+                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+              >
+                Load sample coverage
+              </button>
+              <span className="text-black/45">or type FADE IN:</span>
+            </>
+          ) : coverageStale && !isEmptyDraft ? (
             <>
               <span className="text-black/70">Coverage outdated</span>
               <button
@@ -1264,41 +1283,75 @@ export default function ScriptIDE({
                 onClick={() => handleTaskChange("coverage")}
                 className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
               >
-                Run coverage
+                Re-run coverage
               </button>
             </>
           ) : task === "coverage" ? (
             <>
-              <span className="text-black/70">Diagnose the draft · jump issues from Doctor</span>
-              <button
-                type="button"
-                onClick={() => openToolSlot("coverage")}
-                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
-              >
-                {toolSlot === "coverage" ? "Coverage open" : "Open coverage"}
-              </button>
+              <span className="text-black/70">
+                {toolSlot === "coverage"
+                  ? "Coverage open · pick an issue, then jump to the line"
+                  : "Next: diagnose this draft"}
+              </span>
+              {toolSlot !== "coverage" && (
+                <button
+                  type="button"
+                  onClick={() => openToolSlot("coverage")}
+                  className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+                >
+                  Open coverage
+                </button>
+              )}
             </>
           ) : task === "ship" ? (
             <>
-              <span className="text-black/70">Export · version · simulate</span>
+              <span className="font-bold uppercase tracking-wider text-black/80">Ship</span>
               <button
                 type="button"
                 onClick={exportPDF}
-                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+                disabled={isEmptyDraft}
+                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c] disabled:opacity-40"
               >
                 PDF
               </button>
               <button
                 type="button"
-                onClick={handleSimulateScript}
-                disabled={isSimulating}
+                onClick={exportFountain}
+                disabled={isEmptyDraft}
                 className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
               >
-                Simulate
+                Fountain
+              </button>
+              <button
+                type="button"
+                onClick={takeSnapshot}
+                disabled={isEmptyDraft}
+                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
+              >
+                Snapshot
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulateScript}
+                disabled={isSimulating || isEmptyDraft}
+                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
+              >
+                {isSimulating ? "…" : "Simulate"}
               </button>
             </>
           ) : (
-            <span className="text-black/55">Write · page is primary · scenes in the left rail</span>
+            <>
+              <span className="text-black/55">Write on the page</span>
+              {!isEmptyDraft && (
+                <button
+                  type="button"
+                  onClick={() => handleTaskChange("coverage")}
+                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
+                >
+                  Run coverage
+                </button>
+              )}
+            </>
           )}
 
           {llmReady === false && !llmBannerDismissed && (
@@ -1415,6 +1468,42 @@ export default function ScriptIDE({
             isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
           />
+
+          {/* Empty draft coach — Write mode only; disappears on first keystroke */}
+          {isEmptyDraft && task === "write" && toolSlot === "none" && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[18%] sm:pt-[14%]">
+              <div className="pointer-events-auto mx-4 max-w-md border-2 border-black bg-[#f4f0e6] p-6 shadow-[6px_6px_0_0_#211d15]">
+                <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-black/50">
+                  Script desk · write
+                </p>
+                <h2 className="mt-2 font-display text-2xl uppercase leading-none text-black">
+                  Start the page
+                </h2>
+                <p className="mt-3 font-mono text-xs uppercase tracking-wider text-black/60">
+                  Type a slug line, or load the sample for coverage.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDoctorAutoSample(true);
+                      handleTaskChange("coverage");
+                    }}
+                    className="border border-black bg-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+                  >
+                    Sample coverage
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editorRef.current?.getView()?.focus()}
+                    className="border border-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-black hover:text-white"
+                  >
+                    Focus editor
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action Prompt Modal */}
           <AnimatePresence>

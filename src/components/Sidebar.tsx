@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight, X } from 'lucide-react';
 import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
@@ -6,6 +6,23 @@ import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+function useIsMdUp() {
+  const [md, setMd] = useState(true);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    const apply = () => setMd(mq.matches);
+    apply();
+    if (mq.addEventListener) mq.addEventListener('change', apply);
+    else mq.addListener(apply);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', apply);
+      else mq.removeListener(apply);
+    };
+  }, []);
+  return md;
 }
 
 interface Character {
@@ -146,6 +163,10 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
     return characters.filter(c => c.name.toLowerCase().includes(query));
   }, [characters, searchQuery]);
 
+  const isMdUp = useIsMdUp();
+  // Off-canvas only on small screens; desktop rail is always present.
+  const drawerHidden = !isMdUp && !mobileOpen;
+
   // Navigate to a scene and, on mobile, dismiss the drawer so the editor is
   // revealed again. On desktop onCloseMobile is undefined and this is a no-op.
   const handleNavigate = (lineIndex: number) => {
@@ -156,7 +177,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
   return (
     <>
       {/* Mobile backdrop — only renders when the drawer is open on < md. */}
-      {mobileOpen && (
+      {mobileOpen && !isMdUp && (
         <div
           className="md:hidden fixed inset-0 z-40 bg-black/50"
           aria-hidden="true"
@@ -175,7 +196,8 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
         aria-label="Scenes and characters"
-        aria-hidden={!mobileOpen}
+        aria-hidden={drawerHidden || undefined}
+        inert={drawerHidden || undefined}
       >
       <div role="navigation" className="flex bg-black text-white shrink-0">
         <button
@@ -183,7 +205,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           aria-selected={activeTab === 'scenes'}
           className={cn(
             "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
-            activeTab === 'scenes' ? "bg-[#FF4444]" : "hover:bg-zinc-900"
+            activeTab === 'scenes' ? "bg-[#c1301c]" : "hover:bg-zinc-900"
           )}
         >
           <List className="w-3 h-3" /> Scenes
@@ -193,7 +215,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           aria-selected={activeTab === 'characters'}
           className={cn(
             "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
-            activeTab === 'characters' ? "bg-[#FF4444]" : "hover:bg-zinc-900"
+            activeTab === 'characters' ? "bg-[#c1301c]" : "hover:bg-zinc-900"
           )}
         >
           <Users className="w-3 h-3" /> Characters
