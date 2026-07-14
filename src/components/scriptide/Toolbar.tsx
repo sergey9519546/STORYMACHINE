@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  BookOpen,
   ChevronDown,
   Download,
   Home,
@@ -60,6 +59,10 @@ const TASKS: Array<{ id: IdeTask; label: string; title: string }> = [
   { id: "ship", label: "Ship", title: "Export, version, simulate" },
 ];
 
+/**
+ * Desk chrome — night bar from the paper·ink·stamp system.
+ * Navigation + identity only; tools live in mode, export, or overflow.
+ */
 export default function Toolbar({
   title = "Untitled Script",
   task,
@@ -123,55 +126,55 @@ export default function Toolbar({
     };
   }, [overflowOpen, exportOpen]);
 
-  const statusTone = isAnalyzing
-    ? "text-yellow-300"
+  const statusLabel = isAnalyzing ? "Running" : coverageStale ? "Outdated" : "Ready";
+  const statusClass = isAnalyzing
+    ? "text-[var(--sm-warn)]"
     : coverageStale
-      ? "text-amber-300"
-      : "text-green-300";
-
-  const statusLabel = isAnalyzing
-    ? "Running"
-    : coverageStale
-      ? "Outdated"
-      : "Ready";
+      ? "text-[var(--sm-stamp)]"
+      : "text-[var(--sm-ok)]";
 
   return (
-    <header className="z-20 border-b-2 border-black bg-black text-white">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
-        {/* Location / artifact + room identity */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          {onToggleSidebar && (
-            <button
-              type="button"
-              onClick={onToggleSidebar}
-              aria-label="Open scenes and characters"
-              className="flex min-h-[40px] min-w-[40px] items-center justify-center border border-white/30 md:hidden"
-            >
-              <Menu className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
-          <BookOpen className="hidden h-4 w-4 shrink-0 opacity-80 sm:block" aria-hidden="true" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="hidden rounded border border-white/25 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white/70 sm:inline">
-                Script
-              </span>
-              <h1 className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
-                {title}
-              </h1>
-            </div>
-            <p className="hidden font-mono text-[10px] uppercase tracking-widest text-white/50 sm:block">
-              {provenance !== "user" ? provenance : "desk"}
-              <span className="text-white/35"> · {wordCount}w · {pageCount}pp</span>
-            </p>
+    <header
+      className="sm-pagetop z-20 min-h-[48px] flex-wrap gap-y-2 border-b-[1.5px] border-[var(--sm-ink)]"
+      style={{ padding: "8px 12px" }}
+    >
+      {/* Identity */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label="Open scenes and characters"
+            className="flex h-9 w-9 items-center justify-center border border-[var(--sm-cream)]/25 text-[var(--sm-cream)] md:hidden"
+          >
+            <Menu className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="sm-chip hidden border-[var(--sm-cream)]/30 bg-transparent text-[var(--sm-cream)] sm:inline-flex">
+              Script
+            </span>
+            <h1 className="truncate font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--sm-cream)]">
+              {title}
+            </h1>
           </div>
+          <p className="hidden font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45 sm:block">
+            {provenance !== "user" ? provenance : "desk"}
+            <span className="text-[var(--sm-cream)]/30">
+              {" "}
+              · {wordCount}w · {pageCount}pp
+            </span>
+          </p>
         </div>
+      </div>
 
-        {/* Task modes — stable structure, adaptive emphasis */}
-        <nav
-          aria-label="Current task"
-          className="order-3 flex w-full basis-full justify-center gap-1 sm:order-none sm:w-auto sm:basis-auto"
-        >
+      {/* Mode switch — filled segment = active */}
+      <nav
+        aria-label="Current task"
+        className="order-3 flex w-full basis-full justify-center sm:order-none sm:w-auto sm:basis-auto"
+      >
+        <div className="inline-flex border border-[var(--sm-cream)]/25 p-0.5">
           {TASKS.map((t) => {
             const active = task === t.id;
             return (
@@ -181,227 +184,230 @@ export default function Toolbar({
                 title={t.title}
                 aria-pressed={active}
                 onClick={() => onTaskChange(t.id)}
-                className={`min-h-[40px] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                className={`min-h-[36px] px-3.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                   active
-                    ? "bg-white text-black"
-                    : "border border-white/25 text-white/75 hover:border-white hover:text-white"
+                    ? "bg-[var(--sm-cream)] text-[var(--sm-ink)]"
+                    : "text-[var(--sm-cream)]/70 hover:text-[var(--sm-cream)]"
                 }`}
               >
                 {t.label}
               </button>
             );
           })}
-        </nav>
+        </div>
+      </nav>
 
-        {/* Status + compact actions */}
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/55">
-            <span className={statusTone} role="status" aria-live="polite">
-              {statusLabel}
-            </span>
-            {saveStatusLabel ? (
-              <span className="hidden max-w-[9rem] truncate text-white/45 sm:inline" title={saveStatusLabel}>
-                {saveStatusLabel}
-              </span>
-            ) : null}
-          </div>
+      {/* Status + ship actions */}
+      <div className="flex shrink-0 items-center gap-2">
+        <span
+          className={`font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] ${statusClass}`}
+          role="status"
+          aria-live="polite"
+        >
+          {statusLabel}
+        </span>
+        {saveStatusLabel ? (
+          <span
+            className="hidden max-w-[8rem] truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-cream)]/40 sm:inline"
+            title={saveStatusLabel}
+          >
+            {saveStatusLabel}
+          </span>
+        ) : null}
 
-          {/* Export menu — primary in Ship, available always */}
-          <div className="relative" ref={exportRef}>
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={exportOpen}
-              onClick={() => {
-                setExportOpen((v) => !v);
-                setOverflowOpen(false);
-              }}
-              className={`flex min-h-[40px] items-center gap-1 border px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                task === "ship"
-                  ? "border-white bg-white text-black"
-                  : "border-white/30 text-white hover:border-white"
-              }`}
-            >
-              <Download className="h-3.5 w-3.5" aria-hidden="true" />
-              Export
-              <ChevronDown className="h-3 w-3" aria-hidden="true" />
-            </button>
-            {exportOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-50 mt-1 min-w-[10rem] border-2 border-black bg-white py-1 text-black shadow-[4px_4px_0_0_#000]"
-              >
-                {[
-                  { label: "Fountain", fn: onExportFountain },
-                  { label: "Final Draft", fn: onExportFDX },
-                  { label: "PDF", fn: onExportPDF },
-                  { label: "Word", fn: onExportDOCX },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    role="menuitem"
-                    className="block w-full px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider hover:bg-black hover:text-white"
-                    onClick={() => {
-                      item.fn();
-                      setExportOpen(false);
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
+        <div className="relative" ref={exportRef}>
           <button
             type="button"
-            onClick={onSimulateScript}
-            disabled={isSimulating || !onSimulateScript}
-            aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
-            className="flex min-h-[40px] items-center gap-1.5 border border-white/30 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:border-white disabled:cursor-wait disabled:opacity-40"
+            aria-haspopup="menu"
+            aria-expanded={exportOpen}
+            onClick={() => {
+              setExportOpen((v) => !v);
+              setOverflowOpen(false);
+            }}
+            className={`flex min-h-[36px] items-center gap-1 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+              task === "ship"
+                ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)] text-white"
+                : "border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)]"
+            }`}
           >
-            {isSimulating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-            <span className="hidden sm:inline">{isSimulating ? "…" : "Simulate"}</span>
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            Export
+            <ChevronDown className="h-3 w-3" aria-hidden="true" />
           </button>
-
-          {/* Overflow — secondary tools stay reachable without competing */}
-          <div className="relative" ref={overflowRef}>
-            <button
-              type="button"
-              aria-label="More tools"
-              aria-haspopup="menu"
-              aria-expanded={overflowOpen}
-              onClick={() => {
-                setOverflowOpen((v) => !v);
-                setExportOpen(false);
-              }}
-              className="flex min-h-[40px] min-w-[40px] items-center justify-center border border-white/30 text-white transition-colors hover:border-white"
+          {exportOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-1 min-w-[10rem] border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] py-1 text-[var(--sm-ink)] shadow-[var(--sm-shadow-sm)]"
             >
-              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {overflowOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-50 mt-1 w-56 border-2 border-black bg-white py-1 text-black shadow-[4px_4px_0_0_#000]"
-              >
-                <OverflowItem
-                  icon={<Stethoscope className="h-3.5 w-3.5" />}
-                  label={toolSlot === "coverage" ? "Close Coverage" : "Open Coverage"}
+              {[
+                { label: "Fountain", fn: onExportFountain },
+                { label: "Final Draft", fn: onExportFDX },
+                { label: "PDF", fn: onExportPDF },
+                { label: "Word", fn: onExportDOCX },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-wider hover:bg-[var(--sm-ink)] hover:text-[var(--sm-cream)]"
                   onClick={() => {
-                    onTaskChange(toolSlot === "coverage" ? "write" : "coverage");
+                    item.fn();
+                    setExportOpen(false);
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={onSimulateScript}
+          disabled={isSimulating || !onSimulateScript}
+          aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
+          className="flex min-h-[36px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] disabled:cursor-wait disabled:opacity-40"
+        >
+          {isSimulating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+          <span className="hidden sm:inline">{isSimulating ? "…" : "Simulate"}</span>
+        </button>
+
+        <div className="relative" ref={overflowRef}>
+          <button
+            type="button"
+            aria-label="More tools"
+            aria-haspopup="menu"
+            aria-expanded={overflowOpen}
+            onClick={() => {
+              setOverflowOpen((v) => !v);
+              setExportOpen(false);
+            }}
+            className="flex h-9 w-9 items-center justify-center border border-[var(--sm-cream)]/30 text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)]"
+          >
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          </button>
+          {overflowOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-50 mt-1 w-56 border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] py-1 text-[var(--sm-ink)] shadow-[var(--sm-shadow-sm)]"
+            >
+              <OverflowItem
+                icon={<Stethoscope className="h-3.5 w-3.5" />}
+                label={toolSlot === "coverage" ? "Close Coverage" : "Open Coverage"}
+                onClick={() => {
+                  onTaskChange(toolSlot === "coverage" ? "write" : "coverage");
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<PanelRight className="h-3.5 w-3.5" />}
+                label={toolSlot === "studio" ? "Close Studio" : "Open Studio"}
+                onClick={() => {
+                  onOpenStudio();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<Settings2 className="h-3.5 w-3.5" />}
+                label={toolSlot === "director" ? "Close Director" : "Director HUD"}
+                onClick={() => {
+                  onOpenDirector();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<Layers3 className="h-3.5 w-3.5" />}
+                label={toolSlot === "slate" ? "Close Slate" : "Slate compare"}
+                onClick={() => {
+                  onOpenSlate();
+                  setOverflowOpen(false);
+                }}
+              />
+              <div className="my-1 border-t border-[var(--sm-hair)]" />
+              <OverflowItem
+                icon={<Layers className="h-3.5 w-3.5" />}
+                label={directorsLayer ? "Director layer on" : "Director layer off"}
+                pressed={directorsLayer}
+                onClick={() => {
+                  onToggleDirectorsLayer();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                icon={<SpellCheck className="h-3.5 w-3.5" />}
+                label={liveDiagnostics ? "Live notes on" : "Live notes off"}
+                pressed={liveDiagnostics}
+                onClick={() => {
+                  onToggleLiveDiagnostics();
+                  setOverflowOpen(false);
+                }}
+              />
+              <OverflowItem
+                label={isTypewriterSound ? "Typewriter SFX on" : "Typewriter SFX off"}
+                pressed={isTypewriterSound}
+                onClick={() => {
+                  onToggleTypewriterSound();
+                  setOverflowOpen(false);
+                }}
+              />
+              {onOpenCopilot && (
+                <OverflowItem
+                  label="Copilot voice"
+                  onClick={() => {
+                    onOpenCopilot();
                     setOverflowOpen(false);
                   }}
                 />
+              )}
+              {onOpenCollab && (
                 <OverflowItem
-                  icon={<PanelRight className="h-3.5 w-3.5" />}
-                  label={toolSlot === "studio" ? "Close Studio" : "Open Studio"}
+                  label="Collaborate"
                   onClick={() => {
-                    onOpenStudio();
+                    onOpenCollab();
                     setOverflowOpen(false);
                   }}
                 />
+              )}
+              {onOpenStoryMachine && (
                 <OverflowItem
-                  icon={<Settings2 className="h-3.5 w-3.5" />}
-                  label={toolSlot === "director" ? "Close Director" : "Director HUD"}
+                  label="Open Simulate"
                   onClick={() => {
-                    onOpenDirector();
+                    onOpenStoryMachine();
                     setOverflowOpen(false);
                   }}
                 />
-                <OverflowItem
-                  icon={<Layers3 className="h-3.5 w-3.5" />}
-                  label={toolSlot === "slate" ? "Close Slate" : "Slate compare"}
-                  onClick={() => {
-                    onOpenSlate();
-                    setOverflowOpen(false);
-                  }}
-                />
-                <div className="my-1 border-t border-black/15" />
-                <OverflowItem
-                  icon={<Layers className="h-3.5 w-3.5" />}
-                  label={directorsLayer ? "Director layer on" : "Director layer off"}
-                  pressed={directorsLayer}
-                  onClick={() => {
-                    onToggleDirectorsLayer();
-                    setOverflowOpen(false);
-                  }}
-                />
-                <OverflowItem
-                  icon={<SpellCheck className="h-3.5 w-3.5" />}
-                  label={liveDiagnostics ? "Live notes on" : "Live notes off"}
-                  pressed={liveDiagnostics}
-                  onClick={() => {
-                    onToggleLiveDiagnostics();
-                    setOverflowOpen(false);
-                  }}
-                />
-                <OverflowItem
-                  label={isTypewriterSound ? "Typewriter SFX on" : "Typewriter SFX off"}
-                  pressed={isTypewriterSound}
-                  onClick={() => {
-                    onToggleTypewriterSound();
-                    setOverflowOpen(false);
-                  }}
-                />
-                {onOpenCopilot && (
-                  <OverflowItem
-                    label="Copilot voice"
-                    onClick={() => {
-                      onOpenCopilot();
-                      setOverflowOpen(false);
-                    }}
-                  />
-                )}
-                {onOpenCollab && (
-                  <OverflowItem
-                    label="Collaborate"
-                    onClick={() => {
-                      onOpenCollab();
-                      setOverflowOpen(false);
-                    }}
-                  />
-                )}
-                {onOpenStoryMachine && (
-                  <OverflowItem
-                    label="Launch Story Machine"
-                    onClick={() => {
-                      onOpenStoryMachine();
-                      setOverflowOpen(false);
-                    }}
-                  />
-                )}
-                {(onGoHome || onNewStory) && (
-                  <>
-                    <div className="my-1 border-t border-black/15" />
-                    {onGoHome && (
-                      <OverflowItem
-                        icon={<Home className="h-3.5 w-3.5" />}
-                        label="Home"
-                        onClick={() => {
-                          onGoHome();
-                          setOverflowOpen(false);
-                        }}
-                      />
-                    )}
-                    {onNewStory && (
-                      <OverflowItem
-                        label="New story…"
-                        onClick={() => {
-                          onNewStory();
-                          setOverflowOpen(false);
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+              {(onGoHome || onNewStory) && (
+                <>
+                  <div className="my-1 border-t border-[var(--sm-hair)]" />
+                  {onGoHome && (
+                    <OverflowItem
+                      icon={<Home className="h-3.5 w-3.5" />}
+                      label="Home"
+                      onClick={() => {
+                        onGoHome();
+                        setOverflowOpen(false);
+                      }}
+                    />
+                  )}
+                  {onNewStory && (
+                    <OverflowItem
+                      label="New story…"
+                      onClick={() => {
+                        onNewStory();
+                        setOverflowOpen(false);
+                      }}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -425,8 +431,8 @@ function OverflowItem({
       role="menuitem"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider hover:bg-black hover:text-white ${
-        pressed ? "bg-black/5 font-bold" : ""
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-wider hover:bg-[var(--sm-ink)] hover:text-[var(--sm-cream)] ${
+        pressed ? "bg-[var(--sm-panel-2)] font-bold" : ""
       }`}
     >
       {icon}

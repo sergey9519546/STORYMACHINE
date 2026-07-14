@@ -1,5 +1,5 @@
 /**
- * Coverage summary — primary Coverage-mode surface.
+ * Coverage summary — primary Coverage-mode surface (paper·ink·stamp).
  * Progressive depth: summary first; full Script Doctor is one click deeper.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -10,7 +10,6 @@ import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "..
 interface CoverageSummaryProps {
   fountain: string;
   title?: string;
-  /** When true, run once against the built-in sample (Start → sample handoff). */
   autoLoadSample?: boolean;
   onOpenFullReport: () => void;
   onJumpToLine?: (line1Based: number) => void;
@@ -94,7 +93,6 @@ export default function CoverageSummary({
     [fountain, title, onFreshReport, onLoadSampleIntoEditor],
   );
 
-  // Auto-run on open / sample handoff
   useEffect(() => {
     if (autoLoadSample && !sampleFired.current) {
       sampleFired.current = true;
@@ -106,7 +104,6 @@ export default function CoverageSummary({
       return;
     }
     void run();
-    // Intentionally once per mount / when autoLoadSample flips — re-run via button.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoLoadSample]);
 
@@ -129,17 +126,17 @@ export default function CoverageSummary({
 
   return (
     <aside
-      className="fixed top-0 right-0 z-50 flex h-dvh w-full max-w-[420px] flex-col border-l-4 border-black bg-[#f4f0e6] text-black shadow-[-6px_0_0_rgba(33,29,21,0.12)] sm:w-[400px]"
+      className="fixed top-0 right-0 z-50 flex h-dvh w-full max-w-[400px] flex-col border-l-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] text-[var(--sm-ink)] shadow-[-6px_0_24px_rgba(33,29,21,0.08)] sm:w-[380px]"
       role="region"
       aria-labelledby="coverage-summary-title"
     >
-      <div className="flex items-center gap-3 border-b-4 border-black bg-black px-4 py-3 text-white">
-        <Stethoscope className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <div className="sm-pagetop shrink-0">
+        <Stethoscope className="h-4 w-4 shrink-0 text-[var(--sm-cream)]" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 id="coverage-summary-title" className="font-mono text-[11px] font-bold uppercase tracking-[0.18em]">
+          <h2 id="coverage-summary-title" className="sm-title text-[var(--sm-cream)]">
             Coverage
           </h2>
-          <p className="truncate font-mono text-[10px] uppercase tracking-widest text-white/50">
+          <p className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-cream)]/45">
             {usingSample ? "Sample" : title || "Draft"} · next fix
           </p>
         </div>
@@ -148,45 +145,41 @@ export default function CoverageSummary({
           onClick={() => void run()}
           disabled={status === "loading"}
           aria-label="Re-run coverage"
-          className="border border-white/30 p-2 hover:border-white disabled:opacity-40"
+          className="border border-[var(--sm-cream)]/25 p-2 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40"
         >
           {status === "loading" ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
           )}
         </button>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close coverage"
-          className="border border-white/30 p-2 hover:border-white"
+          className="border border-[var(--sm-cream)]/25 p-2 text-[var(--sm-cream)] hover:border-[var(--sm-cream)]"
         >
-          <X className="h-4 w-4" aria-hidden="true" />
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="sm-panel-body flex-1 overflow-y-auto">
         {status === "loading" && (
-          <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-wider text-black/60">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Reading the draft…
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--sm-ink-mute)]" aria-hidden="true" />
+            <span className="sm-slug">Reading the draft…</span>
           </div>
         )}
 
         {status === "error" && (
-          <div className="border-2 border-[#c1301c] bg-white p-4" role="alert">
+          <div className="sm-card border-[var(--sm-stamp)]" role="alert">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#c1301c]" aria-hidden="true" />
-              <div>
-                <p className="font-mono text-[11px] font-bold uppercase tracking-wider">Coverage failed</p>
-                <p className="mt-1 text-sm text-black/70">{error}</p>
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="sm-title">Coverage failed</p>
+                <p className="sm-sub mt-1">{error}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void run()}
-                    className="border border-black bg-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-white"
-                  >
+                  <button type="button" onClick={() => void run()} className="sm-btn sm-btn--ink">
                     Retry
                   </button>
                   <button
@@ -198,7 +191,7 @@ export default function CoverageSummary({
                         sample: true,
                       })
                     }
-                    className="border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-black hover:text-white"
+                    className="sm-btn"
                   >
                     Use sample
                   </button>
@@ -209,52 +202,51 @@ export default function CoverageSummary({
         )}
 
         {status === "success" && report && (
-          <div className="space-y-5">
-            {/* Primary object */}
-            <div className="border-2 border-black bg-white p-5">
+          <>
+            <div className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)]">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-black/45">Verdict</p>
-                  <p className="mt-2 inline-block rotate-[-3deg] border-2 border-[#c1301c] px-3 py-1 font-mono text-sm font-bold uppercase tracking-[0.16em] text-[#c1301c]">
-                    {verdictLabel(report.verdict)}
-                  </p>
+                  <p className="sm-h">Verdict</p>
+                  <p className="sm-stamp mt-2 text-[13px]">{verdictLabel(report.verdict)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-black/45">Health</p>
-                  <p className="font-display text-5xl leading-none">{Math.round(report.health)}</p>
+                  <p className="sm-h">Health</p>
+                  <p className="font-[family-name:var(--sm-font-display)] text-5xl leading-none text-[var(--sm-ink)]">
+                    {Math.round(report.health)}
+                  </p>
                 </div>
               </div>
               {report.plainSummary && (
-                <p className="mt-4 text-sm leading-snug text-black/70">{report.plainSummary}</p>
+                <p className="mt-4 text-sm leading-snug text-[var(--sm-ink-soft)]">{report.plainSummary}</p>
               )}
             </div>
 
-            {/* Supporting counts */}
-            <dl className="grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-wider">
-              <div className="border border-black/15 bg-white p-3">
-                <dt className="text-black/45">Critical</dt>
-                <dd className="mt-1 text-lg font-bold text-[#c1301c]">{report.bySeverity.critical}</dd>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="sm-card py-3 text-center">
+                <p className="sm-h">Critical</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-stamp)]">
+                  {report.bySeverity.critical}
+                </p>
               </div>
-              <div className="border border-black/15 bg-white p-3">
-                <dt className="text-black/45">Major</dt>
-                <dd className="mt-1 text-lg font-bold">{report.bySeverity.major}</dd>
+              <div className="sm-card py-3 text-center">
+                <p className="sm-h">Major</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink)]">
+                  {report.bySeverity.major}
+                </p>
               </div>
-              <div className="border border-black/15 bg-white p-3">
-                <dt className="text-black/45">Minor</dt>
-                <dd className="mt-1 text-lg font-bold text-black/60">{report.bySeverity.minor}</dd>
+              <div className="sm-card py-3 text-center">
+                <p className="sm-h">Minor</p>
+                <p className="mt-1 font-[family-name:var(--sm-font-mono)] text-lg font-bold text-[var(--sm-ink-mute)]">
+                  {report.bySeverity.minor}
+                </p>
               </div>
-            </dl>
+            </div>
 
-            {/* Next decision */}
-            <div className="border-2 border-black bg-white p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-black/45">
-                What next
-              </p>
-              <p className="mt-2 text-sm font-medium leading-snug text-black">
-                {nextLabel}
-              </p>
+            <div className="sm-card sm-card--sel">
+              <p className="sm-h">What next</p>
+              <p className="mt-2 text-sm font-medium leading-snug text-[var(--sm-ink)]">{nextLabel}</p>
               {top?.location && (
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-black/45">
+                <p className="sm-slug mt-1.5">
                   {top.location}
                   {top.severity ? ` · ${top.severity}` : ""}
                 </p>
@@ -264,17 +256,13 @@ export default function CoverageSummary({
                   <button
                     type="button"
                     onClick={() => onJumpToLine(jumpLine)}
-                    className="inline-flex items-center gap-1.5 border border-black bg-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+                    className="sm-btn sm-btn--stamp"
                   >
                     Jump to line {jumpLine}
                     <ArrowRight className="h-3 w-3" aria-hidden="true" />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={onOpenFullReport}
-                  className="border border-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-black hover:text-white"
-                >
+                <button type="button" onClick={onOpenFullReport} className="sm-btn">
                   Full report
                 </button>
               </div>
@@ -282,27 +270,24 @@ export default function CoverageSummary({
 
             {report.strengths && report.strengths.length > 0 && (
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-black/45">
-                  Working
-                </p>
+                <p className="sm-h">Working</p>
                 <ul className="mt-2 space-y-1.5">
                   {report.strengths.slice(0, 3).map((s) => (
-                    <li key={s} className="border-l-2 border-black/20 pl-3 text-sm text-black/70">
+                    <li
+                      key={s}
+                      className="border-l-[3px] border-[var(--sm-ok)] pl-3 text-sm text-[var(--sm-ink-soft)]"
+                    >
                       {s}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {status === "idle" && !report && (
-          <button
-            type="button"
-            onClick={() => void run()}
-            className="w-full border-2 border-black bg-black py-3 font-mono text-[11px] font-bold uppercase tracking-wider text-white"
-          >
+          <button type="button" onClick={() => void run()} className="sm-btn sm-btn--ink w-full">
             Run coverage
           </button>
         )}

@@ -122,7 +122,7 @@ function LongTextField({
           const capped = e.target.value.slice(0, LONG_FIELD_MAX);
           onUpdate(charId, field, capped);
         }}
-        className="w-full bg-zinc-50 dark:bg-zinc-900 text-[10px] outline-none resize-none h-12 p-2 brutal-border focus:border-[#FF4444] font-mono"
+        className="h-12 w-full resize-none border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel-2)] p-2 font-mono text-[10px] text-[var(--sm-ink)] outline-none focus:ring-2 focus:ring-[var(--sm-stamp)]"
         placeholder={placeholder}
         maxLength={LONG_FIELD_MAX}
         aria-describedby={nearLimit ? `count-${charId}-${String(field)}` : undefined}
@@ -185,27 +185,26 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
         />
       )}
       <aside
-        // On md+ this is a static 320px flex column (shrink-0). On < md it
-        // becomes a left-sliding overlay drawer: fixed, full height, translated
-        // off-screen when closed. The `md:` static rules win at the breakpoint
-        // so the drawer mechanics never affect desktop layout.
+        // On md+ this is a static rail. On < md it is a left drawer.
         className={cn(
-          "bg-white dark:bg-zinc-950 text-black dark:text-white flex flex-col h-full border-r-4 border-black dark:border-zinc-800",
-          "md:w-80 md:shrink-0 md:static md:translate-x-0",
-          "fixed top-0 left-0 z-50 w-[85vw] max-w-xs h-dvh transition-transform duration-200 ease-out",
+          "flex h-full flex-col border-r-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] text-[var(--sm-ink)]",
+          "md:w-72 md:shrink-0 md:static md:translate-x-0",
+          "fixed top-0 left-0 z-50 h-dvh w-[85vw] max-w-xs transition-transform duration-200 ease-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
         aria-label="Scenes and characters"
         aria-hidden={drawerHidden || undefined}
         inert={drawerHidden || undefined}
       >
-      <div role="navigation" className="flex bg-black text-white shrink-0">
+      <div role="navigation" className="sm-pagetop shrink-0 gap-0 p-0">
         <button
           onClick={() => setActiveTab('scenes')}
           aria-selected={activeTab === 'scenes'}
           className={cn(
-            "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
-            activeTab === 'scenes' ? "bg-[#c1301c]" : "hover:bg-zinc-900"
+            "flex flex-1 items-center justify-center gap-2 px-3 py-3 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
+            activeTab === 'scenes'
+              ? "bg-[var(--sm-cream)] text-[var(--sm-ink)]"
+              : "text-[var(--sm-cream)]/70 hover:text-[var(--sm-cream)]"
           )}
         >
           <List className="w-3 h-3" /> Scenes
@@ -214,64 +213,67 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           onClick={() => setActiveTab('characters')}
           aria-selected={activeTab === 'characters'}
           className={cn(
-            "flex-1 p-3 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors",
-            activeTab === 'characters' ? "bg-[#c1301c]" : "hover:bg-zinc-900"
+            "flex flex-1 items-center justify-center gap-2 px-3 py-3 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
+            activeTab === 'characters'
+              ? "bg-[var(--sm-cream)] text-[var(--sm-ink)]"
+              : "text-[var(--sm-cream)]/70 hover:text-[var(--sm-cream)]"
           )}
         >
           <Users className="w-3 h-3" /> Characters
         </button>
-        {/* Mobile-only dismiss — closes the drawer to reveal the editor. */}
         <button
           onClick={onCloseMobile}
           aria-label="Close sidebar"
-          className="md:hidden p-3 text-white hover:bg-zinc-900 transition-colors"
+          className="p-3 text-[var(--sm-cream)]/70 hover:text-[var(--sm-cream)] md:hidden"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+      <div className="shrink-0 border-b border-[var(--sm-hair)] p-3">
         <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-400" />
+          <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--sm-ink-faint)]" />
           <input
             type="text"
-            placeholder="SEARCH..."
+            placeholder="Search…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search scenes or characters"
-            className="w-full bg-zinc-100 dark:bg-zinc-900 p-2 pl-8 text-[10px] font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4444] brutal-border"
+            className="w-full border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel-2)] py-2 pl-8 pr-2 font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-ink)] outline-none focus:ring-2 focus:ring-[var(--sm-stamp)]"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f4f4f0] dark:bg-zinc-900/50">
+      <div className="flex-1 space-y-3 overflow-y-auto bg-[var(--sm-paper)] p-3">
         {activeTab === 'scenes' ? (
           <div className="space-y-1">
             {filteredScenes.map((scene) => (
               <button
                 key={scene.index}
                 onClick={() => handleNavigate(scene.index)}
-                className="w-full text-left p-2 hover:bg-white dark:hover:bg-zinc-800 transition-colors group flex items-center justify-between brutal-border-thin bg-transparent"
+                className="group flex w-full items-center justify-between border border-transparent bg-transparent p-2.5 text-left transition-colors hover:border-[var(--sm-ink)] hover:bg-[var(--sm-panel)]"
               >
-                <span className="text-[10px] font-bold uppercase truncate pr-2">{scene.text}</span>
-                <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="truncate pr-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-wider">
+                  {scene.text}
+                </span>
+                <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             ))}
             {filteredScenes.length === 0 && (
-              <div className="text-center py-8 text-[10px] font-mono opacity-40 uppercase">No scenes found</div>
+              <div className="sm-ph py-10">No scenes yet</div>
             )}
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <button
               onClick={onAddCharacter}
-              className="w-full p-2 bg-black text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
+              className="sm-btn sm-btn--ink w-full"
             >
               <PlusCircle className="w-3 h-3" /> Add Character
             </button>
 
             {filteredCharacters.map(char => (
-              <div key={char.id} className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow">
+              <div key={char.id} className="sm-card border-[var(--sm-ink)] bg-[var(--sm-panel)] p-3">
                 <CharacterNameField
                   charId={char.id}
                   value={char.name}
@@ -303,7 +305,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
               </div>
             ))}
             {filteredCharacters.length === 0 && (
-              <div className="text-center py-8 text-[10px] font-mono opacity-40 uppercase">No characters found</div>
+              <div className="sm-ph py-10">No characters yet</div>
             )}
           </div>
         )}

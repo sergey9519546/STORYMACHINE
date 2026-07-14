@@ -1164,7 +1164,7 @@ export default function ScriptIDE({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
-      className="flex h-dvh w-full bg-[#f4f4f0] text-black font-sans overflow-hidden"
+      className="flex h-dvh w-full overflow-hidden bg-[var(--sm-paper)] font-sans text-[var(--sm-ink)]"
     >
       <Sidebar
         characters={characters}
@@ -1177,11 +1177,10 @@ export default function ScriptIDE({
         onCloseMobile={() => setSidebarOpen(false)}
       />
 
-      {/* CENTER: page stage */}
+      {/* CENTER: page stage — primary visual weight */}
       {/* min-w-0: without it this flex-1 column refuses to shrink below the
-          toolbar's intrinsic (non-wrapping) width, overflowing the viewport and
-          pushing the centered page off to the right. */}
-      <div className="flex-1 min-w-0 h-full border-r-4 border-black flex flex-col bg-white relative">
+          toolbar's intrinsic (non-wrapping) width. */}
+      <div className="relative flex h-full min-w-0 flex-1 flex-col border-r-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)]">
         {cleanError && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
             {cleanError}
@@ -1236,149 +1235,106 @@ export default function ScriptIDE({
           onOpenCopilot={() => setPrefsOpen("copilot")}
         />
 
-        {/* Action strip — one next step; secondary chrome stays quiet */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-black/20 bg-[#f7f3ea] px-3 py-2.5 font-mono text-[11px] text-black">
+        {/* Action strip — paper bar; one dominant next step */}
+        <div className="flex min-h-[44px] flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-3 py-2 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
           {simulateStatus ? (
             <>
               <span
                 className={
                   simulateStatus.type === "error"
-                    ? "text-red-700"
+                    ? "text-[var(--sm-stamp)]"
                     : simulateStatus.type === "warning"
-                      ? "text-amber-800"
-                      : "text-green-800"
+                      ? "text-[var(--sm-warn)]"
+                      : "text-[var(--sm-ok)]"
                 }
               >
                 {simulateStatus.message}
               </span>
-              <button
-                type="button"
-                onClick={() => setSimulateStatus(null)}
-                className="ml-auto border border-black/30 px-2 py-1 uppercase tracking-wider hover:bg-black hover:text-white"
-              >
+              <button type="button" onClick={() => setSimulateStatus(null)} className="sm-btn ml-auto py-1.5">
                 Dismiss
               </button>
             </>
           ) : collabRoom ? (
             <>
-              <span className="font-bold uppercase tracking-widest text-green-800">Live</span>
-              <span className="text-black/70">Room {collabRoom} · {collabUserName}</span>
-              <button
-                type="button"
-                onClick={() => setCollabRoom(undefined)}
-                className="ml-auto border border-black/30 px-2 py-1 uppercase tracking-wider hover:bg-black hover:text-white"
-              >
+              <span className="sm-live"><i /> Live · {collabRoom}</span>
+              <span className="text-[var(--sm-ink-mute)]">{collabUserName}</span>
+              <button type="button" onClick={() => setCollabRoom(undefined)} className="sm-btn ml-auto py-1.5">
                 Leave
               </button>
             </>
           ) : isEmptyDraft && task === "write" ? (
             <>
-              <span className="text-black/70">Empty page</span>
+              <span className="sm-slug">Empty page</span>
               <button
                 type="button"
                 onClick={() => {
                   setDoctorAutoSample(true);
                   handleTaskChange("coverage");
                 }}
-                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+                className="sm-btn sm-btn--stamp py-1.5"
               >
-                Load sample coverage
+                Sample coverage
               </button>
-              <span className="text-black/45">or type FADE IN:</span>
+              <span className="text-[var(--sm-ink-faint)]">or type FADE IN:</span>
             </>
           ) : coverageStale && !isEmptyDraft ? (
             <>
-              <span className="text-black/70">Coverage outdated</span>
-              <button
-                type="button"
-                onClick={() => handleTaskChange("coverage")}
-                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
-              >
+              <span className="sm-slug">Coverage outdated</span>
+              <button type="button" onClick={() => handleTaskChange("coverage")} className="sm-btn sm-btn--stamp py-1.5">
                 Re-run coverage
               </button>
             </>
           ) : task === "coverage" ? (
             <>
-              <span className="text-black/70">
+              <span className="sm-slug">
                 {coverageFull
-                  ? "Full report · Esc returns to summary"
+                  ? "Full report · Esc → summary"
                   : toolSlot === "coverage"
-                    ? "Coverage · next fix in the panel"
-                    : "Next: diagnose this draft"}
+                    ? "Next fix in panel"
+                    : "Diagnose this draft"}
               </span>
               {toolSlot === "coverage" && !coverageFull && (
-                <button
-                  type="button"
-                  onClick={() => setCoverageFull(true)}
-                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
-                >
+                <button type="button" onClick={() => setCoverageFull(true)} className="sm-btn py-1.5">
                   Full report
                 </button>
               )}
               {toolSlot === "coverage" && coverageFull && (
-                <button
-                  type="button"
-                  onClick={() => setCoverageFull(false)}
-                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
-                >
+                <button type="button" onClick={() => setCoverageFull(false)} className="sm-btn py-1.5">
                   Summary
                 </button>
               )}
               {toolSlot !== "coverage" && (
-                <button
-                  type="button"
-                  onClick={() => openToolSlot("coverage")}
-                  className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
-                >
+                <button type="button" onClick={() => openToolSlot("coverage")} className="sm-btn sm-btn--ink py-1.5">
                   Open coverage
                 </button>
               )}
             </>
           ) : task === "ship" ? (
             <>
-              <span className="font-bold uppercase tracking-wider text-black/80">Ship</span>
-              <button
-                type="button"
-                onClick={exportPDF}
-                disabled={isEmptyDraft}
-                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c] disabled:opacity-40"
-              >
+              <span className="sm-title">Ship</span>
+              <button type="button" onClick={exportPDF} disabled={isEmptyDraft} className="sm-btn sm-btn--stamp py-1.5 disabled:opacity-40">
                 PDF
               </button>
-              <button
-                type="button"
-                onClick={exportFountain}
-                disabled={isEmptyDraft}
-                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
-              >
+              <button type="button" onClick={exportFountain} disabled={isEmptyDraft} className="sm-btn py-1.5 disabled:opacity-40">
                 Fountain
               </button>
-              <button
-                type="button"
-                onClick={takeSnapshot}
-                disabled={isEmptyDraft}
-                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
-              >
+              <button type="button" onClick={takeSnapshot} disabled={isEmptyDraft} className="sm-btn py-1.5 disabled:opacity-40">
                 Snapshot
               </button>
               <button
                 type="button"
                 onClick={handleSimulateScript}
                 disabled={isSimulating || isEmptyDraft}
-                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
+                className="sm-btn py-1.5 disabled:opacity-40"
               >
                 {isSimulating ? "…" : "Simulate"}
               </button>
             </>
           ) : (
             <>
-              <span className="text-black/55">Write on the page</span>
+              <span className="sm-slug">Write on the page</span>
               {!isEmptyDraft && (
-                <button
-                  type="button"
-                  onClick={() => handleTaskChange("coverage")}
-                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
-                >
+                <button type="button" onClick={() => handleTaskChange("coverage")} className="sm-btn py-1.5">
                   Run coverage
                 </button>
               )}
@@ -1389,7 +1345,7 @@ export default function ScriptIDE({
             <button
               type="button"
               onClick={dismissLlmBanner}
-              className="ml-auto text-[10px] uppercase tracking-wider text-black/50 underline hover:text-black"
+              className="ml-auto text-[10px] uppercase tracking-wider text-[var(--sm-ink-faint)] underline hover:text-[var(--sm-ink)]"
               title="Analysis works without a key; generation needs Settings"
             >
               No AI key · analysis ok
@@ -1477,7 +1433,7 @@ export default function ScriptIDE({
         )}
 
         <div
-          className="flex-1 relative overflow-hidden bg-white"
+          className="relative flex-1 overflow-hidden bg-[var(--sm-paper)]"
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
@@ -1503,34 +1459,32 @@ export default function ScriptIDE({
           {/* Empty draft coach — Write mode only; disappears on first keystroke */}
           {isEmptyDraft && task === "write" && toolSlot === "none" && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[18%] sm:pt-[14%]">
-              <div className="pointer-events-auto mx-4 max-w-md border-2 border-black bg-[#f4f0e6] p-6 shadow-[6px_6px_0_0_#211d15]">
-                <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-black/50">
-                  Script desk · write
-                </p>
-                <h2 className="mt-2 font-display text-2xl uppercase leading-none text-black">
-                  Start the page
-                </h2>
-                <p className="mt-3 font-mono text-xs uppercase tracking-wider text-black/60">
-                  Type a slug line, or load the sample for coverage.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDoctorAutoSample(true);
-                      handleTaskChange("coverage");
-                    }}
-                    className="border border-black bg-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
-                  >
-                    Sample coverage
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => editorRef.current?.getView()?.focus()}
-                    className="border border-black px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wider hover:bg-black hover:text-white"
-                  >
-                    Focus editor
-                  </button>
+              <div className="sm-panel pointer-events-auto mx-4 max-w-md">
+                <div className="sm-panel-body">
+                  <p className="sm-slug">Script · write</p>
+                  <h2 className="font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
+                    Start the page
+                  </h2>
+                  <p className="sm-sub">Type a slug line, or load the sample for coverage.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDoctorAutoSample(true);
+                        handleTaskChange("coverage");
+                      }}
+                      className="sm-btn sm-btn--stamp"
+                    >
+                      Sample coverage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editorRef.current?.getView()?.focus()}
+                      className="sm-btn"
+                    >
+                      Focus editor
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
