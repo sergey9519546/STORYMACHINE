@@ -401,7 +401,61 @@ export class Stage {
     this.db.prepare(`INSERT OR IGNORE INTO Illusion_State (id) VALUES (1)`).run();
   }
 
-  // ── Location ops ────────────────────────────────────────────────────────────
+  // ── Simulation reset ─────────────────────────────────────────────────────────
+  /** Clear every simulation table while preserving ScriptIDE_State.
+   *
+   *  /api/reset previously called destroySession(), which deleted the entire
+   *  SQLite file — wiping the editor's server-side save along with the
+   *  simulation data. That means "Simulate this script" or "Build Scenario"
+   *  silently erased the user's draft. This method fixes the data-loss bug by
+   *  clearing only the tables that belong to the simulation engine; the
+   *  ScriptIDE_State row survives so the editor can reload it on the next
+   *  mount without hitting localStorage as the only recovery path.
+   *
+   *  The Illusion_State row is cleared rather than deleted so the singleton
+   *  seed INSERT OR IGNORE on schema init stays idempotent. All other
+   *  simulation tables are unconditionally deleted. */
+  public clearSimulationTables(): void {
+    this.db.transaction(() => {
+      // Delete in FK-dependency order: children before parents.
+      // Child tables first (reference Characters or Locations):
+      this.db.prepare('DELETE FROM Stakes').run();           // → Characters
+      this.db.prepare('DELETE FROM Character_State').run();  // → Characters, Locations
+      this.db.prepare('DELETE FROM Knowledge_Ledger').run(); // → Characters
+      this.db.prepare('DELETE FROM Event_Propositions').run(); // → Event_Cards
+      this.db.prepare('DELETE FROM Event_Cards').run();      // → Characters, Locations
+      this.db.prepare('DELETE FROM Action_Log').run();       // → Characters, Locations
+      this.db.prepare('DELETE FROM Belief_Edges').run();
+      this.db.prepare('DELETE FROM Goal_Mutations').run();   // → Characters
+      this.db.prepare('DELETE FROM Dramatic_Pressure').run();// → Characters
+      this.db.prepare('DELETE FROM Beat_Traces').run();      // → Locations
+      this.db.prepare('DELETE FROM Persuasion_Log').run();   // → Characters
+      // Now the parent tables are safe to clear:
+      this.db.prepare('DELETE FROM Characters').run();
+      this.db.prepare('DELETE FROM Locations').run();
+      // NVM / generation state — no cross-table FKs to the tables above:
+      this.db.prepare('DELETE FROM Story_Commits').run();
+      this.db.prepare('DELETE FROM Llm_Cache').run();
+      this.db.prepare('DELETE FROM Ghost_Commits').run();
+      this.db.prepare('DELETE FROM Reveal_Plans').run();
+      this.db.prepare('DELETE FROM Drama_Positions').run();
+      this.db.prepare('DELETE FROM Self_Play_Corpus').run();
+      // Reset the singleton Illusion_State row to blank rather than deleting it
+      this.db.prepare(`
+        UPDATE Illusion_State SET
+          phase                              = 'Setup',
+          planted_elements_json              = '[]',
+          pending_recontextualization_json   = '[]',
+          outline_json                       = NULL,
+          config_json                        = NULL
+        WHERE id = 1
+      `).run();
+      // ScriptIDE_State is intentionally NOT cleared — that table belongs to
+      // the editor, not the simulation, and must survive simulation resets.
+    })();
+  }
+
+  // ── Location ops ─────────────────────────────────────────────────────────────
 
   public addLocation(loc: Location) {
     this.db.prepare(`

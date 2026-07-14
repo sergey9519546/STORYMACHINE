@@ -1,6 +1,4 @@
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
 import { Stage } from '../engine/Stage.ts';
 import { Orchestrator } from '../engine/Orchestrator.ts';
 import type { CharacterSheet, StageSnapshot } from '../engine/types.ts';
@@ -17,8 +15,8 @@ import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { buildInterviewGrounding } from '../lib/interview.ts';
 import { generateContent, modelForTask, getTemperature } from '../engine/ai.ts';
 import {
-  asyncHandler, requireString, sessionId, getOrCreateSession, destroySession,
-  gameLimiter, aiLimiter, sessions, runningRooms, PERSIST_SESSIONS, SESSION_DB_DIR,
+  asyncHandler, requireString, sessionId, getOrCreateSession,
+  gameLimiter, aiLimiter, sessions, runningRooms,
 } from '../lib/session-store.ts';
 import type { RoomProgressEvent } from '../engine/Orchestrator.ts';
 import { buildStoryBibleSummary } from '../nvm/bible/index.ts';
@@ -472,18 +470,24 @@ router.get('/api/state', gameLimiter, asyncHandler(async (req, res) => {
   res.json({ agents: stage.getAllAgents(), nodes: stage.getAllLocations() });
 }));
 
-// Reset a session (clears all simulation state for this sessionId).
-// When running with disk persistence a timestamped backup is written first.
+// Reset a session (clears all simulation state for this sessionId, preserving
+// ScriptIDE editor state). Previously this called destroySession() which wiped
+// the entire SQLite file — including the editor's server-side save — so
+// "Simulate this script" or "Build Scenario" silently erased the user's draft.
+// clearSimulationTables() deletes only the simulation tables; ScriptIDE_State
+// survives so the editor reloads cleanly on the next mount.
+//
+// The backup-before-destroy behaviour is removed: the raw fs.copyFileSync on
+// an open WAL-mode DB was documented as unsafe in README.md:164-172, and the
+// backup copies were never cleaned up (they accumulated as .bak.db files).
+// A proper backup is available via `npm run backup` (scripts/backup-sessions.ts
+// uses SQLite's online backup API). Operators who want pre-reset snapshots
+// should use that script on a schedule rather than relying on the unsafe
+// inline copy here.
 router.post('/api/reset', gameLimiter, asyncHandler(async (req, res) => {
   const sid = sessionId(req);
-  if (PERSIST_SESSIONS) {
-    const src = path.join(SESSION_DB_DIR, `${sid}.db`);
-    if (fs.existsSync(src)) {
-      const dest = path.join(SESSION_DB_DIR, `${sid}.${Date.now()}.bak.db`);
-      try { fs.copyFileSync(src, dest); } catch { /* non-fatal */ }
-    }
-  }
-  destroySession(sid);
+  const { stage } = getOrCreateSession(sid);
+  stage.clearSimulationTables();
   res.json({ status: 'reset', sessionId: sid });
 }));
 

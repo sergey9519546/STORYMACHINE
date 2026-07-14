@@ -1714,6 +1714,26 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     fountain,
   });
   let plainSummary = buildPlainSummary(verdict, health, dimensionBuilds, topPriorities);
+
+  // ── Coherence guard ──────────────────────────────────────────────────────
+  // When a script has fewer scenes than the structural-check minimum AND no
+  // craft issues, every dimension scores 100 (density-penalty = 0) while the
+  // overall health scores 0 (scarcityPenalty = 140/sceneCount dominates).
+  // The default plainSummary then emits "every area holds up well" inside a
+  // PASS verdict — a direct self-contradiction that destroys trust on the very
+  // first interaction. This guard replaces the prose with an honest
+  // explanation when the PASS is caused by insufficient content, not by craft
+  // problems. Condition: PASS verdict AND zero total issues (all dimensions
+  // clean) AND fewer than the RECOMMEND-eligible scene floor (8 scenes).
+  if (verdict === 'PASS' && totalIssues === 0 && analysis.sceneCount < 8) {
+    plainSummary =
+      `PASS — this excerpt contains ${analysis.sceneCount} scene` +
+      `${analysis.sceneCount === 1 ? '' : 's'}, which is not enough for the ` +
+      `pipeline's structural checks to produce a meaningful verdict. The PASS ` +
+      `reflects insufficient content, not craft problems. Submit a complete ` +
+      `draft (8+ scenes) for a full assessment.`;
+  }
+
   // DoS guard (S1-b) notice: analysis.sceneCount is already the
   // ceiling-truncated count (every formula above — health, dimensions,
   // verdict, strengths — is computed against it consistently), so surface

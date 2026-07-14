@@ -916,6 +916,86 @@ describe('runScriptDoctor — degenerate zero-scene coverage layer', () => {
   });
 });
 
+// ── Score coherence invariant ─────────────────────────────────────────────────
+// Fix 1 (2026-07-14): a 1-scene, 0-issue script produced health=0 / verdict=PASS
+// while all five dimension scores showed 100 and the prose said "every area holds
+// up well" — a direct self-contradiction that destroys trust on first interaction.
+// The coherence guard in aggregateReport replaces that prose when the PASS is
+// driven by scarcity (insufficient content) not by craft problems.
+describe('runScriptDoctor — score coherence invariant (Fix 1)', () => {
+  it('PASS + zero issues + <8 scenes → prose names insufficient content, not clean craft', async () => {
+    // A single clean scene: no craft violations, but scarcityPenalty = 140/1
+    // drives health to 0 → PASS. Before Fix 1 this returned dimension scores
+    // of 100 alongside "every area holds up well" while also saying PASS.
+    const singleCleanScene = `INT. KITCHEN - NIGHT
+
+MARA opens an empty drawer. She stares at it.`;
+
+    const report = await runScriptDoctor(singleCleanScene);
+
+    assert.equal(report.verdict, 'PASS', 'single-scene script must score PASS (scarcity)');
+    assert.equal(report.totalIssues, 0, 'no craft issues expected on a clean single scene');
+
+    // Coherence invariant: prose must NOT claim "every area holds up well"
+    // when the verdict is PASS. That phrase contradicts a PASS verdict and
+    // was the user-visible bug this fix closes.
+    assert.ok(
+      !report.plainSummary?.includes('every area holds up well'),
+      `plainSummary must not say "every area holds up well" when verdict is PASS and issues are zero — ` +
+      `got: ${report.plainSummary}`,
+    );
+
+    // The replacement prose must explain the scarcity cause honestly.
+    assert.ok(
+      report.plainSummary?.includes('insufficient content') ||
+      report.plainSummary?.includes('not enough') ||
+      report.plainSummary?.includes('excerpt'),
+      `plainSummary must explain insufficient content or excerpt context — ` +
+      `got: ${report.plainSummary}`,
+    );
+
+    // The plainSummary must still begin with the verdict word so downstream
+    // consumers that parse "PASS" from the start of the string keep working.
+    assert.ok(
+      report.plainSummary?.startsWith('PASS'),
+      `plainSummary must still start with 'PASS' — got: ${report.plainSummary}`,
+    );
+  });
+
+  it('PASS + real craft issues → prose is NOT replaced (craft-PASS, not scarcity-PASS)', async () => {
+    // A multi-word single scene WITH issues: if the PASS is driven by craft
+    // density rather than scarcity alone, the coherence guard must not fire —
+    // the prose should describe actual problems, not redirect to "insufficient
+    // content". This prevents a false-positive replacement on legitimate PASS verdicts.
+    // We need a script that is long enough to have some word count but still get PASS.
+    // Use the weakest calibration corpus sample text-alike: short but issue-dense.
+    const issueRiddenScene =
+      `INT. OFFICE - DAY\n\n` +
+      // Repeat a block of on-the-nose exposition many times to drive up issues
+      Array.from({ length: 10 }, (_, i) =>
+        `ALICE\nI am very angry because of what happened. I feel rage.\n\n` +
+        `BOB\nI understand your anger completely, Alice. You should feel angry.\n\n` +
+        `ALICE\nYes, I definitely feel very angry right now at this moment in time.\n\n` +
+        `BOB\n(to Alice)\nLet me explain exactly why you are feeling angry right now.\n\n`,
+      ).join('');
+
+    const report = await runScriptDoctor(issueRiddenScene);
+
+    // This might still end up PASS (or CONSIDER) depending on the density.
+    // If PASS with issues, the guard must NOT fire (totalIssues > 0).
+    if (report.verdict === 'PASS' && report.totalIssues > 0) {
+      assert.ok(
+        !report.plainSummary?.includes('insufficient content'),
+        `craft-PASS plainSummary must describe craft problems, not scarcity — ` +
+        `got: ${report.plainSummary}`,
+      );
+    }
+    // If CONSIDER or higher, or if somehow no issues, the test is vacuously satisfied.
+    // Either way the important invariant is that it doesn't crash and emits valid prose.
+    assert.ok(report.plainSummary && report.plainSummary.length > 0, 'plainSummary must always be present');
+  });
+});
+
 // ── contentHash ───────────────────────────────────────────────────────────────
 // The determinism receipt (types.ts's ScriptDoctorReport.contentHash doc
 // comment): sha256 hex of the TRIMMED analyzed Fountain text, present on

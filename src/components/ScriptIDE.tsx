@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import { EngineState, StoryConfig, DirectorState } from "../types";
 import { analyzeScriptBlock } from "../services/director";
+import { fountain as SAMPLE_FOUNTAIN_TEXT } from "../lib/sample-script";
 import { parseFountain, FountainBlock } from "../lib/fountain";
 import { layoutScreenplay } from "../lib/screenplay-layout";
 import { buildScenarioFromScript } from "../lib/scenario-from-script";
@@ -549,9 +550,19 @@ export default function ScriptIDE({
   // handleScroll removed — CM6 editor manages its own scroll internally
 
   // ── AI analysis ──────────────────────────────────────────────────────────────
+  // Gated on llmReady: analyzeScriptBlock calls /api/analyze-script, which
+  // requires an AI key and returns 503 without one — but the server's own
+  // keyless contract says analysis works without a key. The silent 503 was
+  // causing "ANALYZING…" to spin and then silently fail on every keyless
+  // typing pause. When llmReady is false (no key), skip the AI Director call
+  // entirely; the deterministic /api/scriptide/diagnose live-notes path
+  // (diagnostics.ts) is already active and requires no guard here.
   const triggerAnalysis = async (text: string) => {
     const currentEngineState = engineStateRef.current;
     if (!text.trim() || !currentEngineState) return;
+    // Skip AI Director analysis when keyless — prevents silent 503 per
+    // server/routes/scriptide.ts line 901 (llmReady guard on /api/analyze-script).
+    if (llmReady === false) return;
 
     // Cancel any in-flight analysis so a stale response can't overwrite newer state.
     analysisAbortRef.current?.abort();
@@ -660,7 +671,7 @@ export default function ScriptIDE({
       const pendingFdx = sessionStorage.getItem("sm_fdx_import_pending");
       if (pendingFdx) {
         setFdxImportNotice(
-          `"${pendingFdx}" is a Final Draft (.fdx) file — this app converts .fdx server-side. Open Script Doctor (below) and use its "Upload script" button to bring it in as Fountain.`
+          `"${pendingFdx}" is a Final Draft (.fdx) file — this app converts .fdx server-side. Click the Doctor button in the toolbar above and use its "Upload script" button to bring it in as Fountain.`
         );
         sessionStorage.removeItem("sm_fdx_import_pending");
       }
@@ -669,6 +680,14 @@ export default function ScriptIDE({
         sessionStorage.removeItem("sm_sample_pending");
         setDoctorAutoSample(true);
         setShowScriptDoctor(true);
+        // Fix: also load the sample into the editor so the writer can read and
+        // edit the script they just saw analyzed, rather than landing on a
+        // blank editor. Only overwrite if the editor is currently empty so a
+        // returning writer's draft is never clobbered.
+        if (!lsGet("script_draft")?.trim()) {
+          setScriptText(SAMPLE_FOUNTAIN_TEXT);
+          lsSet("script_draft", SAMPLE_FOUNTAIN_TEXT);
+        }
       }
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
@@ -1412,23 +1431,25 @@ export default function ScriptIDE({
 
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-bold uppercase opacity-50">
-                        Structural Integrity
+                        Structural State
                       </h3>
                       <div className="space-y-2">
                         {[
-                          "Inciting Incident",
-                          "Plot Point 1",
-                          "Midpoint",
-                          "All is Lost",
-                          "Climax",
-                        ].map((beat) => (
+                          { label: "Current node", value: engineState.directorState.structuralNode ?? "—" },
+                          { label: "Act position", value: engineState.directorState.arcMeter
+                              ? `${Math.round(engineState.directorState.arcMeter.needAwareness)}% arc`
+                              : "—" },
+                          { label: "Tension level", value: `${engineState.directorState.tensionLevel ?? 0}/100` },
+                          { label: "Menace gauge", value: `${engineState.directorState.menaceGauge ?? 0}/100` },
+                          { label: "Active secrets", value: String(engineState.directorState.activeSecrets?.length ?? 0) },
+                        ].map(({ label, value }) => (
                           <div
-                            key={beat}
+                            key={label}
                             className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 brutal-border-thin"
                           >
-                            <span>{beat}</span>
-                            <span className="text-green-600 font-bold">
-                              LOCKED
+                            <span className="opacity-60">{label}</span>
+                            <span className="font-bold text-ink dark:text-cream truncate max-w-[8rem]">
+                              {value}
                             </span>
                           </div>
                         ))}
@@ -1438,16 +1459,18 @@ export default function ScriptIDE({
 
                   <div className="mt-8 p-4 bg-ink text-cream brutal-border">
                     <p className="text-[10px] font-mono leading-relaxed">
-                      SYSTEM STATUS: THE STORY MIND IS ACTIVE. NARRATIVE
-                      COHESION AT 94%. DETECTED THEME:{" "}
+                      DETECTED THEME:{" "}
                       <span className="text-stamp">
                         {engineState.config.theme.toUpperCase()}
                       </span>
-                      . DIRECTOR STYLE:{" "}
+                      {" · "}DIRECTOR STYLE:{" "}
                       <span className="text-stamp">
                         {engineState.config.directorStyle.toUpperCase()}
                       </span>
-                      .
+                      {" · "}STRUCTURE:{" "}
+                      <span className="text-stamp">
+                        {engineState.config.structure.toUpperCase().replace(/_/g, " ")}
+                      </span>
                     </p>
                   </div>
                 </div>

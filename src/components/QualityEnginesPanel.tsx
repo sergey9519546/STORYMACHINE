@@ -133,7 +133,7 @@ export function QualityEnginesPanel({ onClose }: Props) {
         <div>
           <strong style={{ fontSize: 15 }}>Quality Engines — 9 narrative quality signals</strong>
           <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
-            Specificity · 10 Dialogue Validators · Necessity · Burrows's Delta · ArcDebt · Propp · Causal Graph
+            Specificity · 10 Dialogue Validators · Necessity · Voice Overlap · ArcDebt · Propp · Causal Graph
           </div>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
@@ -343,7 +343,7 @@ function VoiceTab({ report }: { report: QualitySceneReport }) {
         hint="How concrete vs. vague the op content is. Vague terms penalize the score." />
       <MetricBar label="Necessity" value={report.necessityScore} lo={0.8} hi={0.95}
         hint="Fraction of ops that are structurally essential (not redundant or repeated)." />
-      <MetricBar label="Burrows's Delta (voice diversity)" value={report.burrowsDelta} lo={0} hi={0.4}
+      <MetricBar label="Voice Overlap (Jaccard)" value={report.burrowsDelta} lo={0} hi={0.4}
         hint="0 = every character has a distinct vocabulary. 1 = all voices identical. Lower is better." invert />
 
       {/* Repair gaps */}

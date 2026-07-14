@@ -856,7 +856,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           </button>
           <button
             onClick={() => setShowRevision(true)}
-            title="12-Pass Revision Pipeline — diagnose and rewrite the compiled screenplay"
+            title="14-Pass Revision Pipeline — diagnose and rewrite the compiled screenplay"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <FileEdit className="w-4 h-4" />

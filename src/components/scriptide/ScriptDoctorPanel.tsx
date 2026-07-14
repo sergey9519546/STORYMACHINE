@@ -820,6 +820,34 @@ function IssueCard({ issue, pass }: { issue: RevisionIssue; pass?: PassName }) {
         >
           {meta.label}
         </span>
+        {/* Confidence tier badge — the trust layer. When determinism is
+            present, show a small badge so the writer knows which findings
+            are deterministic (structural checks) vs heuristic (lexical
+            pattern matches). Absent determinism = legacy, shown as-is. */}
+        {issue.determinism && (
+          <span
+            className={`px-1 py-0.5 text-[8px] font-mono uppercase tracking-wider border ${
+              issue.determinism === 'deterministic'
+                ? 'border-green-500 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30'
+                : issue.determinism === 'structured_only'
+                ? 'border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30'
+                : 'border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'
+            }`}
+            title={
+              issue.determinism === 'deterministic'
+                ? 'This finding is based on a deterministic structural check — fully reproducible.'
+                : issue.determinism === 'structured_only'
+                ? 'This finding uses structured signal extraction with some heuristic steps.'
+                : 'This finding is based on lexical/heuristic pattern matching — review before acting.'
+            }
+          >
+            {issue.determinism === 'deterministic'
+              ? 'deterministic'
+              : issue.determinism === 'structured_only'
+              ? 'structured'
+              : 'heuristic'}
+          </span>
+        )}
         {pass && (
           <span className="text-[9px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400">
             {formatPassName(pass)}
@@ -1250,6 +1278,12 @@ export default function ScriptDoctorPanel({
   // Per-pass collapse overrides; a pass with no override defaults to
   // "open iff it found issues" (collapsed-by-default when 0 issues).
   const [openPasses, setOpenPasses] = useState<Partial<Record<PassName, boolean>>>({});
+  // Root cause display: show the top 5 by default, expand for all. Prevents
+  // the firehose effect where a 200-issue report shows 12+ root cause cards
+  // at once with no prioritization signal. The writer sees the highest-
+  // impact clusters first.
+  const ROOT_CAUSE_COLLAPSED_LIMIT = 5;
+  const [showAllRootCauses, setShowAllRootCauses] = useState(false);
 
   // A client-read file that supersedes `fountain` for diagnosis purposes.
   // Non-null only while the user is analyzing an upload instead of the
@@ -2324,6 +2358,16 @@ export default function ScriptDoctorPanel({
                 scene-by-scene issue heatmap, and your top priority fixes.
                 {uploadedFile && " It will analyze the uploaded file shown above, not the editor."}
               </p>
+              {/* Privacy disclosure — the trust layer. Screenplays are
+                  high-sensitivity IP. This three-sentence disclosure sits
+                  beside the upload action so the writer sees it before
+                  committing their draft. */}
+              <div className="text-[9px] font-mono text-gray-500 dark:text-gray-400 leading-relaxed border-l-2 border-gray-300 dark:border-gray-600 pl-2">
+                Your script is analyzed server-side. The deterministic verdict
+                path uses no LLM — no model reads your text to produce the
+                score. Optional AI features (deep read, fix &amp; verify) send
+                scene text to your configured provider and are clearly labeled.
+              </div>
               {/* Deep read toggle: opt-in, labeled, and disabled (with an
                   explanatory title) whenever it can't actually do anything —
                   no AI key configured, or the active source is a PDF upload
@@ -2566,7 +2610,10 @@ export default function ScriptDoctorPanel({
                   clears the most issues at once.
                 </p>
                 <div className="space-y-2">
-                  {report.rootCauses.map((finding) => {
+                  {(showAllRootCauses
+                    ? report.rootCauses
+                    : report.rootCauses.slice(0, ROOT_CAUSE_COLLAPSED_LIMIT)
+                  ).map((finding) => {
                     // Only findings with a genuine line anchor get a fix
                     // affordance at all — there's no honest span to send
                     // POST /api/scriptide/fix otherwise (see FixRunState's
@@ -2591,6 +2638,26 @@ export default function ScriptDoctorPanel({
                       : null;
                     return <RootCauseCard key={finding.id} finding={finding} fixState={fixState} />;
                   })}
+                  {/* Show "N more root causes" expand button when there are
+                      more findings than the collapsed limit. Prevents the
+                      200-issue firehose — the writer sees the top 5 highest-
+                      impact clusters first and can expand for the rest. */}
+                  {!showAllRootCauses && report.rootCauses.length > ROOT_CAUSE_COLLAPSED_LIMIT && (
+                    <button
+                      onClick={() => setShowAllRootCauses(true)}
+                      className="w-full text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-ink dark:hover:text-cream border border-dashed border-gray-300 dark:border-gray-600 py-2 transition-colors"
+                    >
+                      Show {report.rootCauses.length - ROOT_CAUSE_COLLAPSED_LIMIT} more root cause{report.rootCauses.length - ROOT_CAUSE_COLLAPSED_LIMIT === 1 ? '' : 's'} ↓
+                    </button>
+                  )}
+                  {showAllRootCauses && report.rootCauses.length > ROOT_CAUSE_COLLAPSED_LIMIT && (
+                    <button
+                      onClick={() => setShowAllRootCauses(false)}
+                      className="w-full text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-ink dark:hover:text-cream border border-dashed border-gray-300 dark:border-gray-600 py-2 transition-colors"
+                    >
+                      Show top {ROOT_CAUSE_COLLAPSED_LIMIT} only ↑
+                    </button>
+                  )}
                 </div>
               </div>
             )}

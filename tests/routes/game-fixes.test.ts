@@ -354,3 +354,71 @@ describe('routes/game — Run 13 (keyless deterministic simulation)', async () =
     );
   });
 });
+
+// ── Stage.clearSimulationTables (Fix 8 — 2026-07-14) ──────────────────────────
+// /api/reset previously called destroySession(), which wiped the entire SQLite
+// file — including ScriptIDE_State. "Simulate this script" silently erased the
+// user's draft. clearSimulationTables() must delete every simulation table row
+// while leaving the ScriptIDE_State row intact.
+//
+// This is a direct Stage unit test (no HTTP layer) so it exercises the exact
+// same code path that the new /api/reset route calls.
+describe('Stage.clearSimulationTables (Fix 8)', () => {
+  it('removes all simulation rows and resets Illusion_State but preserves ScriptIDE_State', () => {
+    // Use :memory: to avoid touching the filesystem.
+    const stage = new Stage(':memory:');
+
+    const sessionId = 'test-session-fix8';
+
+    // 1. Write editor content into ScriptIDE_State.
+    stage.saveScriptIDEState(sessionId, {
+      scriptText: 'INT. KITCHEN - NIGHT\n\nMARA opens the drawer.\n\nMARA\nThe key was here.',
+      snapshots: [],
+      characters: [],
+      researchNotes: [],
+      isDarkMode: false,
+    });
+
+    // 2. Add simulation data: a location and an agent.
+    stage.addLocation({
+      location_id: 'loc_kitchen',
+      name: 'The Kitchen',
+      description: 'A small kitchen.',
+      adjacent_locations: [],
+    });
+    stage.addAgent({
+      char_id: 'agent_mara',
+      name: 'Mara',
+      public_mask: 'A careful detective.',
+      hidden_motive: 'Find the key.',
+      knowledge_vector: ['The key is missing.'],
+      suspicion_score: 10,
+      current_location_id: 'loc_kitchen',
+      is_alive: true,
+    });
+
+    // Verify simulation data exists before reset.
+    const locsBefore = stage.getAllLocations();
+    assert.equal(locsBefore.length, 1, 'location must exist before clearSimulationTables');
+    const agentsBefore = stage.getAllAgents();
+    assert.equal(agentsBefore.length, 1, 'agent must exist before clearSimulationTables');
+
+    // 3. Clear simulation tables.
+    stage.clearSimulationTables();
+
+    // 4. Simulation data must be gone.
+    assert.equal(stage.getAllLocations().length, 0, 'locations must be empty after clearSimulationTables');
+    assert.equal(stage.getAllAgents().length, 0, 'agents must be empty after clearSimulationTables');
+
+    // 5. ScriptIDE_State must survive the reset — this is the data-loss bug
+    //    this fix closes.
+    const loaded = stage.loadScriptIDEState(sessionId);
+    assert.ok(loaded !== null, 'ScriptIDE_State must NOT be erased by clearSimulationTables');
+    assert.ok(
+      loaded!.scriptText.includes('MARA'),
+      `ScriptIDE script text must be intact — got: ${loaded!.scriptText.slice(0, 80)}`,
+    );
+
+    stage.close();
+  });
+});
