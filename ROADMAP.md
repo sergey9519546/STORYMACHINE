@@ -201,17 +201,17 @@ real, quiet, and shareable does revision history become valuable.
 Everything below removes cost that never converted into user demand or trust.
 The goal is a clearer front door for the screenwriter, not a bigger engine.
 
-- **Freeze the rule count at the ~2,300 genuinely distinct rules.** Stop the 3-rules-per-wave cadence — it is permutation farming (field×mode×position) that the code's own comments call saturated. More rules add liability, not signal.
+- **Freeze rule growth.** Add no entries to the current 8,917-entry generated catalog; treat ~2,300 distinct rule concepts as the maintained conceptual set. Stop the 3-rules-per-wave cadence — it is permutation farming (field×mode×position) that the code's own comments call saturated. "Freeze" does not authorize deletion; removal requires a separately approved migration and dependency review.
 - **Kill the OASIS multi-agent simulation engine from the default product.** It is roughly half the codebase with no user persona and no journey. Keep it as research behind a Labs flag; in the front door it only dilutes the wedge.
 - **Hide most of the ~40 React panels behind Labs** (SelfPlay, ProjectionGallery, Converge, Twin, EpistemicMap, Room, Debugger, Regression, WhatIf, DirectorPanel, and the rest). They are demand-neutral cost and clarity-negative for a writer who just wants a trustworthy read on a draft.
 - **Kill the "Program v2 wave" as a product driver.** The "add 3 rules + 6 tests per wave, forever" treadmill is exactly the machine that manufactured the inflation liability. Retire the cadence, not just this wave.
 - **Kill research-paper intake as a roadmap spine.** Adopt mechanisms opportunistically, only when they serve a validated user need — never because a paper existed.
 - **Remove or rewrite the "3,216 / 8,917 rules" marketing claim.** It is inconsistent across the landing page, docs, and stale plans, and it actively undermines trust because the rule channel barely moves the score (AUC 0.076 vs 0.938 for scene-count scarcity). Lead with what's true.
-- **Pay down the 1,326 `as any` casts only inside the ~2,300 kept rules.** Let the frozen permutations be deleted rather than maintained — do not spend type-safety effort hardening code slated to leave the product.
+- **Do not launch a broad type-cleanup of the generated permutations.** Pay down the 1,326 `as any` casts only when touched by P1-validity work or when a separately approved catalog migration identifies the retained implementation. Do not spend demand-critical time hardening frozen code for its own sake.
 
 Caution: nothing here is a destructive delete. "Kill" means gate behind Labs
-or stop investing. Any actual file removal is a separate, reviewed step
-requiring explicit confirmation.
+or stop investing. Any actual rule/file removal requires dependency mapping,
+a migration plan, regression evidence, and explicit confirmation.
 
 ---
 
