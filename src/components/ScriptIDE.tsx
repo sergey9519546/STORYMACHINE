@@ -778,9 +778,6 @@ export default function ScriptIDE({
     setTask(next);
     if (next === "write") {
       setToolSlot("none");
-    } else if (next === "map") {
-      setToolSlot("none");
-      setSidebarOpen(true);
     } else if (next === "coverage") {
       setToolSlot("coverage");
       setCoverageStale(false);
@@ -1300,10 +1297,8 @@ export default function ScriptIDE({
                 Simulate
               </button>
             </>
-          ) : task === "map" ? (
-            <span className="text-black/70">Scenes and cast · pick a beat to jump the page</span>
           ) : (
-            <span className="text-black/55">Write · page is primary</span>
+            <span className="text-black/55">Write · page is primary · scenes in the left rail</span>
           )}
 
           {llmReady === false && !llmBannerDismissed && (

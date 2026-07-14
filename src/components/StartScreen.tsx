@@ -239,48 +239,49 @@ export default function StartScreen({
                     id="entrance-actions-heading"
                     className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50"
                   >
-                    Bring A Script
+                    Start here
                   </h2>
 
+                  {/* One primary path: sample → coverage. Everything else is secondary. */}
                   <button
                     type="button"
                     onClick={handleSample}
                     disabled={isGenerating}
-                    className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
+                    className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-8 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-9 ${FOCUS_RING}`}
                   >
                     <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
-                      Reader&rsquo;s Pick
+                      Recommended
                     </span>
                     <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">
-                      Fastest way in
+                      One click · full coverage
                     </span>
                     <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
                       <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
-                      Try The Sample Script
+                      Try sample coverage
                     </span>
-                    <span className="max-w-[40ch] font-sans text-sm text-paper/70">
-                      Coverage on a loaded draft. No setup.
+                    <span className="max-w-[42ch] font-sans text-sm text-paper/70">
+                      Load a script, open the desk, run Script Doctor. No setup.
                     </span>
                   </button>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-                    <button
-                      type="button"
-                      onClick={() => onStart(DEFAULT_STORY_CONFIG)}
-                      disabled={isGenerating}
-                      className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
-                    >
-                      <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      I Have A Script — Open The Editor
-                    </button>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={() => openFileInputRef.current?.click()}
                       disabled={isGenerating}
-                      className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`flex min-h-[44px] items-center justify-center gap-2 border border-ink/40 bg-transparent px-5 py-4 font-mono text-xs uppercase tracking-[0.15em] text-ink/80 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                     >
                       <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      Open A Script File
+                      Open my script
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onStart(DEFAULT_STORY_CONFIG)}
+                      disabled={isGenerating}
+                      className={`flex min-h-[44px] items-center justify-center gap-2 border border-ink/40 bg-transparent px-5 py-4 font-mono text-xs uppercase tracking-[0.15em] text-ink/80 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    >
+                      <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      Blank page
                     </button>
                     <input
                       type="file"
@@ -307,27 +308,36 @@ export default function StartScreen({
                   )}
                 </section>
 
-                <div className="flex flex-col items-start gap-4 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col items-start gap-3 border-t border-ink/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
                   <button
                     type="button"
                     onClick={() => setView("wizard")}
                     disabled={isGenerating}
-                    className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-mono text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`group inline-flex min-h-[40px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/50 transition-colors ${MICRO_TRANSITION} hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                   >
-                    <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                    Start a new story from scratch
+                    <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    New story wizard
                     <ChevronRight
-                      className={`h-4 w-4 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
+                      className={`h-3.5 w-3.5 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
                       aria-hidden="true"
                     />
                   </button>
-                  <a
-                    href="#how-it-works"
-                    className={`inline-flex min-h-[44px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-ink/50 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
-                  >
-                    How the desk works
-                    <ChevronRight className="h-3.5 w-3.5 rotate-90" aria-hidden="true" />
-                  </a>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <a
+                      href="#how-it-works"
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                    >
+                      How it works
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => onOpenStoryMachine?.()}
+                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                    >
+                      <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+                      Simulate later
+                    </button>
+                  </div>
                 </div>
               </motion.main>
             </div>

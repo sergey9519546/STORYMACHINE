@@ -14,7 +14,8 @@ import {
   Stethoscope,
 } from "lucide-react";
 
-export type IdeTask = "write" | "map" | "coverage" | "ship";
+/** Three user-facing desk modes. Scenes/cast stay in the rail (not a peer mode). */
+export type IdeTask = "write" | "coverage" | "ship";
 export type IdeToolSlot = "none" | "coverage" | "studio" | "director" | "slate";
 
 interface ToolbarProps {
@@ -51,7 +52,6 @@ interface ToolbarProps {
 
 const TASKS: Array<{ id: IdeTask; label: string; title: string }> = [
   { id: "write", label: "Write", title: "Draft on the page" },
-  { id: "map", label: "Map", title: "Scenes and cast" },
   { id: "coverage", label: "Coverage", title: "Diagnose the draft" },
   { id: "ship", label: "Ship", title: "Export, version, simulate" },
 ];

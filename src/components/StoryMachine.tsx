@@ -12,7 +12,7 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users, ShieldCheck, Map as MapIcon, ListChecks, HeartPulse, RefreshCw, CheckCircle2, LineChart, Dna, PenLine, FileEdit, Upload } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users, ShieldCheck, Map as MapIcon, ListChecks, HeartPulse, RefreshCw, CheckCircle2, LineChart, Dna, PenLine, FileEdit, Upload, ChevronDown } from "lucide-react";
 // HarvestPanel/CorpusPanel/ArcTimelinePanel stay eager: each is under 8KB
 // source, no heavy deps, and not worth their own network round trip.
 import { HarvestPanel } from "./HarvestPanel";
@@ -204,6 +204,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showRevision, setShowRevision]         = useState(false);
   const [showInterview, setShowInterview]       = useState(false);
   const [showRoom, setShowRoom]                 = useState(false);
+  /** Expert tools live in Inspect ▾ — not as peer header buttons. */
+  const [inspectOpen, setInspectOpen] = useState(false);
 
   // ── Overlay mutual exclusion ────────────────────────────────────────────────
   // QA finding P0-3: each tool owned its own `fixed inset-0 z-50` backdrop, and
@@ -620,16 +622,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           </button>
         </div>
       )}
-      <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold uppercase tracking-widest text-black">
-            Story Machine
-          </h1>
-          <p className="text-gray-600 text-sm mt-1 font-mono uppercase">
-            OASIS Architecture — Perspective-Bounded Simulation
-          </p>
-        </div>
-        <div className="flex gap-3 items-center flex-wrap justify-end">
+      <header className="mb-8 border-b-4 border-black pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-gray-500">Simulate</p>
+            <h1 className="text-3xl font-bold uppercase tracking-widest text-black">
+              Story Machine
+            </h1>
+            <p className="text-gray-600 text-sm mt-1 font-mono uppercase">
+              Build · run · export
+            </p>
+          </div>
           {illusionState && (
             <div
               className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 brutal-border"
@@ -638,254 +641,117 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               Phase: {illusionState.phase} · {illusionState.total_turns} turns
             </div>
           )}
+        </div>
+
+        {/* Primary actions only — expert tools under Inspect */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => openOverlay('Builder')}
+            disabled={loading}
+            className="bg-black hover:bg-[#FF4444] text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors text-xs"
+          >
+            Build scenario
+          </button>
+
           {ledger.length > 0 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSyuzhetMode(m => !m)}
-                title="Syuzhet mode: reorders the screenplay by information-reveal priority (revelation first, then flashback)"
-                className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border brutal-shadow-hover transition-colors ${
-                  syuzhetMode ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
-                }`}
-              >
-                Syuzhet {syuzhetMode ? "ON" : "OFF"}
-              </button>
+            <>
               <button
                 onClick={handleExport}
                 disabled={isExporting}
                 className="bg-[#FF4444] hover:bg-black text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors flex items-center gap-2 text-xs"
               >
                 <FileDown className="w-4 h-4" />
-                {isExporting ? "Exporting…" : "Export to Script IDE"}
+                {isExporting ? "Exporting…" : "Export to script"}
               </button>
-            </div>
+              <button
+                onClick={() => setSyuzhetMode(m => !m)}
+                title="Reorder export by information-reveal priority"
+                className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border transition-colors ${
+                  syuzhetMode ? "bg-black text-white" : "bg-white text-black hover:bg-gray-100"
+                }`}
+              >
+                Syuzhet {syuzhetMode ? "on" : "off"}
+              </button>
+            </>
           )}
-          <button
-            onClick={() => openOverlay('DirectorCut')}
-            title="Director's Cut — inject ops mid-sim"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Scissors className="w-4 h-4" />
-            <span className="hidden sm:inline">Cut</span>
-          </button>
-          <button
-            onClick={() => openOverlay('WhatIf')}
-            title="What-If / Ghost Commits"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <GitBranch className="w-4 h-4" />
-            <span className="hidden sm:inline">What-If</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Epistemic')}
-            title="Epistemic Map"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Brain className="w-4 h-4" />
-            <span className="hidden sm:inline">Beliefs</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Harvest')}
-            title="Harvest — quality metrics + sidecar download"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <FileDown className="w-4 h-4" />
-            <span className="hidden sm:inline">Harvest</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Converge')}
-            title="Convergence Search — AlphaZero-for-drama"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">Converge</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Corpus')}
-            title="Director Policy — learned from self-play corpus"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Shuffle className="w-4 h-4" />
-            <span className="hidden sm:inline">Policy</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Timeline')}
-            title="Arc Timeline — scene-by-scene proof/quality/tension view"
-            className="bg-slate-700 hover:bg-slate-500 text-slate-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Target className="w-4 h-4" />
-            <span className="hidden sm:inline">Arc</span>
-          </button>
-          <button
-            onClick={() => openOverlay('ArcPlanner')}
-            title="Arc Compiler — multi-scene convergence planning"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">Compile</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Projection')}
-            title="Projection Gallery — one canon, every format (G3)"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Target className="w-4 h-4" />
-            <span className="hidden sm:inline">Project</span>
-          </button>
-          <button
-            onClick={() => openOverlay('CausalTwin')}
-            title="Causal Twin — Pearl's do()-calculus intervention (G4)"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">Twin</span>
-          </button>
-          <button
-            onClick={() => openOverlay('FixedPoints')}
-            title="Fixed Points — temporal authoring, author destiny (G9)"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Target className="w-4 h-4" />
-            <span className="hidden sm:inline">Destiny</span>
-          </button>
-          <button
-            onClick={() => openOverlay('SelfPlay')}
-            title="Self-Play — G13 corpus launcher, genome diff/breed"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Zap className="w-4 h-4" />
-            <span className="hidden sm:inline">Corpus</span>
-          </button>
-          <button
-            onClick={() => openOverlay('ProofInspector')}
-            title="Proof Inspector — 4-tier scene analysis + repair patches"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Target className="w-4 h-4" />
-            <span className="hidden sm:inline">Prove</span>
-          </button>
-          <button
-            onClick={() => openOverlay('QualityEngines')}
-            title="Quality Engines — 9 narrative quality signals per committed scene"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Quality</span>
-          </button>
-          <button
-            onClick={() => openOverlay('EpistemicMap')}
-            title="Epistemic Map — who believes what about whom, ToM² meta-layers, dramatic irony"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <MapIcon className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Epistemic</span>
-          </button>
-          <button
-            onClick={() => openOverlay('ArcCompletion')}
-            title="Arc Completion — track open narrative promises with pacing scores"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <ListChecks className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Arcs</span>
-          </button>
-          <button
-            onClick={() => openOverlay('StoryHealth')}
-            title="Story Health — unified vitals: tension, quality, arcs, epistemic depth"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <HeartPulse className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Health</span>
-          </button>
-          <button
-            onClick={() => openOverlay('CharacterArc')}
-            title="Character Arc — per-character belief, emotion, relationship, and agency trajectories"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Chars</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Regression')}
-            title="Narrative Regression Suite — 14 structural invariants graded like a CI test run"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Tests</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Momentum')}
-            title="Narrative Momentum — per-scene CI history of quality, regression, tension, and proofs"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Zap className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Momentum</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Analytics')}
-            title="Narrative Analytics — tension ledger, story-shape archetype fit, and first-watch vs rewatch scoring"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <LineChart className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Analytics</span>
-          </button>
-          <button
-            onClick={() => openOverlay('VoiceDNA')}
-            title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Dna className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Voice</span>
-          </button>
-          <button
-            onClick={() => openOverlay('LivePlay')}
-            title="Author Presence — STEER, INJECT, OVERRULE live story beats"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <PenLine className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Live</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Revision')}
-            title="12-Pass Revision Pipeline — diagnose and rewrite the compiled screenplay"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <FileEdit className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Revise</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Interview')}
-            title="Character Interview — talk to a character, grounded in their real psychology"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span className="hidden sm:inline">Interview</span>
-          </button>
-          <button
-            onClick={() => openOverlay('Room')}
-            title="Writers' Room — convene six critics to debate the current story state"
-            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
-          >
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Room</span>
-          </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={inspectOpen}
+              onClick={() => setInspectOpen((v) => !v)}
+              className="bg-white text-black px-3 py-2 brutal-border hover:bg-gray-100 transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-wider"
+            >
+              Inspect
+              <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+            {inspectOpen && (
+              <div
+                role="menu"
+                className="absolute left-0 top-full z-50 mt-1 max-h-[70vh] w-64 overflow-y-auto border-2 border-black bg-white py-1 shadow-[4px_4px_0_0_#000]"
+              >
+                {(
+                  [
+                    { key: "DirectorCut" as const, label: "Director cut", icon: Scissors },
+                    { key: "WhatIf" as const, label: "What-if", icon: GitBranch },
+                    { key: "Epistemic" as const, label: "Beliefs", icon: Brain },
+                    { key: "EpistemicMap" as const, label: "Epistemic map", icon: MapIcon },
+                    { key: "Harvest" as const, label: "Harvest", icon: FileDown },
+                    { key: "Converge" as const, label: "Converge", icon: Zap },
+                    { key: "Corpus" as const, label: "Policy", icon: Shuffle },
+                    { key: "Timeline" as const, label: "Arc timeline", icon: Target },
+                    { key: "ArcPlanner" as const, label: "Arc compile", icon: Zap },
+                    { key: "ArcCompletion" as const, label: "Open arcs", icon: ListChecks },
+                    { key: "Projection" as const, label: "Project", icon: Target },
+                    { key: "CausalTwin" as const, label: "Causal twin", icon: Zap },
+                    { key: "FixedPoints" as const, label: "Destiny", icon: Target },
+                    { key: "SelfPlay" as const, label: "Self-play", icon: Zap },
+                    { key: "ProofInspector" as const, label: "Proofs", icon: Target },
+                    { key: "QualityEngines" as const, label: "Quality", icon: ShieldCheck },
+                    { key: "StoryHealth" as const, label: "Health", icon: HeartPulse },
+                    { key: "CharacterArc" as const, label: "Character arcs", icon: RefreshCw },
+                    { key: "Regression" as const, label: "Regression", icon: CheckCircle2 },
+                    { key: "Momentum" as const, label: "Momentum", icon: Zap },
+                    { key: "Analytics" as const, label: "Analytics", icon: LineChart },
+                    { key: "VoiceDNA" as const, label: "Voice DNA", icon: Dna },
+                    { key: "LivePlay" as const, label: "Live author", icon: PenLine },
+                    { key: "Revision" as const, label: "Revise", icon: FileEdit },
+                    { key: "Interview" as const, label: "Interview", icon: MessageCircle },
+                    { key: "Room" as const, label: "Writers' room", icon: Users },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider hover:bg-black hover:text-white"
+                    onClick={() => {
+                      openOverlay(item.key);
+                      setInspectOpen(false);
+                    }}
+                  >
+                    <item.icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => openOverlay('Settings')}
             title="AI Provider Settings"
-            className="bg-white text-black px-3 py-2 brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors flex items-center"
+            aria-label="Settings"
+            className="bg-white text-black px-3 py-2 brutal-border hover:bg-gray-100 transition-colors"
           >
             <Settings className="w-4 h-4" />
           </button>
           <button
             onClick={onClose}
-            className="bg-white text-black px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors"
+            className="ml-auto bg-white text-black px-4 py-2 font-bold uppercase tracking-wider brutal-border hover:bg-gray-100 transition-colors text-xs"
           >
-            Back to IDE
-          </button>
-          <button
-            onClick={() => openOverlay('Builder')}
-            disabled={loading}
-            className="bg-black hover:bg-[#FF4444] text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors"
-          >
-            Build Scenario
+            Back to script
           </button>
         </div>
       </header>
