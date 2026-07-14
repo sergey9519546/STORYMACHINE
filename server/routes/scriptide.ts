@@ -17,7 +17,7 @@ import {
   validate, DoctorBodySchema, DeepDoctorBodySchema, DiagnoseBodySchema, FixBodySchema,
   ScriptideSaveBodySchema, PersonaBodySchema, WorldBuildBodySchema, RefineDialogueBodySchema,
   AnalyzeTensionBodySchema, CleanActionBodySchema, CharacterProfileBodySchema, AnalyzeScriptBodySchema,
-  CharactersExportBodySchema, CharactersImportBodySchema,
+  CharactersExportBodySchema, CharactersImportBodySchema, ChangeImpactBodySchema,
 } from '../lib/validation.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { locateIssues } from '../nvm/analyze/locate.ts';
@@ -532,6 +532,38 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
     analyzedAt: Date.now(),
   };
   res.json(diagnosis);
+}));
+
+// POST /api/scriptide/change-impact — deterministic "what breaks if I change
+// this scene?" dependency analysis (RESEARCH_INTEGRATION_2026-07-11.md §2 A1).
+// The product wedge: when a writer edits scene N, show them which downstream
+// scenes depend on it and what specific narrative threads (clue payoffs,
+// character relationships, questions answered) would be affected. Pure
+// dependency traversal over the existing FountainAnalysis data — no LLM, no
+// new heuristics, fully keyless and deterministic.
+//
+// gameLimiter, not aiLimiter — same reasoning as /doctor and /diagnose: this
+// is pure CPU work over the existing dependency graph (analyzeChangeImpact
+// reads only what analyzeFountainText already extracted), with zero LLM calls
+// and zero I/O, so it belongs on the higher-throughput, CPU-only limiter.
+//
+// Stateless: no sessionId, no getOrCreateSession/Stage — the route only needs
+// the fountain text and the target scene index, exactly what
+// ChangeImpactBodySchema validates.
+router.post('/api/scriptide/change-impact', gameLimiter, validate(ChangeImpactBodySchema), asyncHandler(async (req, res) => {
+  const { fountain, sceneIdx } = req.body as { fountain: string; sceneIdx: number };
+
+  // Dynamic import — same lazy-load convention as /doctor and /diagnose above.
+  const { analyzeFountainText } = await import('../nvm/analyze/fountain-analyzer.ts');
+  const { analyzeChangeImpact } = await import('../nvm/analyze/change-impact.ts');
+
+  // Run the analyzer to build the dependency graph.
+  const analysis = analyzeFountainText(fountain);
+
+  // Compute change-impact for the requested scene.
+  const report = analyzeChangeImpact(analysis, sceneIdx);
+
+  res.json(report);
 }));
 
 // ── Fix & Verify (Run 11, bridge half 5) ────────────────────────────────────

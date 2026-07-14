@@ -963,6 +963,20 @@ export const FountainTitleBodySchema = z.object({
   title: z.string().max(2000).optional(),
 }).passthrough();
 
+// POST /api/scriptide/change-impact — deterministic "what breaks if I change
+// this scene?" analysis (RESEARCH_INTEGRATION_2026-07-11.md §2 A1). Same
+// fountain-only contract as DiagnoseBodySchema (the client already has the text
+// live in the editor; no fdx/pdf conversion needed). sceneIdx is 0-based
+// (consistent with ScreenplaySceneRecord.sceneIdx and ChangeImpactReport
+// conventions throughout server/nvm/analyze/), min 0 (the first scene), max
+// left deliberately unbounded (analyzeFountainText can produce arbitrary scene
+// counts, and analyzeChangeImpact guards out-of-bounds itself by returning an
+// isolated report rather than throwing — see change-impact.ts).
+export const ChangeImpactBodySchema = z.object({
+  fountain: z.string().min(1).max(900_000),
+  sceneIdx: z.number().int().min(0),
+});
+
 // ── Middleware factory ───────────────────────────────────────────────────────
 // Usage:  app.post('/api/foo', validate(FooSchema), handler)
 // On failure returns HTTP 400 with { error: '<first issue message>' }.
