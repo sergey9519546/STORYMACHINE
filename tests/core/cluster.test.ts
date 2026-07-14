@@ -9,7 +9,7 @@ import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
 import { locateIssues } from '../../server/nvm/analyze/locate.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
-import type { LocatedIssue, IssueAnchor } from '../../server/nvm/analyze/types.ts';
+import type { LocatedIssue, IssueAnchor, RootCauseFinding } from '../../server/nvm/analyze/types.ts';
 import type { PassName, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 
 function located(
@@ -632,6 +632,36 @@ describe('clusterIssues — root-cause template (document mode): "The story is b
       located('TALKING_HEADS', 'Lines 40–58', 'lines', 'dialogue', { severity: 'minor', startLine: 40, endLine: 58 }),
     ];
     assert.deepEqual(clusterIssues(issues), []);
+  });
+});
+
+describe('clusterIssues — DoS guard (SEC-2): large located-issue input', () => {
+  it('does not throw or hang on a pathological all-overlapping-span input far above any real script', () => {
+    // The worst case for overlapClusters'/matchOverlapTemplate's all-pairs
+    // span scan: every issue shares the identical span, so the sort-then-
+    // early-break optimization never trips and the scan is fully quadratic.
+    // 8000 > MAX_LOCATED_ISSUES_FOR_CLUSTERING (5000), so this also exercises
+    // the entry-point cap: the call must complete cleanly (bounded work),
+    // never throw.
+    const issues: LocatedIssue[] = [];
+    for (let i = 0; i < 8000; i++) {
+      // Two distinct rule names alternating so the generic overlap clusterer
+      // has real (non-singleton, multi-rule) groups to form rather than being
+      // short-circuited — this is the shape that actually drives the O(n^2)
+      // union-find, not a trivially-skipped one.
+      issues.push(located(
+        i % 2 === 0 ? 'THIN_SCENE' : 'FLAT_CONFLICT',
+        'Scene 0 (INT. ROOM)', 'scene', 'pacing',
+        { startLine: 1, endLine: 50 },
+      ));
+    }
+
+    let findings: RootCauseFinding[] | undefined;
+    assert.doesNotThrow(() => { findings = clusterIssues(issues); });
+    assert.ok(Array.isArray(findings), 'clusterIssues returns an array on oversized input');
+    // Determinism holds under the cap too: identical oversized input yields
+    // identical findings.
+    assert.deepEqual(clusterIssues(issues), findings);
   });
 });
 

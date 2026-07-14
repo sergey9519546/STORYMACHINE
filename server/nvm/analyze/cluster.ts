@@ -923,6 +923,40 @@ function synthesizeFamilyFinding(family: DuplicateFamily, members: LocatedIssue[
   };
 }
 
+// DoS note (SEC-2): the two all-pairs union-find scans below —
+// overlapClusters and matchOverlapTemplate — are the cross-scene passes the
+// SEC-2 audit called out as O(n^2)-shaped. They are already bounded for every
+// attacker-reachable input, by two independent mechanisms, so no truncation
+// cap is added here (adding one would be actively wrong — see the last
+// paragraph):
+//   1. Upstream count bound. Every live caller (server/routes/scriptide.ts's
+//      /doctor, /doctor/deep, /doctor/pdf, /diagnose) feeds clusterIssues only
+//      issues produced by runScriptDoctor over an analysis that
+//      fountain-analyzer.ts's ANALYZER_SCENE_CEILING (=1000) has already
+//      scene-truncated. Located issues therefore distribute across at most
+//      ~1000 distinct scene spans; no single overlapping span can accumulate
+//      the tens of thousands of identical-span issues the quadratic worst case
+//      would need.
+//   2. Per-span linearization. overlapClusters/matchOverlapTemplate sort by
+//      startLine and break the inner loop the instant B.startLine exceeds
+//      A.endLine (see those functions' own comments), so a group of k issues
+//      sharing one span costs O(k) per element, not O(n) — bounded time for
+//      the realistic distribution above. tests/core/analyzer-dos.test.ts
+//      proves this end-to-end over 20,002 synthetic issues, and this file's
+//      "large located-issue input" test additionally proves the same-span
+//      degenerate (the case where early-break never trips) still completes
+//      without error.
+//
+// A hard slice cap (e.g. keep only the first N located issues) was considered
+// and rejected: it would SILENTLY DROP clustering for the tail of a
+// LEGITIMATE long script — a 1000-scene screenplay (which fountain-analyzer.ts
+// deliberately analyzes in full, never truncating a real script) firing a
+// handful of issues per scene can exceed several thousand located issues — and
+// it would break the intentional "still finds the true overlaps among 20,002"
+// contract in analyzer-dos.test.ts. The upstream ceiling is the correct place
+// for the count bound; this module stays a pure, complete transform of
+// whatever located[] it is handed.
+
 /**
  * Roll located issues up into named root-cause findings. Pure and
  * deterministic: iteration is over plain arrays/Maps in insertion order (no
