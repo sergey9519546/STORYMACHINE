@@ -25,7 +25,7 @@ export default function CharacterManager({
   onDeleteCharacter,
 }: CharacterManagerProps) {
   return (
-    <div className="space-y-4 bg-[#f4f4f0] dark:bg-zinc-900 dark:text-white">
+    <div className="space-y-4 bg-paper">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
           <Users className="w-4 h-4" /> Characters
@@ -33,14 +33,14 @@ export default function CharacterManager({
         <button
           onClick={onAddCharacter}
           aria-label="Add new character"
-          className="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase brutal-border flex items-center gap-2"
+          className="bg-ink text-cream px-3 py-1 text-[10px] font-bold uppercase brutal-border flex items-center gap-2"
         >
           <PlusCircle className="w-3 h-3" aria-hidden="true" /> Add
         </button>
       </div>
 
       {characters.length === 0 && (
-        <div className="text-center p-8 border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs">
+        <div className="text-center p-8 border-2 border-dashed border-hair text-faint font-mono text-xs">
           No characters yet. Click &ldquo;Add&rdquo; to create one.
         </div>
       )}
@@ -49,7 +49,7 @@ export default function CharacterManager({
         {characters.map((char) => (
           <div
             key={char.id}
-            className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow space-y-3"
+            className="bg-panel p-4 brutal-border-thick brutal-shadow space-y-3"
           >
             <div className="flex justify-between items-center">
               <input
@@ -59,7 +59,7 @@ export default function CharacterManager({
                 }
                 placeholder="CHARACTER NAME"
                 aria-label="Character name"
-                className="flex-1 bg-transparent font-bold uppercase text-xs outline-none border-b border-black dark:border-white mr-2"
+                className="flex-1 bg-transparent font-bold uppercase text-xs outline-none border-b border-ink mr-2"
               />
               <button
                 onClick={() => onDeleteCharacter(char.id)}
@@ -79,7 +79,7 @@ export default function CharacterManager({
               ] as const
             ).map(([field, label]) => (
               <div key={field}>
-                <label className="block text-[10px] font-bold uppercase text-gray-500 mb-1">
+                <label className="block text-[10px] font-bold uppercase text-faint mb-1">
                   {label}
                 </label>
                 <input
@@ -88,7 +88,7 @@ export default function CharacterManager({
                     onUpdateCharacter(char.id, field, e.target.value)
                   }
                   aria-label={`${char.name || "Character"} ${label}`}
-                  className="w-full bg-gray-50 dark:bg-zinc-700 text-xs p-2 outline-none font-mono brutal-border"
+                  className="w-full bg-panel2 text-xs p-2 outline-none font-mono brutal-border"
                 />
               </div>
             ))}

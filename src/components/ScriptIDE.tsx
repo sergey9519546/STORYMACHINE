@@ -46,7 +46,7 @@ const SlatePanel = lazy(() => import("./SlatePanel"));
 // same brutal-border/white-bg idiom) so first-open doesn't flash blank space
 // before sliding in.
 const DrawerPanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-screen bg-panel brutal-border-thick text-ink p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -56,7 +56,7 @@ const DrawerPanelFallback = () => (
 // DrawerPanelFallback's 500px — a mismatched fallback width would flash a
 // narrower box for a moment before the real panel snaps wider.
 const SlatePanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-screen bg-panel brutal-border-thick text-ink p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -64,7 +64,7 @@ const SlatePanelFallback = () => (
 // Matches the plain in-sidebar tab content idiom used elsewhere in this file
 // (e.g. the Codex tab's "No Knowledge Ingested Yet" placeholder).
 const TabPanelFallback = () => (
-  <div className="p-8 text-center border-4 border-dashed border-gray-400 text-gray-400 font-mono text-xs uppercase animate-pulse">
+  <div className="p-8 text-center border-4 border-dashed border-faint text-faint font-mono text-xs uppercase animate-pulse">
     Loading…
   </div>
 );
@@ -982,7 +982,7 @@ export default function ScriptIDE({
 
   // ── Title page ───────────────────────────────────────────────────────────────
   const renderTitlePage = () => (
-    <div className="p-12 bg-white dark:bg-zinc-900 dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
+    <div className="p-12 bg-panel h-full flex flex-col items-center justify-center text-center font-courier">
       <div className="w-full max-w-md space-y-12">
         <input
           value={titlePage.title}
@@ -990,7 +990,7 @@ export default function ScriptIDE({
             setTitlePage({ ...titlePage, title: e.target.value.toUpperCase() })
           }
           aria-label="Script title"
-          className="w-full bg-transparent text-3xl font-bold text-center outline-none border-b-2 border-dashed border-black dark:border-white py-4"
+          className="w-full bg-transparent text-3xl font-bold text-center outline-none border-b-2 border-dashed border-ink py-4"
           placeholder="TITLE"
         />
         <div className="space-y-4">
@@ -1001,7 +1001,7 @@ export default function ScriptIDE({
               setTitlePage({ ...titlePage, author: e.target.value })
             }
             aria-label="Script author"
-            className="w-full bg-transparent text-xl text-center outline-none border-b border-black dark:border-white"
+            className="w-full bg-transparent text-xl text-center outline-none border-b border-ink"
             placeholder="AUTHOR"
           />
         </div>
@@ -1026,7 +1026,7 @@ export default function ScriptIDE({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
-      className={`flex h-screen w-full bg-[#f4f4f0] text-black font-sans overflow-hidden ${isDarkMode ? "dark" : ""}`}
+      className={`flex h-screen w-full bg-[#f4f4f0] text-ink font-sans overflow-hidden ${isDarkMode ? "dark" : ""}`}
     >
       <Sidebar
         characters={characters}
@@ -1041,15 +1041,15 @@ export default function ScriptIDE({
       {/* min-w-0: without it this flex-1 column refuses to shrink below the
           toolbar's intrinsic (non-wrapping) width, overflowing the viewport and
           pushing the centered page off to the right. */}
-      <div className="flex-1 min-w-0 h-full border-r-4 border-black flex flex-col bg-white relative">
+      <div className="flex-1 min-w-0 h-full border-r-4 border-ink flex flex-col bg-panel relative">
         {cleanError && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-stamp text-white text-xs font-bold px-3 py-1.5 border-2 border-ink flex items-center gap-2">
             {cleanError}
             <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
           </div>
         )}
         {fdxImportNotice && (
-          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-warn text-ink text-xs font-bold px-3 py-1.5 border-2 border-ink flex items-start gap-2">
             <span>{fdxImportNotice}</span>
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
           </div>
@@ -1093,12 +1093,12 @@ export default function ScriptIDE({
           <div
             role="status"
             aria-live="polite"
-            className={`px-4 py-2 border-b-2 border-black text-[11px] font-mono flex items-center justify-between gap-3 ${
+            className={`px-4 py-2 border-b-2 border-ink text-[11px] font-mono flex items-center justify-between gap-3 ${
               simulateStatus.type === "error"
-                ? "bg-red-600 text-white"
+                ? "bg-stamp text-white"
                 : simulateStatus.type === "warning"
-                ? "bg-[#FFF4CC] text-black"
-                : "bg-green-600 text-white"
+                ? "bg-panel2 text-ink"
+                : "bg-ok text-white"
             }`}
           >
             <span>{simulateStatus.message}</span>
@@ -1116,7 +1116,7 @@ export default function ScriptIDE({
             the persisted config (App.tsx's onNewStory). The script draft
             itself is untouched; only which screen App shows on next load. */}
         {onNewStory && (
-          <div className="px-4 py-1 border-b-2 border-black bg-gray-100 flex items-center">
+          <div className="px-4 py-1 border-b-2 border-ink bg-panel2 flex items-center">
             <button
               onClick={() => {
                 if (window.confirm("Start a new story? This returns you to the setup wizard — your current draft stays saved.")) {
@@ -1124,7 +1124,7 @@ export default function ScriptIDE({
                 }
               }}
               title="Return to the setup wizard (your script draft is not deleted)"
-              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black transition-colors"
+              className="text-[10px] font-bold uppercase tracking-widest text-faint hover:text-ink transition-colors"
             >
               ← New Story
             </button>
@@ -1134,14 +1134,14 @@ export default function ScriptIDE({
         {/* Finding E: keyless-honesty banner — shown once we know the server
             has no AI key configured, dismissible and remembered per-app. */}
         {llmReady === false && !llmBannerDismissed && (
-          <div className="px-4 py-2 border-b-2 border-black bg-[#FFF4CC] text-black text-[11px] font-mono flex items-center justify-between gap-3">
+          <div className="px-4 py-2 border-b-2 border-ink bg-panel2 text-ink text-[11px] font-mono flex items-center justify-between gap-3">
             <span>
               Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
             </span>
             <button
               onClick={dismissLlmBanner}
               aria-label="Dismiss"
-              className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-colors"
+              className="shrink-0 font-bold uppercase text-[10px] border-2 border-ink px-2 py-0.5 hover:bg-ink hover:text-cream transition-colors"
             >
               Dismiss
             </button>
@@ -1149,10 +1149,10 @@ export default function ScriptIDE({
         )}
 
         {/* P9: inline copilot persona picker — selects the ghost-text voice. */}
-        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2">
+        <div className="px-4 py-1.5 border-b-2 border-ink bg-panel2 flex items-center gap-2">
           <label
             htmlFor="copilot-persona"
-            className="text-[10px] font-bold uppercase tracking-widest text-gray-500"
+            className="text-[10px] font-bold uppercase tracking-widest text-faint"
           >
             Copilot
           </label>
@@ -1161,7 +1161,7 @@ export default function ScriptIDE({
             value={copilotPersona}
             onChange={(e) => setCopilotPersona(e.target.value)}
             title={personaList.find((p) => p.id === copilotPersona)?.description ?? ""}
-            className="text-[11px] font-mono bg-white border-2 border-black px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="text-[11px] font-mono bg-panel border-2 border-ink px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-stamp"
           >
             {(personaList.length > 0
               ? personaList
@@ -1175,7 +1175,7 @@ export default function ScriptIDE({
           {(() => {
             const desc = personaList.find((p) => p.id === copilotPersona)?.description;
             return desc ? (
-              <span className="text-[10px] text-gray-400 italic hidden md:inline truncate">
+              <span className="text-[10px] text-faint italic hidden md:inline truncate">
                 {desc}
               </span>
             ) : null;
@@ -1183,14 +1183,14 @@ export default function ScriptIDE({
         </div>
 
         {/* P4: collaboration join/leave bar */}
-        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2 flex-wrap">
+        <div className="px-4 py-1.5 border-b-2 border-ink bg-panel2 flex items-center gap-2 flex-wrap">
           {collabRoom ? (
             <>
               <span className="text-[10px] font-bold uppercase tracking-widest text-green-700">Live</span>
               <span className="text-[11px] font-mono text-gray-700 bg-green-100 border border-green-400 px-2 py-0.5 rounded">
                 Room: {collabRoom}
               </span>
-              <span className="text-[11px] text-gray-500">as {collabUserName}</span>
+              <span className="text-[11px] text-faint">as {collabUserName}</span>
               <button
                 onClick={() => setCollabRoom(undefined)}
                 className="text-[11px] font-bold text-red-600 border-2 border-red-600 px-2 py-0.5 hover:bg-red-50"
@@ -1204,7 +1204,7 @@ export default function ScriptIDE({
                 value={collabNameInput}
                 onChange={e => setCollabNameInput(e.target.value)}
                 placeholder="Your name"
-                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-28 focus:outline-none"
+                className="text-[11px] font-mono border-2 border-ink px-2 py-0.5 w-28 focus:outline-none"
               />
               <input
                 value={collabInput}
@@ -1220,7 +1220,7 @@ export default function ScriptIDE({
                   }
                 }}
                 placeholder="Room ID (share with co-writer)"
-                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-52 focus:outline-none"
+                className="text-[11px] font-mono border-2 border-ink px-2 py-0.5 w-52 focus:outline-none"
               />
               <button
                 onClick={() => {
@@ -1232,13 +1232,13 @@ export default function ScriptIDE({
                   setShowCollabBar(false);
                   setCollabInput("");
                 }}
-                className="text-[11px] font-bold border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white"
+                className="text-[11px] font-bold border-2 border-ink px-2 py-0.5 hover:bg-ink hover:text-cream"
               >
                 Join
               </button>
               <button
                 onClick={() => setShowCollabBar(false)}
-                className="text-[11px] text-gray-500 border-2 border-gray-300 px-2 py-0.5 hover:bg-gray-100"
+                className="text-[11px] text-faint border-2 border-hair px-2 py-0.5 hover:bg-panel2"
               >
                 Cancel
               </button>
@@ -1246,7 +1246,7 @@ export default function ScriptIDE({
           ) : (
             <button
               onClick={() => { setCollabNameInput(collabUserName); setShowCollabBar(true); }}
-              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black"
+              className="text-[10px] font-bold uppercase tracking-widest text-faint hover:text-ink"
             >
               + Collaborate
             </button>
@@ -1254,7 +1254,7 @@ export default function ScriptIDE({
         </div>
 
         <div
-          className="flex-1 relative overflow-hidden bg-white"
+          className="flex-1 relative overflow-hidden bg-panel"
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
@@ -1284,7 +1284,7 @@ export default function ScriptIDE({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                className="absolute inset-0 z-50 flex items-center justify-center bg-ink/50 backdrop-blur-sm"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Action required"
@@ -1292,9 +1292,9 @@ export default function ScriptIDE({
                 <motion.div
                   initial={{ scale: 0.9, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
-                  className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full"
+                  className="bg-panel border-4 border-ink p-6 brutal-shadow max-w-md w-full"
                 >
-                  <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-black pb-2">
+                  <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-ink pb-2">
                     Action Required
                   </h2>
                   <p className="text-sm font-mono mb-4">
@@ -1316,19 +1316,19 @@ export default function ScriptIDE({
                     }}
                     aria-label="Character action description"
                     placeholder="e.g., pacing the room, lighting a cigarette..."
-                    className="w-full border-2 border-black p-3 font-mono text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border-2 border-ink p-3 font-mono text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
 
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => submitActionModal(true)}
-                      className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
+                      className="px-4 py-2 border-2 border-ink font-bold uppercase text-xs hover:bg-panel2 transition-colors"
                     >
                       Skip (Dialogue)
                     </button>
                     <button
                       onClick={() => submitActionModal(false)}
-                      className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                      className="px-4 py-2 bg-ink text-cream font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
                     >
                       Insert Action
                     </button>
@@ -1345,7 +1345,7 @@ export default function ScriptIDE({
           toggled via the Toolbar's "Panels" button. */}
       {showPanels && (
       <div className="w-[400px] shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto">
-        <div className="flex bg-black text-white overflow-x-auto">
+        <div className="flex bg-ink text-cream overflow-x-auto">
           {(
             [
               { id: "production", icon: Film, label: "Production" },
@@ -1362,7 +1362,7 @@ export default function ScriptIDE({
               aria-pressed={activeTab === id}
               className={`px-3 py-3 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2 transition-colors whitespace-nowrap ${
                 activeTab === id
-                  ? "bg-[#e8e8e3] text-black"
+                  ? "bg-[#e8e8e3] text-ink"
                   : "hover:bg-gray-800"
               }`}
             >
@@ -1388,8 +1388,8 @@ export default function ScriptIDE({
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
-                  <h2 className="font-bold uppercase tracking-widest text-sm mb-6 border-b-4 border-black pb-2 flex items-center gap-2">
+                <div className="bg-panel dark:bg-zinc-900 border-4 border-ink p-6 brutal-shadow">
+                  <h2 className="font-bold uppercase tracking-widest text-sm mb-6 border-b-4 border-ink pb-2 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-stamp" /> Story Engine
                     Diagnostics
                   </h2>
@@ -1403,7 +1403,7 @@ export default function ScriptIDE({
                         {TENSION_BARS.map((h, i) => (
                           <div
                             key={i}
-                            className="flex-1 bg-black dark:bg-white"
+                            className="flex-1 bg-ink dark:bg-panel"
                             style={{ height: `${h}%`, opacity: 0.1 + i * 0.04 }}
                           />
                         ))}
@@ -1436,7 +1436,7 @@ export default function ScriptIDE({
                     </div>
                   </div>
 
-                  <div className="mt-8 p-4 bg-black text-white brutal-border">
+                  <div className="mt-8 p-4 bg-ink text-cream brutal-border">
                     <p className="text-[10px] font-mono leading-relaxed">
                       SYSTEM STATUS: THE STORY MIND IS ACTIVE. NARRATIVE
                       COHESION AT 94%. DETECTED THEME:{" "}
@@ -1452,7 +1452,7 @@ export default function ScriptIDE({
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
+                <div className="bg-panel dark:bg-zinc-900 border-4 border-ink p-6 brutal-shadow">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-4">
                     Active Throughlines
                   </h2>
@@ -1461,7 +1461,7 @@ export default function ScriptIDE({
                       (t) => (
                         <div
                           key={t}
-                          className="p-3 border-2 border-black dark:border-zinc-700 flex items-center justify-between"
+                          className="p-3 border-2 border-ink dark:border-zinc-700 flex items-center justify-between"
                         >
                           <span className="text-xs font-bold uppercase">
                             {t.replace(/([A-Z])/g, " $1")}
@@ -1489,8 +1489,8 @@ export default function ScriptIDE({
               className="space-y-6"
             >
               {directorsLayer && (
-                <div className="bg-white border-4 border-black p-4 brutal-shadow">
-                  <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-purple-600">
+                <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+                  <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2 text-purple-600">
                     <Camera className="w-4 h-4" /> Director&apos;s Shot List
                   </h2>
                   {(() => {
@@ -1500,7 +1500,7 @@ export default function ScriptIDE({
 
                     if (shotBlocks.length === 0) {
                       return (
-                        <p className="text-[10px] font-mono text-gray-500 uppercase">
+                        <p className="text-[10px] font-mono text-faint uppercase">
                           No explicit shots defined.
                         </p>
                       );
@@ -1524,16 +1524,16 @@ export default function ScriptIDE({
 
               {/* MEDIA PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-panel border-4 border-ink p-4 brutal-shadow"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
-                <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+                <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
                   <Film className="w-4 h-4" /> Storyboard &amp; Composition
                 </h2>
                 {engineState.isGeneratingMedia ? (
-                  <div className="h-48 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-400">
+                  <div className="h-48 flex items-center justify-center bg-panel2 border-2 border-dashed border-faint">
                     <Loader2
-                      className="w-8 h-8 animate-spin text-gray-500"
+                      className="w-8 h-8 animate-spin text-faint"
                       aria-hidden="true"
                     />
                   </div>
@@ -1541,10 +1541,10 @@ export default function ScriptIDE({
                   <img
                     src={engineState.currentAnalysis.imageUrl}
                     alt="AI-generated storyboard frame"
-                    className="w-full h-auto border-2 border-black filter grayscale contrast-125"
+                    className="w-full h-auto border-2 border-ink filter grayscale contrast-125"
                   />
                 ) : (
-                  <div className="h-48 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-400 text-gray-500 font-mono text-sm uppercase">
+                  <div className="h-48 flex items-center justify-center bg-panel2 border-2 border-dashed border-faint text-faint font-mono text-sm uppercase">
                     Awaiting Scene Data...
                   </div>
                 )}
@@ -1578,16 +1578,16 @@ export default function ScriptIDE({
 
               {/* AUDIO PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-panel border-4 border-ink p-4 brutal-shadow"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
-                <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+                <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
                   <Mic className="w-4 h-4" /> Table Read (TTS)
                 </h2>
                 {engineState.isGeneratingMedia ? (
-                  <div className="p-4 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-400">
+                  <div className="p-4 flex items-center justify-center bg-panel2 border-2 border-dashed border-faint">
                     <Loader2
-                      className="w-6 h-6 animate-spin text-gray-500"
+                      className="w-6 h-6 animate-spin text-faint"
                       aria-hidden="true"
                     />
                   </div>
@@ -1599,7 +1599,7 @@ export default function ScriptIDE({
                     aria-label="Table read audio"
                   />
                 ) : (
-                  <div className="p-4 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-400 text-gray-500 font-mono text-sm uppercase">
+                  <div className="p-4 flex items-center justify-center bg-panel2 border-2 border-dashed border-faint text-faint font-mono text-sm uppercase">
                     Awaiting Dialogue...
                   </div>
                 )}
@@ -1633,20 +1633,20 @@ export default function ScriptIDE({
               animate={{ opacity: 1 }}
               className="space-y-4"
             >
-              <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+              <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
                 <BookOpen className="w-4 h-4" /> Ingested Knowledge (Codex)
               </h2>
               {engineState.directorState.activeCodexEntries?.length ? (
                 engineState.directorState.activeCodexEntries.map((entry, i) => (
                   <div
                     key={i}
-                    className="bg-white border-4 border-black p-3 brutal-shadow"
+                    className="bg-panel border-4 border-ink p-3 brutal-shadow"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-bold uppercase text-xs">
                         {entry.title}
                       </h3>
-                      <span className="bg-black text-white px-2 py-0.5 text-[8px] uppercase">
+                      <span className="bg-ink text-cream px-2 py-0.5 text-[8px] uppercase">
                         {entry.category}
                       </span>
                     </div>
@@ -1656,7 +1656,7 @@ export default function ScriptIDE({
                   </div>
                 ))
               ) : (
-                <div className="p-8 text-center border-4 border-dashed border-gray-400 text-gray-400 font-mono text-xs uppercase">
+                <div className="p-8 text-center border-4 border-dashed border-faint text-faint font-mono text-xs uppercase">
                   No Knowledge Ingested Yet.
                 </div>
               )}

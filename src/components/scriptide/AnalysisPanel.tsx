@@ -35,8 +35,8 @@ export default function AnalysisPanel({
       aria-busy={engineState.isAnalyzing ? "true" : "false"}
     >
       {/* SEMANTIC FIREWALL */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
-        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-red-600">
+      <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2 text-stamp">
           <ShieldAlert className="w-4 h-4" /> Semantic Firewall
         </h2>
         {lintedBlocks.length === 0 ? (
@@ -50,17 +50,17 @@ export default function AnalysisPanel({
                   key={block.id}
                   className="bg-red-50 border-2 border-red-200 p-3"
                 >
-                  <p className="text-[10px] font-bold text-red-600 uppercase mb-2">
+                  <p className="text-[10px] font-bold text-stamp uppercase mb-2">
                     {block.lintErrors?.join(", ")}
                   </p>
-                  <p className="text-xs font-mono mb-3 text-black">
+                  <p className="text-xs font-mono mb-3 text-ink">
                     {block.text}
                   </p>
                   <button
                     onClick={() => onCleanAction(block.index, block.text)}
                     disabled={isCleaning === block.index}
                     aria-label={`Clean action block with AI — ${block.text.substring(0, 40)}`}
-                    className="bg-black text-white text-[10px] px-3 py-2 uppercase font-bold hover:bg-stamp transition-colors brutal-border disabled:opacity-50 flex items-center gap-2"
+                    className="bg-ink text-white text-[10px] px-3 py-2 uppercase font-bold hover:bg-stamp transition-colors brutal-border disabled:opacity-50 flex items-center gap-2"
                   >
                     {isCleaning === block.index ? (
                       <>
@@ -80,8 +80,8 @@ export default function AnalysisPanel({
       {/* DIALOGUE INCONSISTENCIES */}
       {engineState.currentAnalysis?.dialogueInconsistencies &&
         engineState.currentAnalysis.dialogueInconsistencies.length > 0 && (
-          <div className="bg-white border-4 border-black p-4 brutal-shadow">
-            <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-yellow-600">
+          <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+            <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2 text-warn">
               <ShieldAlert className="w-4 h-4" /> Dialogue Inconsistencies
             </h2>
             <div
@@ -96,16 +96,16 @@ export default function AnalysisPanel({
                     key={i}
                     className="bg-yellow-50 border-2 border-yellow-200 p-3"
                   >
-                    <p className="text-[10px] font-bold text-yellow-600 uppercase mb-2">
+                    <p className="text-[10px] font-bold text-warn uppercase mb-2">
                       {inc.character}
                     </p>
-                    <p className="text-xs font-mono mb-2 text-black italic">
+                    <p className="text-xs font-mono mb-2 text-ink italic">
                       &ldquo;{inc.dialogueText}&rdquo;
                     </p>
-                    <p className="text-[10px] font-bold text-black mb-1">
+                    <p className="text-[10px] font-bold text-ink mb-1">
                       Issue: {inc.issue}
                     </p>
-                    <p className="text-[10px] font-bold text-red-600">
+                    <p className="text-[10px] font-bold text-stamp">
                       Suggestion: {inc.suggestion}
                     </p>
                   </div>
@@ -116,8 +116,8 @@ export default function AnalysisPanel({
         )}
 
       {/* DIRECTOR ANALYSIS */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
-        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+      <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
           <Settings2 className="w-4 h-4" /> Director Analysis
         </h2>
         <div
@@ -131,7 +131,7 @@ export default function AnalysisPanel({
               <span>Menace Gauge</span>
               <span>{engineState.directorState.menaceGauge}%</span>
             </div>
-            <div className="w-full bg-gray-200 h-2 border border-black">
+            <div className="w-full bg-linefill h-2 border border-ink">
               <div
                 className="bg-red-600 h-full transition-all duration-500"
                 style={{ width: `${engineState.directorState.menaceGauge}%` }}
@@ -144,16 +144,16 @@ export default function AnalysisPanel({
               <span>Tension Level</span>
               <span>{engineState.directorState.tensionLevel}%</span>
             </div>
-            <div className="w-full bg-gray-200 h-2 border border-black">
+            <div className="w-full bg-linefill h-2 border border-ink">
               <div
-                className="bg-black h-full transition-all duration-500"
+                className="bg-ink h-full transition-all duration-500"
                 style={{ width: `${engineState.directorState.tensionLevel}%` }}
               />
             </div>
           </div>
 
           {engineState.currentAnalysis?.commentary && (
-            <div className="mt-4 p-3 bg-gray-100 border-l-4 border-black text-xs leading-relaxed">
+            <div className="mt-4 p-3 bg-panel2 border-l-4 border-ink text-xs leading-relaxed">
               <p className="font-bold uppercase mb-1">Director&apos;s Notes:</p>
               <p>{engineState.currentAnalysis.commentary.tensionRationale}</p>
             </div>
@@ -163,8 +163,8 @@ export default function AnalysisPanel({
 
       {/* NARRATIVE METRICS */}
       {engineState.currentAnalysis?.metrics && (
-        <div className="bg-white border-4 border-black p-4 brutal-shadow">
-          <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+        <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+          <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
             <Activity className="w-4 h-4" /> Narrative Metrics
           </h2>
           <div
@@ -173,10 +173,10 @@ export default function AnalysisPanel({
             aria-live="polite"
             aria-label="Narrative metrics results"
           >
-            <div className="p-2 bg-gray-50 border border-black">
+            <div className="p-2 bg-panel2 border border-ink">
               <span className="font-bold block mb-1">Pivot Strength</span>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 border border-black">
+                <div className="flex-1 h-1.5 bg-linefill border border-ink">
                   <div
                     className="h-full bg-blue-600"
                     style={{
@@ -192,10 +192,10 @@ export default function AnalysisPanel({
                 </span>
               </div>
             </div>
-            <div className="p-2 bg-gray-50 border border-black">
+            <div className="p-2 bg-panel2 border border-ink">
               <span className="font-bold block mb-1">Twist Impact</span>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 border border-black">
+                <div className="flex-1 h-1.5 bg-linefill border border-ink">
                   <div
                     className="h-full bg-purple-600"
                     style={{
@@ -211,10 +211,10 @@ export default function AnalysisPanel({
                 </span>
               </div>
             </div>
-            <div className="p-2 bg-gray-50 border border-black">
+            <div className="p-2 bg-panel2 border border-ink">
               <span className="font-bold block mb-1">Surprise</span>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 border border-black">
+                <div className="flex-1 h-1.5 bg-linefill border border-ink">
                   <div
                     className="h-full bg-yellow-600"
                     style={{
@@ -230,10 +230,10 @@ export default function AnalysisPanel({
                 </span>
               </div>
             </div>
-            <div className="p-2 bg-gray-50 border border-black">
+            <div className="p-2 bg-panel2 border border-ink">
               <span className="font-bold block mb-1">Suspense</span>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-200 border border-black">
+                <div className="flex-1 h-1.5 bg-linefill border border-ink">
                   <div
                     className="h-full bg-red-600"
                     style={{
@@ -254,8 +254,8 @@ export default function AnalysisPanel({
       )}
 
       {/* THROUGHLINES */}
-      <div className="bg-white border-4 border-black p-4 brutal-shadow">
-        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
+      <div className="bg-panel border-4 border-ink p-4 brutal-shadow">
+        <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-ink pb-2 flex items-center gap-2">
           <Activity className="w-4 h-4" /> Narrative Throughlines
         </h2>
         <div
@@ -264,25 +264,25 @@ export default function AnalysisPanel({
           aria-live="polite"
           aria-label="Narrative throughlines"
         >
-          <div className="p-2 bg-gray-50 border border-black">
-            <span className="font-bold block mb-1 text-red-600">
+          <div className="p-2 bg-panel2 border border-ink">
+            <span className="font-bold block mb-1 text-stamp">
               Objective Story:
             </span>
             {engineState.directorState.throughlines.objectiveStory}
           </div>
-          <div className="p-2 bg-gray-50 border border-black">
+          <div className="p-2 bg-panel2 border border-ink">
             <span className="font-bold block mb-1 text-blue-600">
               Main Character:
             </span>
             {engineState.directorState.throughlines.mainCharacter}
           </div>
-          <div className="p-2 bg-gray-50 border border-black">
+          <div className="p-2 bg-panel2 border border-ink">
             <span className="font-bold block mb-1 text-green-600">
               Influence Character:
             </span>
             {engineState.directorState.throughlines.influenceCharacter}
           </div>
-          <div className="p-2 bg-gray-50 border border-black">
+          <div className="p-2 bg-panel2 border border-ink">
             <span className="font-bold block mb-1 text-purple-600">
               Relationship Story:
             </span>

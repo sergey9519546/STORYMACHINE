@@ -60,7 +60,7 @@ export default function Toolbar({
   onOpenStoryMachine,
 }: ToolbarProps) {
   return (
-    <div className="p-4 border-b-4 border-black bg-black text-white flex flex-wrap justify-between items-center gap-y-2 z-20">
+    <div className="p-4 border-b-4 border-ink bg-night text-cream flex flex-wrap justify-between items-center gap-y-2 z-20">
       <h1 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
         <BookOpen className="w-4 h-4" /> The Ingest Engine (Script)
       </h1>
@@ -80,7 +80,7 @@ export default function Toolbar({
             <span className="text-green-400">READY</span>
           )}
         </div>
-        <div className="text-[10px] font-mono text-gray-400 hidden sm:block">
+        <div className="text-[10px] font-mono text-cream/60 hidden sm:block">
           {wordCount} words &middot; {pageCount} pp.
         </div>
         <button
@@ -89,7 +89,7 @@ export default function Toolbar({
           aria-pressed={isTypewriterSound}
           title={isTypewriterSound ? "Typewriter sound ON" : "Typewriter sound OFF"}
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border ${
-            isTypewriterSound ? "bg-white text-black" : "bg-gray-600 text-gray-300"
+            isTypewriterSound ? "bg-panel text-ink" : "bg-ink2 text-cream/70"
           }`}
         >
           {isTypewriterSound ? "⌨ SFX" : "⌨ MUTE"}
@@ -100,8 +100,8 @@ export default function Toolbar({
           aria-pressed={showDirectorHUD}
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             showDirectorHUD
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <Settings2 className="w-3 h-3" aria-hidden="true" /> HUD
@@ -116,8 +116,8 @@ export default function Toolbar({
           aria-pressed={directorsLayer}
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             directorsLayer
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <Layers className="w-3 h-3" aria-hidden="true" /> Director&apos;s Layer
@@ -128,8 +128,8 @@ export default function Toolbar({
           aria-pressed={showScriptDoctor}
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             showScriptDoctor
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
@@ -141,8 +141,8 @@ export default function Toolbar({
           title="Rank multiple scripts against each other — producer-tier slate comparison"
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             showSlate
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <Layers3 className="w-3 h-3" aria-hidden="true" /> Slate
@@ -154,8 +154,8 @@ export default function Toolbar({
           title="Toggle Production/Analysis/Engine/Codex/Research/Title panels and Script Snapshots"
           className={`min-h-[44px] px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             showPanels
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <PanelRight className="w-3 h-3" aria-hidden="true" /> Panels
@@ -171,8 +171,8 @@ export default function Toolbar({
           }
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             liveDiagnostics
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
+              ? "bg-stamp text-white"
+              : "bg-panel text-ink hover:bg-panel2"
           }`}
         >
           <SpellCheck className="w-3 h-3" aria-hidden="true" /> Live Notes
@@ -180,7 +180,7 @@ export default function Toolbar({
         <button
           onClick={onExportFountain}
           aria-label="Export script as Fountain file"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+          className="bg-panel text-ink px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-panel2 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .Fountain
         </button>
@@ -188,7 +188,7 @@ export default function Toolbar({
           onClick={onExportFDX}
           aria-label="Export script as Final Draft FDX file"
           title="Export as Final Draft (.fdx)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+          className="bg-panel text-ink px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-panel2 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .FDX
         </button>
@@ -196,7 +196,7 @@ export default function Toolbar({
           onClick={onExportPDF}
           aria-label="Export script as industry-standard PDF"
           title="Export as PDF (Courier 12pt, industry margins)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+          className="bg-panel text-ink px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-panel2 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .PDF
         </button>
@@ -204,7 +204,7 @@ export default function Toolbar({
           onClick={onExportDOCX}
           aria-label="Export script as Word document"
           title="Export as Word (.docx)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
+          className="bg-panel text-ink px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-panel2 transition-colors brutal-border flex items-center gap-2"
         >
           <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
         </button>
@@ -215,8 +215,8 @@ export default function Toolbar({
           title="Seed an OASIS scenario from this script's scenes and characters, then open Story Machine"
           className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
             isSimulating
-              ? "bg-gray-500 text-gray-200 cursor-wait"
-              : "bg-purple-600 text-white hover:bg-white hover:text-black disabled:opacity-40"
+              ? "bg-ink2 text-cream/70 cursor-wait"
+              : "bg-stamp text-white hover:bg-ink hover:text-cream disabled:opacity-40"
           }`}
         >
           {isSimulating ? (
