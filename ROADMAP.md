@@ -24,10 +24,9 @@ commit trail.
   content-hash verification, env-gated harness (corpus text never enters
   git).
 - **Degradation AUC**: shuffle-drop AUC-24 hard floor 0.622 (measured
-  0.672), AUC-71 ~0.652. Act-swap recipe ~0.48 — near coin-flip; diagnosed
-  root cause is structural, not a missing detector: lexicon signals carry
-  content, not position (see NORTH_STAR.md SS2). Closing this gap needs
-  semantic channels that read for document POSITION.
+  0.672), AUC-71 ~0.652. Act-swap recipe 0.48→0.62 (July 12 arc-incoherence
+  deduction, commit 700fb5d) — position-aware arc signal wired as bounded
+  structural deduction; graduation bar 0.55 cleared.
 - **Rulebook**: 3,216 rules, staleness-tested. Suite green (see CI for exact
   count — do not hardcode a stale number here across sessions).
 - **E2E**: keyless journey harness landed (7 journeys), found + fixed a
@@ -130,22 +129,29 @@ are two different 14-pass orderings — do not conflate them. See
 | PR #200 | Security: gate AI provider config writes behind `ADMIN_TOKEN`; IDE `exportFountain` title-page state fix; `requireString` throws `ValidationError` not a masked 500 |
 | Master research audit (2026-07-10) | ~130-file research folder read cover to cover; 68 superseded files archived; 3-tier incorporation queue filed (`docs/research-audit/MASTER_RESEARCH_AUDIT.md`) |
 | S-wave (2026-07-10, commits 85fc133 + f4eb2e4 + 348b24f) | Pre-deployment security audit BLOCKERS closed: SEC-1 (SSRF guard + /metrics auth), SEC-2 (O(n²) analyzer DoS via ANALYZER_SCENE_CEILING + defense-in-depth), OPS-1 (crash handlers), OPS-2 (/metrics gate). SHOULD items: CSV injection guard, non-root container, production CSP. Tests: ingress-security 28/28, analyzer-dos 11/11, hardening 16/16 |
+| Engine + substrate wave (2026-07-12, commit 700fb5d) | Arc-incoherence deduction (act-swap AUC 0.48→0.62); emotional-arc + 8 diagnostic signals (anti-slop, theme, interiority, mirror-scenes, silence, bonding, cold-open, pattern-establishment); substrate spine (NarrativeState, Truth Ledger); detector modules (value-shift, story-spine, scene-economy); fountain import normalizer; paper-ink-stamp design system |
 
 ---
 
 ## 5. Open work (reprioritized, filed items tracked by reference only)
 
-### 5.1 Deep-read arc signals — THE AUC path (highest priority)
+### 5.1 Position-aware arc signals ✅ LANDED (July 12, commit 700fb5d)
 
-Act-swap AUC (~0.48) is the clearest open gap against NORTH_STAR's
-separation-margin metric, and it's structurally diagnosed: lexicon signals
-detect content, not position. Deep-read (Run 10's LLM-per-scene sensing,
-already landed) is the existing mechanism to extend — it needs to emit
-document-POSITION-aware signals (expected-vs-actual narrative position,
-setup/payoff distance, act-boundary coherence), not just per-scene content
-signals, feeding the same deterministic record-signal schema. Design-doc
-first (this is an L). Needs an AI key to develop against (deep-read is
-LLM-gated); keyless fallback must degrade honestly per standing principles.
+**Status:** Act-swap AUC 0.48→0.62 (graduation bar 0.55 cleared). The
+emotional-arc signal (deterministic VAD+tension from 12,142-word lexicon →
+Reagan archetypes + position features) was measured July 11
+(`docs/scoring/ARC_RECALIBRATION_WAVE_2026-07-11.md`), then wired July 12 as
+a bounded arc-incoherence structural deduction (≥15 scenes, capped at 15
+points) rather than an additive health blend. Produced-floor held ≥80,
+calibration corpus byte-identical (the gate only fires on feature-scale
+scripts), shuffle-drop AUC preserved.
+
+**Remaining (LLM deep-read path, future amplifier):** The original §5.1 plan
+(LLM-per-scene position-aware signals: expected-vs-actual narrative position,
+setup/payoff distance, act-boundary coherence) is **not cancelled** — it's
+demoted from critical path to future amplifier. If 0.62 proves insufficient,
+the LLM path becomes the next attempt. But the deterministic path closed the
+gap first, so the LLM path stays filed, not scheduled.
 
 ### 5.2 Composite min-gap guard wave
 
