@@ -199,7 +199,7 @@ export default function StartScreen({
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-paper text-ink font-sans">
+    <div className="relative min-h-dvh overflow-x-hidden bg-paper text-ink font-sans">
       <div className="film-grain" aria-hidden="true" />
 
       <AnimatePresence mode="wait">
@@ -210,143 +210,383 @@ export default function StartScreen({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: DUR_MICRO, ease: EASE_OUT_EXPO }}
-            className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-14 px-6 py-14 sm:gap-16 sm:px-10 sm:py-20"
+            className="relative z-10 w-full"
           >
-            {/* ---- The entrance: wordmark + the one signature move ---- */}
-            <header className="flex flex-col gap-6 sm:gap-8">
-              <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
-                Coverage Report — Reader&rsquo;s Copy
-              </p>
-              <h1
-                className="font-display uppercase leading-[0.82] text-ink"
-                style={{ fontSize: "clamp(3.25rem, 12vw, 9.5rem)" }}
+            {/* ── Hero: wordmark + bring a script (primary task) ── */}
+            <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-14 px-6 py-14 sm:gap-16 sm:px-10 sm:py-20">
+              <header className="flex flex-col gap-6 sm:gap-8">
+                <p className="hidden font-mono text-[11px] uppercase tracking-[0.4em] text-ink/50 sm:block">
+                  Coverage Report — Reader&rsquo;s Copy
+                </p>
+                <h1
+                  className="font-display uppercase leading-[0.82] text-ink"
+                  style={{ fontSize: "clamp(3.25rem, 12vw, 9.5rem)" }}
+                >
+                  Story Machine
+                </h1>
+                <SlugLineIntro onComplete={() => setIsIntroResolved(true)} />
+              </header>
+
+              <motion.main
+                initial={{ opacity: 0, y: 12 }}
+                animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
+                transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
+                className="flex flex-col gap-10 sm:gap-12"
+                inert={!isIntroResolved || undefined}
               >
-                Story Machine
-              </h1>
-              <SlugLineIntro onComplete={() => setIsIntroResolved(true)} />
-            </header>
+                <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
+                  <h2
+                    id="entrance-actions-heading"
+                    className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50"
+                  >
+                    Bring A Script
+                  </h2>
 
-            {/* ---- Primary act: the three script-entry paths ----
-                The "resolves into the tool" half of the signature move:
-                held invisible until the slug line finishes typing, then
-                lifted in on the one sitewide easing/duration pair. Reduced-
-                motion users never see this — isIntroResolved starts true,
-                so initial===animate and Framer renders it already visible. */}
-            <motion.main
-              initial={{ opacity: 0, y: 12 }}
-              animate={isIntroResolved ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-              transition={{ duration: DUR_REVEAL, ease: EASE_OUT_EXPO }}
-              className="flex flex-col gap-10 sm:gap-12"
-              inert={!isIntroResolved || undefined}
-            >
-              <section aria-labelledby="entrance-actions-heading" className="flex flex-col gap-4 sm:gap-5">
-                <h2
-                  id="entrance-actions-heading"
-                  className="font-mono text-xs uppercase tracking-[0.3em] text-ink/50"
-                >
-                  Bring A Script
-                </h2>
-
-                {/* Grid, broken once: the sample gets a full-width, quietly
-                    stamped block instead of sitting equal-weight in a row —
-                    it's the best first taste, so it reads first. */}
-                <button
-                  type="button"
-                  onClick={handleSample}
-                  disabled={isGenerating}
-                  className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
-                >
-                  <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
-                    Reader&rsquo;s Pick
-                  </span>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">
-                    Fastest way in
-                  </span>
-                  <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
-                    <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
-                    Try The Sample Script
-                  </span>
-                  <span className="max-w-[52ch] font-sans text-sm text-paper/70">
-                    See a full coverage read on a script that&rsquo;s already loaded — no setup required.
-                  </span>
-                </button>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                   <button
                     type="button"
-                    onClick={() => onStart(DEFAULT_STORY_CONFIG)}
+                    onClick={handleSample}
                     disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-7 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-8 ${FOCUS_RING}`}
                   >
-                    <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    I Have A Script — Open The Editor
+                    <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
+                      Reader&rsquo;s Pick
+                    </span>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">
+                      Fastest way in
+                    </span>
+                    <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
+                      <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
+                      Try The Sample Script
+                    </span>
+                    <span className="max-w-[52ch] font-sans text-sm text-paper/70">
+                      See a full coverage read on a script that&rsquo;s already loaded — no setup required.
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => openFileInputRef.current?.click()}
-                    disabled={isGenerating}
-                    className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
-                  >
-                    <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    Open A Script File
-                  </button>
-                  <input
-                    type="file"
-                    accept=".fountain,.txt,.fdx"
-                    ref={openFileInputRef}
-                    onChange={handleOpenScriptFile}
-                    className="hidden"
-                    aria-label="Open a script file"
-                  />
-                </div>
 
-                {openFileError && (
-                  <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-mono text-xs text-ink">
-                    <span>{openFileError}</span>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                     <button
                       type="button"
-                      onClick={() => setOpenFileError(null)}
-                      aria-label="Dismiss error"
-                      className={`min-h-[44px] min-w-[44px] font-bold leading-none text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
+                      onClick={() => onStart(DEFAULT_STORY_CONFIG)}
+                      disabled={isGenerating}
+                      className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
                     >
-                      <X className="mx-auto h-4 w-4" aria-hidden="true" />
+                      <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      I Have A Script — Open The Editor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openFileInputRef.current?.click()}
+                      disabled={isGenerating}
+                      className={`flex min-h-[44px] items-center justify-center gap-3 border border-ink bg-transparent px-6 py-5 font-mono text-sm uppercase tracking-[0.15em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                    >
+                      <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      Open A Script File
+                    </button>
+                    <input
+                      type="file"
+                      accept=".fountain,.txt,.fdx"
+                      ref={openFileInputRef}
+                      onChange={handleOpenScriptFile}
+                      className="hidden"
+                      aria-label="Open a script file"
+                    />
+                  </div>
+
+                  {openFileError && (
+                    <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-mono text-xs text-ink">
+                      <span>{openFileError}</span>
+                      <button
+                        type="button"
+                        onClick={() => setOpenFileError(null)}
+                        aria-label="Dismiss error"
+                        className={`min-h-[44px] min-w-[44px] font-bold leading-none text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
+                      >
+                        <X className="mx-auto h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
+                </section>
+
+                <div className="flex flex-col items-start gap-4 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setView("wizard")}
+                    disabled={isGenerating}
+                    className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-mono text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  >
+                    <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                    Start a new story from scratch
+                    <ChevronRight
+                      className={`h-4 w-4 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <a
+                    href="#how-it-works"
+                    className={`inline-flex min-h-[44px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.25em] text-ink/50 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
+                  >
+                    How the desk works
+                    <ChevronRight className="h-3.5 w-3.5 rotate-90" aria-hidden="true" />
+                  </a>
+                </div>
+              </motion.main>
+            </div>
+
+            {/* ── Scroll depth: product story (supporting → explore layers) ── */}
+            <div className="border-t border-ink/15 bg-paper-edge/40">
+              <div className="mx-auto flex w-full max-w-5xl flex-col gap-20 px-6 py-16 sm:gap-24 sm:px-10 sm:py-24">
+
+                {/* Desk map */}
+                <section id="how-it-works" aria-labelledby="desk-heading" className="scroll-mt-10">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
+                    The reading room
+                  </p>
+                  <h2
+                    id="desk-heading"
+                    className="mt-3 font-display text-4xl uppercase leading-none text-ink sm:text-5xl"
+                  >
+                    One desk. Three jobs.
+                  </h2>
+                  <p className="mt-4 max-w-[54ch] text-base leading-relaxed text-ink/70">
+                    Bring a script. Get coverage. Ship or simulate. The page stays center —
+                    tools come to the page, not the other way around.
+                  </p>
+
+                  <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    {[
+                      {
+                        slug: "01 · Write",
+                        title: "Script desk",
+                        body: "Fountain on paper. Scenes and cast in the rail. Live notes only when you ask.",
+                      },
+                      {
+                        slug: "02 · Coverage",
+                        title: "Script Doctor",
+                        body: "Deterministic passes. A verdict, a score, ranked issues — jump straight to the line.",
+                      },
+                      {
+                        slug: "03 · Ship",
+                        title: "Export · Simulate",
+                        body: "PDF, FDX, snapshots — or seed OASIS and watch characters act under pressure.",
+                      },
+                    ].map((card) => (
+                      <article
+                        key={card.slug}
+                        className="flex flex-col gap-3 border border-ink/20 bg-paper p-5 sm:p-6"
+                      >
+                        <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-stamp">
+                          {card.slug}
+                        </p>
+                        <h3 className="font-display text-2xl uppercase leading-none text-ink">
+                          {card.title}
+                        </h3>
+                        <p className="text-sm leading-relaxed text-ink/65">{card.body}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Coverage detail */}
+                <section aria-labelledby="coverage-heading" className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10">
+                  <div className="lg:col-span-5">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
+                      Coverage
+                    </p>
+                    <h2
+                      id="coverage-heading"
+                      className="mt-3 font-display text-3xl uppercase leading-none text-ink sm:text-4xl"
+                    >
+                      A studio read you can inspect
+                    </h2>
+                    <p className="mt-4 max-w-[42ch] text-sm leading-relaxed text-ink/70">
+                      No black-box score. Every note traces to a pass, a scene, a line.
+                      Re-run and the result stays reproducible.
+                    </p>
+                  </div>
+                  <div className="border border-ink bg-paper p-6 lg:col-span-7 sm:p-8">
+                    <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink/15 pb-5">
+                      <div>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/45">
+                          Verdict
+                        </p>
+                        <p
+                          className="mt-2 inline-block rotate-[-4deg] border-2 border-stamp px-3 py-1 font-mono text-sm font-bold uppercase tracking-[0.2em] text-stamp"
+                        >
+                          Consider
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/45">
+                          Health
+                        </p>
+                        <p className="font-display text-5xl leading-none text-ink">76</p>
+                      </div>
+                    </div>
+                    <ul className="mt-5 space-y-3 font-mono text-[12px] uppercase tracking-wider text-ink/75">
+                      <li className="flex justify-between gap-4 border-b border-ink/10 pb-2">
+                        <span>Top issue</span>
+                        <span className="text-stamp">Climax engagement</span>
+                      </li>
+                      <li className="flex justify-between gap-4 border-b border-ink/10 pb-2">
+                        <span>Critical · Major · Minor</span>
+                        <span>3 · 38 · 159</span>
+                      </li>
+                      <li className="flex justify-between gap-4">
+                        <span>LLM in the verdict path</span>
+                        <span>None</span>
+                      </li>
+                    </ul>
+                  </div>
+                </section>
+
+                {/* OASIS / Story Machine */}
+                <section aria-labelledby="oasis-heading" className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                  <div className="border border-ink bg-ink p-6 text-paper sm:p-8 lg:col-span-7">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-paper/50">
+                      OASIS
+                    </p>
+                    <h2
+                      id="oasis-heading"
+                      className="mt-3 font-display text-3xl uppercase leading-none sm:text-4xl"
+                    >
+                      Story Machine simulation
+                    </h2>
+                    <p className="mt-4 max-w-[48ch] text-sm leading-relaxed text-paper/70">
+                      Perspective-bounded characters. Beliefs, pressure, and choices that
+                      leave a ledger you can export back to the script desk.
+                    </p>
+                    <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {[
+                        { t: "Stage", d: "Locations, adjacency, who is present" },
+                        { t: "Agents", d: "Masks, motives, suspicion, emotion" },
+                        { t: "Ledger", d: "Every action timestamped and typed" },
+                        { t: "Export", d: "Fountain back into the editor" },
+                      ].map((item) => (
+                        <div key={item.t} className="border border-paper/20 p-4">
+                          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
+                            {item.t}
+                          </p>
+                          <p className="mt-2 text-sm text-paper/75">{item.d}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onOpenStoryMachine?.()}
+                      className={`mt-8 inline-flex min-h-[44px] items-center gap-2 border border-paper bg-paper px-5 py-2.5 font-mono text-xs uppercase tracking-[0.2em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp hover:text-paper ${FOCUS_RING}`}
+                    >
+                      <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+                      Open OASIS Story Machine
                     </button>
                   </div>
-                )}
-              </section>
 
-              {/* ---- Secondary act: the wizard, clearly de-emphasized ---- */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => setView("wizard")}
-                  disabled={isGenerating}
-                  className={`group inline-flex min-h-[44px] items-center gap-2 py-2 font-mono text-sm uppercase tracking-[0.2em] text-ink/70 underline decoration-ink/30 underline-offset-4 transition-colors ${MICRO_TRANSITION} hover:text-stamp hover:decoration-stamp disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  <div className="flex flex-col justify-between gap-6 border border-ink/20 bg-paper p-6 sm:p-8 lg:col-span-5">
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
+                        Continuity
+                      </p>
+                      <h3 className="mt-3 font-display text-2xl uppercase leading-none text-ink">
+                        Same artifact. Different light.
+                      </h3>
+                      <p className="mt-4 text-sm leading-relaxed text-ink/70">
+                        Draft in the desk. Diagnose in Coverage. Simulate in OASIS.
+                        Export returns to the same page — selection and draft preserved.
+                      </p>
+                    </div>
+                    <ol className="space-y-3 font-mono text-[11px] uppercase tracking-[0.18em] text-ink/80">
+                      <li className="flex gap-3 border-b border-ink/10 pb-2">
+                        <span className="text-stamp">1</span> Bring or write a script
+                      </li>
+                      <li className="flex gap-3 border-b border-ink/10 pb-2">
+                        <span className="text-stamp">2</span> Run coverage · pick a fix
+                      </li>
+                      <li className="flex gap-3 border-b border-ink/10 pb-2">
+                        <span className="text-stamp">3</span> Simulate if you need pressure
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-stamp">4</span> Ship PDF · FDX · snapshot
+                      </li>
+                    </ol>
+                  </div>
+                </section>
+
+                {/* Rules / trust */}
+                <section
+                  aria-labelledby="rules-heading"
+                  className="border border-ink/15 bg-paper px-6 py-8 sm:px-10 sm:py-10"
                 >
-                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                  Start a new story from scratch
-                  <ChevronRight
-                    className={`h-4 w-4 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
-                    aria-hidden="true"
-                  />
-                </button>
-              </div>
-            </motion.main>
+                  <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
+                        Machine truth
+                      </p>
+                      <h2
+                        id="rules-heading"
+                        className="mt-2 font-display text-3xl uppercase leading-none text-ink sm:text-4xl"
+                      >
+                        3,216 rules. Keyless-first.
+                      </h2>
+                      <p className="mt-3 max-w-[50ch] text-sm leading-relaxed text-ink/65">
+                        Analysis and coverage run without an AI key. Generation stays optional —
+                        copilot, rewrites, and simulation turns wait until you configure one.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {["Deterministic", "Inspectable", "Reproducible"].map((chip) => (
+                        <span
+                          key={chip}
+                          className="border border-ink/30 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink/70"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </section>
 
-            {/* ---- OASIS entry + footer meta, restyled but reachable ---- */}
-            <footer className="mt-auto flex flex-col items-center gap-5 border-t border-ink/15 pt-10 text-center">
-              <button
-                type="button"
-                onClick={() => onOpenStoryMachine?.()}
-                className={`inline-flex min-h-[44px] items-center gap-2 border border-ink px-5 py-2.5 font-mono text-xs uppercase tracking-[0.25em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper ${FOCUS_RING}`}
-              >
-                <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
-                Open OASIS Story Machine
-              </button>
-              <div className="space-y-1 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/60">
-                <p className="font-semibold text-ink/60">3,216 deterministic rules · keyless-first</p>
-                <p>Every verdict inspectable · reproducible · no LLM in the verdict path</p>
+                {/* Closing CTA */}
+                <section className="flex flex-col items-start gap-6 border-t border-ink/15 pt-12 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="font-display text-3xl uppercase leading-none text-ink">
+                      Ready for the page
+                    </h2>
+                    <p className="mt-2 max-w-[40ch] text-sm text-ink/65">
+                      Start with a sample, open your draft, or step into simulation.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSample}
+                      disabled={isGenerating}
+                      className={`min-h-[44px] border border-ink bg-ink px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:opacity-40 ${FOCUS_RING}`}
+                    >
+                      Try sample
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onStart(DEFAULT_STORY_CONFIG)}
+                      disabled={isGenerating}
+                      className={`min-h-[44px] border border-ink px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:opacity-40 ${FOCUS_RING}`}
+                    >
+                      Open editor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenStoryMachine?.()}
+                      className={`min-h-[44px] border border-ink/40 px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-ink/80 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink ${FOCUS_RING}`}
+                    >
+                      Open OASIS
+                    </button>
+                  </div>
+                </section>
               </div>
+            </div>
+
+            <footer className="border-t border-ink/15 py-8 text-center">
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink/50">
+                Story Machine · coverage desk · OASIS simulation
+              </p>
             </footer>
           </motion.div>
         ) : (
