@@ -81,8 +81,8 @@ function CharacterNameField({
         onChange={(e) => onUpdate(charId, 'name', e.target.value)}
         onBlur={() => setTouched(true)}
         className={cn(
-          "bg-transparent text-sm font-bold outline-none w-full border-b-2 pb-1 focus:border-[#FF4444] transition-colors uppercase tracking-widest",
-          errorMsg ? "border-red-500 dark:border-red-400" : "border-black dark:border-zinc-700"
+          "w-full border-b-2 bg-transparent pb-1 text-sm font-bold uppercase tracking-widest outline-none transition-colors focus:border-[var(--sm-stamp)]",
+          errorMsg ? "border-[var(--sm-stamp)]" : "border-[var(--sm-ink)]"
         )}
         placeholder="CHARACTER NAME"
         aria-invalid={!!errorMsg}
@@ -290,7 +290,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
                     <div key={item.field} className="flex items-start gap-3">
                       <item.icon className="w-3 h-3 text-black dark:text-white mt-1 shrink-0" />
                       <div className="flex-1">
-                        <label className="text-[8px] font-bold uppercase tracking-widest text-black dark:text-zinc-400 block mb-1">{item.label}</label>
+                        <label className="sm-h mb-1 block">{item.label}</label>
                         <LongTextField
                           charId={char.id}
                           field={item.field}
