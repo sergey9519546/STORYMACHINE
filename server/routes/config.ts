@@ -91,7 +91,7 @@ router.get('/metrics', (req, res) => {
       res.status(404).end();
       return;
     }
-  } else if (!isLoopbackAddress(req.socket.remoteAddress)) {
+  } else if (!isLoopbackAddress(req.ip)) {
     res.status(404).end();
     return;
   }
