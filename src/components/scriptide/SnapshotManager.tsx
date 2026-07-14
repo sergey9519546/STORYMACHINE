@@ -20,6 +20,8 @@ interface SnapshotManagerProps {
   onDeleteSnapshot: (id: string) => void;
   onSetSnapshotModal: (modal: { open: boolean; name: string }) => void;
   onSetRestoreModal: (modal: { open: boolean; text: string }) => void;
+  /** When true, only mount modals (list rendered elsewhere in studio Versions). */
+  hideList?: boolean;
 }
 
 export default function SnapshotManager({
@@ -33,9 +35,11 @@ export default function SnapshotManager({
   onDeleteSnapshot,
   onSetSnapshotModal,
   onSetRestoreModal,
+  hideList = false,
 }: SnapshotManagerProps) {
   return (
     <>
+      {!hideList && (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-sm font-bold uppercase tracking-widest">
@@ -84,6 +88,7 @@ export default function SnapshotManager({
           )}
         </div>
       </div>
+      )}
 
       {/* Snapshot name modal */}
       <AnimatePresence>

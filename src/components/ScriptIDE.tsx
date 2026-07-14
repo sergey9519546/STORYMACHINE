@@ -9,6 +9,11 @@ import { buildScenarioFromScript } from "../lib/scenario-from-script";
 // toolbar button click), never needed for first paint or typing latency.
 import { safeJsonParse } from "../lib/json";
 import {
+  resolveDraftConflict,
+  saveStatusLabel as formatSaveStatus,
+  type SaveStatus,
+} from "../lib/draft-persistence";
+import {
   Loader2,
   BookOpen,
   Film,
@@ -27,7 +32,7 @@ import Sidebar from "./Sidebar";
 import FountainEditor, { FountainEditorHandle } from "./editor/FountainEditor";
 import SnapshotManager from "./scriptide/SnapshotManager";
 import ResearchNotes from "./scriptide/ResearchNotes";
-import Toolbar from "./scriptide/Toolbar";
+import Toolbar, { type IdeTask, type IdeToolSlot } from "./scriptide/Toolbar";
 import { ScriptCharacter } from "./scriptide/CharacterManager";
 
 // Lazy-loaded — each is a conditionally-rendered tab/overlay, never needed on
@@ -124,13 +129,18 @@ const lsGet = (key: string): string | null => {
   }
 };
 
-const lsSet = (key: string, val: string): void => {
+/** Returns true when the write succeeded. */
+const lsSet = (key: string, val: string): boolean => {
   try {
     localStorage.setItem(key, val);
+    return true;
   } catch {
-    // localStorage quota exceeded — changes not persisted, continue silently
+    // localStorage quota exceeded / private mode — caller surfaces save-failed
+    return false;
   }
 };
+
+const DRAFT_UPDATED_AT_KEY = "script_draft_updated_at";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -154,13 +164,12 @@ export default function ScriptIDE({
     | "storyEngine"
     | "research"
     | "titlePage"
+    | "versions"
   >("production");
-  const [showDirectorHUD, setShowDirectorHUD] = useState(false);
-  const [showScriptDoctor, setShowScriptDoctor] = useState(false);
-  // Docked right-side panels (Production/Analysis/Engine/Codex/Research/Title
-  // tabs + Script Snapshots) — hidden by default so the writing page owns the
-  // center of the IDE. Toggled via the Toolbar's "Panels" button.
-  const [showPanels, setShowPanels] = useState(false);
+  // Task-first shell: one task mode + one exclusive right tool slot.
+  // Keep structure stable; only emphasis/occupancy changes.
+  const [task, setTask] = useState<IdeTask>("write");
+  const [toolSlot, setToolSlot] = useState<IdeToolSlot>("none");
   // Mobile sidebar drawer: the Sidebar is a permanent 320px column on md+ but
   // slides in as an overlay on < md (see Sidebar.tsx). This toggles that drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -172,12 +181,18 @@ export default function ScriptIDE({
   // on mount and auto-runs the built-in sample through its own loadSample
   // flow, preserving "sample" provenance end to end.
   const [doctorAutoSample, setDoctorAutoSample] = useState(false);
-  const [showSlate, setShowSlate] = useState(false);
+  // Coverage freshness: after user edits, diagnosis is considered stale until
+  // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
+  const [coverageStale, setCoverageStale] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab">("none");
+  const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
   // a first pass doesn't want squiggles until they ask for them.
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
+  // Theme preference: localStorage + server ScriptIDE_State.is_dark_mode.
+  const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
@@ -190,7 +205,7 @@ export default function ScriptIDE({
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
   >(() => safeJsonParse(lsGet("research_notes"), []));
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [snapshotModal, setSnapshotModal] = useState<{
     open: boolean;
     name: string;
@@ -208,7 +223,6 @@ export default function ScriptIDE({
   const [characters, setCharacters] = useState<ScriptCharacter[]>(() =>
     safeJsonParse(lsGet("script_characters"), [])
   );
-  const [directorsLayer, setDirectorsLayer] = useState(false);
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
   const cleanErrTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -226,7 +240,6 @@ export default function ScriptIDE({
   const [collabUserName, setCollabUserName] = useState<string>(() => lsGet("collab_username") || "Writer");
   const [collabInput, setCollabInput] = useState("");
   const [collabNameInput, setCollabNameInput] = useState("");
-  const [showCollabBar, setShowCollabBar] = useState(false);
   // Keyless-honesty banner (finding E): whether generation-dependent features
   // (copilot, simulation turns, rewriting) have an AI key behind them.
   // null = not yet fetched; the banner only ever renders once we know for
@@ -257,64 +270,123 @@ export default function ScriptIDE({
   // Always-current characters ref so the 2s debounced analysis sees the latest roster.
   // Without this, adding a character during the debounce window would use the old list.
   const charactersRef = useRef(characters);
+  // Always-current draft payload for mount-stable server autosave (must NOT be
+  // recreated on every keystroke — that starved the previous 30s interval).
+  const draftRef = useRef({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  const draftUpdatedAtRef = useRef<number>(
+    Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0,
+  );
+  // Prevent setState-after-unmount from the flush-on-cleanup save path.
+  const mountedRef = useRef(true);
+  draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
+
+  // Sync document class for Tailwind `dark:` variants + CodeMirror theme.
+  useEffect(() => {
+    if (isDarkMode) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+    lsSet("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
-  // H1: Split into two effects:
-  // 1) isSaving indicator responds immediately to any change (good UX).
-  // 2) Actual lsSet() calls are debounced at 500ms so rapid keystrokes only
-  //    write once, preventing localStorage hammering on long scripts.
+  // Debounced write of heavy text data. Success/failure drives honest status.
   useEffect(() => {
-    // Show saving indicator immediately
-    setIsSaving(true);
-    const indicatorTimer = setTimeout(() => setIsSaving(false), 800);
-    return () => clearTimeout(indicatorTimer);
-  }, [scriptText, snapshots, characters, researchNotes]);
-
-  useEffect(() => {
-    // Debounced write of heavy text data (script_draft may be hundreds of KB)
+    setSaveStatus("saving-local");
     const debounceTimer = setTimeout(() => {
-      lsSet("script_draft", scriptText);
-      lsSet("script_snapshots", JSON.stringify(snapshots));
-      lsSet("script_characters", JSON.stringify(characters));
-      lsSet("research_notes", JSON.stringify(researchNotes));
+      const now = Date.now();
+      const ok =
+        lsSet("script_draft", scriptText) &&
+        lsSet("script_snapshots", JSON.stringify(snapshots)) &&
+        lsSet("script_characters", JSON.stringify(characters)) &&
+        lsSet("research_notes", JSON.stringify(researchNotes)) &&
+        lsSet("theme", isDarkMode ? "dark" : "light") &&
+        lsSet(DRAFT_UPDATED_AT_KEY, String(now));
+      if (!mountedRef.current) return;
+      if (ok) {
+        draftUpdatedAtRef.current = now;
+        setSaveStatus("saved-local");
+      } else {
+        setSaveStatus("save-failed");
+      }
     }, 500);
     return () => clearTimeout(debounceTimer);
-  }, [scriptText, snapshots, characters, researchNotes]);
+  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
 
-  // ── Server-side persistence (H2) ────────────────────────────────────────────
-  // Load from server on mount — if the server has a newer save (e.g. after cache
-  // clear), prefer it over localStorage.
+  // ── Server-side persistence ────────────────────────────────────────────────
+  // Load from server on mount. Prefer NEWER draft (timestamp), not longer text.
   useEffect(() => {
     let cancelled = false;
     fetch('/api/scriptide/load')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; updatedAt?: number | null } | null) => {
+      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; isDarkMode?: boolean; updatedAt?: number | null } | null) => {
         if (cancelled || !data || data.status === 'empty') return;
-        // Only overwrite local state if server has a non-trivial script.
-        if (data.scriptText && data.scriptText.length > (scriptText?.length ?? 0)) {
-          setScriptText(data.scriptText);
+        const localText = draftRef.current.scriptText ?? "";
+        const localTs = draftUpdatedAtRef.current || Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0;
+        const decision = resolveDraftConflict(
+          { text: localText, updatedAt: localTs },
+          { text: data.scriptText ?? "", updatedAt: data.updatedAt },
+        );
+        if (decision.source === "server") {
+          setScriptText(decision.text);
+          if (typeof decision.updatedAt === "number") {
+            draftUpdatedAtRef.current = decision.updatedAt;
+            lsSet(DRAFT_UPDATED_AT_KEY, String(decision.updatedAt));
+          }
+          if (data.snapshots?.length) setSnapshots(data.snapshots as { id: string; name: string; text: string; date: string }[]);
+          if (data.characters?.length) setCharacters(data.characters as typeof characters);
+          if (data.researchNotes?.length) setResearchNotes(data.researchNotes as typeof researchNotes);
+          if (typeof data.isDarkMode === "boolean") setIsDarkMode(data.isDarkMode);
         }
-        if (data.snapshots?.length) setSnapshots(data.snapshots as { id: string; name: string; text: string; date: string }[]);
-        if (data.characters?.length) setCharacters(data.characters as typeof characters);
-        if (data.researchNotes?.length) setResearchNotes(data.researchNotes as typeof researchNotes);
       })
       .catch(() => { /* non-critical — continue with localStorage */ });
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount only
 
-  // Auto-save to server every 30s (in addition to localStorage debounce).
+  // Auto-save to server every 30s from refs so continuous typing cannot starve it.
+  // Also flush on tab hide and unmount (unmount path never setStates).
   useEffect(() => {
-    const saveToServer = () => {
+    let inFlight = false;
+    const saveToServer = (opts: { updateStatus: boolean } = { updateStatus: true }) => {
+      if (inFlight) return;
+      const payload = draftRef.current;
+      if (!payload.scriptText && payload.snapshots.length === 0) return;
+      inFlight = true;
+      if (opts.updateStatus && mountedRef.current) setSaveStatus("saving-server");
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptText, snapshots, characters, researchNotes }),
-      }).catch(() => { /* non-critical */ });
+        body: JSON.stringify(payload),
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error(`save ${r.status}`);
+          const now = Date.now();
+          draftUpdatedAtRef.current = now;
+          lsSet(DRAFT_UPDATED_AT_KEY, String(now));
+          if (opts.updateStatus && mountedRef.current) setSaveStatus("saved-server");
+        })
+        .catch(() => {
+          if (opts.updateStatus && mountedRef.current) setSaveStatus("save-failed");
+        })
+        .finally(() => {
+          inFlight = false;
+        });
     };
-    const interval = setInterval(saveToServer, 30_000);
-    return () => clearInterval(interval);
-  }, [scriptText, snapshots, characters, researchNotes]);
+    const interval = setInterval(() => saveToServer({ updateStatus: true }), 30_000);
+    const onVis = () => {
+      if (document.visibilityState === "hidden") saveToServer({ updateStatus: true });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVis);
+      // Fire-and-forget flush; never touch React state after unmount.
+      saveToServer({ updateStatus: false });
+    };
+  }, []); // mount only — reads draftRef
 
   // Keep both refs in sync so async callbacks always read the latest values.
   useEffect(() => {
@@ -466,7 +538,7 @@ export default function ScriptIDE({
         },
       };
     });
-  }, [showDirectorHUD]);
+  }, [toolSlot]);
 
   // ── Memos ────────────────────────────────────────────────────────────────────
   const parsedBlocks = useMemo(() => parseFountain(scriptText), [scriptText]);
@@ -663,7 +735,8 @@ export default function ScriptIDE({
       if (pendingSample) {
         sessionStorage.removeItem("sm_sample_pending");
         setDoctorAutoSample(true);
-        setShowScriptDoctor(true);
+        setTask("coverage");
+        setToolSlot("coverage");
       }
     } catch { /* sessionStorage unavailable — notice just never appears */ }
   }, []);
@@ -685,8 +758,60 @@ export default function ScriptIDE({
     lsSet("llmready_banner_dismissed_scriptide", "1");
   };
 
+  /** Exclusive right tool slot — only one deep tool surface at a time. */
+  const openToolSlot = useCallback((slot: IdeToolSlot) => {
+    setToolSlot((prev) => {
+      const next = prev === slot ? "none" : slot;
+      if (next === "coverage") {
+        setTask("coverage");
+        setCoverageStale(false);
+      } else if (next === "studio") {
+        setTask((t) => (t === "ship" ? "ship" : "write"));
+      } else if (next === "none") {
+        setTask((t) => (t === "coverage" || t === "ship" ? "write" : t));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleTaskChange = useCallback((next: IdeTask) => {
+    setTask(next);
+    if (next === "write") {
+      setToolSlot("none");
+    } else if (next === "map") {
+      setToolSlot("none");
+      setSidebarOpen(true);
+    } else if (next === "coverage") {
+      setToolSlot("coverage");
+      setCoverageStale(false);
+    } else if (next === "ship") {
+      setToolSlot("studio");
+      setActiveTab("versions");
+    }
+  }, []);
+
+  // Escape ladder: prefs → tool slot → mobile sidebar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (prefsOpen !== "none") {
+        setPrefsOpen("none");
+        return;
+      }
+      if (toolSlot !== "none") {
+        setToolSlot("none");
+        if (task === "coverage" || task === "ship") setTask("write");
+        return;
+      }
+      if (sidebarOpen) setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [prefsOpen, toolSlot, task, sidebarOpen]);
+
   const handleScriptChange = (text: string) => {
     setScriptText(text);
+    setCoverageStale(true);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -1021,7 +1146,7 @@ export default function ScriptIDE({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
-      className="flex h-dvh w-full bg-[#f4f4f0] text-black font-sans overflow-hidden"
+      className={`flex h-dvh w-full bg-[#f4f4f0] text-ink font-sans overflow-hidden ${isDarkMode ? "dark" : ""}`}
     >
       <Sidebar
         characters={characters}
@@ -1060,26 +1185,27 @@ export default function ScriptIDE({
           </div>
         )}
         <Toolbar
-          isSaving={isSaving}
+          title={titlePage.title || initialConfig.theme || "Untitled Script"}
+          task={task}
+          toolSlot={toolSlot}
+          saveStatusLabel={formatSaveStatus(saveStatus)}
           isAnalyzing={engineState.isAnalyzing}
-          showDirectorHUD={showDirectorHUD}
           directorsLayer={directorsLayer}
-          showScriptDoctor={showScriptDoctor}
-          showSlate={showSlate}
-          showPanels={showPanels}
           liveDiagnostics={liveDiagnostics}
           wordCount={stats.wordCount}
           pageCount={pageCount}
           isTypewriterSound={isTypewriterSound}
           isSimulating={isSimulating}
-          onToggleHUD={() => setShowDirectorHUD(!showDirectorHUD)}
-          onToggleDirectorsLayer={() => setDirectorsLayer(!directorsLayer)}
-          onToggleScriptDoctor={() => setShowScriptDoctor(!showScriptDoctor)}
-          onToggleSlate={() => setShowSlate((prev) => !prev)}
-          onTogglePanels={() => setShowPanels((prev) => !prev)}
+          coverageStale={coverageStale}
+          provenance={doctorAutoSample ? "sample" : "user"}
+          onTaskChange={handleTaskChange}
+          onToggleDirectorsLayer={() => setDirectorsLayer((v) => !v)}
+          onOpenDirector={() => openToolSlot("director")}
+          onOpenSlate={() => openToolSlot("slate")}
+          onOpenStudio={() => openToolSlot("studio")}
           onToggleLiveDiagnostics={() => setLiveDiagnostics((prev) => !prev)}
           onToggleTypewriterSound={() => {
-            setIsTypewriterSound(prev => {
+            setIsTypewriterSound((prev) => {
               lsSet("typewriter_sound", prev ? "off" : "on");
               return !prev;
             });
@@ -1090,169 +1216,186 @@ export default function ScriptIDE({
           onExportDOCX={exportDOCX}
           onSimulateScript={handleSimulateScript}
           onOpenStoryMachine={onOpenStoryMachine}
+          onNewStory={onNewStory ? () => setNewStoryConfirm(true) : undefined}
+          onOpenCollab={() => {
+            setCollabNameInput(collabUserName);
+            setPrefsOpen("collab");
+          }}
+          onOpenCopilot={() => setPrefsOpen("copilot")}
         />
 
-        {/* "Simulate this script" result banner — success/warning/error, dismissible,
-            auto-clears after 8s (matches cleanError's timer idiom below). */}
-        {simulateStatus && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`px-4 py-2 border-b-2 border-black text-[11px] font-mono flex items-center justify-between gap-3 ${
-              simulateStatus.type === "error"
-                ? "bg-red-600 text-white"
-                : simulateStatus.type === "warning"
-                ? "bg-[#FFF4CC] text-black"
-                : "bg-green-600 text-white"
-            }`}
-          >
-            <span>{simulateStatus.message}</span>
-            <button
-              onClick={() => setSimulateStatus(null)}
-              aria-label="Dismiss"
-              className="shrink-0 font-bold uppercase text-[10px] border-2 border-current px-2 py-0.5 hover:opacity-80"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Deliverable 2: "New story" — returns to the setup wizard, clearing
-            the persisted config (App.tsx's onNewStory). The script draft
-            itself is untouched; only which screen App shows on next load. */}
-        {onNewStory && (
-          <div className="px-4 py-1 border-b-2 border-black bg-gray-100 flex items-center">
-            <button
-              onClick={() => setNewStoryConfirm(true)}
-              title="Return to the setup wizard (your script draft is not deleted)"
-              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black transition-colors"
-            >
-              ← New Story
-            </button>
-          </div>
-        )}
-
-        {/* Finding E: keyless-honesty banner — shown once we know the server
-            has no AI key configured, dismissible and remembered per-app. */}
-        {llmReady === false && !llmBannerDismissed && (
-          <div className="px-4 py-2 border-b-2 border-black bg-[#FFF4CC] text-black text-[11px] font-mono flex items-center justify-between gap-3">
-            <span>
-              Analysis &amp; exports work now. Generation (copilot, simulation turns, rewriting) needs an AI key — Settings explains.
-            </span>
-            <button
-              onClick={dismissLlmBanner}
-              aria-label="Dismiss"
-              className="shrink-0 font-bold uppercase text-[10px] border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* P9: inline copilot persona picker — selects the ghost-text voice. */}
-        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2">
-          <label
-            htmlFor="copilot-persona"
-            className="text-[10px] font-bold uppercase tracking-widest text-gray-500"
-          >
-            Copilot
-          </label>
-          <select
-            id="copilot-persona"
-            value={copilotPersona}
-            onChange={(e) => setCopilotPersona(e.target.value)}
-            title={personaList.find((p) => p.id === copilotPersona)?.description ?? ""}
-            className="text-[11px] font-mono bg-white border-2 border-black px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            {(personaList.length > 0
-              ? personaList
-              : [{ id: "default", name: "Staff Writer", description: "" }]
-            ).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          {(() => {
-            const desc = personaList.find((p) => p.id === copilotPersona)?.description;
-            return desc ? (
-              <span className="text-[10px] text-gray-400 italic hidden md:inline truncate">
-                {desc}
-              </span>
-            ) : null;
-          })()}
-        </div>
-
-        {/* P4: collaboration join/leave bar */}
-        <div className="px-4 py-1.5 border-b-2 border-black bg-gray-50 flex items-center gap-2 flex-wrap">
-          {collabRoom ? (
+        {/* Action strip — one next step; secondary chrome stays quiet */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/20 bg-[#f7f3ea] px-3 py-2 font-mono text-[11px] text-black">
+          {simulateStatus ? (
             <>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-green-700">Live</span>
-              <span className="text-[11px] font-mono text-gray-700 bg-green-100 border border-green-400 px-2 py-0.5 rounded">
-                Room: {collabRoom}
+              <span
+                className={
+                  simulateStatus.type === "error"
+                    ? "text-red-700"
+                    : simulateStatus.type === "warning"
+                      ? "text-amber-800"
+                      : "text-green-800"
+                }
+              >
+                {simulateStatus.message}
               </span>
-              <span className="text-[11px] text-gray-500">as {collabUserName}</span>
               <button
+                type="button"
+                onClick={() => setSimulateStatus(null)}
+                className="ml-auto border border-black/30 px-2 py-1 uppercase tracking-wider hover:bg-black hover:text-white"
+              >
+                Dismiss
+              </button>
+            </>
+          ) : collabRoom ? (
+            <>
+              <span className="font-bold uppercase tracking-widest text-green-800">Live</span>
+              <span className="text-black/70">Room {collabRoom} · {collabUserName}</span>
+              <button
+                type="button"
                 onClick={() => setCollabRoom(undefined)}
-                className="text-[11px] font-bold text-red-600 border-2 border-red-600 px-2 py-0.5 hover:bg-red-50"
+                className="ml-auto border border-black/30 px-2 py-1 uppercase tracking-wider hover:bg-black hover:text-white"
               >
                 Leave
               </button>
             </>
-          ) : showCollabBar ? (
+          ) : coverageStale && scriptText.trim().length > 0 ? (
             <>
-              <input
-                value={collabNameInput}
-                onChange={e => setCollabNameInput(e.target.value)}
-                placeholder="Your name"
-                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-28 focus:outline-none"
-              />
-              <input
-                value={collabInput}
-                onChange={e => setCollabInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && collabInput.trim()) {
-                    const name = collabNameInput.trim() || collabUserName;
-                    lsSet("collab_username", name);
-                    setCollabUserName(name);
-                    setCollabRoom(collabInput.trim());
-                    setShowCollabBar(false);
-                    setCollabInput("");
-                  }
-                }}
-                placeholder="Room ID (share with co-writer)"
-                className="text-[11px] font-mono border-2 border-black px-2 py-0.5 w-52 focus:outline-none"
-              />
+              <span className="text-black/70">Coverage outdated</span>
               <button
-                onClick={() => {
-                  if (!collabInput.trim()) return;
+                type="button"
+                onClick={() => handleTaskChange("coverage")}
+                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+              >
+                Run coverage
+              </button>
+            </>
+          ) : task === "coverage" ? (
+            <>
+              <span className="text-black/70">Diagnose the draft · jump issues from Doctor</span>
+              <button
+                type="button"
+                onClick={() => openToolSlot("coverage")}
+                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+              >
+                {toolSlot === "coverage" ? "Coverage open" : "Open coverage"}
+              </button>
+            </>
+          ) : task === "ship" ? (
+            <>
+              <span className="text-black/70">Export · version · simulate</span>
+              <button
+                type="button"
+                onClick={exportPDF}
+                className="border border-black bg-black px-3 py-1.5 font-bold uppercase tracking-wider text-white hover:bg-[#c1301c]"
+              >
+                PDF
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulateScript}
+                disabled={isSimulating}
+                className="border border-black px-3 py-1.5 font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-40"
+              >
+                Simulate
+              </button>
+            </>
+          ) : task === "map" ? (
+            <span className="text-black/70">Scenes and cast · pick a beat to jump the page</span>
+          ) : (
+            <span className="text-black/55">Write · page is primary</span>
+          )}
+
+          {llmReady === false && !llmBannerDismissed && (
+            <button
+              type="button"
+              onClick={dismissLlmBanner}
+              className="ml-auto text-[10px] uppercase tracking-wider text-black/50 underline hover:text-black"
+              title="Analysis works without a key; generation needs Settings"
+            >
+              No AI key · analysis ok
+            </button>
+          )}
+        </div>
+
+        {/* Progressive depth: prefs only when requested from overflow */}
+        {prefsOpen === "copilot" && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
+            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-black/60">
+              Copilot
+            </label>
+            <select
+              id="copilot-persona"
+              value={copilotPersona}
+              onChange={(e) => setCopilotPersona(e.target.value)}
+              className="border border-black bg-white px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
+            >
+              {(personaList.length > 0
+                ? personaList
+                : [{ id: "default", name: "Staff Writer", description: "" }]
+              ).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setPrefsOpen("none")}
+              className="ml-auto font-mono text-[10px] uppercase tracking-wider underline"
+            >
+              Done
+            </button>
+          </div>
+        )}
+        {prefsOpen === "collab" && !collabRoom && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
+            <input
+              value={collabNameInput}
+              onChange={(e) => setCollabNameInput(e.target.value)}
+              placeholder="Your name"
+              aria-label="Collaborator name"
+              className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+            />
+            <input
+              value={collabInput}
+              onChange={(e) => setCollabInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && collabInput.trim()) {
                   const name = collabNameInput.trim() || collabUserName;
                   lsSet("collab_username", name);
                   setCollabUserName(name);
                   setCollabRoom(collabInput.trim());
-                  setShowCollabBar(false);
+                  setPrefsOpen("none");
                   setCollabInput("");
-                }}
-                className="text-[11px] font-bold border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white"
-              >
-                Join
-              </button>
-              <button
-                onClick={() => setShowCollabBar(false)}
-                className="text-[11px] text-gray-500 border-2 border-gray-300 px-2 py-0.5 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
+                }
+              }}
+              placeholder="Room ID"
+              aria-label="Collaboration room id"
+              className="border border-black px-2 py-1 font-mono text-[11px] focus:outline-none"
+            />
             <button
-              onClick={() => { setCollabNameInput(collabUserName); setShowCollabBar(true); }}
-              className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black"
+              type="button"
+              onClick={() => {
+                if (!collabInput.trim()) return;
+                const name = collabNameInput.trim() || collabUserName;
+                lsSet("collab_username", name);
+                setCollabUserName(name);
+                setCollabRoom(collabInput.trim());
+                setPrefsOpen("none");
+                setCollabInput("");
+              }}
+              className="border border-black bg-black px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-white"
             >
-              + Collaborate
+              Join
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => setPrefsOpen("none")}
+              className="font-mono text-[10px] uppercase tracking-wider underline"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         <div
           className="flex-1 relative overflow-hidden bg-white"
@@ -1274,6 +1417,7 @@ export default function ScriptIDE({
             }}
             collabRoom={collabRoom}
             collabUserName={collabUserName}
+            isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
           />
 
@@ -1382,16 +1526,14 @@ export default function ScriptIDE({
         )}
       </AnimatePresence>
 
-      {/* RIGHT PANEL: VIRTUAL PRODUCTION & DIRECTOR DASHBOARD — hidden by
-          default (showPanels) so the centered writing page owns the layout;
-          toggled via the Toolbar's "Panels" button. */}
-      {showPanels && (
+      {/* RIGHT SLOT: exclusive studio surface */}
+      {toolSlot === "studio" && (
         <>
           {/* Mobile backdrop for the panels drawer. */}
           <div
             className="md:hidden fixed inset-0 z-40 bg-black/50"
             aria-hidden="true"
-            onClick={() => setShowPanels(false)}
+            onClick={() => openToolSlot("studio")}
           />
           {/* On md+ this is a static 400px column (shrink-0). On < md it
               becomes a right-side overlay drawer so it doesn't consume the
@@ -1399,8 +1541,8 @@ export default function ScriptIDE({
           <div className="w-full md:w-[400px] md:shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto fixed md:static top-0 right-0 z-50 md:z-auto">
             {/* Mobile-only close for the panels drawer. */}
             <button
-              onClick={() => setShowPanels(false)}
-              aria-label="Close side panels"
+              onClick={() => openToolSlot("studio")}
+              aria-label="Close studio panel"
               className="md:hidden absolute top-2 right-2 z-10 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
@@ -1414,6 +1556,7 @@ export default function ScriptIDE({
               { id: "codex", icon: BookOpen, label: "Codex" },
               { id: "research", icon: Layers, label: "Research" },
               { id: "titlePage", icon: Film, label: "Title" },
+              { id: "versions", icon: null, label: "Versions" },
             ] as const
           ).map(({ id, label }) => (
             <button
@@ -1741,16 +1884,33 @@ export default function ScriptIDE({
               {renderTitlePage()}
             </motion.div>
           )}
+
+          {activeTab === "versions" && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <SnapshotManager
+                snapshots={snapshots}
+                snapshotModal={snapshotModal}
+                restoreModal={restoreModal}
+                onTakeSnapshot={takeSnapshot}
+                onConfirmSnapshot={confirmSnapshot}
+                onRestoreSnapshot={restoreSnapshot}
+                onConfirmRestore={confirmRestore}
+                onDeleteSnapshot={deleteSnapshot}
+                onSetSnapshotModal={setSnapshotModal}
+                onSetRestoreModal={setRestoreModal}
+              />
+            </motion.div>
+          )}
         </div>
           </div>
         </>
       )}
 
-      {/* ── DIRECTOR HUD OVERLAY ── */}
+      {/* ── DIRECTOR HUD — exclusive tool slot ── */}
       <AnimatePresence>
-        {showDirectorHUD && engineState && (
+        {toolSlot === "director" && engineState && (
           <Suspense fallback={<DrawerPanelFallback />}><DirectorPanel
-            onClose={() => setShowDirectorHUD(false)}
+            onClose={() => openToolSlot("director")}
             state={{
               config: engineState.config,
               protagonist: engineState.protagonist,
@@ -1809,9 +1969,9 @@ export default function ScriptIDE({
         )}
       </AnimatePresence>
 
-      {/* ── SCRIPT DOCTOR OVERLAY ── */}
+      {/* ── SCRIPT DOCTOR — exclusive coverage tool slot ── */}
       <AnimatePresence>
-        {showScriptDoctor && (
+        {toolSlot === "coverage" && (
           <Suspense fallback={<DrawerPanelFallback />}><ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
@@ -1821,30 +1981,30 @@ export default function ScriptIDE({
               // .fdx→Fountain conversion behaves identically to any other
               // full-script replacement for undo/collab purposes.
               setScriptText(text);
+              setCoverageStale(false);
               triggerAnalysis(text);
             }}
             autoLoadSample={doctorAutoSample}
-            onClose={() => { setDoctorAutoSample(false); setShowScriptDoctor(false); }}
+            onClose={() => {
+              setDoctorAutoSample(false);
+              setToolSlot("none");
+              if (task === "coverage") setTask("write");
+            }}
           /></Suspense>
         )}
       </AnimatePresence>
 
-      {/* ── SLATE OVERLAY (producer-tier multi-script comparison) ── */}
+      {/* ── SLATE — exclusive tool slot ── */}
       <AnimatePresence>
-        {showSlate && (
+        {toolSlot === "slate" && (
           <Suspense fallback={<SlatePanelFallback />}>
-            <SlatePanel onClose={() => setShowSlate(false)} />
+            <SlatePanel onClose={() => openToolSlot("slate")} />
           </Suspense>
         )}
       </AnimatePresence>
 
-      {/* ── Script Snapshots panel + its modals (delegated to SnapshotManager) ──
-          SnapshotManager renders its snapshot list as an un-widthed flex child
-          (its modals are `fixed` overlays and unaffected), so it was a second
-          permanently-docked right-side column stealing width from the centered
-          writing page. Gated behind showPanels along with the tabs panel above
-          so both hide together by default. */}
-      {showPanels && (
+      {/* Snapshot modals when Versions tab is not mounting the full manager */}
+      {!(toolSlot === "studio" && activeTab === "versions") && (
         <SnapshotManager
           snapshots={snapshots}
           snapshotModal={snapshotModal}
@@ -1856,6 +2016,7 @@ export default function ScriptIDE({
           onDeleteSnapshot={deleteSnapshot}
           onSetSnapshotModal={setSnapshotModal}
           onSetRestoreModal={setRestoreModal}
+          hideList
         />
       )}
     </div>

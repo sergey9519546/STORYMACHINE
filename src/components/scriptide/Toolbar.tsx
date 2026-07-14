@@ -1,27 +1,41 @@
-import React from "react";
-import { BookOpen, Settings2, Layers, Layers3, Download, Loader2, Stethoscope, SpellCheck, Sparkles, PanelRight } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  BookOpen,
+  ChevronDown,
+  Download,
+  Layers,
+  Layers3,
+  Loader2,
+  MoreHorizontal,
+  PanelRight,
+  Settings2,
+  Sparkles,
+  SpellCheck,
+  Stethoscope,
+} from "lucide-react";
+
+export type IdeTask = "write" | "map" | "coverage" | "ship";
+export type IdeToolSlot = "none" | "coverage" | "studio" | "director" | "slate";
 
 interface ToolbarProps {
-  isSaving: boolean;
+  title?: string;
+  task: IdeTask;
+  toolSlot: IdeToolSlot;
+  saveStatusLabel?: string;
   isAnalyzing: boolean;
-  showDirectorHUD: boolean;
   directorsLayer: boolean;
-  showScriptDoctor: boolean;
-  showSlate: boolean;
-  /** Docked right-side panels (Production/Analysis/Engine/Codex/Research/Title
-   *  tabs + Script Snapshots) — hidden by default so the writing page centers. */
-  showPanels: boolean;
   liveDiagnostics: boolean;
   wordCount: number;
-  /** Live page count from layoutScreenplay() — the same pagination the PDF exporter uses. */
   pageCount: number;
   isTypewriterSound: boolean;
   isSimulating: boolean;
-  onToggleHUD: () => void;
+  coverageStale?: boolean;
+  provenance?: "user" | "sample" | "import" | "simulation";
+  onTaskChange: (task: IdeTask) => void;
   onToggleDirectorsLayer: () => void;
-  onToggleScriptDoctor: () => void;
-  onToggleSlate: () => void;
-  onTogglePanels: () => void;
+  onOpenDirector: () => void;
+  onOpenSlate: () => void;
+  onOpenStudio: () => void;
   onToggleLiveDiagnostics: () => void;
   onToggleTypewriterSound: () => void;
   onExportFountain: () => void;
@@ -30,26 +44,37 @@ interface ToolbarProps {
   onExportDOCX: () => void;
   onSimulateScript?: () => void;
   onOpenStoryMachine?: () => void;
+  onNewStory?: () => void;
+  onOpenCollab?: () => void;
+  onOpenCopilot?: () => void;
 }
 
+const TASKS: Array<{ id: IdeTask; label: string; title: string }> = [
+  { id: "write", label: "Write", title: "Draft on the page" },
+  { id: "map", label: "Map", title: "Scenes and cast" },
+  { id: "coverage", label: "Coverage", title: "Diagnose the draft" },
+  { id: "ship", label: "Ship", title: "Export, version, simulate" },
+];
+
 export default function Toolbar({
-  isSaving,
+  title = "Untitled Script",
+  task,
+  toolSlot,
+  saveStatusLabel = "",
   isAnalyzing,
-  showDirectorHUD,
   directorsLayer,
-  showScriptDoctor,
-  showSlate,
-  showPanels,
   liveDiagnostics,
   wordCount,
   pageCount,
   isTypewriterSound,
   isSimulating,
-  onToggleHUD,
+  coverageStale = false,
+  provenance = "user",
+  onTaskChange,
   onToggleDirectorsLayer,
-  onToggleScriptDoctor,
-  onToggleSlate,
-  onTogglePanels,
+  onOpenDirector,
+  onOpenSlate,
+  onOpenStudio,
   onToggleLiveDiagnostics,
   onToggleTypewriterSound,
   onExportFountain,
@@ -58,185 +83,324 @@ export default function Toolbar({
   onExportDOCX,
   onSimulateScript,
   onOpenStoryMachine,
+  onNewStory,
+  onOpenCollab,
+  onOpenCopilot,
 }: ToolbarProps) {
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!overflowOpen && !exportOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (overflowOpen && overflowRef.current && !overflowRef.current.contains(t)) {
+        setOverflowOpen(false);
+      }
+      if (exportOpen && exportRef.current && !exportRef.current.contains(t)) {
+        setExportOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOverflowOpen(false);
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overflowOpen, exportOpen]);
+
+  const statusTone = isAnalyzing
+    ? "text-yellow-300"
+    : coverageStale
+      ? "text-amber-300"
+      : "text-green-300";
+
+  const statusLabel = isAnalyzing
+    ? "Running"
+    : coverageStale
+      ? "Outdated"
+      : "Ready";
+
   return (
-    <div className="p-4 border-b-4 border-black bg-black text-white flex flex-wrap justify-between items-center gap-y-2 z-20">
-      <h1 className="font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-        <BookOpen className="w-4 h-4" /> The Ingest Engine (Script)
-      </h1>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {isSaving && (
-          <div className="text-[10px] font-bold text-yellow-400 animate-pulse uppercase tracking-widest">
-            Auto-saving...
+    <header className="z-20 border-b-2 border-black bg-black text-white">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
+        {/* Location / artifact */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <BookOpen className="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
+          <div className="min-w-0">
+            <h1 className="truncate font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
+              {title}
+            </h1>
+            <p className="hidden font-mono text-[10px] uppercase tracking-widest text-white/50 sm:block">
+              Script desk
+              {provenance !== "user" ? ` · ${provenance}` : ""}
+            </p>
           </div>
-        )}
-        <div className="text-xs font-mono" aria-live="polite" role="status">
-          {isAnalyzing ? (
-            <span className="flex items-center gap-2 text-yellow-400">
-              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />{" "}
-              ANALYZING...
+        </div>
+
+        {/* Task modes — stable structure, adaptive emphasis */}
+        <nav
+          aria-label="Current task"
+          className="order-3 flex w-full basis-full justify-center gap-1 sm:order-none sm:w-auto sm:basis-auto"
+        >
+          {TASKS.map((t) => {
+            const active = task === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                title={t.title}
+                aria-pressed={active}
+                onClick={() => onTaskChange(t.id)}
+                className={`min-h-[40px] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                  active
+                    ? "bg-white text-black"
+                    : "border border-white/25 text-white/75 hover:border-white hover:text-white"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Status + compact actions */}
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/55 md:flex">
+            <span className={statusTone} role="status" aria-live="polite">
+              {statusLabel}
             </span>
-          ) : (
-            <span className="text-green-400">READY</span>
-          )}
+            {saveStatusLabel ? (
+              <span className="max-w-[9rem] truncate text-white/45" title={saveStatusLabel}>
+                {saveStatusLabel}
+              </span>
+            ) : null}
+            <span>
+              {wordCount}w · {pageCount}pp
+            </span>
+          </div>
+
+          {/* Export menu — primary in Ship, available always */}
+          <div className="relative" ref={exportRef}>
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={exportOpen}
+              onClick={() => {
+                setExportOpen((v) => !v);
+                setOverflowOpen(false);
+              }}
+              className={`flex min-h-[40px] items-center gap-1 border px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                task === "ship"
+                  ? "border-white bg-white text-black"
+                  : "border-white/30 text-white hover:border-white"
+              }`}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Export
+              <ChevronDown className="h-3 w-3" aria-hidden="true" />
+            </button>
+            {exportOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-1 min-w-[10rem] border-2 border-black bg-white py-1 text-black shadow-[4px_4px_0_0_#000]"
+              >
+                {[
+                  { label: "Fountain", fn: onExportFountain },
+                  { label: "Final Draft", fn: onExportFDX },
+                  { label: "PDF", fn: onExportPDF },
+                  { label: "Word", fn: onExportDOCX },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    role="menuitem"
+                    className="block w-full px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider hover:bg-black hover:text-white"
+                    onClick={() => {
+                      item.fn();
+                      setExportOpen(false);
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onSimulateScript}
+            disabled={isSimulating || !onSimulateScript}
+            aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
+            className="flex min-h-[40px] items-center gap-1.5 border border-white/30 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:border-white disabled:cursor-wait disabled:opacity-40"
+          >
+            {isSimulating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">{isSimulating ? "…" : "Simulate"}</span>
+          </button>
+
+          {/* Overflow — secondary tools stay reachable without competing */}
+          <div className="relative" ref={overflowRef}>
+            <button
+              type="button"
+              aria-label="More tools"
+              aria-haspopup="menu"
+              aria-expanded={overflowOpen}
+              onClick={() => {
+                setOverflowOpen((v) => !v);
+                setExportOpen(false);
+              }}
+              className="flex min-h-[40px] min-w-[40px] items-center justify-center border border-white/30 text-white transition-colors hover:border-white"
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {overflowOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-1 w-56 border-2 border-black bg-white py-1 text-black shadow-[4px_4px_0_0_#000]"
+              >
+                <OverflowItem
+                  icon={<Stethoscope className="h-3.5 w-3.5" />}
+                  label={toolSlot === "coverage" ? "Close Coverage" : "Open Coverage"}
+                  onClick={() => {
+                    onTaskChange(toolSlot === "coverage" ? "write" : "coverage");
+                    setOverflowOpen(false);
+                  }}
+                />
+                <OverflowItem
+                  icon={<PanelRight className="h-3.5 w-3.5" />}
+                  label={toolSlot === "studio" ? "Close Studio" : "Open Studio"}
+                  onClick={() => {
+                    onOpenStudio();
+                    setOverflowOpen(false);
+                  }}
+                />
+                <OverflowItem
+                  icon={<Settings2 className="h-3.5 w-3.5" />}
+                  label={toolSlot === "director" ? "Close Director" : "Director HUD"}
+                  onClick={() => {
+                    onOpenDirector();
+                    setOverflowOpen(false);
+                  }}
+                />
+                <OverflowItem
+                  icon={<Layers3 className="h-3.5 w-3.5" />}
+                  label={toolSlot === "slate" ? "Close Slate" : "Slate compare"}
+                  onClick={() => {
+                    onOpenSlate();
+                    setOverflowOpen(false);
+                  }}
+                />
+                <div className="my-1 border-t border-black/15" />
+                <OverflowItem
+                  icon={<Layers className="h-3.5 w-3.5" />}
+                  label={directorsLayer ? "Director layer on" : "Director layer off"}
+                  pressed={directorsLayer}
+                  onClick={() => {
+                    onToggleDirectorsLayer();
+                    setOverflowOpen(false);
+                  }}
+                />
+                <OverflowItem
+                  icon={<SpellCheck className="h-3.5 w-3.5" />}
+                  label={liveDiagnostics ? "Live notes on" : "Live notes off"}
+                  pressed={liveDiagnostics}
+                  onClick={() => {
+                    onToggleLiveDiagnostics();
+                    setOverflowOpen(false);
+                  }}
+                />
+                <OverflowItem
+                  label={isTypewriterSound ? "Typewriter SFX on" : "Typewriter SFX off"}
+                  pressed={isTypewriterSound}
+                  onClick={() => {
+                    onToggleTypewriterSound();
+                    setOverflowOpen(false);
+                  }}
+                />
+                {onOpenCopilot && (
+                  <OverflowItem
+                    label="Copilot voice"
+                    onClick={() => {
+                      onOpenCopilot();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                )}
+                {onOpenCollab && (
+                  <OverflowItem
+                    label="Collaborate"
+                    onClick={() => {
+                      onOpenCollab();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                )}
+                {onOpenStoryMachine && (
+                  <OverflowItem
+                    label="Launch Story Machine"
+                    onClick={() => {
+                      onOpenStoryMachine();
+                      setOverflowOpen(false);
+                    }}
+                  />
+                )}
+                {onNewStory && (
+                  <>
+                    <div className="my-1 border-t border-black/15" />
+                    <OverflowItem
+                      label="New story…"
+                      onClick={() => {
+                        onNewStory();
+                        setOverflowOpen(false);
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="text-[10px] font-mono text-gray-400 hidden sm:block">
-          {wordCount} words &middot; {pageCount} pp.
-        </div>
-        <button
-          onClick={onToggleTypewriterSound}
-          aria-label={isTypewriterSound ? "Mute typewriter sound" : "Enable typewriter sound"}
-          aria-pressed={isTypewriterSound}
-          title={isTypewriterSound ? "Typewriter sound ON" : "Typewriter sound OFF"}
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border ${
-            isTypewriterSound ? "bg-white text-black" : "bg-gray-600 text-gray-300"
-          }`}
-        >
-          {isTypewriterSound ? "⌨ SFX" : "⌨ MUTE"}
-        </button>
-        <button
-          onClick={onToggleHUD}
-          aria-label={showDirectorHUD ? "Hide Director HUD" : "Show Director HUD"}
-          aria-pressed={showDirectorHUD}
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            showDirectorHUD
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <Settings2 className="w-3 h-3" aria-hidden="true" /> HUD
-        </button>
-        <button
-          onClick={onToggleDirectorsLayer}
-          aria-label={
-            directorsLayer
-              ? "Hide Director's Layer"
-              : "Show Director's Layer"
-          }
-          aria-pressed={directorsLayer}
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            directorsLayer
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <Layers className="w-3 h-3" aria-hidden="true" /> Director&apos;s Layer
-        </button>
-        <button
-          onClick={onToggleScriptDoctor}
-          aria-label={showScriptDoctor ? "Hide Script Doctor" : "Show Script Doctor"}
-          aria-pressed={showScriptDoctor}
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            showScriptDoctor
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <Stethoscope className="w-3 h-3" aria-hidden="true" /> Doctor
-        </button>
-        <button
-          onClick={onToggleSlate}
-          aria-label={showSlate ? "Hide Slate" : "Show Slate"}
-          aria-pressed={showSlate}
-          title="Rank multiple scripts against each other — producer-tier slate comparison"
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            showSlate
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <Layers3 className="w-3 h-3" aria-hidden="true" /> Slate
-        </button>
-        <button
-          onClick={onTogglePanels}
-          aria-label={showPanels ? "Hide side panels" : "Show side panels"}
-          aria-pressed={showPanels}
-          title="Toggle Production/Analysis/Engine/Codex/Research/Title panels and Script Snapshots"
-          className={`min-h-[44px] px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            showPanels
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <PanelRight className="w-3 h-3" aria-hidden="true" /> Panels
-        </button>
-        <button
-          onClick={onToggleLiveDiagnostics}
-          aria-label={liveDiagnostics ? "Hide Live Notes" : "Show Live Notes"}
-          aria-pressed={liveDiagnostics}
-          title={
-            liveDiagnostics
-              ? "Live Notes ON — narrative issues underline as you write"
-              : "Live Notes OFF — enable in-editor squiggle diagnostics"
-          }
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            liveDiagnostics
-              ? "bg-purple-600 text-white"
-              : "bg-white text-black hover:bg-gray-200"
-          }`}
-        >
-          <SpellCheck className="w-3 h-3" aria-hidden="true" /> Live Notes
-        </button>
-        <button
-          onClick={onExportFountain}
-          aria-label="Export script as Fountain file"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
-        >
-          <Download className="w-3 h-3" aria-hidden="true" /> .Fountain
-        </button>
-        <button
-          onClick={onExportFDX}
-          aria-label="Export script as Final Draft FDX file"
-          title="Export as Final Draft (.fdx)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
-        >
-          <Download className="w-3 h-3" aria-hidden="true" /> .FDX
-        </button>
-        <button
-          onClick={onExportPDF}
-          aria-label="Export script as industry-standard PDF"
-          title="Export as PDF (Courier 12pt, industry margins)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
-        >
-          <Download className="w-3 h-3" aria-hidden="true" /> .PDF
-        </button>
-        <button
-          onClick={onExportDOCX}
-          aria-label="Export script as Word document"
-          title="Export as Word (.docx)"
-          className="bg-white text-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors brutal-border flex items-center gap-2"
-        >
-          <Download className="w-3 h-3" aria-hidden="true" /> .DOCX
-        </button>
-        <button
-          onClick={onSimulateScript}
-          disabled={isSimulating || !onSimulateScript}
-          aria-label={isSimulating ? "Simulating script…" : "Simulate this script in Story Machine"}
-          title="Seed an OASIS scenario from this script's scenes and characters, then open Story Machine"
-          className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors brutal-border flex items-center gap-2 ${
-            isSimulating
-              ? "bg-gray-500 text-gray-200 cursor-wait"
-              : "bg-purple-600 text-white hover:bg-white hover:text-black disabled:opacity-40"
-          }`}
-        >
-          {isSimulating ? (
-            <>
-              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Simulating…
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-3 h-3" aria-hidden="true" /> Simulate
-            </>
-          )}
-        </button>
-        <button
-          onClick={onOpenStoryMachine}
-          aria-label="Launch Story Machine"
-          className="bg-[#FF4444] text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors brutal-border"
-        >
-          Launch Machine
-        </button>
       </div>
-    </div>
+    </header>
+  );
+}
+
+function OverflowItem({
+  label,
+  onClick,
+  icon,
+  pressed,
+}: {
+  label: string;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  pressed?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[11px] uppercase tracking-wider hover:bg-black hover:text-white ${
+        pressed ? "bg-black/5 font-bold" : ""
+      }`}
+    >
+      {icon}
+      <span className="flex-1">{label}</span>
+    </button>
   );
 }
