@@ -102,18 +102,21 @@ separates strong from weak real writing — not a larger rulebook.
    regressions.
 6. Close the composite minimum-gap guard through measured false-positive
    reduction — never by a global curve tweak that merely moves the fixture.
-7. Freeze the rule count at the ~2,300 genuinely distinct checks. Author no
-   new wave. Delete nothing yet; destructive removal is a separately reviewed
-   step after dependency mapping.
+7. Freeze rule growth: add no entries to the current 8,917-entry generated
+   catalog; treat ~2,300 distinct rule concepts as the maintained conceptual
+   set. Author no new wave. Removal is a separately approved migration after
+   dependency mapping, never implied by "freeze."
 
 ### P1 exit gate
 
-- Held-out real-writing discrimination AUC **>= 0.80**.
+- On a pre-registered held-out set large enough to report uncertainty,
+  real-writing discrimination point-estimate AUC **>= 0.80**; report a 95%
+  bootstrap interval whose lower bound is **> 0.65**.
 - Shuffle-drop AUC **>= 0.80**.
 - Act-swap AUC **>= 0.70**.
 - Composite minimum-gap guard passes at **>= 5.0**.
-- Existing deterministic, keyless, calibration, produced-floor, security,
-  type-check, and build gates remain green.
+- No benchmark leakage or material regression in deterministic, keyless,
+  calibration, produced-floor, security, type-check, or build gates.
 
 If the thresholds cannot be met without unstable proxies or benchmark
 leakage, report that result and revisit the product claim. Do not hide it
