@@ -642,15 +642,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           )}
         </div>
 
-        {/* Primary actions only — expert tools under Inspect */}
+        {/* Primary actions only — setup CTA lives in the Stage card until initialized. */}
         <div className="flex w-full flex-wrap items-center gap-2">
-          <button
-            onClick={() => openOverlay('Builder')}
-            disabled={loading}
-            className="sm-btn border-[var(--sm-cream)]/30 bg-transparent text-[var(--sm-cream)] hover:bg-[var(--sm-cream)] hover:text-[var(--sm-ink)] disabled:opacity-50"
-          >
-            Build scenario
-          </button>
+          {nodes.length > 0 && (
+            <button
+              onClick={() => openOverlay('Builder')}
+              disabled={loading}
+              className="sm-btn border-[var(--sm-cream)]/30 bg-transparent text-[var(--sm-cream)] hover:bg-[var(--sm-cream)] hover:text-[var(--sm-ink)] disabled:opacity-50"
+            >
+              Edit scenario
+            </button>
+          )}
 
           {ledger.length > 0 && (
             <>
