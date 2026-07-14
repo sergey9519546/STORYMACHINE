@@ -8,8 +8,10 @@ const StoryMachine = lazy(() => import('./components/StoryMachine'));
 const DesignPreview = lazy(() => import('./components/DesignPreview'));
 
 const LoadingFallback = () => (
-  <div className="min-h-screen bg-white flex items-center justify-center font-mono">
-    <div className="text-black text-xl uppercase tracking-widest animate-pulse">Loading...</div>
+  <div className="min-h-[100dvh] bg-paper text-ink flex items-center justify-center font-mono">
+    <div className="border-[1.5px] border-ink bg-panel px-6 py-4 text-xs font-bold uppercase tracking-[.16em] shadow-[6px_6px_0_rgba(33,29,21,.15)] animate-pulse">
+      Loading…
+    </div>
   </div>
 );
 

@@ -12,7 +12,31 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Brain,
+  CheckCircle2,
+  Clock3,
+  Dna,
+  Eye,
+  FileDown,
+  FileEdit,
+  FlaskConical,
+  GitBranch,
+  HeartPulse,
+  MessageCircle,
+  PenTool,
+  Scissors,
+  Settings,
+  Shuffle,
+  Smile,
+  Target,
+  UserRound,
+  Users,
+  Zap,
+} from "lucide-react";
 // HarvestPanel/CorpusPanel/ArcTimelinePanel stay eager: each is under 8KB
 // source, no heavy deps, and not worth their own network round trip.
 import { HarvestPanel } from "./HarvestPanel";
@@ -571,7 +595,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
       : "#22cc44";
 
   return (
-    <div className="min-h-screen bg-paper text-ink p-8 font-sans">
+    <div className="min-h-[100dvh] bg-paper text-ink px-4 py-6 sm:p-8 font-sans">
       {errorMsg && (
         <div
           role="alert"
@@ -596,7 +620,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           </button>
         </div>
       )}
-      <header className="mb-8 border-b-4 border-black pb-4 flex justify-between items-center">
+      <header className="mb-8 border-b-4 border-ink pb-4 flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6">
         <div>
           <h1 className="text-3xl font-bold uppercase tracking-widest text-ink">
             Story Machine
@@ -605,7 +629,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             OASIS Architecture — Perspective-Bounded Simulation
           </p>
         </div>
-        <div className="flex gap-3 items-center flex-wrap justify-end">
+        <div className="flex gap-3 items-center flex-wrap justify-start lg:justify-end w-full lg:w-auto">
           {illusionState && (
             <div
               className="text-[10px] font-bold uppercase tracking-widest px-3 py-2 brutal-border"
@@ -752,7 +776,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Quality Engines — 9 narrative quality signals per committed scene"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◈</span>
+            <BarChart3 className="w-4 h-4" />
             <span className="hidden sm:inline">Quality</span>
           </button>
           <button
@@ -760,7 +784,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Epistemic Map — who believes what about whom, ToM² meta-layers, dramatic irony"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◎</span>
+            <Brain className="w-4 h-4" />
             <span className="hidden sm:inline">Epistemic</span>
           </button>
           <button
@@ -768,7 +792,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Arc Completion — track open narrative promises with pacing scores"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◷</span>
+            <Clock3 className="w-4 h-4" />
             <span className="hidden sm:inline">Arcs</span>
           </button>
           <button
@@ -776,7 +800,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Story Health — unified vitals: tension, quality, arcs, epistemic depth"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>♥</span>
+            <HeartPulse className="w-4 h-4" />
             <span className="hidden sm:inline">Health</span>
           </button>
           <button
@@ -784,7 +808,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Character Arc — per-character belief, emotion, relationship, and agency trajectories"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>⟳</span>
+            <UserRound className="w-4 h-4" />
             <span className="hidden sm:inline">Chars</span>
           </button>
           <button
@@ -792,7 +816,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Narrative Regression Suite — 14 structural invariants graded like a CI test run"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✓</span>
+            <CheckCircle2 className="w-4 h-4" />
             <span className="hidden sm:inline">Tests</span>
           </button>
           <button
@@ -800,7 +824,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Narrative Momentum — per-scene CI history of quality, regression, tension, and proofs"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>⚡</span>
+            <Activity className="w-4 h-4" />
             <span className="hidden sm:inline">Momentum</span>
           </button>
           <button
@@ -808,7 +832,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Narrative Analytics — tension ledger, story-shape archetype fit, and first-watch vs rewatch scoring"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>🔬</span>
+            <FlaskConical className="w-4 h-4" />
             <span className="hidden sm:inline">Analytics</span>
           </button>
           <button
@@ -816,7 +840,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>🧬</span>
+            <Dna className="w-4 h-4" />
             <span className="hidden sm:inline">Voice</span>
           </button>
           </div>
@@ -827,7 +851,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="Author Presence — STEER, INJECT, OVERRULE live story beats"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✍</span>
+            <PenTool className="w-4 h-4" />
             <span className="hidden sm:inline">Live</span>
           </button>
           <button
@@ -835,7 +859,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             title="12-Pass Revision Pipeline — diagnose and rewrite the compiled screenplay"
             className="bg-ink hover:bg-stamp text-cream px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✒</span>
+            <FileEdit className="w-4 h-4" />
             <span className="hidden sm:inline">Revise</span>
           </button>
           <button
