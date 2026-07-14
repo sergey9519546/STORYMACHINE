@@ -46,6 +46,7 @@ const AIPanel = lazy(() => import("./AIPanel"));
 const DirectorPanel = lazy(() => import("./DirectorPanel"));
 const AnalysisPanel = lazy(() => import("./scriptide/AnalysisPanel"));
 const ScriptDoctorPanel = lazy(() => import("./scriptide/ScriptDoctorPanel"));
+const CoverageSummary = lazy(() => import("./scriptide/CoverageSummary"));
 const SlatePanel = lazy(() => import("./SlatePanel"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
@@ -183,6 +184,8 @@ export default function ScriptIDE({
   // Coverage freshness: after user edits, diagnosis is considered stale until
   // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
   const [coverageStale, setCoverageStale] = useState(false);
+  /** Progressive depth: summary first; full Script Doctor is opt-in. */
+  const [coverageFull, setCoverageFull] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab">("none");
   const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
@@ -777,12 +780,15 @@ export default function ScriptIDE({
     setTask(next);
     if (next === "write") {
       setToolSlot("none");
+      setCoverageFull(false);
     } else if (next === "coverage") {
       setToolSlot("coverage");
+      setCoverageFull(false);
       setCoverageStale(false);
     } else if (next === "ship") {
       setToolSlot("studio");
       setActiveTab("versions");
+      setCoverageFull(false);
     }
   }, []);
 
@@ -794,8 +800,13 @@ export default function ScriptIDE({
         setPrefsOpen("none");
         return;
       }
+      if (toolSlot === "coverage" && coverageFull) {
+        setCoverageFull(false);
+        return;
+      }
       if (toolSlot !== "none") {
         setToolSlot("none");
+        setCoverageFull(false);
         if (task === "coverage" || task === "ship") setTask("write");
         return;
       }
@@ -803,7 +814,7 @@ export default function ScriptIDE({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [prefsOpen, toolSlot, task, sidebarOpen]);
+  }, [prefsOpen, toolSlot, task, sidebarOpen, coverageFull]);
 
   const handleScriptChange = (text: string) => {
     setScriptText(text);
@@ -1289,10 +1300,30 @@ export default function ScriptIDE({
           ) : task === "coverage" ? (
             <>
               <span className="text-black/70">
-                {toolSlot === "coverage"
-                  ? "Coverage open · pick an issue, then jump to the line"
-                  : "Next: diagnose this draft"}
+                {coverageFull
+                  ? "Full report · Esc returns to summary"
+                  : toolSlot === "coverage"
+                    ? "Coverage · next fix in the panel"
+                    : "Next: diagnose this draft"}
               </span>
+              {toolSlot === "coverage" && !coverageFull && (
+                <button
+                  type="button"
+                  onClick={() => setCoverageFull(true)}
+                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
+                >
+                  Full report
+                </button>
+              )}
+              {toolSlot === "coverage" && coverageFull && (
+                <button
+                  type="button"
+                  onClick={() => setCoverageFull(false)}
+                  className="border border-black/30 px-3 py-1.5 uppercase tracking-wider hover:border-black hover:bg-black hover:text-white"
+                >
+                  Summary
+                </button>
+              )}
               {toolSlot !== "coverage" && (
                 <button
                   type="button"
@@ -2053,26 +2084,49 @@ export default function ScriptIDE({
         )}
       </AnimatePresence>
 
-      {/* ── SCRIPT DOCTOR — exclusive coverage tool slot ── */}
+      {/* ── COVERAGE — summary first; full doctor is progressive depth ── */}
       <AnimatePresence>
-        {toolSlot === "coverage" && (
+        {toolSlot === "coverage" && !coverageFull && (
+          <Suspense fallback={<DrawerPanelFallback />}>
+            <CoverageSummary
+              fountain={scriptText}
+              title={titlePage.title}
+              autoLoadSample={doctorAutoSample}
+              onFreshReport={() => setCoverageStale(false)}
+              onLoadSampleIntoEditor={(text) => {
+                setScriptText(text);
+                setCoverageStale(false);
+                triggerAnalysis(text);
+              }}
+              onJumpToLine={(line1) => {
+                editorRef.current?.navigateTo(line1);
+                // Keep coverage open; user is deciding/acting on the page
+              }}
+              onOpenFullReport={() => setCoverageFull(true)}
+              onClose={() => {
+                setDoctorAutoSample(false);
+                setCoverageFull(false);
+                setToolSlot("none");
+                if (task === "coverage") setTask("write");
+              }}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {toolSlot === "coverage" && coverageFull && (
           <Suspense fallback={<DrawerPanelFallback />}><ScriptDoctorPanel
             fountain={scriptText}
             title={titlePage.title}
             onLoadFountain={(text) => {
-              // Same path as confirmRestore (snapshot restore): set the
-              // editor's script text and re-trigger analysis, so a loaded
-              // .fdx→Fountain conversion behaves identically to any other
-              // full-script replacement for undo/collab purposes.
               setScriptText(text);
               setCoverageStale(false);
               triggerAnalysis(text);
             }}
-            autoLoadSample={doctorAutoSample}
+            autoLoadSample={false}
             onClose={() => {
-              setDoctorAutoSample(false);
-              setToolSlot("none");
-              if (task === "coverage") setTask("write");
+              // Back one depth to summary, not all the way to write
+              setCoverageFull(false);
             }}
           /></Suspense>
         )}
