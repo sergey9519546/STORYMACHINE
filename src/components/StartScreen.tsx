@@ -159,6 +159,7 @@ export default function StartScreen({
           sessionStorage.setItem("sm_fdx_import_pending", file.name);
         } else {
           localStorage.setItem("script_draft", text);
+          localStorage.setItem("script_draft_updated_at", String(Date.now()));
         }
       } catch {
         setOpenFileError(`Couldn't open "${file.name}" — your browser is blocking local storage (private mode?).`);
@@ -247,19 +248,19 @@ export default function StartScreen({
                     type="button"
                     onClick={handleSample}
                     disabled={isGenerating}
-                    className={`group relative flex min-h-[44px] flex-col gap-2 border border-ink bg-ink px-7 py-8 text-left text-paper transition-transform ${MICRO_TRANSITION} hover:-translate-y-[2px] disabled:pointer-events-none disabled:opacity-40 sm:px-9 sm:py-9 ${FOCUS_RING}`}
+                    className={`sm-btn sm-btn--stamp group relative flex min-h-[56px] w-full flex-col items-start gap-2 px-7 py-8 text-left sm:px-9 sm:py-9 ${FOCUS_RING}`}
                   >
-                    <span className="absolute -top-3 -right-3 rotate-[6deg] border border-stamp bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.25em] text-stamp">
+                    <span className="sm-stamp absolute -right-3 -top-3 rotate-[6deg] text-[10px]">
                       Recommended
                     </span>
-                    <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">
+                    <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]/60">
                       One click · full coverage
                     </span>
-                    <span className="flex items-center gap-3 font-display text-2xl uppercase tracking-wide sm:text-3xl">
+                    <span className="flex items-center gap-3 font-[family-name:var(--sm-font-display)] text-2xl uppercase tracking-wide text-[var(--sm-cream)] sm:text-3xl">
                       <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
                       Try sample coverage
                     </span>
-                    <span className="max-w-[42ch] font-sans text-sm text-paper/70">
+                    <span className="max-w-[42ch] text-sm text-[var(--sm-cream)]/70">
                       Load a script, open the desk, run Script Doctor. No setup.
                     </span>
                   </button>
@@ -269,7 +270,7 @@ export default function StartScreen({
                       type="button"
                       onClick={() => openFileInputRef.current?.click()}
                       disabled={isGenerating}
-                      className={`flex min-h-[44px] items-center justify-center gap-2 border border-ink/40 bg-transparent px-5 py-4 font-mono text-xs uppercase tracking-[0.15em] text-ink/80 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`sm-btn flex items-center justify-center gap-2 ${FOCUS_RING}`}
                     >
                       <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
                       Open my script
@@ -278,7 +279,7 @@ export default function StartScreen({
                       type="button"
                       onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                       disabled={isGenerating}
-                      className={`flex min-h-[44px] items-center justify-center gap-2 border border-ink/40 bg-transparent px-5 py-4 font-mono text-xs uppercase tracking-[0.15em] text-ink/80 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`sm-btn flex items-center justify-center gap-2 ${FOCUS_RING}`}
                     >
                       <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
                       Blank page
@@ -294,16 +295,18 @@ export default function StartScreen({
                   </div>
 
                   {openFileError && (
-                    <div className="flex items-center justify-between gap-3 border border-stamp bg-paper px-4 py-3 font-mono text-xs text-ink">
-                      <span>{openFileError}</span>
-                      <button
-                        type="button"
-                        onClick={() => setOpenFileError(null)}
-                        aria-label="Dismiss error"
-                        className={`min-h-[44px] min-w-[44px] font-bold leading-none text-ink transition-colors ${MICRO_TRANSITION} hover:text-stamp ${FOCUS_RING}`}
-                      >
-                        <X className="mx-auto h-4 w-4" aria-hidden="true" />
-                      </button>
+                    <div className="sm-card border-[var(--sm-stamp)]" role="alert">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="sm-slug">{openFileError}</span>
+                        <button
+                          type="button"
+                          onClick={() => setOpenFileError(null)}
+                          aria-label="Dismiss error"
+                          className={`min-h-[44px] min-w-[44px] leading-none transition-colors hover:text-[var(--sm-stamp)] ${FOCUS_RING}`}
+                        >
+                          <X className="mx-auto h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </section>
@@ -369,18 +372,13 @@ export default function StartScreen({
                       { n: "3", t: "Coverage", d: "Verdict · top issue" },
                       { n: "4", t: "Ship", d: "Export · simulate" },
                     ].map((step) => (
-                      <li
-                        key={step.n}
-                        className="flex items-start gap-3 border border-ink/20 bg-paper px-4 py-4"
-                      >
-                        <span className="font-display text-3xl leading-none text-stamp">{step.n}</span>
+                      <li key={step.n} className="sm-card flex items-start gap-3">
+                        <span className="font-[family-name:var(--sm-font-display)] text-3xl leading-none text-[var(--sm-stamp)]">
+                          {step.n}
+                        </span>
                         <div>
-                          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-ink">
-                            {step.t}
-                          </p>
-                          <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-ink/55">
-                            {step.d}
-                          </p>
+                          <p className="sm-title">{step.t}</p>
+                          <p className="sm-slug mt-1">{step.d}</p>
                         </div>
                       </li>
                     ))}
@@ -390,70 +388,68 @@ export default function StartScreen({
                 {/* L1 — coverage primary object */}
                 <section aria-labelledby="coverage-heading" className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                   <div className="lg:col-span-4">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
-                      Most important after a draft
-                    </p>
+                    <p className="sm-h">Most important after a draft</p>
                     <h2
                       id="coverage-heading"
-                      className="mt-2 font-display text-3xl uppercase leading-none text-ink sm:text-4xl"
+                      className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none text-[var(--sm-ink)] sm:text-4xl"
                     >
                       Coverage
                     </h2>
-                    <p className="mt-3 font-mono text-[12px] uppercase tracking-[0.15em] text-ink/60">
-                      Verdict · score · next fix
-                    </p>
+                    <p className="sm-sub">Verdict · score · next fix</p>
                     <button
                       type="button"
                       onClick={handleSample}
                       disabled={isGenerating}
-                      className={`mt-6 min-h-[44px] border border-ink bg-ink px-4 py-2.5 font-mono text-[11px] uppercase tracking-[0.2em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`sm-btn sm-btn--ink mt-6 ${FOCUS_RING}`}
                     >
                       See it on the sample
                     </button>
                   </div>
 
-                  <div className="border border-ink bg-paper p-5 sm:p-6 lg:col-span-8">
-                    <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink/15 pb-4">
-                      <div>
-                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/45">Verdict</p>
-                        <p className="mt-2 inline-block rotate-[-4deg] border-2 border-stamp px-3 py-1 font-mono text-sm font-bold uppercase tracking-[0.18em] text-stamp">
-                          Consider
-                        </p>
+                  <div className="sm-panel lg:col-span-8">
+                    <div className="sm-panel-body">
+                      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--sm-hair)] pb-4">
+                        <div>
+                          <p className="sm-h">Verdict</p>
+                          <p className="sm-stamp mt-2 text-[13px]">Consider</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="sm-h">Health</p>
+                          <p className="font-[family-name:var(--sm-font-display)] text-5xl leading-none text-[var(--sm-ink)]">
+                            76
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/45">Health</p>
-                        <p className="font-display text-5xl leading-none text-ink">76</p>
-                      </div>
+                      <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="sm-card py-3 text-center">
+                          <dt className="sm-h">Next</dt>
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-stamp)]">
+                            Climax engagement
+                          </dd>
+                        </div>
+                        <div className="sm-card py-3 text-center">
+                          <dt className="sm-h">Counts</dt>
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">3 · 38 · 159</dd>
+                        </div>
+                        <div className="sm-card py-3 text-center">
+                          <dt className="sm-h">LLM judge</dt>
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">None</dd>
+                        </div>
+                      </dl>
                     </div>
-                    <dl className="mt-4 grid grid-cols-1 gap-3 font-mono text-[11px] uppercase tracking-wider sm:grid-cols-3">
-                      <div className="border border-ink/10 p-3">
-                        <dt className="text-ink/45">Next</dt>
-                        <dd className="mt-1 text-stamp">Climax engagement</dd>
-                      </div>
-                      <div className="border border-ink/10 p-3">
-                        <dt className="text-ink/45">Counts</dt>
-                        <dd className="mt-1 text-ink">3 · 38 · 159</dd>
-                      </div>
-                      <div className="border border-ink/10 p-3">
-                        <dt className="text-ink/45">LLM judge</dt>
-                        <dd className="mt-1 text-ink">None</dd>
-                      </div>
-                    </dl>
                   </div>
                 </section>
 
                 {/* L2 — OASIS explore */}
-                <section aria-labelledby="oasis-heading" className="border border-ink bg-ink text-paper">
+                <section aria-labelledby="oasis-heading" className="sm-panel sm-panel--ink">
                   <div className="grid grid-cols-1 lg:grid-cols-12">
-                    <div className="p-6 sm:p-8 lg:col-span-7">
-                      <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-paper/45">
-                        When you need pressure
-                      </p>
+                    <div className="sm-panel-body lg:col-span-7">
+                      <p className="sm-h text-[var(--sm-cream)]/45">When you need pressure</p>
                       <h2
                         id="oasis-heading"
-                        className="mt-2 font-display text-3xl uppercase leading-none sm:text-4xl"
+                        className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none text-[var(--sm-cream)] sm:text-4xl"
                       >
-                        OASIS Story Machine
+                        Story Machine Simulate
                       </h2>
                       <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {[
@@ -462,24 +458,24 @@ export default function StartScreen({
                           ["Ledger", "Every act"],
                           ["Return", "Back to page"],
                         ].map(([k, v]) => (
-                          <div key={k} className="border border-paper/15 p-3">
-                            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-stamp">{k}</p>
-                            <p className="mt-1 font-mono text-[11px] uppercase tracking-wider text-paper/70">{v}</p>
+                          <div key={k} className="border border-[var(--sm-cream)]/15 p-3">
+                            <p className="sm-h text-[var(--sm-stamp)]">{k}</p>
+                            <p className="sm-slug mt-1 text-[var(--sm-cream)]/70">{v}</p>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="flex flex-col justify-between gap-6 border-t border-paper/15 p-6 sm:p-8 lg:col-span-5 lg:border-l lg:border-t-0">
-                      <ol className="space-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-paper/80">
-                        <li><span className="text-stamp">1</span> · Draft or import</li>
-                        <li><span className="text-stamp">2</span> · Coverage · pick a fix</li>
-                        <li><span className="text-stamp">3</span> · Simulate if needed</li>
-                        <li><span className="text-stamp">4</span> · Export / return</li>
+                    <div className="flex flex-col justify-between gap-6 border-t border-[var(--sm-cream)]/15 p-6 sm:p-8 lg:col-span-5 lg:border-l lg:border-t-0">
+                      <ol className="space-y-2 font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.16em] text-[var(--sm-cream)]/80">
+                        <li><span className="text-[var(--sm-stamp)]">1</span> · Draft or import</li>
+                        <li><span className="text-[var(--sm-stamp)]">2</span> · Coverage · pick a fix</li>
+                        <li><span className="text-[var(--sm-stamp)]">3</span> · Simulate if needed</li>
+                        <li><span className="text-[var(--sm-stamp)]">4</span> · Export / return</li>
                       </ol>
                       <button
                         type="button"
                         onClick={() => onOpenStoryMachine?.()}
-                        className={`inline-flex min-h-[44px] w-full items-center justify-center gap-2 border border-paper bg-paper px-4 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp hover:text-paper sm:w-auto ${FOCUS_RING}`}
+                        className={`sm-btn w-full bg-[var(--sm-cream)] text-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] hover:text-[var(--sm-cream)] sm:w-auto ${FOCUS_RING}`}
                       >
                         <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
                         Open simulation
@@ -491,24 +487,19 @@ export default function StartScreen({
                 {/* L1 — trust chips + primary re-entry */}
                 <section
                   aria-labelledby="next-heading"
-                  className="flex flex-col gap-8 border-t border-ink/15 pt-10 sm:flex-row sm:items-end sm:justify-between"
+                  className="flex flex-col gap-8 border-t border-[var(--sm-hair)] pt-10 sm:flex-row sm:items-end sm:justify-between"
                 >
                   <div>
-                    <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-ink/45">
-                      What next
-                    </p>
+                    <p className="sm-h">What next</p>
                     <h2
                       id="next-heading"
-                      className="mt-2 font-display text-3xl uppercase leading-none text-ink"
+                      className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none text-[var(--sm-ink)]"
                     >
                       Back to the page
                     </h2>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {["3,216 rules", "Keyless analysis", "Inspectable"].map((chip) => (
-                        <span
-                          key={chip}
-                          className="border border-ink/25 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-ink/60"
-                        >
+                        <span key={chip} className="sm-chip">
                           {chip}
                         </span>
                       ))}
@@ -519,7 +510,7 @@ export default function StartScreen({
                       type="button"
                       onClick={handleSample}
                       disabled={isGenerating}
-                      className={`min-h-[44px] border border-ink bg-ink px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-paper transition-colors ${MICRO_TRANSITION} hover:bg-stamp hover:border-stamp disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`sm-btn sm-btn--stamp ${FOCUS_RING}`}
                     >
                       Sample
                     </button>
@@ -527,26 +518,24 @@ export default function StartScreen({
                       type="button"
                       onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                       disabled={isGenerating}
-                      className={`min-h-[44px] border border-ink px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-ink transition-colors ${MICRO_TRANSITION} hover:bg-ink hover:text-paper disabled:opacity-40 ${FOCUS_RING}`}
+                      className={`sm-btn ${FOCUS_RING}`}
                     >
                       Editor
                     </button>
                     <button
                       type="button"
                       onClick={() => onOpenStoryMachine?.()}
-                      className={`min-h-[44px] border border-ink/35 px-5 py-3 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/70 transition-colors ${MICRO_TRANSITION} hover:border-ink hover:text-ink ${FOCUS_RING}`}
+                      className={`sm-btn text-[var(--sm-ink-mute)] ${FOCUS_RING}`}
                     >
-                      OASIS
+                      Simulate
                     </button>
                   </div>
                 </section>
               </div>
             </div>
 
-            <footer className="border-t border-ink/15 py-6 text-center">
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/45">
-                Story Machine
-              </p>
+            <footer className="border-t border-[var(--sm-hair)] py-6 text-center">
+              <p className="sm-slug">Story Machine</p>
             </footer>
           </motion.div>
         ) : (
