@@ -15,12 +15,12 @@ new spine is §3: validate with writers → make the score provably discriminate
 → collapse scope → ship a shareable artifact → then defensibility.
 
 Ground yourself before touching code: `NORTH_STAR.md` (constitution),
-`ARCHITECTURE.md` (system map), `CLAUDE.md` (conventions), and
-`git log --oneline -40` for the session's commit trail. **Note:** where
-`NORTH_STAR.md`, `ULTRAPLAN.md`, and `CLAUDE.md` still lead with rule count or
-the wave cadence as the product's structural claim, this roadmap supersedes
-them — see §5 (revised working principles). Those files should be updated to
-match; until they are, §3 and §5 here are canonical for priority.
+`ULTRAPLAN.md` (short execution brief), `ARCHITECTURE.md` (system map),
+`CLAUDE.md` (working constraints), and `git log --oneline -40` for the
+session's commit trail. These documents were reconciled to this roadmap on
+2026-07-14: the roadmap sets sequence, NORTH_STAR sets product laws,
+ULTRAPLAN summarizes the active phase, and CLAUDE sets implementation
+constraints.
 
 ---
 
@@ -106,15 +106,15 @@ optimizing rigor in isolation from a user again, which is exactly the mistake
 that got us here.
 
 **Work:**
-- Recruit >=5 working screenwriters (any tier, real drafts in hand).
+- Recruit >=5 real screenwriters (any career tier, real drafts in hand).
 - Show them the existing sample coverage report; watch, don't pitch.
 - Capture the single core question: *does this make you want to run your own draft — why or why not?*
 - Log objections, moments of trust, and moments of disbelief verbatim.
-- Write zero new product code until sessions are done.
+- Write zero new product or engine code until the P0 exit gate clears. Critical security fixes are the only exception.
 
 **Exit gate:** >=5 documented sessions with a clear signal on the core
-question. If the signal is negative, **STOP and reframe before P1** — do not
-proceed to build on a report nobody wants to run.
+question. If the signal is negative or ambiguous, **STOP, reframe, and repeat
+P0** — do not proceed to build on a report nobody wants to run.
 
 ### P1 — Make the score provably discriminate on real writing (the One Bet)
 
