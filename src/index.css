@@ -14,21 +14,35 @@
  *
  * Only the families + weights/styles actually referenced in src/** are
  * hosted:
- *   - Anton 400 (--font-display, font-display class) ΓÇö only weight used.
- *   - Inter 400/500/600 (--font-sans, body default + font-medium/font-semibold)
- *     ΓÇö weight 800 is declared in --font-* nowhere consumed (no
- *     font-extrabold / fontWeight:800 usage found) and is intentionally not
- *     hosted; the token itself is untouched.
+ *   - Anton 400 (--font-display, font-display class) — only weight used.
+ *   - Archivo 400–700 variable (--font-sans primary — the redesign's body
+ *     voice; Inter remains the fallback face).
+ *   - Caveat 500–700 variable (--font-hand, the stamped margin-note hand).
+ *   - Inter 400/500/600 (--font-sans fallback + legacy font-medium/semibold).
  *   - JetBrains Mono 400/700 (--font-mono, pervasive font-mono + font-bold
  *     combinations).
  *   - Courier Prime 400 normal, 700 normal, 400 italic (--font-courier, the
  *     ScriptIDE title-page: body text, bold title field, italic "written by")
- *     ΓÇö 700 italic is unused and not hosted.
+ *     — 700 italic is unused and not hosted.
  *   - Cormorant Garamond (--font-serif) is NOT hosted: no component
  *     references font-serif or "Cormorant" anywhere in src/**. The
- *     --font-serif token is left in place for the redesign wave that will
- *     consume it.
+ *     --font-serif token is left in place for a wave that consumes it.
  */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/archivo-var.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Caveat";
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url("/fonts/caveat-var.woff2") format("woff2");
+}
 @font-face {
   font-family: "Anton";
   font-style: normal;
@@ -102,44 +116,60 @@
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-courier: "Courier Prime", "Courier", monospace;
   --font-display: "Anton", sans-serif;
+  --font-hand: "Caveat", "Segoe Script", cursive;
   --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
-  
-  --color-brutal-black: #211d15;  /* warm ink */
-  --color-brutal-white: #f4efe2;  /* panel paper */
-  --color-brutal-gray: #efe8d7;  /* inset paper */
-  --color-accent: #c1301c;  /* stamp-red */
 
   /*
-   * Redesign token layer ("reading room / screenplay page" language) ΓÇö
-   * warm ink on production paper, one stamped accent. Foundation wave for
-   * the StartScreen redesign; a later agent consumes these to restyle
-   * components. Legacy brutal-* / --color-accent tokens above are left
-   * untouched ΓÇö un-migrated panels keep using them until they're moved
-   * over individually.
+   * Canonical "paper · ink · stamp" palette — single source of truth,
+   * taken verbatim from the redesign moodboard's :root (public/redesign.html
+   * line 8) and design-system.css, which agree. The former @theme layer
+   * (#14110D/#F4F0E6/#C8341E) was the odd one out and is consolidated here.
+   * design-system.css's --sm-* vars alias these; legacy brutal-* aliases
+   * below keep un-migrated panels rendering identically.
    *
-   * Contrast: --color-ink (#14110D) on --color-paper (#F4F0E6) is ~14.8:1,
-   * comfortably clearing the WCAG AA text minimum of 4.5:1.
+   * Contrast: --color-ink (#211d15) on --color-paper (#e6dfcf) is ~12.5:1,
+   * and on --color-panel (#f4efe2) ~14:1 — both clear WCAG AA (4.5:1).
    */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-micro: 200ms;
   --dur-reveal: 700ms;
 
-  --color-ink: #14110D;
-  --color-paper: #F4F0E6;
-  --color-paper-edge: #E7E1D2;
-  --color-stamp: #C8341E;
+  --color-paper: #e6dfcf;      /* app background — production paper */
+  --color-panel: #f4efe2;      /* raised panel surface */
+  --color-panel2: #efe8d7;     /* inset / card surface */
+  --color-bar: #e8e0cf;        /* panel title bar */
+  --color-ink: #211d15;        /* primary ink / borders */
+  --color-ink2: #4a4436;       /* body ink */
+  --color-mute: #6b6152;       /* secondary text */
+  --color-faint: #857c68;      /* labels / captions */
+  --color-hair: #d3cab3;       /* hairline borders on cards */
+  --color-linefill: #d6cdb7;   /* skeleton line fill */
+  --color-stamp: #c1301c;      /* the one accent — verdicts, live, alerts */
+  --color-stampdk: #a0281a;    /* stamp hover/pressed */
+  --color-cream: #f2ecdd;      /* text on ink/night */
+  --color-night: #1a1712;      /* dark chrome — nav, page tops */
+  --color-ok: #4b7a4e;         /* pass / clean */
+  --color-warn: #b58a2e;       /* major / caution */
+  --color-cool: #3f5c86;       /* info / cool accent */
 
+  --color-paper-edge: #d3cab3; /* legacy alias for hair */
+
+  /* Legacy aliases — un-migrated panels keep using these until moved over. */
+  --color-brutal-black: #211d15;
+  --color-brutal-white: #f4efe2;
+  --color-brutal-gray: #efe8d7;
+  --color-accent: #c1301c;
   --color-black: var(--color-brutal-black);
   --color-white: var(--color-brutal-white);
 }
 
 body {
-  background-color: #e6dfcf; /* production paper */
-  color: var(--color-brutal-black);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

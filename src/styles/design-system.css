@@ -2,36 +2,35 @@
  * Story Machine — unified "paper · ink · stamp" design system.
  *
  * Ported from the Claude Design handoff (Story Machine - Rebuild Wireframes).
- * This is the shared foundation every restyled panel consumes: the editorial
- * token set (cream paper, near-black ink, one stamp-red accent), the four
- * type roles, and the reusable primitives (panel frame, button, chip/tag,
- * stamp, card, bar/gauge). Screens compose these — they do not redefine them.
+ * The palette's single source of truth is index.css's @theme block; the
+ * --sm-* names below are ALIASES kept for existing var(--sm-*) consumers
+ * (DesignPreview, ScriptDoctorPanel). New work should use the Tailwind
+ * utilities (bg-paper, text-ink, border-stamp, …) or the src/components/ui
+ * kit, not these vars.
  *
- * Fonts: Anton + JetBrains Mono are already self-hosted (see index.css).
- * Archivo (body) and Caveat (margin hand) are declared here with graceful
- * fallbacks to the already-hosted Inter/system + cursive until their woff2
- * files are vendored under public/fonts/ (follow-up — needs the font binaries).
+ * Fonts: Anton, Archivo, Caveat, JetBrains Mono are all self-hosted —
+ * @font-face declarations live in index.css alongside the other faces.
  */
 
 :root {
-  /* ---- palette ---- */
-  --sm-paper:      #e6dfcf;  /* app background (document mode) */
-  --sm-panel:      #f4efe2;  /* raised panel surface */
-  --sm-panel-2:    #efe8d7;  /* inset / card surface */
-  --sm-bar:        #e8e0cf;  /* panel title bar */
-  --sm-ink:        #211d15;  /* primary ink / borders */
-  --sm-ink-soft:   #4a4436;  /* body ink */
-  --sm-ink-mute:   #6b6152;  /* secondary text */
-  --sm-ink-faint:  #857c68;  /* labels / captions */
-  --sm-hair:       #d3cab3;  /* hairline borders on cards */
-  --sm-line:       #d6cdb7;  /* skeleton line fill */
-  --sm-stamp:      #c1301c;  /* the one accent — verdicts, live, alerts */
-  --sm-stamp-dk:   #a0281a;
-  --sm-cream:      #f2ecdd;  /* text on ink */
-  --sm-night:      #1a1712;  /* dark chrome (page tops, cinematic) */
-  --sm-ok:         #4b7a4e;  /* pass / clean */
-  --sm-warn:       #b58a2e;  /* major */
-  --sm-cool:       #3f5c86;  /* voice / cool accent */
+  /* ---- palette (aliases of index.css @theme) ---- */
+  --sm-paper:      var(--color-paper);
+  --sm-panel:      var(--color-panel);
+  --sm-panel-2:    var(--color-panel2);
+  --sm-bar:        var(--color-bar);
+  --sm-ink:        var(--color-ink);
+  --sm-ink-soft:   var(--color-ink2);
+  --sm-ink-mute:   var(--color-mute);
+  --sm-ink-faint:  var(--color-faint);
+  --sm-hair:       var(--color-hair);
+  --sm-line:       var(--color-linefill);
+  --sm-stamp:      var(--color-stamp);
+  --sm-stamp-dk:   var(--color-stampdk);
+  --sm-cream:      var(--color-cream);
+  --sm-night:      var(--color-night);
+  --sm-ok:         var(--color-ok);
+  --sm-warn:       var(--color-warn);
+  --sm-cool:       var(--color-cool);
 
   /* ---- type roles ---- */
   --sm-font-display: 'Anton', system-ui, sans-serif;
@@ -44,9 +43,6 @@
   --sm-shadow-sm: 3px 3px 0 rgba(33,29,21,.12);
   --sm-shadow-lg: 9px 9px 0 rgba(33,29,21,.18);
 }
-
-@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo'),url('/fonts/archivo-var.woff2') format('woff2')}
-@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat'),url('/fonts/caveat-var.woff2') format('woff2')}
 
 /* ============================ primitives ============================ */
 
