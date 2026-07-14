@@ -190,7 +190,7 @@ body {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   pointer-events: none;
   z-index: 9999;
   opacity: 0.04;
@@ -204,4 +204,26 @@ body {
 }
 .animate-blink {
   animation: blink 1s step-end infinite;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+ * QA finding P1-4: only StartScreen's slug-line hook honored prefers-reduced-
+ * motion. Everything else (brutal-hover translate, sm-pulse, animate-bounce,
+ * 11 spin/pulse sites, Framer transitions) animated unconditionally. This
+ * global rule collapses every animation/transition to effectively-instant for
+ * users who've asked the OS for less motion, without touching each call site.
+ * Framer Motion is also wrapped in <MotionConfig reducedMotion="user"> at the
+ * App root, so JS-driven transitions honor the same preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Kill the decorative cursor blink and the brutalist hover translate outright. */
+  .animate-blink { animation: none !important; }
+  .brutal-shadow-hover:hover {
+    transform: none !important;
+  }
 }

@@ -72,7 +72,7 @@ export interface FountainEditorProps {
 // same US-Letter proportions the export uses.
 const baseTheme = EditorView.baseTheme({
   '&': {
-    fontFamily: "'Courier New', Courier, monospace",
+    fontFamily: "var(--font-courier, 'Courier Prime', 'Courier New', Courier, monospace)",
     // Tuned so 60 monospace characters (SPEC's action/scene-heading band)
     // fill roughly the ~624px text column described above, instead of an
     // arbitrary UI font size.

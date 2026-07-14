@@ -1,4 +1,5 @@
 import React, { useState, Suspense, lazy, useCallback, useEffect, useRef } from 'react';
+import { MotionConfig } from 'motion/react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { StoryConfig } from './types';
 
@@ -124,39 +125,47 @@ export default function App() {
     && window.location.hash.replace(/^#/, '') === 'design-preview';
   if (isDesignPreview) {
     return (
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <DesignPreview />
-        </Suspense>
-      </ErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <DesignPreview />
+          </Suspense>
+        </ErrorBoundary>
+      </MotionConfig>
     );
   }
 
+  // reducedMotion="user": honors prefers-reduced-motion for every Framer
+  // Motion transition in the tree (QA P1-4). Pairs with the global CSS
+  // @media (prefers-reduced-motion: reduce) rule in index.css that collapses
+  // CSS animations/transitions for the same audience.
   return (
-    <ErrorBoundary>
-      <Suspense fallback={<LoadingFallback />}>
-        {showStoryMachine ? (
-          <StoryMachine
-            onClose={() => setShowStoryMachine(false)}
-            onExportToIDE={handleExportToIDE}
-          />
-        ) : config ? (
-          <ScriptIDE
-            initialConfig={config}
-            onOpenStoryMachine={() => setShowStoryMachine(true)}
-            importedScript={importedScript}
-            importedCharacters={importedCharacters}
-            onImportConsumed={handleClearImport}
-            onNewStory={handleNewStory}
-          />
-        ) : (
-          <StartScreen
-            onStart={setConfig}
-            isGenerating={false}
-            onOpenStoryMachine={handleOpenStoryMachineFromStart}
-          />
-        )}
-      </Suspense>
-    </ErrorBoundary>
+    <MotionConfig reducedMotion="user">
+      <ErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          {showStoryMachine ? (
+            <StoryMachine
+              onClose={() => setShowStoryMachine(false)}
+              onExportToIDE={handleExportToIDE}
+            />
+          ) : config ? (
+            <ScriptIDE
+              initialConfig={config}
+              onOpenStoryMachine={() => setShowStoryMachine(true)}
+              importedScript={importedScript}
+              importedCharacters={importedCharacters}
+              onImportConsumed={handleClearImport}
+              onNewStory={handleNewStory}
+            />
+          ) : (
+            <StartScreen
+              onStart={setConfig}
+              isGenerating={false}
+              onOpenStoryMachine={handleOpenStoryMachineFromStart}
+            />
+          )}
+        </Suspense>
+      </ErrorBoundary>
+    </MotionConfig>
   );
 }

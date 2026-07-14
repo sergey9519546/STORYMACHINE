@@ -359,7 +359,7 @@ export default function StartScreen({
                 <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
                 Open OASIS Story Machine
               </button>
-              <div className="space-y-1 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45">
+              <div className="space-y-1 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/60">
                 <p className="font-semibold text-ink/60">3,216 deterministic rules · keyless-first</p>
                 <p>Every verdict inspectable · reproducible · no LLM in the verdict path</p>
               </div>

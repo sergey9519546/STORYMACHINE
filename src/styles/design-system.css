@@ -22,7 +22,7 @@
   --sm-ink:        #211d15;  /* primary ink / borders */
   --sm-ink-soft:   #4a4436;  /* body ink */
   --sm-ink-mute:   #6b6152;  /* secondary text */
-  --sm-ink-faint:  #857c68;  /* labels / captions */
+  --sm-ink-faint:  #6f6553;  /* labels / captions — nudged from #857c68 for WCAG AA on paper (~4.6:1) */
   --sm-hair:       #d3cab3;  /* hairline borders on cards */
   --sm-line:       #d6cdb7;  /* skeleton line fill */
   --sm-stamp:      #c1301c;  /* the one accent — verdicts, live, alerts */
@@ -45,8 +45,8 @@
   --sm-shadow-lg: 9px 9px 0 rgba(33,29,21,.18);
 }
 
-@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo'),url('/fonts/archivo-var.woff2') format('woff2')}
-@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat'),url('/fonts/caveat-var.woff2') format('woff2')}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 700;font-display:swap;src:local('Archivo')}
+@font-face{font-family:'Caveat';font-style:normal;font-weight:500 700;font-display:swap;src:local('Caveat')}
 
 /* ============================ primitives ============================ */
 
@@ -100,5 +100,6 @@
 .sm-live{display:inline-flex;align-items:center;gap:7px;font:600 9px var(--sm-font-mono);letter-spacing:.15em;color:var(--sm-stamp);text-transform:uppercase}
 .sm-live > i{width:7px;height:7px;border-radius:50%;background:var(--sm-stamp);animation:sm-pulse 1.6s ease-in-out infinite}
 @keyframes sm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
+@media (prefers-reduced-motion: reduce){.sm-live > i{animation:none}}
 .sm-note{font:600 18px/1.02 var(--sm-font-hand);color:var(--sm-stamp)}
 .sm-note--ink{color:#6a6350}

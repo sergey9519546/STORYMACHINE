@@ -324,20 +324,29 @@ export default function InterviewPanel({ onClose, agents }: InterviewPanelProps)
     }
   }, [question, selectedAgent, selectedId, inFlight, messagesByAgent]);
 
+  // Escape closes the panel, matching ScriptDoctorPanel's overlay convention.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="interview-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-purple-400" />
-            <h2 className="text-white font-semibold text-lg">Character Interview</h2>
+            <h2 id="interview-panel-title" className="text-white font-semibold text-lg">Character Interview</h2>
             <span className="text-xs text-gray-500 ml-2">psychology, grounded and receipted</span>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close Character Interview" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

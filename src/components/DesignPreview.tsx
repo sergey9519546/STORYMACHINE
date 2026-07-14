@@ -13,8 +13,8 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
 
 export default function DesignPreview() {
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sm-paper)', color: 'var(--sm-ink)',
-      fontFamily: 'var(--sm-font-body)', padding: '46px 50px', display: 'flex',
+    <div style={{ minHeight: '100dvh', background: 'var(--sm-paper)', color: 'var(--sm-ink)',
+      fontFamily: 'var(--sm-font-body)', padding: 'clamp(16px, 5vw, 46px) clamp(12px, 3.5vw, 50px)', display: 'flex',
       flexDirection: 'column', gap: 34 }}>
       <div>
         <div style={{ fontFamily: 'var(--sm-font-display)', fontSize: 34, textTransform: 'uppercase', letterSpacing: '.03em' }}>
@@ -28,9 +28,9 @@ export default function DesignPreview() {
 
       <Row label="Type roles">
         <div style={{ fontFamily: 'var(--sm-font-display)', fontSize: 30, textTransform: 'uppercase' }}>Anton display</div>
-        <div style={{ fontFamily: 'var(--sm-font-body)', fontSize: 18 }}>Archivo body</div>
+        <div style={{ fontFamily: 'var(--sm-font-body)', fontSize: 18 }}>Inter body (Archivo if installed)</div>
         <div style={{ fontFamily: 'var(--sm-font-mono)', fontSize: 15 }}>JetBrains machine-truth</div>
-        <div className="sm-note">Caveat margin note</div>
+        <div className="sm-note">System handwriting margin note</div>
       </Row>
 
       <Row label="Buttons">
@@ -59,7 +59,7 @@ export default function DesignPreview() {
       </Row>
 
       <Row label="Panel frame">
-        <div className="sm-panel" style={{ width: 364 }}>
+        <div className="sm-panel" style={{ width: 'min(364px, 100%)' }}>
           <div className="sm-panel-top"><span className="sm-title">✎ Writers' Room</span><span className="sm-x">Consensus 74 / 100</span></div>
           <div className="sm-panel-body">
             <span className="sm-h">Dominant voice</span>
@@ -79,7 +79,7 @@ export default function DesignPreview() {
           </div>
         </div>
 
-        <div className="sm-panel" style={{ width: 364 }}>
+        <div className="sm-panel" style={{ width: 'min(364px, 100%)' }}>
           <div className="sm-pagetop"><span className="sm-title" style={{ color: 'var(--sm-cream)' }}>◈ Quality Engines</span>
             <span className="sm-x" style={{ color: '#8f846b' }}>Wave gate</span></div>
           <div className="sm-panel-body">

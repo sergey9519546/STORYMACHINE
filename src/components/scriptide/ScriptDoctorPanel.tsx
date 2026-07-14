@@ -2060,10 +2060,10 @@ export default function ScriptDoctorPanel({
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-screen bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
+      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
     >
       {/* Chrome header */}
-      <div className="flex items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
+      <div className="flex flex-wrap items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
         <Stethoscope className="w-8 h-8 shrink-0" aria-hidden="true" />
         <h2
           id="script-doctor-title"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import type {
   CharacterSheet,
   Location,
@@ -12,7 +12,7 @@ import type {
   PersuasionRecord,
   DramaticPressure,
 } from "../../server/engine/types";
-import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users } from "lucide-react";
+import { FileDown, Brain, Eye, AlertTriangle, GitBranch, Target, Zap, Smile, Shuffle, Settings, Scissors, MessageCircle, Users, ShieldCheck, Map as MapIcon, ListChecks, HeartPulse, RefreshCw, CheckCircle2, LineChart, Dna, PenLine, FileEdit, Upload } from "lucide-react";
 // HarvestPanel/CorpusPanel/ArcTimelinePanel stay eager: each is under 8KB
 // source, no heavy deps, and not worth their own network round trip.
 import { HarvestPanel } from "./HarvestPanel";
@@ -204,6 +204,30 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
   const [showRevision, setShowRevision]         = useState(false);
   const [showInterview, setShowInterview]       = useState(false);
   const [showRoom, setShowRoom]                 = useState(false);
+
+  // ── Overlay mutual exclusion ────────────────────────────────────────────────
+  // QA finding P0-3: each tool owned its own `fixed inset-0 z-50` backdrop, and
+  // all were mounted as siblings — so opening one while another was open meant
+  // the new backdrop intercepted pointer events to the old one's buttons (4
+  // flow timeouts in the browser QA matrix). openOverlay() closes every other
+  // overlay before opening the requested one, so only one is ever mounted at a
+  // time. Close handlers (setShowX(false)) are unaffected.
+  const allOverlaySetters = useMemo(() => ({
+    Builder: setShowBuilder, Settings: setShowSettings, DirectorCut: setShowDirectorCut,
+    WhatIf: setShowWhatIf, Epistemic: setShowEpistemic, Harvest: setShowHarvest,
+    Converge: setShowConverge, Corpus: setShowCorpus, Timeline: setShowTimeline,
+    ArcPlanner: setShowArcPlanner, Projection: setShowProjection, CausalTwin: setShowCausalTwin,
+    FixedPoints: setShowFixedPoints, SelfPlay: setShowSelfPlay, ProofInspector: setShowProofInspector,
+    QualityEngines: setShowQualityEngines, EpistemicMap: setShowEpistemicMap, ArcCompletion: setShowArcCompletion,
+    StoryHealth: setShowStoryHealth, CharacterArc: setShowCharacterArc, Regression: setShowRegression,
+    Analytics: setShowAnalytics, Momentum: setShowMomentum, VoiceDNA: setShowVoiceDNA,
+    LivePlay: setShowLivePlay, Revision: setShowRevision, Interview: setShowInterview, Room: setShowRoom,
+  }), []);
+  const openOverlay = useCallback((name: keyof typeof allOverlaySetters) => {
+    Object.entries(allOverlaySetters).forEach(([key, setter]) => {
+      setter(key === name);
+    });
+  }, [allOverlaySetters]);
 
   // Keyless-honesty banner (finding E): null until the readiness check
   // resolves, so the banner never flashes an incorrect "no key" warning on
@@ -578,7 +602,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-5 py-3 font-mono text-sm border-2 border-black shadow-lg flex items-center gap-3"
         >
           <span>{errorMsg}</span>
-          <button onClick={() => setErrorMsg(null)} className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+          <button onClick={() => setErrorMsg(null)} aria-label="Dismiss error" className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
         </div>
       )}
       {/* Finding E: keyless-honesty banner — non-nagging (dismissible,
@@ -636,55 +660,55 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             </div>
           )}
           <button
-            onClick={() => setShowDirectorCut(true)}
+            onClick={() => openOverlay('DirectorCut')}
             title="Director's Cut — inject ops mid-sim"
-            className="bg-yellow-900 hover:bg-yellow-700 text-yellow-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Scissors className="w-4 h-4" />
             <span className="hidden sm:inline">Cut</span>
           </button>
           <button
-            onClick={() => setShowWhatIf(true)}
+            onClick={() => openOverlay('WhatIf')}
             title="What-If / Ghost Commits"
-            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <GitBranch className="w-4 h-4" />
             <span className="hidden sm:inline">What-If</span>
           </button>
           <button
-            onClick={() => setShowEpistemic(true)}
+            onClick={() => openOverlay('Epistemic')}
             title="Epistemic Map"
-            className="bg-cyan-900 hover:bg-cyan-700 text-cyan-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Brain className="w-4 h-4" />
             <span className="hidden sm:inline">Beliefs</span>
           </button>
           <button
-            onClick={() => setShowHarvest(true)}
+            onClick={() => openOverlay('Harvest')}
             title="Harvest — quality metrics + sidecar download"
-            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <FileDown className="w-4 h-4" />
             <span className="hidden sm:inline">Harvest</span>
           </button>
           <button
-            onClick={() => setShowConverge(true)}
+            onClick={() => openOverlay('Converge')}
             title="Convergence Search — AlphaZero-for-drama"
-            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Converge</span>
           </button>
           <button
-            onClick={() => setShowCorpus(true)}
+            onClick={() => openOverlay('Corpus')}
             title="Director Policy — learned from self-play corpus"
-            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Shuffle className="w-4 h-4" />
             <span className="hidden sm:inline">Policy</span>
           </button>
           <button
-            onClick={() => setShowTimeline(true)}
+            onClick={() => openOverlay('Timeline')}
             title="Arc Timeline — scene-by-scene proof/quality/tension view"
             className="bg-slate-700 hover:bg-slate-500 text-slate-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
@@ -692,159 +716,159 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <span className="hidden sm:inline">Arc</span>
           </button>
           <button
-            onClick={() => setShowArcPlanner(true)}
+            onClick={() => openOverlay('ArcPlanner')}
             title="Arc Compiler — multi-scene convergence planning"
-            className="bg-fuchsia-900 hover:bg-fuchsia-700 text-fuchsia-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Compile</span>
           </button>
           <button
-            onClick={() => setShowProjection(true)}
+            onClick={() => openOverlay('Projection')}
             title="Projection Gallery — one canon, every format (G3)"
-            className="bg-teal-900 hover:bg-teal-700 text-teal-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Project</span>
           </button>
           <button
-            onClick={() => setShowCausalTwin(true)}
+            onClick={() => openOverlay('CausalTwin')}
             title="Causal Twin — Pearl's do()-calculus intervention (G4)"
-            className="bg-orange-900 hover:bg-orange-700 text-orange-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Twin</span>
           </button>
           <button
-            onClick={() => setShowFixedPoints(true)}
+            onClick={() => openOverlay('FixedPoints')}
             title="Fixed Points — temporal authoring, author destiny (G9)"
-            className="bg-purple-900 hover:bg-purple-700 text-purple-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Destiny</span>
           </button>
           <button
-            onClick={() => setShowSelfPlay(true)}
+            onClick={() => openOverlay('SelfPlay')}
             title="Self-Play — G13 corpus launcher, genome diff/breed"
-            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">Corpus</span>
           </button>
           <button
-            onClick={() => setShowProofInspector(true)}
+            onClick={() => openOverlay('ProofInspector')}
             title="Proof Inspector — 4-tier scene analysis + repair patches"
-            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Prove</span>
           </button>
           <button
-            onClick={() => setShowQualityEngines(true)}
+            onClick={() => openOverlay('QualityEngines')}
             title="Quality Engines — 9 narrative quality signals per committed scene"
-            className="bg-emerald-900 hover:bg-emerald-700 text-emerald-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◈</span>
+            <ShieldCheck className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Quality</span>
           </button>
           <button
-            onClick={() => setShowEpistemicMap(true)}
+            onClick={() => openOverlay('EpistemicMap')}
             title="Epistemic Map — who believes what about whom, ToM² meta-layers, dramatic irony"
-            className="bg-violet-900 hover:bg-violet-700 text-violet-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◎</span>
+            <MapIcon className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Epistemic</span>
           </button>
           <button
-            onClick={() => setShowArcCompletion(true)}
+            onClick={() => openOverlay('ArcCompletion')}
             title="Arc Completion — track open narrative promises with pacing scores"
-            className="bg-amber-900 hover:bg-amber-700 text-amber-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>◷</span>
+            <ListChecks className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Arcs</span>
           </button>
           <button
-            onClick={() => setShowStoryHealth(true)}
+            onClick={() => openOverlay('StoryHealth')}
             title="Story Health — unified vitals: tension, quality, arcs, epistemic depth"
-            className="bg-sky-900 hover:bg-sky-700 text-sky-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>♥</span>
+            <HeartPulse className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Health</span>
           </button>
           <button
-            onClick={() => setShowCharacterArc(true)}
+            onClick={() => openOverlay('CharacterArc')}
             title="Character Arc — per-character belief, emotion, relationship, and agency trajectories"
-            className="bg-pink-900 hover:bg-pink-700 text-pink-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>⟳</span>
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Chars</span>
           </button>
           <button
-            onClick={() => setShowRegression(true)}
+            onClick={() => openOverlay('Regression')}
             title="Narrative Regression Suite — 14 structural invariants graded like a CI test run"
-            className="bg-violet-950 hover:bg-violet-800 text-violet-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✓</span>
+            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Tests</span>
           </button>
           <button
-            onClick={() => setShowMomentum(true)}
+            onClick={() => openOverlay('Momentum')}
             title="Narrative Momentum — per-scene CI history of quality, regression, tension, and proofs"
-            className="bg-emerald-950 hover:bg-emerald-800 text-emerald-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>⚡</span>
+            <Zap className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Momentum</span>
           </button>
           <button
-            onClick={() => setShowAnalytics(true)}
+            onClick={() => openOverlay('Analytics')}
             title="Narrative Analytics — tension ledger, story-shape archetype fit, and first-watch vs rewatch scoring"
-            className="bg-orange-950 hover:bg-orange-800 text-orange-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>🔬</span>
+            <LineChart className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Analytics</span>
           </button>
           <button
-            onClick={() => setShowVoiceDNA(true)}
+            onClick={() => openOverlay('VoiceDNA')}
             title="Voice DNA — stylometric fingerprints, pairwise voice similarity matrix, acoustic twins"
-            className="bg-indigo-950 hover:bg-indigo-800 text-indigo-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>🧬</span>
+            <Dna className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Voice</span>
           </button>
           <button
-            onClick={() => setShowLivePlay(true)}
+            onClick={() => openOverlay('LivePlay')}
             title="Author Presence — STEER, INJECT, OVERRULE live story beats"
-            className="bg-rose-950 hover:bg-rose-800 text-rose-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✍</span>
+            <PenLine className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Live</span>
           </button>
           <button
-            onClick={() => setShowRevision(true)}
+            onClick={() => openOverlay('Revision')}
             title="12-Pass Revision Pipeline — diagnose and rewrite the compiled screenplay"
-            className="bg-purple-950 hover:bg-purple-800 text-purple-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
-            <span style={{ fontSize: 14 }}>✒</span>
+            <FileEdit className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Revise</span>
           </button>
           <button
-            onClick={() => setShowInterview(true)}
+            onClick={() => openOverlay('Interview')}
             title="Character Interview — talk to a character, grounded in their real psychology"
-            className="bg-fuchsia-950 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <MessageCircle className="w-4 h-4" />
             <span className="hidden sm:inline">Interview</span>
           </button>
           <button
-            onClick={() => setShowRoom(true)}
+            onClick={() => openOverlay('Room')}
             title="Writers' Room — convene six critics to debate the current story state"
-            className="bg-rose-900 hover:bg-rose-700 text-rose-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
+            className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 brutal-border brutal-shadow-hover transition-colors flex items-center gap-1 text-xs"
           >
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Room</span>
           </button>
           <button
-            onClick={() => setShowSettings(true)}
+            onClick={() => openOverlay('Settings')}
             title="AI Provider Settings"
             className="bg-white text-black px-3 py-2 brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors flex items-center"
           >
@@ -857,7 +881,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             Back to IDE
           </button>
           <button
-            onClick={() => setShowBuilder(true)}
+            onClick={() => openOverlay('Builder')}
             disabled={loading}
             className="bg-black hover:bg-[#FF4444] text-white px-4 py-2 font-bold uppercase tracking-wider disabled:opacity-50 brutal-border brutal-shadow-hover transition-colors"
           >
@@ -916,7 +940,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                 title="Import a character memory bundle (JSON) exported from another story"
                 className="text-[10px] font-bold uppercase tracking-widest cursor-pointer border-2 border-black px-2 py-1 hover:bg-black hover:text-white transition-colors"
               >
-                ⬆ Import Memory
+                <Upload className="w-3 h-3 inline" aria-hidden="true" /> Import Memory
                 <input
                   type="file"
                   accept="application/json,.json"

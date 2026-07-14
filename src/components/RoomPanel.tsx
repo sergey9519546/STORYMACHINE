@@ -16,7 +16,7 @@
 // legitimate 200 with critiques: [] — rendered as an honest empty result,
 // not an error.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 interface RoomCritique {
   criticId: string;
@@ -115,16 +115,29 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
   const dominant = result?.dominant ?? result?.dominantCritic;
   const sorted = [...critiques].sort((a, b) => b.severity - a.severity);
 
+  // Escape closes the panel, matching ScriptDoctorPanel's overlay convention.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
-    <div style={{
+    <div
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+    <div role="dialog" aria-modal="true" aria-labelledby="room-panel-title" style={{
       background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
       padding: 20, width: 640, maxWidth: '95vw', fontFamily: 'monospace',
       fontSize: 13, border: '1px solid #334155',
       maxHeight: '80vh', overflowY: 'auto',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <strong style={{ fontSize: 15 }}>Writers' Room</strong>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>x</button>
+        <strong id="room-panel-title" style={{ fontSize: 15 }}>Writers' Room</strong>
+        <button onClick={onClose} aria-label="Close Writers' Room" style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
       <p style={{ color: '#64748b', fontSize: 11.5, marginTop: 0, marginBottom: 14 }}>
@@ -220,6 +233,7 @@ export function RoomPanel({ onClose }: RoomPanelProps) {
           Convene the room to see where the six critics stand on the story as it is right now.
         </p>
       )}
+    </div>
     </div>
   );
 }

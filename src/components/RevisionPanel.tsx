@@ -535,16 +535,25 @@ export function RevisionPanel({ onClose }: RevisionPanelProps) {
     });
   }, []);
 
+  // Escape closes the panel, matching ScriptDoctorPanel's overlay convention.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/60">
-      <div className="h-full w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/60" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="revision-panel-title" className="h-full w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80">
           <div>
-            <h2 className="text-sm font-bold text-zinc-100">14-Pass Revision Pipeline</h2>
+            <h2 id="revision-panel-title" className="text-sm font-bold text-zinc-100">14-Pass Revision Pipeline</h2>
             <p className="text-xs text-zinc-500 mt-0.5">Diagnose → mark → rewrite → preserve</p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">✕</button>
+          <button onClick={onClose} aria-label="Close Revision Pipeline" className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">✕</button>
         </div>
 
         {/* Protected spans — approvedSpans front door */}

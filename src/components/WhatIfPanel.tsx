@@ -710,17 +710,26 @@ export default function WhatIfPanel({ onClose, onCommitted }: WhatIfPanelProps) 
 
   const hasAnyInterventionTargets = interventionGroups.some(g => g.nodes.length > 0);
 
+  // Escape closes the panel, matching ScriptDoctorPanel's overlay convention.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="whatif-panel-title" className="bg-[#1a1a2e] border border-[#333] rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#333]">
           <div className="flex items-center gap-2">
             <FlaskConical className="w-5 h-5 text-purple-400" />
-            <h2 className="text-white font-semibold text-lg">What-If Lab</h2>
+            <h2 id="whatif-panel-title" className="text-white font-semibold text-lg">What-If Lab</h2>
             <span className="text-xs text-gray-500 ml-2">flip a decision, see provably-coherent alternate futures</span>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close What-If Lab" className="text-gray-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>

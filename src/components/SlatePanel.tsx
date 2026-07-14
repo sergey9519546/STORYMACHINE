@@ -405,7 +405,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-screen bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
+      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
     >
       {/* Chrome header */}
       <div className="flex items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">

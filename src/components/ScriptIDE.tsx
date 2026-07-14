@@ -17,6 +17,8 @@ import {
   Sparkles,
   Camera,
   Layers,
+  Menu,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Sidebar from "./Sidebar";
@@ -46,7 +48,7 @@ const SlatePanel = lazy(() => import("./SlatePanel"));
 // same brutal-border/white-bg idiom) so first-open doesn't flash blank space
 // before sliding in.
 const DrawerPanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -56,7 +58,7 @@ const DrawerPanelFallback = () => (
 // DrawerPanelFallback's 500px — a mismatched fallback width would flash a
 // narrower box for a moment before the real panel snaps wider.
 const SlatePanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-screen bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -159,6 +161,12 @@ export default function ScriptIDE({
   // tabs + Script Snapshots) — hidden by default so the writing page owns the
   // center of the IDE. Toggled via the Toolbar's "Panels" button.
   const [showPanels, setShowPanels] = useState(false);
+  // Mobile sidebar drawer: the Sidebar is a permanent 320px column on md+ but
+  // slides in as an overlay on < md (see Sidebar.tsx). This toggles that drawer.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // In-app confirm for "New Story" — replaces window.confirm (QA P1-5: native
+  // confirms block the thread, are unstyleable, and can't be dismissed by Esc).
+  const [newStoryConfirm, setNewStoryConfirm] = useState(false);
   // StartScreen's "Try the sample script" handoff (sessionStorage flag, same
   // idiom as sm_fdx_import_pending below): when set, the doctor overlay opens
   // on mount and auto-runs the built-in sample through its own loadSample
@@ -170,7 +178,6 @@ export default function ScriptIDE({
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
-  const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
@@ -257,14 +264,11 @@ export default function ScriptIDE({
   // 2) Actual lsSet() calls are debounced at 500ms so rapid keystrokes only
   //    write once, preventing localStorage hammering on long scripts.
   useEffect(() => {
-    // Write non-text settings immediately (they change rarely and aren't typed)
-    lsSet("theme", isDarkMode ? "dark" : "light");
-
     // Show saving indicator immediately
     setIsSaving(true);
     const indicatorTimer = setTimeout(() => setIsSaving(false), 800);
     return () => clearTimeout(indicatorTimer);
-  }, [scriptText, isDarkMode, snapshots, characters, researchNotes]);
+  }, [scriptText, snapshots, characters, researchNotes]);
 
   useEffect(() => {
     // Debounced write of heavy text data (script_draft may be hundreds of KB)
@@ -284,7 +288,7 @@ export default function ScriptIDE({
     let cancelled = false;
     fetch('/api/scriptide/load')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; isDarkMode?: boolean; updatedAt?: number | null } | null) => {
+      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; updatedAt?: number | null } | null) => {
         if (cancelled || !data || data.status === 'empty') return;
         // Only overwrite local state if server has a non-trivial script.
         if (data.scriptText && data.scriptText.length > (scriptText?.length ?? 0)) {
@@ -305,21 +309,12 @@ export default function ScriptIDE({
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scriptText, snapshots, characters, researchNotes, isDarkMode }),
+        body: JSON.stringify({ scriptText, snapshots, characters, researchNotes }),
       }).catch(() => { /* non-critical */ });
     };
     const interval = setInterval(saveToServer, 30_000);
     return () => clearInterval(interval);
-  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
-
-  // ── Dark mode DOM sync ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDarkMode]);
+  }, [scriptText, snapshots, characters, researchNotes]);
 
   // Keep both refs in sync so async callbacks always read the latest values.
   useEffect(() => {
@@ -1026,7 +1021,7 @@ export default function ScriptIDE({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
-      className={`flex h-screen w-full bg-[#f4f4f0] text-black font-sans overflow-hidden ${isDarkMode ? "dark" : ""}`}
+      className="flex h-dvh w-full bg-[#f4f4f0] text-black font-sans overflow-hidden"
     >
       <Sidebar
         characters={characters}
@@ -1035,6 +1030,8 @@ export default function ScriptIDE({
         scriptText={scriptText}
         parsedBlocks={parsedBlocks}
         onNavigate={handleNavigate}
+        mobileOpen={sidebarOpen}
+        onCloseMobile={() => setSidebarOpen(false)}
       />
 
       {/* CENTER PANEL: INGEST (Script Editor) */}
@@ -1042,10 +1039,18 @@ export default function ScriptIDE({
           toolbar's intrinsic (non-wrapping) width, overflowing the viewport and
           pushing the centered page off to the right. */}
       <div className="flex-1 min-w-0 h-full border-r-4 border-black flex flex-col bg-white relative">
+        {/* Mobile-only sidebar toggle — the Sidebar is a drawer below md. */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open scenes and characters sidebar"
+          className="md:hidden absolute top-2 left-2 z-30 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
         {cleanError && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-xs font-bold px-3 py-1.5 border-2 border-black flex items-center gap-2">
             {cleanError}
-            <button onClick={() => setCleanError(null)} className="ml-1 leading-none hover:opacity-70">✕</button>
+            <button onClick={() => setCleanError(null)} aria-label="Dismiss error" className="ml-1 leading-none hover:opacity-70">✕</button>
           </div>
         )}
         {fdxImportNotice && (
@@ -1118,11 +1123,7 @@ export default function ScriptIDE({
         {onNewStory && (
           <div className="px-4 py-1 border-b-2 border-black bg-gray-100 flex items-center">
             <button
-              onClick={() => {
-                if (window.confirm("Start a new story? This returns you to the setup wizard — your current draft stays saved.")) {
-                  onNewStory();
-                }
-              }}
+              onClick={() => setNewStoryConfirm(true)}
               title="Return to the setup wizard (your script draft is not deleted)"
               className="text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-black transition-colors"
             >
@@ -1273,7 +1274,6 @@ export default function ScriptIDE({
             }}
             collabRoom={collabRoom}
             collabUserName={collabUserName}
-            isDarkMode={isDarkMode}
             liveDiagnostics={liveDiagnostics}
           />
 
@@ -1340,11 +1340,71 @@ export default function ScriptIDE({
         </div>
       </div>
 
+      {/* New Story confirm modal — replaces window.confirm (QA P1-5). */}
+      <AnimatePresence>
+        {newStoryConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-story-confirm-title"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full mx-4"
+            >
+              <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
+                Start a new story?
+              </h2>
+              <p className="text-sm font-mono mb-5 text-gray-700">
+                This returns you to the setup wizard — your current draft stays saved.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setNewStoryConfirm(false)}
+                  className="px-4 py-2 border-2 border-black font-bold uppercase text-xs hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
+                  className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                >
+                  New Story
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* RIGHT PANEL: VIRTUAL PRODUCTION & DIRECTOR DASHBOARD — hidden by
           default (showPanels) so the centered writing page owns the layout;
           toggled via the Toolbar's "Panels" button. */}
       {showPanels && (
-      <div className="w-[400px] shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto">
+        <>
+          {/* Mobile backdrop for the panels drawer. */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/50"
+            aria-hidden="true"
+            onClick={() => setShowPanels(false)}
+          />
+          {/* On md+ this is a static 400px column (shrink-0). On < md it
+              becomes a right-side overlay drawer so it doesn't consume the
+              whole narrow viewport alongside the editor. */}
+          <div className="w-full md:w-[400px] md:shrink-0 h-full flex flex-col bg-[#e8e8e3] overflow-y-auto fixed md:static top-0 right-0 z-50 md:z-auto">
+            {/* Mobile-only close for the panels drawer. */}
+            <button
+              onClick={() => setShowPanels(false)}
+              aria-label="Close side panels"
+              className="md:hidden absolute top-2 right-2 z-10 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
         <div className="flex bg-black text-white overflow-x-auto">
           {(
             [
@@ -1682,7 +1742,8 @@ export default function ScriptIDE({
             </motion.div>
           )}
         </div>
-      </div>
+          </div>
+        </>
       )}
 
       {/* ── DIRECTOR HUD OVERLAY ── */}

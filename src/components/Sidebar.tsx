@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight } from 'lucide-react';
+import { Ghost, Crosshair, Target, Heart, PlusCircle, List, Users, Search, ChevronRight, X } from 'lucide-react';
 import { FountainBlock } from '../lib/fountain';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -24,6 +24,14 @@ interface SidebarProps {
   scriptText: string;
   parsedBlocks: FountainBlock[];
   onNavigate: (lineIndex: number) => void;
+  /**
+   * Mobile drawer mode. When true (and the viewport is below md), the Sidebar
+   * renders as a left-sliding overlay with a dismiss button and backdrop,
+   * instead of a permanent 320px column. On md+ the prop is ignored — the
+   * Sidebar always docks. See ScriptIDE's responsive shell.
+   */
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 const LONG_FIELD_MAX = 500;
@@ -117,7 +125,7 @@ function LongTextField({
   );
 }
 
-export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate }: SidebarProps) {
+export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -138,8 +146,37 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
     return characters.filter(c => c.name.toLowerCase().includes(query));
   }, [characters, searchQuery]);
 
+  // Navigate to a scene and, on mobile, dismiss the drawer so the editor is
+  // revealed again. On desktop onCloseMobile is undefined and this is a no-op.
+  const handleNavigate = (lineIndex: number) => {
+    onNavigate(lineIndex);
+    onCloseMobile?.();
+  };
+
   return (
-    <div className="w-80 bg-white dark:bg-zinc-950 text-black dark:text-white flex flex-col h-full border-r-4 border-black dark:border-zinc-800 shrink-0">
+    <>
+      {/* Mobile backdrop — only renders when the drawer is open on < md. */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50"
+          aria-hidden="true"
+          onClick={onCloseMobile}
+        />
+      )}
+      <aside
+        // On md+ this is a static 320px flex column (shrink-0). On < md it
+        // becomes a left-sliding overlay drawer: fixed, full height, translated
+        // off-screen when closed. The `md:` static rules win at the breakpoint
+        // so the drawer mechanics never affect desktop layout.
+        className={cn(
+          "bg-white dark:bg-zinc-950 text-black dark:text-white flex flex-col h-full border-r-4 border-black dark:border-zinc-800",
+          "md:w-80 md:shrink-0 md:static md:translate-x-0",
+          "fixed top-0 left-0 z-50 w-[85vw] max-w-xs h-dvh transition-transform duration-200 ease-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+        aria-label="Scenes and characters"
+        aria-hidden={!mobileOpen}
+      >
       <div role="navigation" className="flex bg-black text-white shrink-0">
         <button
           onClick={() => setActiveTab('scenes')}
@@ -161,6 +198,14 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
         >
           <Users className="w-3 h-3" /> Characters
         </button>
+        {/* Mobile-only dismiss — closes the drawer to reveal the editor. */}
+        <button
+          onClick={onCloseMobile}
+          aria-label="Close sidebar"
+          className="md:hidden p-3 text-white hover:bg-zinc-900 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
@@ -172,7 +217,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search scenes or characters"
-            className="w-full bg-zinc-100 dark:bg-zinc-900 p-2 pl-8 text-[10px] font-mono outline-none brutal-border"
+            className="w-full bg-zinc-100 dark:bg-zinc-900 p-2 pl-8 text-[10px] font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4444] brutal-border"
           />
         </div>
       </div>
@@ -183,7 +228,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
             {filteredScenes.map((scene) => (
               <button
                 key={scene.index}
-                onClick={() => onNavigate(scene.index)}
+                onClick={() => handleNavigate(scene.index)}
                 className="w-full text-left p-2 hover:bg-white dark:hover:bg-zinc-800 transition-colors group flex items-center justify-between brutal-border-thin bg-transparent"
               >
                 <span className="text-[10px] font-bold uppercase truncate pr-2">{scene.text}</span>
@@ -241,6 +286,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
           </div>
         )}
       </div>
-    </div>
+      </aside>
+    </>
   );
 }
