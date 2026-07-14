@@ -4,3 +4,6 @@
 ## 2024-05-19 - [O(N) Rendering Latency Bottleneck in Fountain Highlighting]
 **Learning:** Found an unexpected O(N^2) memory scaling issue caused by `text.split("\n")` being mapped into a massive dictionary (`lineClasses`) and then mapped *again* to create React elements. This double-allocation strategy causes measurable frame stuttering when typing in large scripts since it executes completely synchronously on the main thread during high-frequency render events.
 **Action:** When parsing hierarchical document structures to flat nodes (like text lines), always prefer mapping directly over the parsed AST (e.g. `blocks`) to generate React Elements instead of building intermediate hash maps or re-splitting raw strings.
+## 2024-05-20 - [Zero-Allocation in CodeMirror Decorators]
+**Learning:** Found O(N) memory allocations per keystroke caused by `block.text.split("\n")` inside CodeMirror extensions `fountain-highlight.ts` and `screenplay-format.ts`, which run on every editor state update. This causes GC pressure during rapid typing on long scripts.
+**Action:** When calculating line offsets for CodeMirror decorations, replace `.split("\n")` with a zero-allocation `indexOf("\n")` `while` loop that increments the offset directly.
