@@ -22,6 +22,36 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.equal(body.status, 'empty');
   });
 
+  it('POST /api/scriptide/save then GET /api/scriptide/load roundtrips text + updatedAt', async () => {
+    const sid = freshSessionId();
+    // POST reads sessionId from body (not query) — see session-store.sessionId().
+    const saveRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'INT. TEST ROOM - DAY\n\nA draft for persistence.\n',
+        snapshots: [],
+        characters: [],
+        researchNotes: [],
+        isDarkMode: true,
+      }),
+    });
+    assert.equal(saveRes.status, 200);
+    const saveBody = await saveRes.json();
+    assert.equal(saveBody.status, 'saved');
+    assert.equal(typeof saveBody.updatedAt, 'number');
+
+    const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+    assert.equal(loadRes.status, 200);
+    const loadBody = await loadRes.json();
+    assert.equal(loadBody.status, 'ok');
+    assert.match(loadBody.scriptText, /TEST ROOM/);
+    assert.equal(typeof loadBody.updatedAt, 'number');
+    assert.ok(loadBody.updatedAt >= saveBody.updatedAt - 5_000);
+    assert.equal(loadBody.isDarkMode, true);
+  });
+
   it('POST /api/scriptide/personas rejects an invalid persona with 400', async () => {
     const res = await fetch(`${server.baseUrl}/api/scriptide/personas`, {
       method: 'POST',

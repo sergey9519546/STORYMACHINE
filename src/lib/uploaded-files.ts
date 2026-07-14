@@ -1,0 +1,75 @@
+// Pure helpers for StartScreen / StoryConfigForm multi-file ingest.
+// Extracted so batch accumulation can be unit-tested without a React harness.
+
+export type FileCategory = 'Lore' | 'Character' | 'Plot' | 'Rules' | 'Other';
+
+export interface UploadedFile {
+  name: string;
+  content: string;
+  size: number;
+  category: FileCategory;
+}
+
+/** Extensions accepted by the lore/knowledge uploader (aligned with StartScreen drop). */
+export const UPLOAD_ALLOWED_EXTS = /\.(txt|fountain|fdx|md|htm|html|json|csv)$/i;
+
+/** Per-file size cap (bytes) — same 2 MB as StartScreen drag/drop. */
+export const UPLOAD_MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+export function inferUploadCategory(filename: string): FileCategory {
+  const ext = filename.toLowerCase().split('.').pop() ?? '';
+  if (ext === 'fountain' || ext === 'fdx') return 'Plot';
+  if (ext === 'json' || ext === 'csv') return 'Rules';
+  return 'Lore';
+}
+
+export function filterUploadableFiles(files: Iterable<File>): File[] {
+  return Array.from(files).filter(
+    (f) => UPLOAD_ALLOWED_EXTS.test(f.name) && f.size > 0 && f.size <= UPLOAD_MAX_FILE_SIZE,
+  );
+}
+
+/** Append a batch of newly read files onto the previous list. Pure. */
+export function appendUploadedFiles(prev: UploadedFile[], batch: UploadedFile[]): UploadedFile[] {
+  return prev.concat(batch);
+}
+
+/**
+ * Read a batch of Files into UploadedFile records.
+ * Uses File.text() when available; falls back to FileReader for older runtimes.
+ * Failures on individual files are skipped (caller may surface a notice later).
+ */
+export async function readUploadedFiles(files: File[]): Promise<UploadedFile[]> {
+  const out: UploadedFile[] = [];
+  for (const file of files) {
+    try {
+      const content = typeof file.text === 'function'
+        ? await file.text()
+        : await readFileAsText(file);
+      if (typeof content === 'string') {
+        out.push({
+          name: file.name,
+          content,
+          size: file.size,
+          category: inferUploadCategory(file.name),
+        });
+      }
+    } catch {
+      // Skip unreadable file — do not abort the rest of the batch.
+    }
+  }
+  return out;
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === 'string') resolve(result);
+      else reject(new Error('FileReader did not return text'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'));
+    reader.readAsText(file);
+  });
+}

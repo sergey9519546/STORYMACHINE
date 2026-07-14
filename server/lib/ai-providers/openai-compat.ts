@@ -41,15 +41,128 @@ import { ssrfUnsafeUrlReason } from '../validation.ts';
 // Self-hosted production deployments that intentionally point at a LOCAL
 // model server must opt in explicitly via AI_ALLOW_PRIVATE_NETWORK_TARGETS=
 // true — see .env.example for the flag.
-const ALLOW_PRIVATE_NETWORK_TARGETS = process.env.AI_ALLOW_PRIVATE_NETWORK_TARGETS === 'true';
-const ENFORCE_FETCH_SITE_GUARD = process.env.NODE_ENV === 'production';
+// Read at call time (not module load) so tests / ops can toggle the flag
+// without re-importing this module.
+function allowPrivateNetworkTargets(): boolean {
+  return process.env.AI_ALLOW_PRIVATE_NETWORK_TARGETS === 'true';
+}
+function enforceFetchSiteGuard(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
 
 function assertFetchTargetSafe(baseURL: string): void {
-  if (!ENFORCE_FETCH_SITE_GUARD || ALLOW_PRIVATE_NETWORK_TARGETS) return;
+  if (!enforceFetchSiteGuard() || allowPrivateNetworkTargets()) return;
   const reason = ssrfUnsafeUrlReason(baseURL);
   if (reason) {
     throw new Error(`Refusing outbound AI-provider request: baseUrl ${reason}`);
   }
+}
+
+// ── Redirect-safe fetch (audit finding: open redirect SSRF) ───────────────────
+// Node's fetch() follows redirects by default WITHOUT re-running the baseURL
+// SSRF check above. A permitted public provider URL can 302 to 127.0.0.1 /
+// 169.254.169.254 / RFC1918 and the server would still connect with its own
+// network identity (and, worse, forward the Authorization header).
+//
+// This helper:
+//   1. Uses redirect:'manual' so every hop is explicit.
+//   2. Re-validates each hop via assertFetchTargetSafe (same production policy
+//      as the initial baseURL check).
+//   3. Never forwards Authorization across origins (scheme/host/port change).
+//   4. Caps the hop chain (default 3).
+//
+// Residual gap (unchanged, documented in validation.ts): this is still a
+// literal-form host check, not DNS-pinning. A hostname that resolves public at
+// validation time can be repointed to a private IP before the TCP connect.
+// Full closure needs resolve-and-pin at the connection layer — out of scope here.
+const DEFAULT_MAX_REDIRECTS = 3;
+
+function originKey(u: URL): string {
+  const port = u.port || (u.protocol === 'https:' ? '443' : u.protocol === 'http:' ? '80' : '');
+  return `${u.protocol}//${u.hostname.toLowerCase()}:${port}`;
+}
+
+function isRedirectStatus(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+/** Normalize HeadersInit into a mutable Headers so we can strip Authorization. */
+function toHeaders(init?: HeadersInit): Headers {
+  return new Headers(init ?? undefined);
+}
+
+/**
+ * fetch() with manual redirect handling and per-hop SSRF revalidation.
+ * Exported for unit tests that exercise redirect chains directly.
+ */
+export async function fetchOpenAICompat(
+  url: string,
+  init: RequestInit = {},
+  opts: { maxRedirects?: number } = {},
+): Promise<Response> {
+  const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
+  let currentUrl = url;
+  // Clone once so body/method stay available across same-origin hops. Request
+  // bodies may be streams; our adapters always pass a string body, so re-use
+  // is safe.
+  const baseInit: RequestInit = { ...init, redirect: 'manual' };
+  const originalHeaders = toHeaders(init.headers);
+  const startOrigin = originKey(new URL(currentUrl));
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    assertFetchTargetSafe(currentUrl);
+
+    const headers = toHeaders(originalHeaders);
+    // Strip credentials when the hop leaves the original origin — never hand
+    // the API key to an attacker-controlled redirect target.
+    if (originKey(new URL(currentUrl)) !== startOrigin) {
+      headers.delete('Authorization');
+    }
+
+    const res = await fetch(currentUrl, { ...baseInit, headers });
+    if (!isRedirectStatus(res.status)) return res;
+
+    if (hop === maxRedirects) {
+      throw new Error(`OpenAI-compat redirect limit (${maxRedirects}) exceeded starting from ${url}`);
+    }
+
+    const location = res.headers.get('location');
+    if (!location) {
+      throw new Error(`OpenAI-compat redirect missing Location header (HTTP ${res.status}) from ${currentUrl}`);
+    }
+
+    let next: URL;
+    try {
+      next = new URL(location, currentUrl);
+    } catch {
+      throw new Error(`OpenAI-compat redirect has invalid Location: ${location}`);
+    }
+
+    const nextUrl = next.toString();
+    // Production gate (same as initial baseURL).
+    assertFetchTargetSafe(nextUrl);
+    // Cross-origin hops are revalidated with the literal SSRF guard even in
+    // dev/test: a same-host loopback mock may still redirect to itself (dev
+    // Ollama/LM Studio / unit tests), but a public origin pivoting to
+    // 127.0.0.1 / 169.254.169.254 / RFC1918 is never intentional.
+    const prevOrigin = originKey(new URL(currentUrl));
+    if (originKey(next) !== prevOrigin && !allowPrivateNetworkTargets()) {
+      const reason = ssrfUnsafeUrlReason(nextUrl);
+      if (reason) {
+        throw new Error(`Refusing OpenAI-compat redirect to ${nextUrl}: ${reason}`);
+      }
+    }
+
+    // 303 switches method to GET and drops the body per fetch semantics.
+    if (res.status === 303) {
+      baseInit.method = 'GET';
+      delete baseInit.body;
+    }
+
+    currentUrl = nextUrl;
+  }
+
+  throw new Error(`OpenAI-compat redirect limit (${maxRedirects}) exceeded starting from ${url}`);
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,7 +210,6 @@ export function makeOpenAICompatLLMProvider(cfg: {
 }): LLMProvider {
   return {
     generate: async (params: GenerateContentParameters): Promise<GenerateContentResponse> => {
-      assertFetchTargetSafe(cfg.baseURL);
       const messages = buildMessages(params);
       const body: Record<string, unknown> = { model: params.model, messages };
 
@@ -119,7 +231,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
         body.temperature = params.config.temperature;
       }
 
-      const res = await fetch(`${cfg.baseURL}/chat/completions`, {
+      const res = await fetchOpenAICompat(`${cfg.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cfg.apiKey}`,
@@ -158,8 +270,7 @@ export function makeOpenAICompatEmbeddingProvider(cfg: {
 }): EmbeddingProvider {
   return {
     embed: async (text: string): Promise<number[]> => {
-      assertFetchTargetSafe(cfg.baseURL);
-      const res = await fetch(`${cfg.baseURL}/embeddings`, {
+      const res = await fetchOpenAICompat(`${cfg.baseURL}/embeddings`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cfg.apiKey}`,
@@ -183,8 +294,7 @@ export function makeOpenAICompatImageProvider(cfg: {
 }): ImageProvider {
   return {
     generate: async (prompt: string): Promise<string | undefined> => {
-      assertFetchTargetSafe(cfg.baseURL);
-      const res = await fetch(`${cfg.baseURL}/images/generations`, {
+      const res = await fetchOpenAICompat(`${cfg.baseURL}/images/generations`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cfg.apiKey}`,
@@ -217,8 +327,7 @@ export function makeOpenAICompatTTSProvider(cfg: {
   return {
     speak: async (text: string): Promise<{ dataUrl: string; mimeType: string } | undefined> => {
       if (!text) return undefined;
-      assertFetchTargetSafe(cfg.baseURL);
-      const res = await fetch(`${cfg.baseURL}/audio/speech`, {
+      const res = await fetchOpenAICompat(`${cfg.baseURL}/audio/speech`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cfg.apiKey}`,

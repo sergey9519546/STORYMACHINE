@@ -12,6 +12,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "node --experimental-strip-types --test",
+    "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
     "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts"
   },

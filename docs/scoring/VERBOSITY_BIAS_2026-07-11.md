@@ -5,6 +5,10 @@ re-calibration of the density regime — no zero-regression surgical patch exist
 Proven three ways by measurement below.** Keep the `empty_verbosity` metamorphic
 case as the standing regression witness.
 
+**CI (2026-07-14):** `npm run test:metamorphic` runs in CI/release. Hard
+invariants fail the build; `empty_verbosity` is classified **known-failing**
+(printed, exit 0 if only it fails). Flip it to HARD only after recalibration.
+
 ## The bias (confirmed, exact)
 
 `health = 100 − densityPenalty − scarcityPenalty`, where

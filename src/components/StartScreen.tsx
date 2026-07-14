@@ -6,6 +6,11 @@ import { EXPLAINERS } from "./startscreen/explainers.config";
 import { ExplainerCard } from "./startscreen/ExplainerCard";
 import { StoryConfigForm, UploadedFile } from "./startscreen/StoryConfigForm";
 import { SlugLineIntro, usePrefersReducedMotion } from "./startscreen/SlugLineIntro";
+import {
+  appendUploadedFiles,
+  filterUploadableFiles,
+  readUploadedFiles,
+} from "../lib/uploaded-files";
 
 interface StartScreenProps {
   onStart: (config: StoryConfig) => void;
@@ -100,36 +105,15 @@ export default function StartScreen({
     setIsDragging(false);
   };
 
-  // H3: Read dropped files (previously a no-op stub).
-  // Accepts .txt / .fountain / .fdx / text-like files; reads as text via FileReader.
-  const ALLOWED_EXTS = /\.(txt|fountain|fdx|md|htm|html)$/i;
-  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB per file
-
-  const inferDropCategory = (filename: string): typeof uploadedFiles[number]['category'] => {
-    const ext = filename.toLowerCase().split('.').pop() ?? '';
-    if (ext === 'fountain' || ext === 'fdx') return 'Plot';
-    if (ext === 'json' || ext === 'csv') return 'Rules';
-    return 'Lore';
-  };
-
+  // H3: Read dropped files (batch, functional update — same path as StoryConfigForm upload).
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(f =>
-      ALLOWED_EXTS.test(f.name) && f.size <= MAX_FILE_SIZE
-    );
-    droppedFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result;
-        if (typeof text === 'string') {
-          setUploadedFiles(prev => [
-            ...prev,
-            { name: file.name, content: text, size: file.size, category: inferDropCategory(file.name) },
-          ]);
-        }
-      };
-      reader.readAsText(file);
+    const droppedFiles = filterUploadableFiles(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+    void readUploadedFiles(droppedFiles).then((batch) => {
+      if (batch.length === 0) return;
+      setUploadedFiles((prev) => appendUploadedFiles(prev, batch));
     });
   };
 

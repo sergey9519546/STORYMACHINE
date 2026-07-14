@@ -39,6 +39,12 @@ jobs:
       - name: Run tests (keyless — analysis-only posture)
         run: npm test
 
+      # Hard metamorphic invariants must hold; empty_verbosity is a known-failing
+      # witness (verbosity bias) and does not fail this step — see
+      # evals/scoring/runner/metamorphic-lib.ts + docs/scoring/VERBOSITY_BIAS_2026-07-11.md.
+      - name: Metamorphic scoring gate
+        run: npm run test:metamorphic
+
       - name: Build
         run: npm run build
         env:

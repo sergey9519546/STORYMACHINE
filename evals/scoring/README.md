@@ -13,9 +13,19 @@ Makes every future scorer change measurable against the frozen baseline
 
 ## Run
 ```
-node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts
+npm run test:metamorphic
+# or: node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts
 ```
 (Requires dev deps; run off-OneDrive per EXECUTION_PLAN F0.)
+
+### CI contract
+- **Hard cases** (`identity`, rename/whitespace invariance, scene shuffle/reverse,
+  scene-dup padding) must pass — failure exits nonzero and fails CI/release.
+- **Known-failing witness:** `empty_verbosity` currently fails under the density
+  formula (padding raises health). It is printed as `KNOWN FAIL` and does **not**
+  fail CI until recalibration. See `docs/scoring/VERBOSITY_BIAS_2026-07-11.md`.
+- Optional baseline write: `METAMORPHIC_WRITE_BASELINE=1 npm run test:metamorphic`
+  (or `--write-baseline`). Baseline write is opt-in; exit code is the gate.
 
 ## Why metamorphic first
 No human labels exist yet, so absolute-score benchmarks aren't possible. But the
