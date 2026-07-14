@@ -45,7 +45,7 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
 
   return (
     <div className="flex flex-col h-full space-y-6">
-      <h2 className="text-2xl font-bold text-black uppercase tracking-widest flex items-center gap-3 mb-2">
+      <h2 className="text-2xl font-bold text-ink uppercase tracking-widest flex items-center gap-3 mb-2">
         <Icon className="w-8 h-8" />
         {title}
       </h2>
@@ -62,46 +62,46 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
                 onClick={() => onSelect(key)}
                 className={`text-left p-4 brutal-border-thick transition-all flex items-center justify-between group brutal-shadow-hover ${
                   isSelected
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-black hover:border-[#FF4444]"
+                    ? "bg-ink text-cream border-ink"
+                    : "bg-panel text-ink hover:border-stamp"
                 }`}
               >
                 <div className="flex items-center gap-4">
                   {isEmotionalArc && (
-                    <div className={`p-1 brutal-border ${isSelected ? 'bg-white text-black' : 'bg-black text-white'}`}>
+                    <div className={`p-1 brutal-border ${isSelected ? 'bg-panel text-ink' : 'bg-ink text-cream'}`}>
                       <ArcVisual arc={key} className="w-8 h-8" />
                     </div>
                   )}
                   <div>
-                    <div className={`font-bold uppercase tracking-widest ${isSelected ? 'text-white' : 'group-hover:text-[#FF4444]'}`}>
+                    <div className={`font-bold uppercase tracking-widest ${isSelected ? 'text-cream' : 'group-hover:text-stamp'}`}>
                       {data.title}
                     </div>
-                    <div className={`text-[10px] font-mono uppercase mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div className={`text-[10px] font-mono uppercase mt-1 ${isSelected ? 'text-cream/60' : 'text-mute'}`}>
                       {data.vibe}
                     </div>
                   </div>
                 </div>
-                {isSelected && <Check className="w-5 h-5 text-[#FF4444]" />}
+                {isSelected && <Check className="w-5 h-5 text-stamp" />}
               </button>
             );
           })}
         </div>
 
         {/* Right: Inspector */}
-        <div className="w-full lg:w-2/3 bg-gray-50 brutal-border-thick p-6 relative flex flex-col">
-          <div className="absolute top-0 right-0 bg-black text-white px-3 py-1 text-[10px] font-mono uppercase tracking-widest brutal-border-thick border-t-0 border-r-0">
+        <div className="w-full lg:w-2/3 bg-panel2 brutal-border-thick p-6 relative flex flex-col">
+          <div className="absolute top-0 right-0 bg-ink text-cream px-3 py-1 text-[10px] font-mono uppercase tracking-widest brutal-border-thick border-t-0 border-r-0">
             {selectedValue === activeKey ? "Selected" : "Preview"}
           </div>
 
           <div className="mb-6 pr-20 flex items-start gap-6">
             {isEmotionalArc && (
-              <div className="p-4 bg-black text-[#FF4444] brutal-border-thick shrink-0">
+              <div className="p-4 bg-ink text-stamp brutal-border-thick shrink-0">
                 <ArcVisual arc={activeKey} className="w-24 h-24" />
               </div>
             )}
             <div>
-              <h3 className="text-3xl md:text-4xl font-display uppercase tracking-widest mb-2 text-black leading-none">{activeData.title}</h3>
-              <span className="inline-block px-2 py-1 border-2 border-black text-xs font-mono uppercase tracking-widest text-[#FF4444] font-bold mt-2">
+              <h3 className="text-3xl md:text-4xl font-display uppercase tracking-widest mb-2 text-ink leading-none">{activeData.title}</h3>
+              <span className="inline-block px-2 py-1 border-2 border-ink text-xs font-mono uppercase tracking-widest text-stamp font-bold mt-2">
                 {activeData.vibe}
               </span>
             </div>
@@ -109,30 +109,30 @@ export function ExplainerCard({ options, selectedValue, onSelect, title, icon: I
 
           <div className="space-y-6 font-mono text-sm flex-1 overflow-y-auto pr-4">
             <div>
-              <h4 className="font-bold uppercase border-b-2 border-black pb-1 mb-2 text-black">Director's Notes</h4>
-              <p className="text-gray-700 leading-relaxed">{activeData.desc}</p>
+              <h4 className="font-bold uppercase border-b-2 border-ink pb-1 mb-2 text-ink">Director's Notes</h4>
+              <p className="text-ink2 leading-relaxed">{activeData.desc}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <h4 className="font-bold uppercase border-b-2 border-black pb-1 mb-2 text-black">Mechanics</h4>
-                <p className="text-gray-700 leading-relaxed">{activeData.mechanics}</p>
+                <h4 className="font-bold uppercase border-b-2 border-ink pb-1 mb-2 text-ink">Mechanics</h4>
+                <p className="text-ink2 leading-relaxed">{activeData.mechanics}</p>
               </div>
               <div>
-                <h4 className="font-bold uppercase border-b-2 border-black pb-1 mb-2 text-black">Ideal For</h4>
-                <p className="text-gray-700 leading-relaxed">{activeData.idealFor}</p>
+                <h4 className="font-bold uppercase border-b-2 border-ink pb-1 mb-2 text-ink">Ideal For</h4>
+                <p className="text-ink2 leading-relaxed">{activeData.idealFor}</p>
               </div>
             </div>
 
             <div>
-              <h4 className="font-bold uppercase border-b-2 border-[#FF4444] pb-1 mb-2 text-[#FF4444]">Warning / Pitfalls</h4>
-              <p className="text-gray-700 leading-relaxed">{activeData.warning}</p>
+              <h4 className="font-bold uppercase border-b-2 border-stamp pb-1 mb-2 text-stamp">Warning / Pitfalls</h4>
+              <p className="text-ink2 leading-relaxed">{activeData.warning}</p>
             </div>
           </div>
 
-          <div className="mt-6 bg-black text-white p-4 brutal-border-thick shrink-0">
-            <h4 className="font-bold uppercase mb-2 text-[#FF4444] text-xs tracking-widest">Cinematic References</h4>
-            <p className="text-gray-300 font-mono text-sm">{activeData.examples}</p>
+          <div className="mt-6 bg-ink text-cream p-4 brutal-border-thick shrink-0">
+            <h4 className="font-bold uppercase mb-2 text-stamp text-xs tracking-widest">Cinematic References</h4>
+            <p className="text-cream/80 font-mono text-sm">{activeData.examples}</p>
           </div>
         </div>
       </div>
