@@ -232,7 +232,7 @@ export default function Toolbar({
         <button
           onClick={onOpenStoryMachine}
           aria-label="Launch Story Machine"
-          className="bg-[#FF4444] text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-colors brutal-border"
+          className="bg-stamp text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-panel hover:text-ink transition-colors brutal-border"
         >
           Launch Machine
         </button>

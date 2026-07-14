@@ -168,7 +168,7 @@ export default function SnapshotManager({
                 </button>
                 <button
                   onClick={onConfirmRestore}
-                  className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-[#FF4444]"
+                  className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-stamp"
                 >
                   Restore
                 </button>

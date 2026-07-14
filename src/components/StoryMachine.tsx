@@ -84,13 +84,13 @@ const PanelLoadingInline = () => (
 // ── Emotion display helpers ───────────────────────────────────────────────────
 
 const EMOTION_COLOR: Record<EmotionType, string> = {
-  neutral:  'bg-gray-200 text-gray-600',
+  neutral:  'bg-linefill text-gray-600',
   joy:      'bg-green-500 text-white',
   distress: 'bg-red-800 text-white',
   anger:    'bg-[#FF4444] text-white',
   fear:     'bg-purple-600 text-white',
   pride:    'bg-yellow-400 text-black',
-  shame:    'bg-gray-500 text-white',
+  shame:    'bg-panel20 text-white',
 };
 
 const PERSUASION_BADGE: Record<string, string> = {
@@ -620,7 +620,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                 onClick={() => setSyuzhetMode(m => !m)}
                 title="Syuzhet mode: reorders the screenplay by information-reveal priority (revelation first, then flashback)"
                 className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border brutal-shadow-hover transition-colors ${
-                  syuzhetMode ? "bg-ink text-cream" : "bg-panel text-ink hover:bg-gray-100"
+                  syuzhetMode ? "bg-ink text-cream" : "bg-panel text-ink hover:bg-panel2"
                 }`}
               >
                 Syuzhet {syuzhetMode ? "ON" : "OFF"}
@@ -635,6 +635,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
               </button>
             </div>
           )}
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="font-mono font-bold text-[8px] tracking-[.18em] uppercase text-faint select-none self-center mr-1">DIRECT</span>
           <button
             onClick={() => setShowDirectorCut(true)}
             title="Director's Cut — inject ops mid-sim"
@@ -667,6 +669,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <FileDown className="w-4 h-4" />
             <span className="hidden sm:inline">Harvest</span>
           </button>
+          </div>
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="font-mono font-bold text-[8px] tracking-[.18em] uppercase text-faint select-none self-center mr-1">ENGINE</span>
           <button
             onClick={() => setShowConverge(true)}
             title="Convergence Search — AlphaZero-for-drama"
@@ -739,6 +744,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <Target className="w-4 h-4" />
             <span className="hidden sm:inline">Prove</span>
           </button>
+          </div>
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="font-mono font-bold text-[8px] tracking-[.18em] uppercase text-faint select-none self-center mr-1">INSTRUMENTS</span>
           <button
             onClick={() => setShowQualityEngines(true)}
             title="Quality Engines — 9 narrative quality signals per committed scene"
@@ -811,6 +819,9 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <span style={{ fontSize: 14 }}>🧬</span>
             <span className="hidden sm:inline">Voice</span>
           </button>
+          </div>
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="font-mono font-bold text-[8px] tracking-[.18em] uppercase text-faint select-none self-center mr-1">LIVE</span>
           <button
             onClick={() => setShowLivePlay(true)}
             title="Author Presence — STEER, INJECT, OVERRULE live story beats"
@@ -843,16 +854,17 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Room</span>
           </button>
+          </div>
           <button
             onClick={() => setShowSettings(true)}
             title="AI Provider Settings"
-            className="bg-panel text-ink px-3 py-2 brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors flex items-center"
+            className="bg-panel text-ink px-3 py-2 brutal-border brutal-shadow-hover hover:bg-panel2 transition-colors flex items-center"
           >
             <Settings className="w-4 h-4" />
           </button>
           <button
             onClick={onClose}
-            className="bg-panel text-ink px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-gray-100 transition-colors"
+            className="bg-panel text-ink px-4 py-2 font-bold uppercase tracking-wider brutal-border brutal-shadow-hover hover:bg-panel2 transition-colors"
           >
             Back to IDE
           </button>
@@ -883,7 +895,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                     <div className="mt-2 text-xs text-faint font-mono uppercase">
                       {here.length > 0 ? `Present: ${here.map(a => a.name).join(", ")}` : "Empty"}
                     </div>
-                    <div className="mt-1 text-xs text-faint font-mono uppercase border-t border-dashed border-gray-200 pt-1">
+                    <div className="mt-1 text-xs text-faint font-mono uppercase border-t border-dashed border-hair pt-1">
                       Connected: {node.adjacent_locations.join(", ")}
                     </div>
                     <button
@@ -894,7 +906,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                       {loading ? "Running…" : "Run Dialogue Lock (5 Turns)"}
                     </button>
                     {loading && streamLog.length > 0 && (
-                      <div className="mt-2 bg-black text-green-400 font-mono text-xs p-2 max-h-24 overflow-y-auto brutal-border">
+                      <div className="mt-2 bg-night text-ok font-mono text-xs p-2 max-h-24 overflow-y-auto brutal-border">
                         {streamLog.map((line, i) => <div key={i}>{line}</div>)}
                       </div>
                     )}
@@ -982,7 +994,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                             {agent.suspicion_score}/100
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 h-2 border border-black">
+                        <div className="w-full bg-linefill h-2 border border-ink">
                           <div
                             className="h-full transition-all duration-500"
                             style={{
@@ -996,7 +1008,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
                       {/* ── OCC Emotion state ── */}
                       {agent.emotionState && agent.emotionState.dominant !== 'neutral' && (
-                        <div className="border-t border-dashed border-gray-200 pt-2">
+                        <div className="border-t border-dashed border-hair pt-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Smile className="w-3 h-3 shrink-0" />
                             <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase ${EMOTION_COLOR[agent.emotionState.dominant]}`}>
@@ -1024,7 +1036,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
                       {/* ── Goal stack summary ── */}
                       {agent.goalStack && (
-                        <div className="border-t border-dashed border-gray-200 pt-2">
+                        <div className="border-t border-dashed border-hair pt-2">
                           <div className="flex items-start gap-1 mb-1">
                             <Target className="w-3 h-3 shrink-0 mt-0.5" />
                             <div>
@@ -1047,7 +1059,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
                       {/* ── Persuasion strategies in use ── */}
                       {(persuasionLog[agent.char_id] ?? []).length > 0 && (
-                        <div className="border-t border-dashed border-gray-200 pt-2">
+                        <div className="border-t border-dashed border-hair pt-2">
                           <div className="flex items-center gap-1 mb-1">
                             <Shuffle className="w-3 h-3" />
                             <span className="text-[9px] font-bold uppercase text-faint">Persuasion</span>
@@ -1070,7 +1082,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                         const pq = activePressures.find(p => p.char_id === agent.char_id)?.pressures ?? [];
                         if (pq.length === 0) return null;
                         return (
-                          <div className="border-t border-dashed border-gray-200 pt-2">
+                          <div className="border-t border-dashed border-hair pt-2">
                             <div className="flex items-center gap-1 mb-1">
                               <Zap className="w-3 h-3 text-purple-600" />
                               <span className="text-[9px] font-bold uppercase text-purple-600">{pq.length} pressure{pq.length !== 1 ? 's' : ''}</span>
@@ -1105,7 +1117,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                         </div>
                       )}
 
-                      <div className="border-t border-dashed border-gray-300 pt-2">
+                      <div className="border-t border-dashed border-hair pt-2">
                         <span className="font-bold uppercase">Knowledge:</span>
                         <ul className="list-disc list-inside pl-2 mt-1 text-ink2">
                           {agent.knowledge_vector.map((k, i) => <li key={i}>{k}</li>)}
@@ -1126,12 +1138,12 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                               {topBeliefs.map((b: Belief, i) => (
                                 <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
                                   <div className="w-10 shrink-0 mt-1">
-                                    <div className="w-full bg-gray-200 h-1.5 border border-gray-400">
-                                      <div className="h-full bg-black" style={{ width: `${b.confidence * 100}%` }} />
+                                    <div className="w-full bg-linefill h-1.5 border border-faint">
+                                      <div className="h-full bg-ink" style={{ width: `${b.confidence * 100}%` }} />
                                     </div>
                                     <span className="text-[8px] text-faint">{Math.round(b.confidence * 100)}%</span>
                                   </div>
-                                  <span className={`text-gray-800 leading-tight ${(b.contradicts?.length ?? 0) > 0 ? 'text-stamp' : ''}`}>
+                                  <span className={`text-ink2 leading-tight ${(b.contradicts?.length ?? 0) > 0 ? 'text-stamp' : ''}`}>
                                     {b.proposition}
                                     {(b.contradicts?.length ?? 0) > 0 && ' ⚡'}
                                   </span>
@@ -1160,7 +1172,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                                   </div>
                                   <div className="text-faint text-[9px]">turn {edge.turn_index}</div>
                                   {edge.severity != null && (
-                                    <div className="mt-1 w-full bg-gray-200 h-1 border border-gray-300">
+                                    <div className="mt-1 w-full bg-linefill h-1 border border-hair">
                                       <div
                                         className="h-full bg-stamp"
                                         style={{ width: `${edge.severity}%` }}
@@ -1209,7 +1221,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                               {tomEntries.map((tom, i) => {
                                 const subject = agents.find(a => a.char_id === tom.subject_id);
                                 return (
-                                  <div key={i} className="text-[10px] font-mono bg-gray-50 p-2 border border-gray-200">
+                                  <div key={i} className="text-[10px] font-mono bg-panel2 p-2 border border-hair">
                                     <span className="font-bold">{subject?.name ?? tom.subject_id}</span>
                                     <span className="text-faint"> trust: {Math.round(tom.trust_level * 100)}%</span>
                                     <div className="text-ink2 italic mt-0.5">"{tom.believed_motive}"</div>
@@ -1270,8 +1282,8 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                 const rowClass = isLie || isThreatOrBetray
                   ? "border-stamp bg-red-50"
                   : isCovert
-                    ? "border-dashed border-gray-400 bg-gray-100"
-                    : "border-black bg-gray-50";
+                    ? "border-dashed border-faint bg-panel2"
+                    : "border-black bg-panel2";
                 return (
                   <div
                     key={entry.action_id}
@@ -1323,7 +1335,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                     onClick={() => setSyuzhetMode(m => !m)}
                     title="Syuzhet: reveal-order reconstruction. Opens on the highest-drama beat, then flashback to cause."
                     className={`text-[10px] px-3 py-2 font-bold uppercase tracking-widest brutal-border transition-colors ${
-                      syuzhetMode ? "bg-ink text-cream" : "bg-panel text-ink border-black hover:bg-gray-100"
+                      syuzhetMode ? "bg-ink text-cream" : "bg-panel text-ink border-black hover:bg-panel2"
                     }`}
                   >
                     Syuzhet {syuzhetMode ? "ON" : "OFF"}
@@ -1361,7 +1373,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
 
           <div className="relative">
             {/* Vertical timeline spine */}
-            <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-black" />
+            <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-ink" />
 
             <div className="space-y-4 pl-8">
               {beatTraces.map((beat) => {
@@ -1397,7 +1409,7 @@ export default function StoryMachine({ onClose, onExportToIDE }: StoryMachinePro
                       </p>
 
                       {beat.fountain_hint && (
-                        <p className="mt-2 text-[11px] text-faint italic font-mono border-l-2 border-gray-300 pl-2">
+                        <p className="mt-2 text-[11px] text-faint italic font-mono border-l-2 border-hair pl-2">
                           {beat.fountain_hint}
                         </p>
                       )}

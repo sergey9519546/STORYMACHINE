@@ -518,7 +518,7 @@ function StoryTab() {
           <button
             onClick={() => story.structure && void applyStructure(story.structure)}
             disabled={applying || !story.structure}
-            className="px-4 py-2 font-bold uppercase tracking-wider text-xs bg-black text-white border-2 border-black hover:bg-[#FF4444] transition-colors disabled:opacity-40"
+            className="px-4 py-2 font-bold uppercase tracking-wider text-xs bg-black text-white border-2 border-black hover:bg-stamp transition-colors disabled:opacity-40"
           >
             {applying ? "Applying…" : "Re-apply"}
           </button>
@@ -753,7 +753,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-black text-white px-6 py-2 font-bold uppercase tracking-wider text-sm brutal-border brutal-shadow-hover hover:bg-[#FF4444] transition-colors disabled:opacity-50"
+                  className="bg-black text-white px-6 py-2 font-bold uppercase tracking-wider text-sm brutal-border brutal-shadow-hover hover:bg-stamp transition-colors disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>

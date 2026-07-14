@@ -1390,7 +1390,7 @@ export default function ScriptIDE({
               >
                 <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-6 border-b-4 border-black pb-2 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-[#FF4444]" /> Story Engine
+                    <Activity className="w-5 h-5 text-stamp" /> Story Engine
                     Diagnostics
                   </h2>
 
@@ -1440,11 +1440,11 @@ export default function ScriptIDE({
                     <p className="text-[10px] font-mono leading-relaxed">
                       SYSTEM STATUS: THE STORY MIND IS ACTIVE. NARRATIVE
                       COHESION AT 94%. DETECTED THEME:{" "}
-                      <span className="text-[#FF4444]">
+                      <span className="text-stamp">
                         {engineState.config.theme.toUpperCase()}
                       </span>
                       . DIRECTOR STYLE:{" "}
-                      <span className="text-[#FF4444]">
+                      <span className="text-stamp">
                         {engineState.config.directorStyle.toUpperCase()}
                       </span>
                       .
@@ -1468,7 +1468,7 @@ export default function ScriptIDE({
                           </span>
                           <div className="w-24 h-2 bg-zinc-200 dark:bg-zinc-800">
                             <div
-                              className="h-full bg-[#FF4444]"
+                              className="h-full bg-stamp"
                               style={{ width: "65%" }}
                             />
                           </div>

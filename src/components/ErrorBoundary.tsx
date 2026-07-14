@@ -71,7 +71,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => this.setState({ error: null, errorTime: null })}
-                className="w-full py-3 bg-black text-white font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border"
+                className="w-full py-3 bg-black text-white font-bold uppercase tracking-widest hover:bg-stamp transition-colors brutal-border"
               >
                 Try Again
               </button>

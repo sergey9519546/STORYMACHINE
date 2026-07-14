@@ -2359,7 +2359,7 @@ export default function ScriptDoctorPanel({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => runDiagnosis()}
-                  className="flex-1 bg-black text-white px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#FF4444] transition-colors brutal-border flex items-center justify-center gap-2"
+                  className="flex-1 bg-ink text-cream px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-stamp transition-colors brutal-border flex items-center justify-center gap-2"
                 >
                   <Stethoscope className="w-4 h-4" aria-hidden="true" /> Run Diagnosis
                 </button>

@@ -521,7 +521,7 @@ export default function DirectorPanel({
           <button
             onClick={onClose}
             aria-label="Close Director panel"
-            className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+            className="p-2 brutal-border hover:bg-ink hover:text-cream transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -578,7 +578,7 @@ export default function DirectorPanel({
                 </select>
               </div>
               {currentScene.isQBNMode && (
-                <div className="bg-black text-white p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
+                <div className="bg-ink text-cream p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
                   QBN Mode Active (Investigation)
                 </div>
               )}
@@ -604,7 +604,7 @@ export default function DirectorPanel({
               <div className="pt-4 border-t-[4px] border-black">
                 <div className="flex justify-between items-center mb-4">
                   <label className="text-ink font-bold uppercase tracking-wider text-xs">Choices:</label>
-                  <button onClick={addChoice} className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-panel hover:text-ink transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover">
+                  <button onClick={addChoice} className="px-3 py-2 bg-ink text-cream brutal-border-thick hover:bg-panel hover:text-ink transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover">
                     + Add
                   </button>
                 </div>
@@ -763,7 +763,7 @@ export default function DirectorPanel({
                         onClick={() => toggleDefenseMech(mech)}
                         aria-pressed={active}
                         className={`px-2 py-1 text-[10px] font-bold uppercase brutal-border transition-colors ${
-                          active ? "bg-black text-white" : "bg-panel text-gray-400 border-gray-300 hover:border-black hover:text-ink"
+                          active ? "bg-ink text-cream" : "bg-panel text-faint border-hair hover:border-ink hover:text-ink"
                         }`}
                       >
                         {mech}
@@ -788,7 +788,7 @@ export default function DirectorPanel({
                               : lvl === "medium"
                               ? "bg-yellow-400 text-ink"
                               : "bg-green-500 text-white"
-                            : "bg-panel text-gray-400 border-gray-300 hover:border-black hover:text-ink"
+                            : "bg-panel text-faint border-hair hover:border-ink hover:text-ink"
                         }`}
                       >
                         {lvl.replace("_", " ")}
@@ -844,7 +844,7 @@ export default function DirectorPanel({
                     <SparkLine data={tensionHistoryRef.current.map((d) => d.menace)} color="#000000" height={24} />
                     <div className="flex gap-4 text-[9px] font-mono text-faint">
                       <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-stamp inline-block" />tension</span>
-                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-black inline-block" />menace</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-ink inline-block" />menace</span>
                     </div>
                   </div>
                 </div>
@@ -886,7 +886,7 @@ export default function DirectorPanel({
               ).map(([field, label]) => (
                 <div key={field} className="flex justify-between items-center">
                   <span className="font-bold text-xs uppercase tracking-widest">{label}</span>
-                  <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics[field]?.toFixed(2)}</span>
+                  <span className="font-mono bg-ink text-cream px-2 py-1">{currentScene.metrics[field]?.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -929,8 +929,8 @@ export default function DirectorPanel({
                         <span>{label}</span>
                         <span>{score}</span>
                       </div>
-                      <div className="w-full bg-gray-100 h-2 border border-gray-300">
-                        <div className="h-full bg-black transition-all" style={{ width: `${Math.min(100, score)}%` }} />
+                      <div className="w-full bg-linefill h-2 border border-hair">
+                        <div className="h-full bg-ink transition-all" style={{ width: `${Math.min(100, score)}%` }} />
                       </div>
                     </div>
                   );
@@ -954,7 +954,7 @@ export default function DirectorPanel({
               ).map(([field, label]) => {
                 const active = directorState.throughlines.activeThroughlines?.includes(field as "objectiveStory");
                 return (
-                  <div key={field} className={`p-3 border-2 border-black ${active ? "bg-black text-white" : "bg-panel text-ink"}`}>
+                  <div key={field} className={`p-3 border-2 border-black ${active ? "bg-ink text-cream" : "bg-panel text-ink"}`}>
                     <span className="font-bold text-xs uppercase tracking-widest block mb-1">{label}</span>
                     <p className="text-sm">{directorState.throughlines[field as keyof typeof directorState.throughlines] as string}</p>
                   </div>
@@ -1048,7 +1048,7 @@ export default function DirectorPanel({
                 <label className="text-ink font-bold uppercase tracking-wider text-xs block mb-2">Active Secrets:</label>
                 <div className="space-y-2">
                   {directorState.activeSecrets?.map((secret, idx) => (
-                    <div key={`secret-${secret.owner}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`secret-${secret.owner}-${idx}`} className="p-3 border-2 border-black bg-panel2 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{secret.owner}</span>
                       <span className="text-sm">{secret.content}</span>
                       <span className={`text-[10px] uppercase font-bold ${secret.revealed ? "text-red-600" : "text-green-600"}`}>
@@ -1063,7 +1063,7 @@ export default function DirectorPanel({
                 <label className="text-ink font-bold uppercase tracking-wider text-xs block mb-2">NPCs:</label>
                 <div className="space-y-2">
                   {directorState.npcs?.map((npc, idx) => (
-                    <div key={`npc-${npc.name}-${npc.role}-${idx}`} className="p-3 border-2 border-black bg-gray-50 flex flex-col gap-1">
+                    <div key={`npc-${npc.name}-${npc.role}-${idx}`} className="p-3 border-2 border-black bg-panel2 flex flex-col gap-1">
                       <span className="font-bold text-xs uppercase">{npc.name} ({npc.role})</span>
                       <span className="text-sm">Agenda: {npc.agenda}</span>
                       <span className="text-[10px] uppercase font-bold text-faint">Trust: {npc.trustworthiness}%</span>
@@ -1114,13 +1114,13 @@ export default function DirectorPanel({
                       onChange={e => setExpectedTurns(Math.max(4, Number(e.target.value)))}
                       className={inputClass}
                     />
-                    <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Beat turn ranges will be scaled to this session length.</p>
+                    <p className="text-[9px] text-faint mt-1 font-mono uppercase">Beat turn ranges will be scaled to this session length.</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button
                       onClick={applyStructurePreset}
                       disabled={applyingPreset}
-                      className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover disabled:opacity-40"
+                      className="flex-1 py-2 bg-ink text-cream brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover disabled:opacity-40"
                     >
                       {applyingPreset ? 'Applying…' : 'Apply Preset → Beats'}
                     </button>
@@ -1146,7 +1146,7 @@ export default function DirectorPanel({
                   ))}
                 </select>
                 {emotionalArc && (
-                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Engine will emit ESCALATE/COOL pressure when tension deviates &gt;22pts from the curve.</p>
+                  <p className="text-[9px] text-faint mt-1 font-mono uppercase">Engine will emit ESCALATE/COOL pressure when tension deviates &gt;22pts from the curve.</p>
                 )}
               </div>
 
@@ -1157,12 +1157,12 @@ export default function DirectorPanel({
                 const W = 200; const H = 48;
                 const pts = curve.map((v, i) => `${(i / (curve.length - 1)) * W},${H - (v / 100) * H}`).join(' ');
                 return (
-                  <div className="bg-gray-50 border-2 border-black p-2">
+                  <div className="bg-panel2 border-2 border-black p-2">
                     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label={`Tension curve for ${emotionalArc}`}>
                       <polyline points={pts} fill="none" stroke="#FF4444" strokeWidth="2.5" strokeLinejoin="round" />
                       <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="#ccc" strokeWidth="1" strokeDasharray="4,4" />
                     </svg>
-                    <div className="flex justify-between text-[9px] font-mono text-gray-400 uppercase mt-0.5">
+                    <div className="flex justify-between text-[9px] font-mono text-faint uppercase mt-0.5">
                       <span>start</span><span>middle</span><span>end</span>
                     </div>
                   </div>
@@ -1185,7 +1185,7 @@ export default function DirectorPanel({
                   ))}
                 </select>
                 {directorStyle && (
-                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
+                  <p className="text-[9px] text-faint mt-1 font-mono uppercase">Injected into every agent's character prompt and modulates Director pressure tone.</p>
                 )}
               </div>
 
@@ -1205,7 +1205,7 @@ export default function DirectorPanel({
                   ))}
                 </select>
                 {storyGenre && (
-                  <p className="text-[9px] text-gray-400 mt-1 font-mono uppercase">Sets tone, register, and genre-specific clichés to avoid. Composes with cinematic style.</p>
+                  <p className="text-[9px] text-faint mt-1 font-mono uppercase">Sets tone, register, and genre-specific clichés to avoid. Composes with cinematic style.</p>
                 )}
               </div>
             </div>
@@ -1227,7 +1227,7 @@ export default function DirectorPanel({
                     onClick={() => savePacingTarget(opt)}
                     className={`py-2 brutal-border-thick uppercase font-bold tracking-widest text-xs transition-colors ${
                       pacingTarget === opt
-                        ? 'bg-black text-white'
+                        ? 'bg-ink text-cream'
                         : 'bg-panel text-ink hover:bg-panel2'
                     }`}
                   >
@@ -1244,23 +1244,23 @@ export default function DirectorPanel({
 
               <button
                 onClick={addOutlineBeat}
-                className="w-full py-2 bg-black text-white brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                className="w-full py-2 bg-ink text-cream brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
               >
                 + Add Beat
               </button>
 
               {outlineBeats.length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs uppercase">
+                <div className="p-8 text-center border-2 border-dashed border-hair text-faint font-mono text-xs uppercase">
                   No beats. Add one above or let the Director improvise.
                 </div>
               ) : (
                 <div className="space-y-4">
                   {outlineBeats.map((beat, idx) => (
-                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-panel2 p-4 brutal-border-thick brutal-shadow relative space-y-3">
                       <button
                         onClick={() => removeOutlineBeat(idx)}
                         aria-label={`Remove beat ${idx + 1}`}
-                        className="absolute top-3 right-3 text-gray-400 hover:text-stamp font-bold text-xl leading-none transition-colors"
+                        className="absolute top-3 right-3 text-faint hover:text-stamp font-bold text-xl leading-none transition-colors"
                       >
                         ×
                       </button>
@@ -1350,7 +1350,7 @@ export default function DirectorPanel({
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={saveOutline}
-                  className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                  className="flex-1 py-2 bg-ink text-cream brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
                 >
                   Save to Engine
                 </button>
@@ -1387,7 +1387,7 @@ export default function DirectorPanel({
                 ) : (
                   <button
                     onClick={() => setConfirmClearBeats(true)}
-                    className="w-full py-1.5 bg-panel text-gray-400 brutal-border hover:text-stamp hover:border-stamp transition-colors uppercase font-bold tracking-widest text-[10px]"
+                    className="w-full py-1.5 bg-panel text-faint brutal-border hover:text-stamp hover:border-stamp transition-colors uppercase font-bold tracking-widest text-[10px]"
                   >
                     Clear All Beats
                   </button>
@@ -1440,7 +1440,7 @@ export default function DirectorPanel({
                     setNewQualityKey("");
                     setNewQualityValue("0");
                   }}
-                  className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold text-xs brutal-shadow-hover shrink-0"
+                  className="px-3 py-2 bg-ink text-cream brutal-border-thick hover:bg-stamp transition-colors uppercase font-bold text-xs brutal-shadow-hover shrink-0"
                 >
                   Add
                 </button>
@@ -1448,13 +1448,13 @@ export default function DirectorPanel({
 
               {/* Existing qualities */}
               {Object.keys(directorState.qbnQualities ?? {}).length === 0 ? (
-                <div className="p-8 text-center border-2 border-dashed border-gray-300 text-gray-400 font-mono text-xs uppercase">
+                <div className="p-8 text-center border-2 border-dashed border-hair text-faint font-mono text-xs uppercase">
                   No qualities set. Add one above.
                 </div>
               ) : (
                 <div className="space-y-2">
                   {Object.entries(directorState.qbnQualities ?? {}).map(([key, val]) => (
-                    <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 brutal-border">
+                    <div key={key} className="flex items-center gap-2 bg-panel2 p-2 brutal-border">
                       <span className="flex-1 font-mono text-xs font-bold uppercase truncate" title={key}>{key}</span>
                       <input
                         type="number"
@@ -1466,7 +1466,7 @@ export default function DirectorPanel({
                       <button
                         onClick={() => removeQbnQuality(key)}
                         aria-label={`Remove quality ${key}`}
-                        className="text-gray-400 hover:text-stamp font-bold text-xl leading-none transition-colors"
+                        className="text-faint hover:text-stamp font-bold text-xl leading-none transition-colors"
                       >
                         ×
                       </button>
@@ -1478,7 +1478,7 @@ export default function DirectorPanel({
               {/* Active secrets with QBN context */}
               {currentScene.isQBNMode && (
                 <div className="pt-4 border-t-[4px] border-black">
-                  <div className="bg-black text-white p-3 font-bold uppercase tracking-widest text-xs">
+                  <div className="bg-ink text-cream p-3 font-bold uppercase tracking-widest text-xs">
                     QBN Mode Active — {Object.keys(directorState.qbnQualities ?? {}).length} qualities governing {currentScene.choices.length} choices
                   </div>
                 </div>

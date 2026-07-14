@@ -60,7 +60,7 @@ export default function AnalysisPanel({
                     onClick={() => onCleanAction(block.index, block.text)}
                     disabled={isCleaning === block.index}
                     aria-label={`Clean action block with AI — ${block.text.substring(0, 40)}`}
-                    className="bg-black text-white text-[10px] px-3 py-2 uppercase font-bold hover:bg-[#FF4444] transition-colors brutal-border disabled:opacity-50 flex items-center gap-2"
+                    className="bg-black text-white text-[10px] px-3 py-2 uppercase font-bold hover:bg-stamp transition-colors brutal-border disabled:opacity-50 flex items-center gap-2"
                   >
                     {isCleaning === block.index ? (
                       <>

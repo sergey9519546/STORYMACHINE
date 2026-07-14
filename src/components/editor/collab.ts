@@ -39,7 +39,7 @@ export interface CollabOptions {
 
 // A small palette of distinct, legible cursor colors.
 const CURSOR_COLORS = [
-  '#FF4444', '#22C55E', '#3B82F6', '#A855F7',
+  '#c1301c', '#22C55E', '#3B82F6', '#A855F7',
   '#F59E0B', '#EC4899', '#14B8A6', '#8B5CF6',
 ];
 
