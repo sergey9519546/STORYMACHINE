@@ -129,6 +129,7 @@ are two different 14-pass orderings — do not conflate them. See
 | PR #199 | Final Draft-style IDE typing (autocomplete, auto-uppercase, smart Enter); centered screenplay page with live formatting |
 | PR #200 | Security: gate AI provider config writes behind `ADMIN_TOKEN`; IDE `exportFountain` title-page state fix; `requireString` throws `ValidationError` not a masked 500 |
 | Master research audit (2026-07-10) | ~130-file research folder read cover to cover; 68 superseded files archived; 3-tier incorporation queue filed (`docs/research-audit/MASTER_RESEARCH_AUDIT.md`) |
+| S-wave (2026-07-10, commits 85fc133 + f4eb2e4 + 348b24f) | Pre-deployment security audit BLOCKERS closed: SEC-1 (SSRF guard + /metrics auth), SEC-2 (O(n²) analyzer DoS via ANALYZER_SCENE_CEILING + defense-in-depth), OPS-1 (crash handlers), OPS-2 (/metrics gate). SHOULD items: CSV injection guard, non-root container, production CSP. Tests: ingress-security 28/28, analyzer-dos 11/11, hardening 16/16 |
 
 ---
 
@@ -272,34 +273,35 @@ spatial line-of-sight, streaming tags, TTS/storyboards.
 
 ---
 
-## 6. Pre-deployment audit (2026-07-10) — S-wave fix plan
+## 6. Pre-deployment audit (2026-07-10) — S-wave ✅ CLOSED
 
-Two read-only audits (ops + security) found BLOCKERS still open as of this
-writing — verify against current code before assuming any are stale:
-- **SEC-1**: `/api/ai-config` SSRF + unauthenticated GLOBAL provider
-  hijack — `baseUrl` has no host/scheme allowlist; config is
-  process-global; `/test` fires the request. (`validation.ts:143`,
-  `ai-config.ts:55`, `openai-compat.ts:75`) — PARTIALLY ADDRESSED by
-  PR #200's `ADMIN_TOKEN` gate on config writes; re-verify the SSRF
-  allowlist specifically is still open.
-- **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` /
-  `detectQuestionLatency` / `computeContentWordClueClusters` unbounded;
-  `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`,
-  `fountain-analyzer.ts:1118`/`1314`)
-- **OPS-1**: no `process.on(uncaughtException/unhandledRejection)` —
-  a rejection from the sweep intervals crashes the container.
-- **OPS-2**: `/metrics` fully unauth — leaks token usage, `est_cost_usd`,
-  session counts (`config.ts:30`).
+**All S-wave blockers closed as of 2026-07-10:**
+
+- ✅ **SEC-1** (commit f4eb2e4): SSRF guard via `ssrfSafeUrlField` on all
+  `*BaseUrl` fields (rejects private IPs, metadata endpoints, localhost in
+  prod); `/metrics` auth via `METRICS_TOKEN` (loopback-only by default,
+  bearer check when token set); collab prod-secret enforcement; run-room
+  limiter fixed to `aiLimiter`. Tests: `ingress-security.test.ts` 28/28.
+- ✅ **SEC-2** (commit 348b24f): `ANALYZER_SCENE_CEILING=1000` primary guard
+  (truncates + degrades honestly via `truncatedForAnalysis`/`totalSceneCount`);
+  defense-in-depth on 5 O(n²) functions via sort+early-break
+  (`overlapClusters`, `matchOverlapTemplate`), per-anchor clue index + 200 cap,
+  500 open-question scan cap, 50 relationship-pairing cap. Output
+  byte-identical on corpus. Tests: `analyzer-dos.test.ts` 11/11.
+- ✅ **OPS-1** (commit 85fc133): `uncaughtException` → graceful shutdown (same
+  path as SIGTERM, exit 1 for orchestrator restart); `unhandledRejection` logs
+  + continues (one bad promise doesn't kill server). Tests:
+  `hardening.test.ts` crash-handler suite 4/4.
+- ✅ **OPS-2** (commit f4eb2e4): `/metrics` gated (see SEC-1 above).
+
+**SHOULD items also closed (commit 85fc133):** CSV formula injection guard
+(`escapeCsvField`), non-root container (USER node), production CSP
+(default-src 'self', no unsafe-eval). Tests: `breakdown.test.ts` +8
+injection, `hardening.test.ts` +2 CSP.
+
+**Remaining (not blockers):**
 - **OPS-3** (wave 2): no release pipeline / tags / version / health SHA.
 - **OPS-4** (wave 2): no backup job (README documents, nothing calls it).
-
-SHOULD folded into S-wave: CSV formula injection (`breakdown.ts:644`),
-collab token no room-ownership (`collab.ts:12`), run-room limiter tier
-mismatch (`game.ts:245`), no prod CSP (`app.ts:97`), container runs root.
-NICE: 4 transitive dev-dep CVEs (`npm audit fix`), ai-config/test error
-snippet. Clean at last audit: session capability model, HTML export
-escaping, prompt-injection boundary, secrets never in bundle/logs, body/
-rate limits.
 
 ---
 
