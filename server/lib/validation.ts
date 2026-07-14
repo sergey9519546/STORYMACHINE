@@ -71,14 +71,25 @@ function isPrivateIPv6(ip: string): boolean {
   if (/^fe[89ab]/.test(norm)) return true;
   // fc00::/7 unique-local: first hextet in 0xfc00–0xfdff.
   if (norm.startsWith('fc') || norm.startsWith('fd')) return true;
-  // IPv4-mapped (::ffff:a.b.c.d) — check the embedded IPv4 address.
-  const v4map = norm.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (v4map) return isPrivateIPv4(v4map[1]);
+  // WHATWG URL canonicalizes dotted IPv4-mapped addresses to two hexadecimal
+  // hextets (for example ::ffff:127.0.0.1 → ::ffff:7f00:1). Decode that form
+  // before applying the IPv4 private-range policy.
+  const v4map = norm.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4map) {
+    const high = Number.parseInt(v4map[1], 16);
+    const low = Number.parseInt(v4map[2], 16);
+    const embedded = `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`;
+    return isPrivateIPv4(embedded);
+  }
   return false;
 }
 
+export interface SsrfUrlPolicy {
+  allowPrivateNetworkTargets?: boolean;
+}
+
 /** Returns null when `raw` is a safe public http(s) URL, else a human-readable rejection reason. */
-export function ssrfUnsafeUrlReason(raw: string): string | null {
+export function ssrfUnsafeUrlReason(raw: string, policy: SsrfUrlPolicy = {}): string | null {
   let u: URL;
   try { u = new URL(raw); } catch { return 'must be a valid URL'; }
 
@@ -91,14 +102,27 @@ export function ssrfUnsafeUrlReason(raw: string): string | null {
 
   let hostname = u.hostname.toLowerCase();
   if (hostname.startsWith('[') && hostname.endsWith(']')) hostname = hostname.slice(1, -1);
+  // A trailing root-label dot does not change DNS resolution. Normalize FQDNs
+  // before matching localhost/internal suffixes so `localhost.` cannot bypass
+  // the literal-host guard.
+  hostname = hostname.replace(/\.+$/, '');
+  if (!hostname) return 'must contain a hostname';
 
+  const allowPrivate = policy.allowPrivateNetworkTargets === true;
   if (net.isIPv4(hostname)) {
-    return isPrivateIPv4(hostname) ? 'must not target a private/loopback/reserved IP address' : null;
+    return !allowPrivate && isPrivateIPv4(hostname)
+      ? 'must not target a private/loopback/reserved IP address'
+      : null;
   }
   if (net.isIPv6(hostname)) {
-    return isPrivateIPv6(hostname) ? 'must not target a private/loopback/reserved IP address' : null;
+    return !allowPrivate && isPrivateIPv6(hostname)
+      ? 'must not target a private/loopback/reserved IP address'
+      : null;
   }
-  if (PRIVATE_HOSTNAME_EXACT.has(hostname) || PRIVATE_HOSTNAME_SUFFIXES.some(s => hostname.endsWith(s))) {
+  if (
+    !allowPrivate &&
+    (PRIVATE_HOSTNAME_EXACT.has(hostname) || PRIVATE_HOSTNAME_SUFFIXES.some(s => hostname.endsWith(s)))
+  ) {
     return 'must not target localhost or an internal/.local/.internal hostname';
   }
   // Alternate numeric-IP encodings (plain decimal, e.g. "2130706433" ==
@@ -842,6 +866,7 @@ export const ScriptideSaveBodySchema = z.object({
   characters: z.array(z.unknown()).max(100).optional(),
   researchNotes: z.array(z.unknown()).max(200).optional(),
   isDarkMode: z.boolean().optional(),
+  expectedUpdatedAt: z.number().int().nonnegative().nullable().optional(),
 }).passthrough();
 
 // POST /api/scriptide/personas — registerUserPersona (server/personas/

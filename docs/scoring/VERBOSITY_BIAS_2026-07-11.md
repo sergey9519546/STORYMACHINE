@@ -17,7 +17,8 @@ Appending stateless filler ("The wind continues. Nothing else happens. Time
 passes without event.") to each scene adds words but no issues and no scenes,
 so density falls, penalty falls, health **rises**.
 
-- base.fountain health **66.4 → 72.4 = +6.0** (metamorphic epsilon is 0.5 → FAIL).
+- Historical 2026-07-11 measurement: **66.4 → 72.4 = +6.0**.
+- Current 2026-07-14 HEAD witness: **66.4 → 72.9 = +6.5** (metamorphic epsilon is 0.5 → FAIL).
 - scarcityPenalty (140/sceneCount) is unchanged (scene count constant), so the
   entire bias flows through the word denominator.
 

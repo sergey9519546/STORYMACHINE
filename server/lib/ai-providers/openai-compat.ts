@@ -51,8 +51,12 @@ function enforceFetchSiteGuard(): boolean {
 }
 
 function assertFetchTargetSafe(baseURL: string): void {
-  if (!enforceFetchSiteGuard() || allowPrivateNetworkTargets()) return;
-  const reason = ssrfUnsafeUrlReason(baseURL);
+  // URL shape is always enforced. Development and the explicit production
+  // override may allow private model servers, but neither may enable non-http
+  // schemes, userinfo, or malformed targets.
+  const reason = ssrfUnsafeUrlReason(baseURL, {
+    allowPrivateNetworkTargets: !enforceFetchSiteGuard() || allowPrivateNetworkTargets(),
+  });
   if (reason) {
     throw new Error(`Refusing outbound AI-provider request: baseUrl ${reason}`);
   }
@@ -101,12 +105,17 @@ export async function fetchOpenAICompat(
   opts: { maxRedirects?: number } = {},
 ): Promise<Response> {
   const maxRedirects = opts.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
+  if (!Number.isInteger(maxRedirects) || maxRedirects < 0) {
+    throw new Error('OpenAI-compat maxRedirects must be a non-negative integer');
+  }
+
   let currentUrl = url;
   // Clone once so body/method stay available across same-origin hops. Request
   // bodies may be streams; our adapters always pass a string body, so re-use
   // is safe.
   const baseInit: RequestInit = { ...init, redirect: 'manual' };
   const originalHeaders = toHeaders(init.headers);
+  assertFetchTargetSafe(currentUrl);
   const startOrigin = originKey(new URL(currentUrl));
 
   for (let hop = 0; hop <= maxRedirects; hop++) {
@@ -121,6 +130,7 @@ export async function fetchOpenAICompat(
 
     const res = await fetch(currentUrl, { ...baseInit, headers });
     if (!isRedirectStatus(res.status)) return res;
+    await res.body?.cancel().catch(() => { /* best effort: release redirect connection */ });
 
     if (hop === maxRedirects) {
       throw new Error(`OpenAI-compat redirect limit (${maxRedirects}) exceeded starting from ${url}`);
@@ -146,17 +156,31 @@ export async function fetchOpenAICompat(
     // Ollama/LM Studio / unit tests), but a public origin pivoting to
     // 127.0.0.1 / 169.254.169.254 / RFC1918 is never intentional.
     const prevOrigin = originKey(new URL(currentUrl));
-    if (originKey(next) !== prevOrigin && !allowPrivateNetworkTargets()) {
+    const crossesOrigin = originKey(next) !== prevOrigin;
+    if (crossesOrigin && !allowPrivateNetworkTargets()) {
       const reason = ssrfUnsafeUrlReason(nextUrl);
       if (reason) {
         throw new Error(`Refusing OpenAI-compat redirect to ${nextUrl}: ${reason}`);
       }
     }
 
-    // 303 switches method to GET and drops the body per fetch semantics.
-    if (res.status === 303) {
+    const method = (baseInit.method ?? 'GET').toUpperCase();
+    const switchesToGet =
+      (res.status === 303 && method !== 'GET' && method !== 'HEAD') ||
+      ((res.status === 301 || res.status === 302) && method === 'POST');
+
+    // Never forward prompt/input bodies across origins on a body-preserving
+    // redirect. Authorization stripping alone would still disclose user data.
+    if (crossesOrigin && baseInit.body != null && !switchesToGet) {
+      throw new Error(`Refusing OpenAI-compat cross-origin ${res.status} redirect with request body to ${nextUrl}`);
+    }
+
+    // Match Fetch semantics for POST 301/302 and non-GET/HEAD 303 redirects.
+    if (switchesToGet) {
       baseInit.method = 'GET';
       delete baseInit.body;
+      originalHeaders.delete('Content-Type');
+      originalHeaders.delete('Content-Length');
     }
 
     currentUrl = nextUrl;

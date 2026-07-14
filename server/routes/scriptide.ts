@@ -208,14 +208,23 @@ router.post('/api/scriptide/save', gameLimiter, validate(ScriptideSaveBodySchema
     characters?: unknown;
     researchNotes?: unknown;
     isDarkMode?: unknown;
+    expectedUpdatedAt?: number | null;
   };
   const scriptText     = typeof body.scriptText     === 'string' ? body.scriptText.substring(0, 500_000) : '';
   const snapshots      = Array.isArray(body.snapshots)     ? body.snapshots.slice(0, 20)  : [];
   const characters     = Array.isArray(body.characters)    ? body.characters.slice(0, 100) : [];
   const researchNotes  = Array.isArray(body.researchNotes) ? body.researchNotes.slice(0, 200) : [];
   const isDarkMode     = body.isDarkMode === true;
-  stage.saveScriptIDEState(sessionId(req), { scriptText, snapshots, characters, researchNotes, isDarkMode });
-  res.json({ status: 'saved', updatedAt: Date.now() });
+  const result = stage.saveScriptIDEState(
+    sessionId(req),
+    { scriptText, snapshots, characters, researchNotes, isDarkMode },
+    body.expectedUpdatedAt,
+  );
+  if (result.status === 'conflict') {
+    res.status(409).json(result);
+    return;
+  }
+  res.json(result);
 }));
 
 router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => {

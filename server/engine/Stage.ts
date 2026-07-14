@@ -34,6 +34,22 @@ import type { ActionType } from './types.ts';
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
 
+export interface ScriptIDEState {
+  scriptText: string;
+  snapshots: unknown[];
+  characters: unknown[];
+  researchNotes: unknown[];
+  isDarkMode: boolean;
+}
+
+export interface SavedScriptIDEState extends ScriptIDEState {
+  updatedAt: number;
+}
+
+export type SaveScriptIDEResult =
+  | { status: 'saved'; updatedAt: number }
+  | { status: 'conflict'; server: SavedScriptIDEState };
+
 // ── Action audibility (types.ts "TO ADD A NEW ACTION TYPE" step 5) ─────────────
 // Single source of truth for whether an action type is perceivable by OTHER
 // agents in the same location (drives ActionLogEntry.is_audible, which in
@@ -1565,36 +1581,51 @@ export class Stage {
 
   // ── ScriptIDE server-side persistence (H2) ───────────────────────────────────
 
-  public saveScriptIDEState(sessionId: string, state: {
-    scriptText: string;
-    snapshots: unknown[];
-    characters: unknown[];
-    researchNotes: unknown[];
-    isDarkMode: boolean;
-  }): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO ScriptIDE_State
-        (session_id, script_text, snapshots_json, characters_json, research_notes_json, is_dark_mode, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      sessionId,
-      state.scriptText,
-      JSON.stringify(state.snapshots),
-      JSON.stringify(state.characters),
-      JSON.stringify(state.researchNotes),
-      state.isDarkMode ? 1 : 0,
-      Date.now(),
-    );
+  public saveScriptIDEState(
+    sessionId: string,
+    state: ScriptIDEState,
+    expectedUpdatedAt?: number | null,
+  ): SaveScriptIDEResult {
+    return this.db.transaction((): SaveScriptIDEResult => {
+      const current = this.loadScriptIDEState(sessionId);
+      const isLegacyWrite = expectedUpdatedAt === undefined;
+      const matchesRevision = expectedUpdatedAt === null
+        ? current === null
+        : current?.updatedAt === expectedUpdatedAt;
+
+      if (!isLegacyWrite && !matchesRevision) {
+        return {
+          status: 'conflict',
+          server: current ?? {
+            scriptText: '',
+            snapshots: [],
+            characters: [],
+            researchNotes: [],
+            isDarkMode: false,
+            updatedAt: 0,
+          },
+        };
+      }
+
+      const updatedAt = Math.max(Date.now(), (current?.updatedAt ?? 0) + 1);
+      this.db.prepare(`
+        INSERT OR REPLACE INTO ScriptIDE_State
+          (session_id, script_text, snapshots_json, characters_json, research_notes_json, is_dark_mode, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        sessionId,
+        state.scriptText,
+        JSON.stringify(state.snapshots),
+        JSON.stringify(state.characters),
+        JSON.stringify(state.researchNotes),
+        state.isDarkMode ? 1 : 0,
+        updatedAt,
+      );
+      return { status: 'saved', updatedAt };
+    })();
   }
 
-  public loadScriptIDEState(sessionId: string): {
-    scriptText: string;
-    snapshots: unknown[];
-    characters: unknown[];
-    researchNotes: unknown[];
-    isDarkMode: boolean;
-    updatedAt: number;
-  } | null {
+  public loadScriptIDEState(sessionId: string): SavedScriptIDEState | null {
     const row = this.db.prepare(
       'SELECT * FROM ScriptIDE_State WHERE session_id = ?'
     ).get(sessionId) as {

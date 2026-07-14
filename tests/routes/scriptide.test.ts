@@ -48,8 +48,110 @@ describe('routes/scriptide — HTTP behavior', async () => {
     assert.equal(loadBody.status, 'ok');
     assert.match(loadBody.scriptText, /TEST ROOM/);
     assert.equal(typeof loadBody.updatedAt, 'number');
-    assert.ok(loadBody.updatedAt >= saveBody.updatedAt - 5_000);
+    assert.equal(loadBody.updatedAt, saveBody.updatedAt);
+    assert.deepEqual(loadBody.snapshots, []);
+    assert.deepEqual(loadBody.characters, []);
+    assert.deepEqual(loadBody.researchNotes, []);
     assert.equal(loadBody.isDarkMode, true);
+  });
+
+  it('persists an intentionally blank draft and metadata-only state', async () => {
+    const sid = freshSessionId();
+    const saveRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: '',
+        snapshots: [],
+        characters: [{ id: 'c1', name: 'ONLY METADATA' }],
+        researchNotes: [{ id: 'r1', title: 'Note', content: 'Research' }],
+        isDarkMode: false,
+      }),
+    });
+    assert.equal(saveRes.status, 200);
+    const saveBody = await saveRes.json();
+
+    const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+    const loadBody = await loadRes.json();
+    assert.equal(loadBody.status, 'ok');
+    assert.equal(loadBody.scriptText, '');
+    assert.deepEqual(loadBody.snapshots, []);
+    assert.equal(loadBody.characters[0].name, 'ONLY METADATA');
+    assert.equal(loadBody.researchNotes[0].title, 'Note');
+    assert.equal(loadBody.updatedAt, saveBody.updatedAt);
+  });
+
+  it('rejects a stale conditional save without changing server state', async () => {
+    const sid = freshSessionId();
+    const createRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'REVISION ONE',
+        expectedUpdatedAt: null,
+      }),
+    });
+    assert.equal(createRes.status, 200);
+    const created = await createRes.json();
+
+    const updateRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'REVISION TWO',
+        expectedUpdatedAt: created.updatedAt,
+      }),
+    });
+    assert.equal(updateRes.status, 200);
+    const updated = await updateRes.json();
+    assert.ok(updated.updatedAt > created.updatedAt);
+
+    const staleRes = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'STALE OVERWRITE',
+        expectedUpdatedAt: created.updatedAt,
+      }),
+    });
+    assert.equal(staleRes.status, 409);
+    const conflict = await staleRes.json();
+    assert.equal(conflict.status, 'conflict');
+    assert.equal(conflict.server.scriptText, 'REVISION TWO');
+    assert.equal(conflict.server.updatedAt, updated.updatedAt);
+    assert.deepEqual(conflict.server.snapshots, []);
+    assert.deepEqual(conflict.server.characters, []);
+    assert.deepEqual(conflict.server.researchNotes, []);
+
+    const loadRes = await fetch(`${server.baseUrl}/api/scriptide/load?sessionId=${sid}`);
+    const loaded = await loadRes.json();
+    assert.equal(loaded.scriptText, 'REVISION TWO');
+    assert.equal(loaded.updatedAt, updated.updatedAt);
+  });
+
+  it('rejects conditional creation when a row already exists', async () => {
+    const sid = freshSessionId();
+    await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid, scriptText: 'EXISTING' }),
+    });
+    const res = await fetch(`${server.baseUrl}/api/scriptide/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        scriptText: 'SECOND CREATOR',
+        expectedUpdatedAt: null,
+      }),
+    });
+    assert.equal(res.status, 409);
+    const body = await res.json();
+    assert.equal(body.server.scriptText, 'EXISTING');
   });
 
   it('POST /api/scriptide/personas rejects an invalid persona with 400', async () => {

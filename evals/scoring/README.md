@@ -8,7 +8,7 @@ Makes every future scorer change measurable against the frozen baseline
 - `contracts/` — `MetamorphicCase`, `HumanPreferenceLabel`, `MetamorphicResult`.
 - `metamorphic/base.fountain` — an original 9-scene synthetic script (committable, no rights issue).
 - `runner/run-metamorphic.ts` — applies known-direction transforms, asserts the score MOVES correctly.
-- `golden/` — locked baselines (metamorphic + produced-anchor).
+- `golden/` — optional generated baselines; create explicitly with the command below and review before tracking.
 - `human/HUMAN_LABELING_TASK.md` — the blinded-pairwise protocol that unblocks calibration (Phase G).
 
 ## Run

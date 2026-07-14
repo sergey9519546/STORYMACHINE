@@ -52,6 +52,7 @@
 
 /* panel frame */
 .sm-panel{background:var(--sm-panel);border:1.5px solid var(--sm-ink);box-shadow:var(--sm-shadow);position:relative}
+.sm-panel--ink{background:var(--sm-night);color:var(--sm-cream);border-color:var(--sm-ink)}
 .sm-panel-top{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1.5px solid var(--sm-ink);background:var(--sm-bar)}
 .sm-panel-body{padding:16px;display:flex;flex-direction:column;gap:11px}
 .sm-slug{font:600 9.5px var(--sm-font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--sm-ink-soft)}

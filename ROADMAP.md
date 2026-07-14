@@ -4,58 +4,73 @@ Durable master plan. Any session with fresh context (no memory of prior work)
 should be able to read this file top to bottom and resume exactly where the
 project stands — what shipped, what's mid-flight, and what's next, in order.
 
-Ground yourself before touching code: `NORTH_STAR.md` (constitution — read
-first), `ULTRAPLAN.md` (current spine, supersedes stale sequencing below),
-`CLAUDE.md` (conventions + Wave Program v2), `ARCHITECTURE.md` (system map),
-`server/nvm/revision/WAVE_QUALITY_GUARANTEE.md` § "Program v2" (binding
-quality spec for wave work), and `git log --oneline -40` for the session's
-commit trail.
+**This roadmap was re-spined on 2026-07-14 around demand, not rigor.** The
+prior version was organized around the wave program (3 rules/wave forever),
+research-paper intake, and corpus growth. A product teardown found those were
+the wrong priorities: they manufactured an inflated rule count that, by the
+engine's own measurements, barely moves the score — while no real user had
+ever been shown the product. The old engineering spine is preserved below as
+history and as a filed backlog (§8), but it no longer drives sequencing. The
+new spine is §3: validate with writers → make the score provably discriminate
+→ collapse scope → ship a shareable artifact → then defensibility.
+
+Ground yourself before touching code: `NORTH_STAR.md` (constitution),
+`ARCHITECTURE.md` (system map), `CLAUDE.md` (conventions), and
+`git log --oneline -40` for the session's commit trail. **Note:** where
+`NORTH_STAR.md`, `ULTRAPLAN.md`, and `CLAUDE.md` still lead with rule count or
+the wave cadence as the product's structural claim, this roadmap supersedes
+them — see §5 (revised working principles). Those files should be updated to
+match; until they are, §3 and §5 here are canonical for priority.
 
 ---
 
-## 1. Current state (measured, 2026-07-11)
+## 1. Current state — the honest version (measured, 2026-07-14)
 
-- **Discrimination**: 6/6 pairs order correctly; 5 hard in CI (+1.4 to
-  +6.2 margins); composite-reviewer-scenario orders (+2.2) but the 5.0-pt
-  minimum-gap guard is still `todo` — diagnosed as ~19 style-minor false
-  positives flooding the good half.
-- **Corpus**: 72 produced scripts (70 animation + Pulp Fiction + Jaws — the
-  first live-action entries), all RECOMMEND, manifest-locked with
-  content-hash verification, env-gated harness (corpus text never enters
-  git).
-- **Degradation AUC**: shuffle-drop AUC-24 hard floor 0.622 (measured
-  0.672), AUC-71 ~0.652. Act-swap recipe ~0.48 — near coin-flip; diagnosed
-  root cause is structural, not a missing detector: lexicon signals carry
-  content, not position (see NORTH_STAR.md SS2). Closing this gap needs
-  semantic channels that read for document POSITION.
-- **Rulebook**: 3,216 rules, staleness-tested. Suite green (see CI for exact
-  count — do not hardcode a stale number here across sessions).
-- **E2E**: keyless journey harness landed (7 journeys), found + fixed a
-  silent Stage.ts FK bug.
-- **Structural deduction path** (the feature-scale answer to density
-  normalization eating rule families, NORTH_STAR SS2): SCENE_CONTINUITY
-  (two-tier gate + location-run corroboration axis, 2.0/instance cap 20,
-  verdict cap) + GLOBAL_ARC_INCOHERENCE (weak, zero false-positive).
-- **Tier-1 rules landed**: COINCIDENCE_RESOLVES_PROBLEM,
-  RELATIONSHIP_REPAIR_UNEARNED, REINCORPORATION_VOID, CLIMAX_NO_AFTERMATH.
-- **Filed, not built** (tracked below by reference, not duplicated): OWNE
-  O1-O5 (SS4), STORY GOD SG1-SG6 (SS4), D-wave seeded divergence (SS6),
-  MASTER_RESEARCH_AUDIT's 3-tier queue (SS6), deep-read arc signals (needs
-  an AI key), OCR recovery (4 scans), composite min-gap guard wave (SS3),
-  content-word clue channel SceneUnit.characters gap (SS4), frontend
-  tests, auth implementation, Run 17b polish, B-wave 2/3 + R-wave
-  remnants (SS6).
+StoryMachine is a beautifully engineered answer to a question nobody has
+confirmed anyone is asking. The deterministic core is real and well-built —
+keyless boot, reproducible hashing, honest degradation. But the headline
+pitch (8,917 deterministic rules scoring your screenplay) is inflated at the
+source and, by the doctor's own measurements, the rules barely move the
+score. We have zero evidence of real users, and the score has never been
+validated against a human quality judgment on a real, non-synthetic
+screenplay.
+
+### What actually works
+- Keyless-first boot with honest degradation — no 500s when running without an LLM key.
+- `contentHash` reproducibility: identical input yields identical output, and coverage export re-runs server-side for authenticity.
+- The health score (`server/nvm/analyze/doctor.ts`) is fully deterministic and LLM-free. This part of the pitch is true.
+- Security/CI posture: rate limiting, server-side-only LLM calls, CI-enforced no-console and keyless test guarantees.
+- The emotional-arc signal (`server/nvm/analyze/emotional-arc.ts`, 12,142-word VAD lexicon, Reagan-2016 fitting) landed cleanly as a diagnostic field.
+
+### What's broken or overstated
+- **Rule count is inflated.** The claimed 8,917 rules include ~5,701 generated in one bulk wave (Wave 1191) from just 7 template functions in `server/nvm/revision/passes/lib/checks.ts` (aftermath-void, drought-run, zone-cluster, co-occurrence, half-loaded, zone-imbalance, peak-uncaused) as field×mode×position permutations. The rulebook's own table: 6,610 "Unattributed," 9 "Founding," 22 "meaningful." Genuinely distinct hand-authored checks: ~2,300. The passes are ~47,500 lines with 1,326 `as any` casts.
+- **The score doesn't discriminate — by its own numbers.** Comments in `doctor.ts:1656-1669` record: scene-count scarcity term AUC 0.938, the entire weighted-rule channel AUC 0.076, and with scene count held constant "the doctor cannot detect reordering at all (AUC ~0.48)." Scene count + raw issue density dominate; the 8,917 rules barely register.
+- **Evidence base is synthetic and largely unrunnable.** Only 6 synthetic discrimination pairs (`tests/core/discrimination.test.ts`) — 2 pass by only +1.4, the composite pair FAILS the 5.0 min-gap guard (still a todo), 3 were tied until a curve was retuned. Calibration corpus = 20 synthetic samples. The "72 produced scripts" real corpus is not in the repo; `tests/core/real-script-corpus.test.ts` SKIPS every assertion without `REAL_SCRIPT_CORPUS_DIR` (0 files locally, never runs), the manifest is actually 71 RECOMMEND + 1 CONSIDER, and the check is a floor-check (health>=80), not discrimination. Degradation AUCs are near coin-flip: shuffle-drop ~0.652, act-swap 0.48→0.62.
+- **Marketing number is internally inconsistent.** Landing footer says "3,216 deterministic rules," docs say 8,917, a stale plan file says 10,523.
+- **UI sprawl:** ~40 React panels (DirectorPanel 70KB, StoryMachine 82KB, WhatIfPanel 53KB, plus SelfPlay, EpistemicMap, Converge, Twin, Room, etc.).
+- **Two products, one repo.** OASIS (the multi-agent simulation engine) is ~half the codebase with no defined user persona.
+
+### What we do NOT know
+- Whether a single real user exists. There is zero validated user evidence.
+- Whether screenwriters actually want a deterministic coverage score at all.
+- Whether the health score tracks human quality judgment on real screenplays — every discrimination test to date is synthetic, and the one real-corpus test does not run.
+- Who OASIS is for, or whether it should exist in this product.
+
+---
 
 ## 2. Resume protocol (how any session continues)
 
 - Work on the session-designated branch. **Never hardcode a branch name** —
   read it from the current checkout.
+- **Check §3 before starting anything.** The current phase's exit gate is the
+  only work that counts as progress. Work outside the active phase is filed
+  backlog (§8), not the roadmap — do not pull it forward without an explicit
+  decision to re-sequence.
 - Per workstream: dispatch focused agents on **disjoint file sets**.
   Shared-file collisions are the project's main recurring hazard — enforce
-  one owner per file per wave/run. Parallel sessions are real (two sessions
-  have independently built the same detector and merged concurrently
-  before) — pull `main` and check `git log` for overlapping work before
-  starting anything.
+  one owner per file per run. Parallel sessions are real (two sessions have
+  independently built the same detector and merged concurrently before) —
+  pull `main` and check `git log` for overlapping work before starting.
 - Per landing: independently re-run that workstream's own tests, review the
   diff, commit that workstream alone, push. Do not batch unrelated
   workstreams into one commit.
@@ -66,42 +81,157 @@ commit trail.
   and every new route must degrade honestly in it, not 500.
 - Check CI (GitHub Actions, `ci.yml`) after every push.
 - Never commit an agent's files mid-flight — verify the diff first.
-- **Measure before threshold, on the real corpus, always** — every detector
-  that skipped this died or misfired (NORTH_STAR SS1).
-
-## 3. Standing principles (unchanged, from CLAUDE.md)
-
-- **Quality bar**: build the strongest version of a change, not the
-  quickest one that passes — edge cases handled, inputs guarded, fire +
-  no-fire tests for every new rule, consistency with the surrounding
-  file's patterns.
-- **Security constraints**: API keys live only in `.env` (gitignored),
-  never serialized to clients; all AI calls are server-side only; every
-  route sits behind `gameLimiter` or the stricter `aiLimiter`; no new
-  `console.*` under `server/**` (CI-enforced).
-- **Keyless-first**: the server boots and operates in analysis-only mode
-  without an AI key — this is the product's front door, not a degraded
-  afterthought. Never reintroduce a fatal key check in `server.ts`.
-- **Determinism receipts**: `contentHash`-keyed reproducibility is
-  load-bearing — preserve it through every new feature that touches
-  scoring or diagnosis.
-- **Honest degradation**: every LLM-gated feature must degrade to a
-  labeled, functional fallback when keyless — never a silent quality drop
-  and never a 500.
-- **Calibration corpus controlled-richness constraint**: the 20-sample
-  corpus is a controlled experiment — all bands share scene/word budgets
-  and structural-signal presence so craft is the only variable. Never
-  rebalance one band's richness without matching every other band.
-- **No console in server**: CI-enforced grep over `server/**`; use
-  `server/lib/logger.ts` instead.
-
-*Wave rotation order (Program v1/v2) and revision pipeline execution order
-are two different 14-pass orderings — do not conflate them. See
-`ARCHITECTURE.md`'s pipeline list and `CLAUDE.md`'s rotation list.*
+- **Measure discrimination on runnable, real writing — always.** A test that
+  skips in CI proves nothing (NORTH_STAR SS1, and §1's evidence-base finding).
 
 ---
 
-## 4. Completed history (changelog)
+## 3. The plan — demand-driven phases
+
+These phases are **strictly ordered**. Do not parallelize them — the ordering
+*is* the strategy. Each phase ends with a hard exit gate that must be met
+before the next begins, because every downstream promise (private, instant,
+deterministic, reproducible coverage) rests on the score being provably real,
+and by our own numbers it isn't yet. We build demand-out, not rigor-first.
+
+### P0 — Validate with real writers (this week; blocks everything)
+
+**Goal:** Confirm that a screenwriter, shown the existing sample coverage
+report, actually wants to run their own draft.
+
+**Why this before anything else:** Our sharpest persona is a screenwriter
+seeking objective, private feedback before paying a reader. If the current
+report doesn't create that pull, no amount of AUC fixes matters — we'd be
+optimizing rigor in isolation from a user again, which is exactly the mistake
+that got us here.
+
+**Work:**
+- Recruit >=5 working screenwriters (any tier, real drafts in hand).
+- Show them the existing sample coverage report; watch, don't pitch.
+- Capture the single core question: *does this make you want to run your own draft — why or why not?*
+- Log objections, moments of trust, and moments of disbelief verbatim.
+- Write zero new product code until sessions are done.
+
+**Exit gate:** >=5 documented sessions with a clear signal on the core
+question. If the signal is negative, **STOP and reframe before P1** — do not
+proceed to build on a report nobody wants to run.
+
+### P1 — Make the score provably discriminate on real writing (the One Bet)
+
+**Goal:** A runnable test proving the score separates strong from weak *real*
+writing, not synthetic pairs.
+
+**Why this before anything else:** The screenwriter wants feedback they can
+trust. Today there is no runnable discrimination test on real writing — the
+72-script corpus text isn't in the repo and its test skips locally.
+Rule-channel AUC is 0.076; the score currently leans on scene-count scarcity
+(AUC 0.938). We must make the score real before we make it shareable.
+
+**Work:**
+- Build a legally distributable benchmark from **real drafts**: Creative-Commons/public-domain screenplay material where available, plus author-contributed drafts licensed explicitly for testing. Do not substitute newly written synthetic "bad" scripts.
+- Establish the target with blinded pairwise judgments from >=3 independent experienced readers; measure inter-rater agreement and preserve disagreements rather than forcing false ground truth.
+- Pre-register the benchmark split, score metrics, and gates before changing formula constants. Keep a held-out set the implementer cannot tune against; version and hash every fixture and label artifact.
+- Measure each score component independently, then rebuild around the smallest set of signals that shows held-out separation. Do not assume the answer is 5–10 signals if the evidence says otherwise.
+- Fold in the emotional-arc signal only if it improves held-out doctor-level discrimination (its standalone act-swap AUC is ~0.647).
+- **Freeze the rule count.** Stop leading with rule count in the score narrative.
+
+**Exit gate:** On a pre-registered held-out set large enough to report uncertainty:
+point-estimate discrimination **AUC >= 0.80**, with the 95% bootstrap lower
+bound reported and above **0.65**; shuffle-drop **>= 0.80**; act-swap
+**>= 0.70**; composite min-gap guard passes; no benchmark leakage or material
+regression on calibration, produced-floor, determinism, or keyless behavior.
+
+### P2 — Collapse the surface to Doctor + Editor
+
+**Goal:** Default experience = paste/open script → report → per-scene fixes →
+export. Nothing else visible.
+
+**Why this before anything else:** A screenwriter who just learned to trust
+the score will bounce if greeted by ~40 panels and simulation jargon. The
+surface must match the one job they came for.
+
+**Work:**
+- Gate OASIS and the ~38 research panels behind a single **"Labs"** flag.
+- Make Doctor + Editor the default and only first-run surface.
+- Keep StartScreen's script-first "Try the sample script" flow as the entry point.
+- Strip NVM/converge/twin/simulation vocabulary from the default path.
+
+**Exit gate:** A new user reaches their first coverage report with **zero
+exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is
+measured.
+
+### P3 — Ship the shareable, verifiable coverage report (the growth loop)
+
+**Goal:** Turn a coverage run into a branded artifact a third party can
+independently verify.
+
+**Why this before anything else:** The report is the atomic growth unit — a
+screenwriter shares it with a manager, contest, or peer, and reproducibility
+is the hook that makes it credible. The server-side re-run and contentHash
+receipts already exist; this phase productizes them.
+
+**Work:**
+- Produce a branded, presentable PDF/HTML artifact: verdict + 5 craft dimensions + top 5 fixes.
+- Add a **"verify this report"** link that re-derives the score from contentHash.
+- Ensure export re-runs server-side for authenticity (already does).
+- Instrument sharing.
+
+**Exit gate:** A third party can open a shared report and **independently
+verify** the score; % of Doctor runs that export is measured.
+
+### P4 — Retention & defensibility (later; only after the score is trusted)
+
+**Goal:** Make writers come back and make the product hard to leave.
+
+**Why this before anything else:** It doesn't — it comes *last*. A retention
+loop around an untrusted score just accelerates churn. Only once the score is
+real, quiet, and shareable does revision history become valuable.
+
+**Work:**
+- Draft-history loop: "watch your score climb across revisions."
+- Jump-to-line and one-click deterministic fixes.
+- Auth + accounts (currently a deploy blocker per docs/AUTH.md, not yet a product gap).
+
+**Exit gate:** Returning-user rate and multi-revision session rate are measured.
+
+---
+
+## 4. Freeze / kill list — cut cost that doesn't create demand
+
+Everything below removes cost that never converted into user demand or trust.
+The goal is a clearer front door for the screenwriter, not a bigger engine.
+
+- **Freeze the rule count at the ~2,300 genuinely distinct rules.** Stop the 3-rules-per-wave cadence — it is permutation farming (field×mode×position) that the code's own comments call saturated. More rules add liability, not signal.
+- **Kill the OASIS multi-agent simulation engine from the default product.** It is roughly half the codebase with no user persona and no journey. Keep it as research behind a Labs flag; in the front door it only dilutes the wedge.
+- **Hide most of the ~40 React panels behind Labs** (SelfPlay, ProjectionGallery, Converge, Twin, EpistemicMap, Room, Debugger, Regression, WhatIf, DirectorPanel, and the rest). They are demand-neutral cost and clarity-negative for a writer who just wants a trustworthy read on a draft.
+- **Kill the "Program v2 wave" as a product driver.** The "add 3 rules + 6 tests per wave, forever" treadmill is exactly the machine that manufactured the inflation liability. Retire the cadence, not just this wave.
+- **Kill research-paper intake as a roadmap spine.** Adopt mechanisms opportunistically, only when they serve a validated user need — never because a paper existed.
+- **Remove or rewrite the "3,216 / 8,917 rules" marketing claim.** It is inconsistent across the landing page, docs, and stale plans, and it actively undermines trust because the rule channel barely moves the score (AUC 0.076 vs 0.938 for scene-count scarcity). Lead with what's true.
+- **Pay down the 1,326 `as any` casts only inside the ~2,300 kept rules.** Let the frozen permutations be deleted rather than maintained — do not spend type-safety effort hardening code slated to leave the product.
+
+Caution: nothing here is a destructive delete. "Kill" means gate behind Labs
+or stop investing. Any actual file removal is a separate, reviewed step
+requiring explicit confirmation.
+
+---
+
+## 5. Working principles (revised)
+
+These replace the old rigor-first principles while keeping the engineering
+constraints that genuinely carry weight. The shift is from "prove rigor in
+isolation" to "prove value to a real writer, then harden it."
+
+- **Demand before rigor.** No new engine work ships without a validated user need. This is a P0 gate, not a preference.
+- **Correct before reproducible.** Reproducibility is earned *after* the score is shown valid on real writing. A broken ruler is perfectly reproducible; determinism is worthless if the verdict is wrong.
+- **Measure discrimination on runnable, real writing — always.** Synthetic fixtures are necessary but never sufficient. A test that skips in CI proves nothing; the score must separate strong drafts from weak ones on actual screenplays.
+- **One honest claim over a big number.** Lead with verifiable reproducibility receipts, not a rule count. A defensible small claim beats an impressive inflated one.
+- **Preserve the real foundations.** Keyless-first boot, honest degradation (no 500s when keyless), contentHash reproducibility receipts, server-side-only LLM calls, CI-enforced no-console-in-server, rate limiting, and determinism in the verdict path are genuine assets. Keep every one.
+- **Sharpen the wedge, don't broaden scope.** Every change must tie to the screenwriter persona and a concrete reason they'd care — private, instant, trustworthy, reproducible feedback on a draft.
+- **Ship artifacts users can share, not features only the codebase appreciates.** A coverage report a writer sends to a collaborator beats an internal panel no one outside the repo will ever open.
+
+---
+
+## 6. Completed history (changelog)
 
 | Run/Wave | Landed |
 |---|---|
@@ -129,286 +259,51 @@ are two different 14-pass orderings — do not conflate them. See
 | PR #199 | Final Draft-style IDE typing (autocomplete, auto-uppercase, smart Enter); centered screenplay page with live formatting |
 | PR #200 | Security: gate AI provider config writes behind `ADMIN_TOKEN`; IDE `exportFountain` title-page state fix; `requireString` throws `ValidationError` not a masked 500 |
 | Master research audit (2026-07-10) | ~130-file research folder read cover to cover; 68 superseded files archived; 3-tier incorporation queue filed (`docs/research-audit/MASTER_RESEARCH_AUDIT.md`) |
+| S-wave (2026-07-10) | Pre-deployment security audit BLOCKERS closed: SEC-1 (SSRF guard + /metrics auth), SEC-2 (O(n²) analyzer DoS via ANALYZER_SCENE_CEILING + defense-in-depth), OPS-1 (crash handlers), OPS-2 (/metrics gate). SHOULD items: CSV injection guard, non-root container, production CSP. Tests: ingress-security 28/28, analyzer-dos 11/11, hardening 16/16 |
+| Engine + substrate wave (2026-07-12, commit 700fb5d) | Arc-incoherence deduction (act-swap AUC 0.48→0.62); emotional-arc + 8 diagnostic signals (anti-slop, theme, interiority, mirror-scenes, silence, bonding, cold-open, pattern-establishment); substrate spine (NarrativeState, Truth Ledger); detector modules (value-shift, story-spine, scene-economy); fountain import normalizer; paper-ink-stamp design system |
+| Wave 1191 (bulk expansion) | 5,701 template-generated rules across all 14 passes (rule count 3,216 → 8,917). **Flagged 2026-07-14 as inflation** — see §1, §4; this wave is the last of the wave cadence, which is now retired. |
+| Change-impact surface (commit 9f538e5) | Deterministic scene-dependency analysis surface |
 
 ---
 
-## 5. Open work (reprioritized, filed items tracked by reference only)
+## 7. Pre-deployment audit (2026-07-10) — open security items
 
-### 5.1 Deep-read arc signals — THE AUC path (highest priority)
+Verify against current code before assuming any are stale. Two read-only
+audits (ops + security) found BLOCKERS; most were closed in S-wave (see
+changelog), but re-verify these specifically:
 
-Act-swap AUC (~0.48) is the clearest open gap against NORTH_STAR's
-separation-margin metric, and it's structurally diagnosed: lexicon signals
-detect content, not position. Deep-read (Run 10's LLM-per-scene sensing,
-already landed) is the existing mechanism to extend — it needs to emit
-document-POSITION-aware signals (expected-vs-actual narrative position,
-setup/payoff distance, act-boundary coherence), not just per-scene content
-signals, feeding the same deterministic record-signal schema. Design-doc
-first (this is an L). Needs an AI key to develop against (deep-read is
-LLM-gated); keyless fallback must degrade honestly per standing principles.
+- **SEC-1**: `/api/ai-config` SSRF + unauthenticated GLOBAL provider hijack — `baseUrl` has no host/scheme allowlist; config is process-global; `/test` fires the request. (`validation.ts:143`, `ai-config.ts:55`, `openai-compat.ts:75`) — PARTIALLY ADDRESSED by PR #200's `ADMIN_TOKEN` gate on config writes; re-verify the SSRF allowlist specifically is still open.
+- **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` / `detectQuestionLatency` / `computeContentWordClueClusters` unbounded; `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`, `fountain-analyzer.ts:1118`/`1314`) — mitigated via `ANALYZER_SCENE_CEILING` in S-wave; confirm coverage.
+- **OPS-1 / OPS-2**: crash handlers + `/metrics` gate — closed in S-wave; confirm still present.
 
-### 5.2 Composite min-gap guard wave
+SHOULD items (verify): CSV formula injection (`breakdown.ts:644`), collab
+token no room-ownership (`collab.ts:12`), run-room limiter tier mismatch
+(`game.ts:245`), no prod CSP (`app.ts:97`), container runs root. NICE: 4
+transitive dev-dep CVEs (`npm audit fix`). Clean at last audit: session
+capability model, HTML export escaping, prompt-injection boundary, secrets
+never in bundle/logs, body/rate limits.
 
-Close the 5.0-point minimum-gap floor on `composite-reviewer-scenario`
-(`tests/core/discrimination.test.ts`). ~19 style-minor false positives
-flood the good half. Same length-normalization discipline as the earlier
-rhythm-guard wave: measure each offending rule on the corpus first;
-TALKING_HEADS (24/69) and OPENING_SCENE_UNDERWEIGHT (22/69) are the next
-worst offenders after the two already fixed by D2-wave. Heavily
-calibration-guarded — do not regress band monotonicity or length-invariance
-while tightening this.
-
-### 5.3 OWNE O1 typed promises + STORY GOD SG1 (converged item)
-
-`docs/owne/` vendors a 22-entry promise-template library (PT_*). O1 adopts
-the PT_* shape onto SEED_CLUE/PAYOFF_SETUP (type + hard/soft + priority +
-payoff predicate class) — StoryOp contract change, sequence with
-record-parity. SG1 (Well-Made Surprise Test: preTwistSatisfaction >= 0.6,
-hindsightInevitability >= 0.7, >= 3 setups, misdirectionEffectiveness >=
-0.5) is deterministic over the same setup/payoff ledger and converges with
-O1 — do them together. Do together with the content-word clue-channel
-rebuild (5.6) — same subsystem, one migration. Full spec: ROADMAP history
-had this at "13d" and "13e" in prior drafts of this file; canonical
-source now is `docs/owne/TRUTH_REGISTRY.md` and
-`docs/research-audit/MASTER_RESEARCH_AUDIT.md`.
-
-### 5.4 OWNE O2 — Tavern Letter golden fixture + Integrity Rate
-
-Import the vendored Tavern Letter fixture (world fluents, STRIPS schemas,
-physics invariants, golden path, negative tests) as an ops/scenario. Add
-IR = (1/T)*Sum 1[event legal AND invariants hold] over sim traces; CI-assert
-IR = 1.0 and Halluc = 0 on the golden path, plus its negative tests
-(early-accusation gate, teleport prevention, double possession, herring
-non-softlock). Proves the sim layer the way the 72-script corpus proves the
-doctor. Self-contained — any session can pick this up.
-
-### 5.5 OWNE O3 — Assertion containment on generative output
-
-Registry law: Asserted(output) subset-of licensed facts union common
-ground. Every LLM rewrite/candidate gets a deterministic post-check that
-its prose asserts no unlicensed facts (entity/fact extraction vs. session
-canon + input span). Generalizes the filed Semantic Firewall item to ALL
-generation paths — the strongest trust upgrade on the generative side. Gate
-D-wave's divergence operators (5.6) behind this once both exist.
-
-### 5.6 MASTER_RESEARCH_AUDIT Tier 1 remnants + Tier 2 channels
-
-Tier 1 (deterministic, wave-sized, corpus-measurable — ranked, pick next):
-Dialogue-information ratio (<=40% via dialogue) + anti-sentimentality;
-Burrows's-Delta voice differentiation (function-word z-scores); effort-
-supremacy / first-try-success flag + want-need opposition validator +
-antagonist defensibility (No Pure Evil); silence/letting-go excellence
-detectors; Oxytocin window (no post-climax settling beat >= ~1 page);
-dialogue attribution at scale; mirror-scene detection + Scene Transition
-taxonomy. (Coincidence-direction, relationship-repair-proof, and
-reincorporation-density are DONE — see the Tier-1 rules already landed in
-SS1.)
-
-Tier 2 (signal channels, Type-1 waves): ArcDebt typed object; pacing
-triple (tensionVelocity/acceleration/rhythmRegularity); dramatic-irony
-tracker / AudienceState; Emotional Arc DSL vs. Reagan's six shapes;
-scene-state pacing model; narrative stance vector; signed
-relationship-graph harmony-bias detector.
-
-Tier 3 (architecture, design-doc-first) and the full research provenance
-map: see `docs/research-audit/MASTER_RESEARCH_AUDIT.md` directly — not
-duplicated here to avoid drift between the two files.
-
-Also filed under this item, from OWNE: **O4** belief-movement surprise
-channel (explicit hypothesis distribution over who/what/why, per-scene
-TV-distance Surprise(e) = 1/2 * ||mu_e - mu||_1 — replaces lexicon-intensity
-twist proxies with real math); **O5** mystery fairness gates (Type 3,
-genre-routed: min_true_clues_before_solve >= 2, red-herring non-softlock,
-solution-clue reachability before reveal). And from STORY GOD: **SG2**
-Genre Obligation Engine (per-genre obligatory scenes with act deadlines);
-**SG3** Cold Open Promise Tracker (opening-vs-final-image mirroring — a
-shuffle-sensitive document-scale signal, candidate axis for the
-degradation-AUC spine, see 5.1); **SG4** pattern-establishment rule
-(minimum 3 exposures before subversion is legal); **SG5** Causality
-Enforcer (coincidence allowed in Act 1 only, must gain meaning later).
-Deliberately NOT adopted: Five-Evaluator LLM negotiation as a scoring
-surface (NORTH_STAR rejects LLM judges outright).
-
-### 5.7 Deployment items
-
-E2E browser journeys (Playwright, upload->doctor->fix-verify / what-if /
-interview / coverage export — nothing has been clicked end-to-end in a real
-browser, only the keyless API-level harness exists); frontend component
-tests (start with `ScriptDoctorPanel` formula-versioning + sample
-provenance, `StartScreen` sample handoff); auth implementation
-(`docs/AUTH.md` documents the trust model, nothing enforces it — blocks
-public multi-user deploy only); Run 17b polish (panel consolidation from
-24+ flat buttons, accessibility pass, dedupe the two hand-rolled Fountain
-parsers in `src/services/director.ts` and `src/lib/fountain.ts`, `.fdx`
-direct client import instead of toast-redirect).
-
-### 5.8 Corpus growth
-
-OCR recovery of the ~4 remaining dropped scans; the 155-screenplay sourcing
-index (`Film_Script_Research_Report.docx`, 91.6% publicly available,
-per-title sources — cataloged as SG6) is the acquisition map for growing
-the corpus 72 -> 150+ across eras/genres. Repo-hygiene caution attached:
-this work has hit OneDrive file truncation before — stage via the sandbox,
-copy with byte-count verification, keep `.git` operations on the Windows
-side.
-
-### 5.9 D-wave, R-wave, and B-wave remnants (filed, not scheduled)
-
-**D-wave** (seeded divergence operators, research-backed): stimulus module
-+ Osborn-style angle operators + opt-in divergence knob on
-`/api/nvm/converge`. Gate behind O3 assertion containment (5.5) once it
-exists, so divergent candidates are contained from day one. **B-wave 2**
-remainder: menace target-curve delta audit, contradiction families
-(PHYSICAL/KNOWLEDGE/MOTIVATION/TIMELINE) over rootCauses. **B-wave 3**:
-setup/payoff typing beyond O1's scope, defense-cascade arousal states +
-Id/Ego/Superego arbitration, arc meter, narrator-reliability score,
-cognitive-illusion ledger, retrieval scoring with recency + salience.
-**R-wave** residue not covered by O4/O5: scene economy score + value-shift
-contract, fair-play mystery solver, confusion-vs-mystery metric, speech-act
-signal channel, epistemic contract + unreliability budget, clock
-segments/threat fronts/antagonist autonomy, canon tiers + retcon
-governance, evaluator hard-veto audit, benchmark scenario suite. Filed
-deliberately unscheduled within R-wave: BOID obligations, factions,
-spatial line-of-sight, streaming tags, TTS/storyboards.
+Security work is **not** gated behind the §3 phases — a live deployment
+blocker is fixed when found, regardless of the active product phase.
 
 ---
 
-## 6. Pre-deployment audit (2026-07-10) — S-wave fix plan
+## 8. Filed backlog (NOT scheduled — do not pull forward without re-sequencing)
 
-Two read-only audits (ops + security) found BLOCKERS still open as of this
-writing — verify against current code before assuming any are stale:
-- **SEC-1**: `/api/ai-config` SSRF + unauthenticated GLOBAL provider
-  hijack — `baseUrl` has no host/scheme allowlist; config is
-  process-global; `/test` fires the request. (`validation.ts:143`,
-  `ai-config.ts:55`, `openai-compat.ts:75`) — PARTIALLY ADDRESSED by
-  PR #200's `ADMIN_TOKEN` gate on config writes; re-verify the SSRF
-  allowlist specifically is still open.
-- **SEC-2**: O(n^2) analyzer DoS — `overlapClusters` /
-  `detectQuestionLatency` / `computeContentWordClueClusters` unbounded;
-  `DoctorBodySchema` caps bytes, not scene count. (`cluster.ts:591`,
-  `fountain-analyzer.ts:1118`/`1314`)
-- **OPS-1**: no `process.on(uncaughtException/unhandledRejection)` —
-  a rejection from the sweep intervals crashes the container.
-- **OPS-2**: `/metrics` fully unauth — leaks token usage, `est_cost_usd`,
-  session counts (`config.ts:30`).
-- **OPS-3** (wave 2): no release pipeline / tags / version / health SHA.
-- **OPS-4** (wave 2): no backup job (README documents, nothing calls it).
+The prior roadmap's entire open-work spine (wave program, OWNE O1-O5, STORY
+GOD SG1-SG6, MASTER_RESEARCH_AUDIT 3-tier queue, TRACE/MAESTRO-S research
+intake, D/R/B-wave remnants, corpus growth to 150+, deep-read arc signals)
+lives here as a filed backlog. It is real engineering, much of it good — but
+it is downstream of §3. **None of it is progress until the active phase's
+exit gate is met.**
 
-SHOULD folded into S-wave: CSV formula injection (`breakdown.ts:644`),
-collab token no room-ownership (`collab.ts:12`), run-room limiter tier
-mismatch (`game.ts:245`), no prod CSP (`app.ts:97`), container runs root.
-NICE: 4 transitive dev-dep CVEs (`npm audit fix`), ai-config/test error
-snippet. Clean at last audit: session capability model, HTML export
-escaping, prompt-injection boundary, secrets never in bundle/logs, body/
-rate limits.
+Canonical sources for the filed items, unchanged:
+- `docs/research-audit/MASTER_RESEARCH_AUDIT.md` — the 3-tier incorporation queue.
+- `docs/research-audit/RESEARCH_INTEGRATION_2026-07-11.md` — TRACE / MAESTRO-S / ref-engine adopt/defer/reject map. **Note:** its item #1 (Change-Impact surface) and #4 (real-literary calibration band) are the two filed items most aligned with §3's P1/P3 — pull those forward first if any backlog item is scheduled.
+- `docs/research-audit/RESEARCH_INTAKE_2026-07-11B_EMOTIONAL_RNE.md` — emotional-arc / anti-slop / abstention waves (EA landed; AS + ABST filed).
+- `docs/owne/TRUTH_REGISTRY.md` — OWNE promise-template + STORY GOD specs.
 
----
-
-## 7. Research integration — 2026-07-11 intake (TRACE / MAESTRO-S / ref-engine)
-
-Four new artifacts read in full: the Master Research Document, the **MAESTRO-S
-v2** generation blueprint, the **TRACE** product white paper, and a runnable
-Python **Reference Engine 0.2.0**. Full adopt/defer/reject verdict map with
-reasons: `docs/research-audit/RESEARCH_INTEGRATION_2026-07-11.md`. They
-*ratify* NORTH_STAR (deterministic canon, no LLM-judge, sparse specialists,
-proof-before-prose) and sharpen specific mechanisms — no rewrite implied.
-
-**Adopt, sequenced (details in the companion doc):**
-
-1. **Change-Impact surface** — first-class, page-linked "what breaks if I change
-   this?" over the existing dependency graph. Highest leverage, deterministic,
-   low theory cost. The product wedge TRACE argues for.
-2. **Confidence tiers + evidence clamp** — port the ref-engine `CraftFinding`
-   split (severity `blocker/major/minor/positive/info` × confidence
-   `strong_evidence/worth_a_look/pattern_to_watch`); a low-confidence extracted
-   fact may not support a high-certainty finding. Codifies the existing
-   "blockers assert only encoded facts" law.
-3. **Extraction-confirmation loop + author locks** (TRACE T4) — ask only
-   high-value confirmations at import; writer corrections outrank model
-   inference; locks let soft detectors graduate to blockers honestly.
-4. **Real-literary calibration band** — port the ref-engine corpus (public-domain
-   Ibsen/Chekhov/Wilde "great" vs "broken"/"middle") + `fixtures.json` gate as an
-   added controlled band alongside the 72-script corpus (match band budgets).
-5. **Repair Portfolio: three validated modes** — minimal / bold-structural /
-   production-cheap, each validated against current state before it is shown.
-   Productizes converge/revision without MAP-Elites cost.
-6. **Abstention** as a first-class finding outcome (trust return, honest degrade).
-7. **Sparse-critic conversion + MAESTRO gates** for the generation track: convert
-   the always-on 12-critic room to evidence-triggered capability calls; before
-   any "agents are better" claim, require matched-budget (accelerator-seconds),
-   role-placebo/permutation controls, revision-homogenization measurement, and
-   explicit falsification conditions.
-8. **Maturity ladder** as release gates: M0 extraction → M1 audit → M2
-   change-impact → M3 repair → M4 faithful patch → M5 collaborative.
-
-**Deliberately deferred / rejected (do not re-litigate — reasons in companion):**
-autonomous full-script generation *as the wedge* (keep behind the engine, never
-the front door); permanent multi-agent swarm (→ sparse); graph DB / MAP-Elites /
-learned routing / RL at launch (JSON state wins below a measured complexity
-threshold); LLM-as-judge scoring (already rejected by NORTH_STAR); treating
-MAESTRO flash-fiction wins as screenplay transfer; any citation from the
-fabricated-source "Ernie" lineage (adopt mechanisms, never citations).
-
-**One real duplication to resolve:** TS `server/nvm` vs the Python Reference
-Engine 0.2.0 both implement the proof kernel. Decision: **TypeScript is the
-single production engine; Python 0.2.0 is a conformance oracle/spec** — mine it
-for the four assets above and treat its 56 tests as a behavior spec, do not run
-two engines.
-
-> Verbatim formulas, algorithms, and schemas extracted from these sources
-> (MAESTRO-S objectives, TRACE data model + algorithms, the 0.2.0 proof kernel
-> and JSON schemas, FactTrack pipeline) live in
-> `docs/research-audit/RESEARCH_FORMULAS_ALGORITHMS_SCHEMAS_2026-07-11.md` —
-> the implementable contract layer, with a source→TS-engine mapping table.
-
----
-
-## 8. Emotional-arc + anti-slop integration — 2026-07-11B intake
-
-Second research drop (~30 docs) triaged by 5 readers; 25 files archived to
-`STORYMACHINE V1 REPO/_superseded_2026-07-11B/` (RNE V8 reroute, multi-agent
-swarm, infra-defer). Verdict map: `docs/research-audit/RESEARCH_INTAKE_2026-07-11B_EMOTIONAL_RNE.md`.
-Needed source preserved in `docs/research-audit/2026-07-11B-needed/`. **Rejected:
-RNE V8** (swaps proof gates for a single-scalar Transportation score + LLM debate
-— violates proof-before-preference + no-single-scalar). Three deterministic,
-law-compliant waves adopted:
-
-- **EA — Emotional-arc signal channel [P1, highest research value].** Port a
-  deterministic per-scene VAD (valence[-1,1] / arousal[0,1] / dominance[0,1]) +
-  tension[0–100] trajectory into `fountain-analyzer.ts` as a new signal channel
-  (Wave Program v2 type 1), fitted to Reagan-2016 arc shapes; soft constraints
-  (climax tension high, resolution low; VAD drift >0.3 with no causal trigger).
-  **Why first:** an emotional arc is inherently POSITION-AWARE → the first
-  credible attack on the act-swap AUC ≈0.48 blind spot (§5.1) AND a real signal
-  for the dead theme/emotion dimension. **Measure-before-threshold:** prototype
-  against the real 45-film corpus; **accept** only if act-swap AUC moves
-  materially above chance (>~0.55) or shuffle-drop AUC rises, with NO regression
-  to the 0.622 floor or 6/6 discrimination. Source: `2026-07-11B-needed/uvm_state_tensor.py`,
-  `escp_protocol.py`, `emotion_as_structural_mechanic_research.md`. Strip the
-  CrewAI/agent wrapper — the core is ~150 lines, deterministic, no LLM.
-  **STATUS (2026-07-11): diagnostic signal LANDED** — `server/nvm/analyze/
-  emotional-arc.ts` on a real 12,142-word VAD lexicon (VADER + NRC EmoLex) with
-  Reagan-2016 six-arc fitting; wired into the doctor report as a diagnostic
-  field (NOT health). Measured act-swap AUC **0.647** (engine ~0.48). Full suite
-  green (9,039 tests, 0 fail). Remaining: feed into the health scalar — gated on
-  doctor-level AUC gain + zero calibration regression.
-- **AS — Anti-slop detectors + verbosity-bias fix [P1].** Replace/augment the
-  raw word-count density normalization (the confirmed **+6 verbosity bias**,
-  Phase-B metamorphic `empty_verbosity`) with **deviation-from-corpus-mean**
-  scoring; add heuristic-tier (`pattern_to_watch`, per W1) detectors for
-  negated-statement clichés ("it's not X, it's Y"), generic emotion descriptors,
-  and vocabulary-freshness. **Accept:** `evals/scoring` `empty_verbosity` flips
-  to PASS (padding no longer raises health) with no calibration/discrimination
-  regression. Source: `2026-07-11B-needed/ai-slop-storytelling-research.md`.
-- **ABST — Abstention + human-label rubric [P1, feeds scoring-kernel Phases F/G].**
-  Ship the abstention finding outcome (already planned), triggered by critic
-  **disagreement**; adopt **TS-SF** (Green & Brock 2000) + NVAR as the Phase-G
-  human-labeling rubric — as **diagnostics, never a gate** (no single scalar).
-  Source: `2026-07-11B-needed/ts_sf_scorer.py`, `creative-ai-multiagent-evaluation-research.md`,
-  `evals/scoring/human/HUMAN_LABELING_TASK.md`.
-
-**Rejected/deferred (do not re-litigate):** RNE V8 reroute; permanent multi-agent
-swarm / CrewAI / LangGraph / ESC-P bus / MAD-debate-as-gate; TS-SF-as-gate;
-event-store/saga migration; MCP connectors; graph DB. **Citation caution:** the
-drop's arXiv flags were mis-read (YYMM: `2601`=2026-01, `2604`=2026-04 are REAL —
-verified 2026-07-11: NVAR eval + 100-Endings tension). Still unverified: an
-"Anthropic 2026 Emotion" paper + `arXiv 2508.02132` — flag, don't assert fabricated. `stage-plans/*` copies are STALE; this file is canon.
+Deferred/rejected items (do not re-litigate — reasons in the companion docs):
+autonomous full-script generation as the wedge, permanent multi-agent swarm,
+graph DB / MAP-Elites / RL at launch, LLM-as-judge scoring, TS-SF-as-gate,
+any citation from the fabricated-source "Ernie" lineage.

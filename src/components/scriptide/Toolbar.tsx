@@ -208,8 +208,10 @@ export default function Toolbar({
         </span>
         {saveStatusLabel ? (
           <span
-            className="hidden max-w-[8rem] truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-cream)]/40 sm:inline"
+            className="max-w-[7rem] truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-cream)]/55 sm:max-w-[8rem]"
             title={saveStatusLabel}
+            role="status"
+            aria-live="polite"
           >
             {saveStatusLabel}
           </span>

@@ -3,7 +3,7 @@
 // run-metamorphic.ts so CI cannot silently ignore hard regressions.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyResults } from './metamorphic-lib.ts';
+import { exitCodeForResults } from './metamorphic-lib.ts';
 import type { MetamorphicResult } from '../contracts/scoring-eval-case.ts';
 
 function result(id: string, passed: boolean): MetamorphicResult {
@@ -18,15 +18,9 @@ function result(id: string, passed: boolean): MetamorphicResult {
   };
 }
 
-/** Mirror of run-metamorphic.ts exit decision (kept tiny and explicit). */
-function exitCodeFor(results: MetamorphicResult[]): number {
-  const { hardFailures } = classifyResults(results);
-  return hardFailures.length > 0 ? 1 : 0;
-}
-
 describe('metamorphic exit-code contract', () => {
   it('exits 0 when only known-failing empty_verbosity fails', () => {
-    const code = exitCodeFor([
+    const code = exitCodeForResults([
       result('identity', true),
       result('whitespace_reflow', true),
       result('rename_character', true),
@@ -39,7 +33,7 @@ describe('metamorphic exit-code contract', () => {
   });
 
   it('exits 1 when a hard case fails', () => {
-    const code = exitCodeFor([
+    const code = exitCodeForResults([
       result('identity', true),
       result('scene_shuffle', false),
       result('empty_verbosity', false),

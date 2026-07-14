@@ -14,6 +14,19 @@ import {
   type SaveStatus,
 } from "../lib/draft-persistence";
 import {
+  acknowledgeScriptIDESave,
+  shouldStartScriptIDESave,
+} from "../lib/scriptide-autosave";
+import {
+  loadScriptIDEDraft,
+  readScriptIDEDraft,
+  scriptIDEDraftStatesEqual,
+  updateScriptIDEDraft,
+  writeScriptIDEDraft,
+  type ScriptIDEDraftEnvelope,
+  type ScriptIDEDraftState,
+} from "../lib/scriptide-draft-store";
+import {
   Loader2,
   BookOpen,
   Film,
@@ -78,6 +91,10 @@ const TabPanelFallback = () => (
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface ScriptIDEServerDraft extends ScriptIDEDraftState {
+  updatedAt: number;
+}
+
 interface ScriptIDEProps {
   initialConfig: StoryConfig;
   onOpenStoryMachine?: () => void;
@@ -140,8 +157,6 @@ const lsSet = (key: string, val: string): boolean => {
   }
 };
 
-const DRAFT_UPDATED_AT_KEY = "script_draft_updated_at";
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ScriptIDE({
@@ -152,11 +167,18 @@ export default function ScriptIDE({
   onImportConsumed,
   onNewStory,
 }: ScriptIDEProps) {
+  const initialDraftRef = useRef<ScriptIDEDraftEnvelope | null>(null);
+  const hadVersionedDraftRef = useRef(false);
+  if (!initialDraftRef.current) {
+    const stored = readScriptIDEDraft(lsGet);
+    hadVersionedDraftRef.current = stored !== null;
+    initialDraftRef.current = stored ?? loadScriptIDEDraft(lsGet);
+  }
+  const initialDraft = initialDraftRef.current;
+
   // ── Core state ──────────────────────────────────────────────────────────────
   const [engineState, setEngineState] = useState<EngineState | null>(null);
-  const [scriptText, setScriptText] = useState<string>(
-    () => lsGet("script_draft") || ""
-  );
+  const [scriptText, setScriptText] = useState<string>(initialDraft.scriptText);
   const [activeTab, setActiveTab] = useState<
     | "production"
     | "analysis"
@@ -193,12 +215,12 @@ export default function ScriptIDE({
   const [liveDiagnostics, setLiveDiagnostics] = useState(
     () => lsGet("live_diagnostics") === "1"
   );
-  // Theme preference: localStorage + server ScriptIDE_State.is_dark_mode.
-  const [isDarkMode, setIsDarkMode] = useState(() => lsGet("theme") === "dark");
+  // Theme preference: atomic local draft + server ScriptIDE_State.is_dark_mode.
+  const [isDarkMode, setIsDarkMode] = useState(initialDraft.isDarkMode);
   const [isTypewriterSound, setIsTypewriterSound] = useState(() => lsGet("typewriter_sound") !== "off");
   const [snapshots, setSnapshots] = useState<
     { id: string; name: string; text: string; date: string }[]
-  >(() => safeJsonParse(lsGet("script_snapshots"), []));
+  >(initialDraft.snapshots as { id: string; name: string; text: string; date: string }[]);
   const [titlePage, setTitlePage] = useState({
     title: "UNTITLED SCRIPT",
     author: "AUTHOR NAME",
@@ -206,8 +228,13 @@ export default function ScriptIDE({
   });
   const [researchNotes, setResearchNotes] = useState<
     { id: string; title: string; content: string }[]
-  >(() => safeJsonParse(lsGet("research_notes"), []));
+  >(initialDraft.researchNotes as { id: string; title: string; content: string }[]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveConflict, setSaveConflict] = useState<(ScriptIDEDraftState & { updatedAt: number }) | null>(null);
+  // Persistence starts only after the mount-time server/local conflict has been
+  // resolved. This prevents StrictMode cleanup and slow loads from saving stale
+  // local state over a newer server revision.
+  const [persistenceReady, setPersistenceReady] = useState(false);
   const [snapshotModal, setSnapshotModal] = useState<{
     open: boolean;
     name: string;
@@ -222,8 +249,8 @@ export default function ScriptIDE({
     cursor: number;
   }>({ show: false, charName: "", cursor: 0 });
   const [actionInput, setActionInput] = useState("");
-  const [characters, setCharacters] = useState<ScriptCharacter[]>(() =>
-    safeJsonParse(lsGet("script_characters"), [])
+  const [characters, setCharacters] = useState<ScriptCharacter[]>(
+    initialDraft.characters as ScriptCharacter[],
   );
   const [isCleaning, setIsCleaning] = useState<number | null>(null);
   const [cleanError, setCleanError] = useState<string | null>(null);
@@ -274,10 +301,14 @@ export default function ScriptIDE({
   const charactersRef = useRef(characters);
   // Always-current draft payload for mount-stable server autosave (must NOT be
   // recreated on every keystroke — that starved the previous 30s interval).
-  const draftRef = useRef({ scriptText, snapshots, characters, researchNotes, isDarkMode });
-  const draftUpdatedAtRef = useRef<number>(
-    Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0,
-  );
+  const draftRef = useRef<ScriptIDEDraftState>({ scriptText, snapshots, characters, researchNotes, isDarkMode });
+  const draftEnvelopeRef = useRef(initialDraft);
+  const draftGenerationRef = useRef(0);
+  const persistedGenerationRef = useRef(initialDraft.dirty ? -1 : 0);
+  const persistenceReadyRef = useRef(false);
+  const saveConflictRef = useRef<ScriptIDEServerDraft | null>(null);
+  const requestServerSaveRef = useRef<(opts?: { updateStatus: boolean; keepalive?: boolean }) => void>(() => {});
+  const skipNextLocalWriteRef = useRef(true);
   // Prevent setState-after-unmount from the flush-on-cleanup save path.
   const mountedRef = useRef(true);
   draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
@@ -295,100 +326,222 @@ export default function ScriptIDE({
   }, []);
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
-  // Debounced write of heavy text data. Success/failure drives honest status.
+  // Update the in-memory envelope immediately on a real edit, then debounce its
+  // single atomic storage write. Mounting and server restore are not edits.
   useEffect(() => {
-    setSaveStatus("saving-local");
+    const state = draftRef.current;
+    if (skipNextLocalWriteRef.current) {
+      skipNextLocalWriteRef.current = false;
+      return;
+    }
+    if (scriptIDEDraftStatesEqual(draftEnvelopeRef.current, state)) return;
+
+    draftEnvelopeRef.current = updateScriptIDEDraft(draftEnvelopeRef.current, state);
+    const generation = ++draftGenerationRef.current;
+    setSaveStatus(saveConflictRef.current ? "save-conflict" : "saving-local");
+
+    // A writer may type while the initial server load is still pending. Persist
+    // that edit immediately so the restore decision sees it and navigation
+    // cannot lose it. Server-applied state sets skipNextLocalWriteRef above.
+    if (!persistenceReady) {
+      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+      setSaveStatus(ok ? "saved-local" : "save-failed");
+      return;
+    }
+
     const debounceTimer = setTimeout(() => {
-      const now = Date.now();
-      const ok =
-        lsSet("script_draft", scriptText) &&
-        lsSet("script_snapshots", JSON.stringify(snapshots)) &&
-        lsSet("script_characters", JSON.stringify(characters)) &&
-        lsSet("research_notes", JSON.stringify(researchNotes)) &&
-        lsSet("theme", isDarkMode ? "dark" : "light") &&
-        lsSet(DRAFT_UPDATED_AT_KEY, String(now));
+      const ok = writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
       if (!mountedRef.current) return;
       if (ok) {
-        draftUpdatedAtRef.current = now;
-        setSaveStatus("saved-local");
+        if (draftGenerationRef.current === generation && !saveConflictRef.current) {
+          setSaveStatus("saved-local");
+        }
       } else {
         setSaveStatus("save-failed");
       }
     }, 500);
     return () => clearTimeout(debounceTimer);
-  }, [scriptText, snapshots, characters, researchNotes, isDarkMode]);
+  }, [persistenceReady, scriptText, snapshots, characters, researchNotes, isDarkMode]);
 
   // ── Server-side persistence ────────────────────────────────────────────────
-  // Load from server on mount. Prefer NEWER draft (timestamp), not longer text.
+  // Versioned drafts compare opaque server revisions. Legacy drafts use the old
+  // timestamp/length rule once, then migrate into the envelope.
   useEffect(() => {
     let cancelled = false;
     fetch('/api/scriptide/load')
       .then(r => r.ok ? r.json() : null)
-      .then((data: { status: string; scriptText?: string; snapshots?: unknown[]; characters?: unknown[]; researchNotes?: unknown[]; isDarkMode?: boolean; updatedAt?: number | null } | null) => {
-        if (cancelled || !data || data.status === 'empty') return;
-        const localText = draftRef.current.scriptText ?? "";
-        const localTs = draftUpdatedAtRef.current || Number(lsGet(DRAFT_UPDATED_AT_KEY) || "0") || 0;
-        const decision = resolveDraftConflict(
-          { text: localText, updatedAt: localTs },
-          { text: data.scriptText ?? "", updatedAt: data.updatedAt },
-        );
-        if (decision.source === "server") {
-          setScriptText(decision.text);
-          if (typeof decision.updatedAt === "number") {
-            draftUpdatedAtRef.current = decision.updatedAt;
-            lsSet(DRAFT_UPDATED_AT_KEY, String(decision.updatedAt));
-          }
-          if (data.snapshots?.length) setSnapshots(data.snapshots as { id: string; name: string; text: string; date: string }[]);
-          if (data.characters?.length) setCharacters(data.characters as typeof characters);
-          if (data.researchNotes?.length) setResearchNotes(data.researchNotes as typeof researchNotes);
-          if (typeof data.isDarkMode === "boolean") setIsDarkMode(data.isDarkMode);
+      .then((data: ({ status: string } & Partial<ScriptIDEServerDraft>) | null) => {
+        if (cancelled || !data) return;
+        if (data.status === 'empty') {
+          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+          return;
         }
+        if (
+          typeof data.scriptText !== 'string' ||
+          !Array.isArray(data.snapshots) ||
+          !Array.isArray(data.characters) ||
+          !Array.isArray(data.researchNotes) ||
+          typeof data.isDarkMode !== 'boolean' ||
+          typeof data.updatedAt !== 'number'
+        ) return;
+
+        const server: ScriptIDEServerDraft = {
+          scriptText: data.scriptText,
+          snapshots: data.snapshots,
+          characters: data.characters,
+          researchNotes: data.researchNotes,
+          isDarkMode: data.isDarkMode,
+          updatedAt: data.updatedAt,
+        };
+        const local = draftEnvelopeRef.current;
+        const serverChanged = local.serverRevision !== server.updatedAt;
+        const versionedConflict = hadVersionedDraftRef.current && local.dirty && serverChanged;
+        const legacyDecision = resolveDraftConflict(
+          { text: local.scriptText, updatedAt: local.contentUpdatedAt },
+          { text: server.scriptText, updatedAt: server.updatedAt },
+        );
+        const useServer = hadVersionedDraftRef.current
+          ? !local.dirty || local.serverRevision === null
+          : legacyDecision.source === 'server';
+
+        if (versionedConflict) {
+          saveConflictRef.current = server;
+          setSaveConflict(server);
+          setSaveStatus('save-conflict');
+          return;
+        }
+        if (useServer) {
+          const cleanEnvelope: ScriptIDEDraftEnvelope = {
+            ...server,
+            schemaVersion: 1,
+            contentUpdatedAt: server.updatedAt,
+            serverRevision: server.updatedAt,
+            dirty: false,
+          };
+          draftEnvelopeRef.current = cleanEnvelope;
+          skipNextLocalWriteRef.current = true;
+          persistedGenerationRef.current = draftGenerationRef.current;
+          setScriptText(server.scriptText);
+          setSnapshots(server.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setCharacters(server.characters as typeof characters);
+          setResearchNotes(server.researchNotes as typeof researchNotes);
+          setIsDarkMode(server.isDarkMode);
+          writeScriptIDEDraft(lsSet, cleanEnvelope);
+          return;
+        }
+
+        draftEnvelopeRef.current = {
+          ...local,
+          serverRevision: server.updatedAt,
+          dirty: true,
+        };
+        writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
       })
-      .catch(() => { /* non-critical — continue with localStorage */ });
+      .catch(() => { /* non-critical — continue with local envelope */ })
+      .finally(() => {
+        if (cancelled) return;
+        persistenceReadyRef.current = true;
+        setPersistenceReady(true);
+      });
     return () => { cancelled = true; };
   }, []); // mount only
 
   // Auto-save to server every 30s from refs so continuous typing cannot starve it.
-  // Also flush on tab hide and unmount (unmount path never setStates).
+  // A trigger during an in-flight request queues one trailing save of the newest
+  // generation. Only the generation actually acknowledged may claim success.
   useEffect(() => {
+    if (!persistenceReady) return;
     let inFlight = false;
-    const saveToServer = (opts: { updateStatus: boolean } = { updateStatus: true }) => {
-      if (inFlight) return;
+    let trailingRequested = false;
+    let disposed = false;
+
+    const saveToServer = (opts: { updateStatus: boolean; keepalive?: boolean } = { updateStatus: true }) => {
+      if (!persistenceReadyRef.current) return;
+      if (inFlight) {
+        trailingRequested = true;
+        return;
+      }
+      if (!shouldStartScriptIDESave(draftEnvelopeRef.current, saveConflictRef.current !== null, inFlight)) return;
+
+      const generation = draftGenerationRef.current;
       const payload = draftRef.current;
-      if (!payload.scriptText && payload.snapshots.length === 0) return;
+      const expectedUpdatedAt = draftEnvelopeRef.current.serverRevision;
       inFlight = true;
       if (opts.updateStatus && mountedRef.current) setSaveStatus("saving-server");
       fetch('/api/scriptide/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, expectedUpdatedAt }),
+        keepalive: opts.keepalive === true,
       })
-        .then((r) => {
-          if (!r.ok) throw new Error(`save ${r.status}`);
-          const now = Date.now();
-          draftUpdatedAtRef.current = now;
-          lsSet(DRAFT_UPDATED_AT_KEY, String(now));
-          if (opts.updateStatus && mountedRef.current) setSaveStatus("saved-server");
+        .then(async (r) => {
+          const data = await r.json() as {
+            status?: string;
+            updatedAt?: number;
+            server?: ScriptIDEServerDraft;
+          };
+          if (r.status === 409 && data.status === 'conflict' && data.server) {
+            saveConflictRef.current = data.server;
+            if (mountedRef.current) {
+              setSaveConflict(data.server);
+              setSaveStatus('save-conflict');
+            }
+            return;
+          }
+          if (!r.ok || data.status !== 'saved' || typeof data.updatedAt !== 'number') {
+            throw new Error(`save ${r.status}`);
+          }
+
+          const transition = acknowledgeScriptIDESave(
+            draftEnvelopeRef.current,
+            generation,
+            draftGenerationRef.current,
+            data.updatedAt,
+          );
+          draftEnvelopeRef.current = transition.envelope;
+          persistedGenerationRef.current = Math.max(persistedGenerationRef.current, generation);
+          const localWriteOk = writeScriptIDEDraft(lsSet, transition.envelope);
+          if (transition.needsTrailingSave) trailingRequested = true;
+          if (opts.updateStatus && mountedRef.current && transition.acknowledgedCurrentDraft) {
+            setSaveStatus(localWriteOk ? "saved-server" : "save-failed");
+          }
         })
         .catch(() => {
           if (opts.updateStatus && mountedRef.current) setSaveStatus("save-failed");
         })
         .finally(() => {
           inFlight = false;
+          if (trailingRequested && !disposed && !saveConflictRef.current) {
+            trailingRequested = false;
+            saveToServer({ updateStatus: true });
+          }
         });
+    };
+    requestServerSaveRef.current = saveToServer;
+    const syncLocalEnvelope = () => {
+      if (!scriptIDEDraftStatesEqual(draftEnvelopeRef.current, draftRef.current)) {
+        draftEnvelopeRef.current = updateScriptIDEDraft(draftEnvelopeRef.current, draftRef.current);
+        draftGenerationRef.current += 1;
+      }
+      return writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
     };
     const interval = setInterval(() => saveToServer({ updateStatus: true }), 30_000);
     const onVis = () => {
-      if (document.visibilityState === "hidden") saveToServer({ updateStatus: true });
+      if (document.visibilityState === "hidden") {
+        syncLocalEnvelope();
+        saveToServer({ updateStatus: true, keepalive: true });
+      }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVis);
-      // Fire-and-forget flush; never touch React state after unmount.
-      saveToServer({ updateStatus: false });
+      syncLocalEnvelope();
+      saveToServer({ updateStatus: false, keepalive: true });
+      requestServerSaveRef.current = () => {};
+      disposed = true;
     };
-  }, []); // mount only — reads draftRef
+  }, [persistenceReady]);
 
   // Keep both refs in sync so async callbacks always read the latest values.
   useEffect(() => {
@@ -1102,6 +1255,45 @@ export default function ScriptIDE({
     setResearchNotes(researchNotes.filter((n) => n.id !== id));
   };
 
+  const useServerConflictDraft = () => {
+    const server = saveConflictRef.current;
+    if (!server) return;
+    const cleanEnvelope: ScriptIDEDraftEnvelope = {
+      ...server,
+      schemaVersion: 1,
+      contentUpdatedAt: server.updatedAt,
+      serverRevision: server.updatedAt,
+      dirty: false,
+    };
+    draftEnvelopeRef.current = cleanEnvelope;
+    skipNextLocalWriteRef.current = true;
+    persistedGenerationRef.current = draftGenerationRef.current;
+    saveConflictRef.current = null;
+    setSaveConflict(null);
+    setScriptText(server.scriptText);
+    setSnapshots(server.snapshots as typeof snapshots);
+    setCharacters(server.characters as typeof characters);
+    setResearchNotes(server.researchNotes as typeof researchNotes);
+    setIsDarkMode(server.isDarkMode);
+    setSaveStatus("saved-server");
+    writeScriptIDEDraft(lsSet, cleanEnvelope);
+  };
+
+  const keepLocalConflictDraft = () => {
+    const server = saveConflictRef.current;
+    if (!server) return;
+    draftEnvelopeRef.current = {
+      ...draftEnvelopeRef.current,
+      serverRevision: server.updatedAt,
+      dirty: true,
+    };
+    saveConflictRef.current = null;
+    setSaveConflict(null);
+    setSaveStatus("saving-server");
+    writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+    requestServerSaveRef.current({ updateStatus: true });
+  };
+
   // renderAnalysis() removed — dead code (never called; superseded by the
   // "analysis" tab's <AnalysisPanel/>, which has no recharts dependency).
   // Removing it drops recharts entirely from the bundle: it was the only
@@ -1191,6 +1383,30 @@ export default function ScriptIDE({
           <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
             <span>{fdxImportNotice}</span>
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
+          </div>
+        )}
+        {saveConflict && (
+          <div
+            className="z-30 flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-warn)] px-3 py-2 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]"
+            role="alert"
+          >
+            <span className="mr-auto font-bold uppercase tracking-wider">
+              This draft changed in another tab.
+            </span>
+            <button
+              type="button"
+              onClick={useServerConflictDraft}
+              className="min-h-8 border border-[var(--sm-ink)] bg-[var(--sm-panel)] px-3 font-bold uppercase"
+            >
+              Use server
+            </button>
+            <button
+              type="button"
+              onClick={keepLocalConflictDraft}
+              className="min-h-8 bg-[var(--sm-ink)] px-3 font-bold uppercase text-[var(--sm-cream)]"
+            >
+              Keep mine
+            </button>
           </div>
         )}
         <Toolbar

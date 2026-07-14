@@ -11,6 +11,11 @@ import {
   filterUploadableFiles,
   readUploadedFiles,
 } from "../lib/uploaded-files";
+import {
+  importScriptText,
+  loadScriptIDEDraft,
+  writeScriptIDEDraft,
+} from "../lib/scriptide-draft-store";
 
 interface StartScreenProps {
   onStart: (config: StoryConfig) => void;
@@ -118,9 +123,8 @@ export default function StartScreen({
   };
 
   // Opens an uploaded script file straight into ScriptIDE, skipping the
-  // wizard. .fountain/.txt content becomes the editor's initial draft by
-  // writing the exact localStorage key ScriptIDE's lsGet("script_draft")
-  // reads on mount (see ScriptIDE.tsx). .fdx has no client-side converter, so
+  // wizard. .fountain/.txt content becomes the editor's initial draft through
+  // the same atomic envelope ScriptIDE reads on mount. .fdx has no client-side converter, so
   // it's handed off via sessionStorage for ScriptIDE to surface as a toast
   // pointing at Script Doctor's server-side conversion instead of silently
   // dumping raw Final Draft XML into the Fountain editor.
@@ -158,8 +162,15 @@ export default function StartScreen({
         if (isFdx) {
           sessionStorage.setItem("sm_fdx_import_pending", file.name);
         } else {
-          localStorage.setItem("script_draft", text);
-          localStorage.setItem("script_draft_updated_at", String(Date.now()));
+          const read = (key: string) => localStorage.getItem(key);
+          const write = (key: string, value: string) => {
+            localStorage.setItem(key, value);
+            return true;
+          };
+          const current = loadScriptIDEDraft(read);
+          if (!writeScriptIDEDraft(write, importScriptText(current, text))) {
+            throw new Error('draft write failed');
+          }
         }
       } catch {
         setOpenFileError(`Couldn't open "${file.name}" — your browser is blocking local storage (private mode?).`);

@@ -1,192 +1,217 @@
-# STORYMACHINE — ULTRAPLAN (what's left, current spine)
+# STORYMACHINE — ULTRAPLAN (short execution brief)
 
-*Written 2026-07-11 during the documentation-consolidation wave. Supersedes
-stale sequencing in ROADMAP.md's numbered §§ where the two disagree;
-NORTH_STAR.md remains the constitution. Read this file first when resuming
-cold — it's the shorter, denser path to "what do I do next."*
+*Re-spined 2026-07-14 after the product teardown. `ROADMAP.md` is the
+canonical plan and `NORTH_STAR.md` is the constitution. This file is the
+short cold-start answer to: **what do I do next?** If any detail here drifts
+from the roadmap, the roadmap wins.*
 
-## 0. Where the project actually stands (measured, not claimed)
+## 0. The decision
 
-- **Discrimination**: 6/6 pairs order correctly (good > bad); 5 hard in CI
-  with real margins (+1.4 to +6.2). The 6th, composite-reviewer-scenario,
-  orders correctly (+2.2) but hasn't cleared its own 5.0-point minimum-gap
-  floor — diagnosed as ~19 style-minor false positives on the good half
-  (`discrimination.test.ts` header carries the live numbers; re-read before
-  quoting).
-- **Ground truth**: 72 produced scripts (70 animation + Pulp Fiction + Jaws
-  — first live-action entries), all RECOMMEND, manifest-locked with
-  content-hash verification, env-gated harness. Has already found and
-  fixed two flood-class bugs (ORPHAN_CLUE over-firing, TRIADIC/CONSECUTIVE
-  firing on 90-100% of professional scripts).
-- **The north-star metric is executable**: structural-degradation AUC.
-  Shuffle-drop AUC-24 = 0.672 measured against a 0.622 hard ratchet floor;
-  AUC-71 (full corpus) ~0.652. Chain is fully wired: harness -> detector
-  (SCENE_CONTINUITY_COLLAPSE + location-run corroboration axis) -> bounded
-  structural-deduction formula pathway. Binding constraint remaining is
-  the detector gate's sensitivity, not the pipeline.
-  A second degradation recipe, act-swap, measures ~0.48 — near coin-flip.
-  This is diagnosed, not mysterious: see §1 and NORTH_STAR §2.
-- **Known-dead ends, measured — do not re-run without new evidence**:
-  voice-distinctness detector (PDF cue parsing yields only 3 qualifying
-  speakers on 12/69 scripts — corpus-invisible); payoff-discipline
-  detector (content-word clue channel is noise-bound: median 299 seeds,
-  ~17% payoff ratio — too noisy to threshold); suspense-jaggedness
-  scramble signal (runs backwards on real data).
+StoryMachine is now one product by default: **private, instant, trustworthy,
+reproducible screenplay coverage for a screenwriter who wants feedback before
+paying a reader or submitting a draft.** Doctor + Editor is the wedge.
+OASIS and the research surfaces remain available only as filed Labs work.
 
-## 1. THE SPINE — deep-read arc signals, then the AUC (sequential, 2-4 sessions)
+The project has strong deterministic engineering but no documented evidence
+in this repo that a real writer wants the output. Its former headline metric
+is also non-load-bearing: ~5,701 of 8,917 generated rules are permutations
+from 7 templates, while the doctor's own diagnostics report rule-channel AUC
+~0.076 versus scene-count scarcity AUC ~0.938. Reproducibility is real; score
+validity on real writing is not yet proven.
 
-The single number that operationalizes NORTH_STAR's separation-margin
-claim, and everything below compounds on it — nothing else beats its
-value/hour right now.
+Therefore the order is fixed:
 
-1. **Deep-read arc signals (the AUC path).** Diagnosed root cause of the
-   ~0.48 act-swap AUC: lexicon-derived signals detect WHAT is said, not
-   WHERE it sits in the document — swapping acts preserves all the same
-   words while destroying sequence, and today's 3,216 rules are almost
-   entirely content-keyed. Run 10's deep-read sensing (LLM-per-scene,
-   already landed, keyless-degrading) is the mechanism to extend: emit
-   document-position-aware signals (expected-vs-actual narrative position,
-   setup/payoff distance, act-boundary coherence) into the same
-   deterministic record-signal schema the rules already consume. Design
-   doc first — this is an L, needs a real AI key to develop and measure
-   against, and must degrade honestly (to today's lexicon-only signals)
-   when keyless.
-2. **Composite min-gap guard wave.** Close the 5.0-point floor on
-   `composite-reviewer-scenario`. Same discipline as the earlier
-   rhythm-guard wave: measure each offending rule against the corpus
-   first. TALKING_HEADS (24/69 corpus scripts) and
-   OPENING_SCENE_UNDERWEIGHT (22/69) are next after the two D2-wave
-   already fixed. Heavily calibration-guarded — band monotonicity and
-   length-invariance (+/-7 at 1x/2x/3x) must hold throughout.
-3. **Second + third structural axes**, once (1) lands new signal.
-   Location-run coherence (adjacent same-location rate — weak alone, good
-   as a corroborator, already partially in via SCENE_CONTINUITY) and
-   escalation coherence at scale (act-level suspense means under shuffle).
-   Feed the SAME bounded deduction pathway — no new formula architecture
-   needed, just new corroborating axes into the existing gate.
-4. **Bad-band beyond synthetic degradations.** User's own drafts (declared
-   bad by the user; needs screenplay-format versions) and/or amateur
-   public drafts. Converts the AUC measurement from synthetic-bad
-   (shuffled/swapped intact scripts) to real-bad, which is a stronger
-   claim and may reveal degradation recipes the synthetic ones don't
-   exercise.
+> **Validate demand → prove the score → simplify the product → make the report
+> shareable → build retention.**
 
-## 2. OWNE integration (assets vendored in `docs/owne/`)
+Do not parallelize phases. The ordering is the strategy.
 
-- **O1 typed promises + SG1 (converged item, do together).** Adopt the
-  22-entry PT_* promise-template library onto SEED_CLUE/PAYOFF_SETUP
-  (type + hard/soft + priority + payoff predicate class) — fixes
-  ORPHAN_CLUE severity honestly, unblocks the payoff-discipline
-  excellence detector. StoryOp contract change: sequence with
-  record-parity. SG1 (Well-Made Surprise Test: preTwistSatisfaction >=
-  0.6, hindsightInevitability >= 0.7, >= 3 setups,
-  misdirectionEffectiveness >= 0.5) is deterministic over the same
-  setup/payoff ledger — converges naturally, one migration.
-  *Do together with the content-word clue-channel rebuild (§3) — same
-  subsystem.*
-- **O2 Tavern Letter golden fixture + Integrity Rate.** Import the fixture
-  as ops/scenario; IR = (1/T)*Sum 1[event legal AND invariants hold] over
-  sim traces; CI-assert IR = 1.0 and Halluc = 0 on the golden path plus
-  its negative tests (early-accusation gate, teleport prevention, double
-  possession, herring non-softlock). Proves the sim layer the way the
-  corpus proves the doctor. Self-contained — any session, any order.
-- **O3 assertion containment.** Asserted(output) subset-of licensed facts
-  union common ground, checked deterministically on every LLM
-  rewrite/candidate via entity/fact extraction against session canon +
-  input span. The strongest trust upgrade on the generative side
-  (subsumes the filed Semantic Firewall item). Gates D-wave's divergence
-  operators once both exist.
-- **O4 belief-movement surprise** (1/2 * ||mu_e - mu||_1 over an explicit
-  hypothesis distribution) — new Type-1 channel with real math, replacing
-  lexicon-intensity twist proxies. Feeds twist/reveal rules + the metrics
-  module.
-- **O5 mystery fairness gates** (Type 3, genre-routed) — min-clues-before-
-  solve, herring non-softlock, discourse-class ScenePurpose extensions for
-  the mystery genre router.
+## 1. ACTIVE NOW — P0: validate with real writers
 
-## 3. Score-trust remainder
+**Status:** No completed user-validation sessions are documented in the repo.
+P0 blocks new product and engine work. Critical security fixes are the only
+exception.
 
-1. **Composite min-gap wave** — see §1.2, same item, listed once.
-2. **Content-word clue-channel rebuild.** Residual noise traces to a
-   `SceneUnit.characters` coverage gap (character names leak into cluster
-   word sets — e.g. "hand-anna"). Fix attribution, re-measure; if the
-   payoff ratio becomes informative (>0.4 median, up from ~17%), land the
-   payoff-discipline detector using O1's typed promises as the severity
-   model.
+**Core question:**
 
-## 4. Deployment & credibility
+> After seeing the existing sample coverage report, does a screenwriter want
+> to run their own draft? Why or why not?
 
-1. **E2E browser journeys** (Playwright — nothing has been clicked
-   end-to-end in a real browser; the current harness is keyless API-level
-   only): upload->doctor->fix-verify, what-if, interview, coverage export.
-2. **Frontend tests**: start with `ScriptDoctorPanel` (formula versioning,
-   sample provenance) + `StartScreen` (sample-handoff sessionStorage).
-3. **Auth implementation** (`docs/AUTH.md` documents the trust model;
-   nothing enforces it) — blocks public multi-user deploy only, not the
-   deterministic core.
-4. **OCR recovery** of the remaining dropped scans -> corpus toward 150+
-   via the 155-screenplay sourcing index (SG6, `Film_Script_Research_
-   Report.docx`, 91.6% publicly available).
-5. **Repo hygiene**: this has bitten the project before (OneDrive
-   truncated source files mid-edit) — keep the working clone off
-   OneDrive where possible, `.gitattributes` (`* text=auto`), prune stale
-   branches periodically.
+### P0 work
 
-## 5. Product surface (still open, lower priority than §§1-4)
+1. Recruit at least **5 real screenwriters** with drafts in hand. Any career
+   tier is acceptable; record enough context to interpret the session.
+2. Show each person the existing sample flow and coverage report. Do not
+   explain the engine, rule count, NVM, or intended answer first.
+3. Observe where they understand, hesitate, distrust, or lose interest.
+4. Ask the core question above, then ask:
+   - What part, if any, felt useful enough to act on?
+   - What did you distrust or need evidence for?
+   - What would you do next with this report?
+   - Would you run a private draft now? Would you pay? Why?
+5. Record exact language, not a founder's interpretation. Separate observed
+   behavior from interview claims.
+6. Summarize the sessions in one evidence artifact. Do not add a new doctrine
+   hierarchy; link the artifact from `ROADMAP.md` P0 when complete.
 
-- Run 25 remainder: blank-editor bounce fix; sample content reachable from
-  every entry surface (Doctor panel and StartScreen have it; verify
-  ScriptIDE's empty state does too).
-- Run 17b polish: panel consolidation (24+ flat buttons -> grouped nav),
-  accessibility pass, dedupe the two hand-rolled Fountain parsers
-  (`src/services/director.ts` vs. `src/lib/fountain.ts`), `.fdx` in-place
-  client import (currently toast-redirects to the Doctor upload flow).
-- D-wave (seeded divergence operators) — the one generative-side upgrade
-  with actual research backing (Osborn-checklist divergence-before-
-  convergence). Sequence AFTER O3 (§2) so containment gates divergent
-  candidates from day one.
-- B-wave 2 remainder beyond O3: menace target-curve delta audit,
-  contradiction families over rootCauses.
-- R-wave residue not covered by O4/O5: scene economy score, speech-act
-  channel, epistemic contract, canon tiers, evaluator hard-veto audit —
-  full list in ROADMAP §5.9, not duplicated here.
-- MASTER_RESEARCH_AUDIT Tier 1 remnants + Tier 2 channels — full ranked
-  list in ROADMAP §5.6 and `docs/research-audit/MASTER_RESEARCH_AUDIT.md`
-  directly; not duplicated here to avoid three-way drift.
+### P0 exit gate
 
-## 6. Standing cautions (learned the expensive way — read before a wave)
+At least **5 documented sessions** produce a clear answer to whether the
+report creates pull toward running a writer's own draft.
 
-- **Parallel sessions are real.** Two sessions have independently built
-  the same detector and merged concurrently. Before ANY wave: `git pull`
-  main, check `git log` for overlapping work, expect to reconcile.
-- **Measure before threshold — on the REAL corpus, always.** Every
-  detector that skipped this died (never fired) or misfired (inverted on
-  well-crafted writing). Fixture-only evidence is necessary but never
-  sufficient.
-- **Density normalization eats rule families at feature scale.** A new
-  rule that must move feature-length health needs either the structural-
-  deduction pathway or multiplicity with a cap + rollup — never assume
-  instances add up linearly against the density term.
-- **Lexicon signals carry content, not position.** Global-arc / document-
-  position claims need a semantic channel that reads FOR position — see
-  §1.1. This is the reason act-swap AUC lags shuffle-drop AUC by ~0.2.
-- **OneDrive + git + this repo = file truncation risk.** Stage via a
-  sandbox, copy with byte-count verification, keep `.git` operations on
-  the Windows side when working from the OneDrive-synced clone.
-- **Sandbox environment notes**: `npm install --ignore-scripts --no-audit
-  --no-fund` then `npm rebuild better-sqlite3 --nodedir=/usr` if native
-  bindings are needed in-sandbox; no `gh` CLI in sandbox — ship via the
-  Desktop Commander PowerShell ritual (stage files, then a `.ps1` written
-  via `write_file` + run via `start_process`, never inline `-c` with
-  shell variables); OneDrive round-trips can inflate diffs with CRLF —
-  normalize to LF before every commit and verify with a byte/line check,
-  not just a visual diff.
+- **Positive/qualified signal:** proceed to P1 using the objections and trust
+  requirements as P1 inputs.
+- **Negative/ambiguous signal:** STOP. Reframe the persona, report, or problem
+  and repeat P0. Do not compensate by adding features or rules.
 
-## 7. Definition of done (v1.0-north-star)
+## 2. NEXT — P1: prove the score on runnable real writing
 
-All of NORTH_STAR §1 (non-negotiables) plus, now measurable: degradation
-AUC >= 0.9 with at least three degradation recipes (shuffle-drop, act-swap,
-and one more) and at least one real-bad band (not just synthetic
-degradation); Integrity Rate = 1.0 on all golden sim fixtures; assertion
-containment enforced on every generative path; composite discrimination
-gap >= 5.0 hard in CI, alongside the 5 pairs already there.
+P1 begins only after P0 clears. The One Bet is a score that demonstrably
+separates strong from weak real writing — not a larger rulebook.
+
+### Known baseline
+
+- 6 synthetic discrimination pairs; two hard pairs clear by only +1.4 and the
+  composite pair still misses its 5.0-point minimum-gap guard.
+- 20-sample calibration corpus is synthetic controlled-richness data.
+- The 72-produced-script corpus text is outside the repo, so its harness skips
+  without `REAL_SCRIPT_CORPUS_DIR`; it is a produced-floor check, not a
+  strong-vs-weak discrimination test. Manifest: 71 RECOMMEND + 1 CONSIDER.
+- Shuffle-drop AUC ~0.652 (hard floor 0.622).
+- Raw act-swap ~0.48; doctor-level bounded deduction ~0.62; emotional-arc
+  diagnostic signal ~0.647.
+- Rule-channel AUC ~0.076; scene-count scarcity AUC ~0.938.
+
+### P1 work
+
+1. Build a legally distributable, **runnable-in-CI** benchmark from real
+   drafts: Creative-Commons/public-domain screenplay material where available,
+   plus author-contributed drafts licensed explicitly for testing. Do not
+   manufacture synthetic "bad" scripts.
+2. Obtain blinded pairwise judgments from >=3 independent experienced readers;
+   measure inter-rater agreement and preserve disagreement rather than forcing
+   false ground truth.
+3. Pre-register the split, metrics, and gates before changing formula
+   constants. Keep a held-out set the implementer cannot tune against; version
+   and hash fixtures and labels.
+4. Measure each score component and candidate signal independently. Rebuild
+   around the smallest set that shows held-out separation; remove or neutralize
+   proxy terms such as script length without craft evidence.
+5. Integrate the landed emotional-arc channel only if it improves held-out
+   doctor-level discrimination without calibration or produced-floor
+   regressions.
+6. Close the composite minimum-gap guard through measured false-positive
+   reduction — never by a global curve tweak that merely moves the fixture.
+7. Freeze the rule count at the ~2,300 genuinely distinct checks. Author no
+   new wave. Delete nothing yet; destructive removal is a separately reviewed
+   step after dependency mapping.
+
+### P1 exit gate
+
+- Held-out real-writing discrimination AUC **>= 0.80**.
+- Shuffle-drop AUC **>= 0.80**.
+- Act-swap AUC **>= 0.70**.
+- Composite minimum-gap guard passes at **>= 5.0**.
+- Existing deterministic, keyless, calibration, produced-floor, security,
+  type-check, and build gates remain green.
+
+If the thresholds cannot be met without unstable proxies or benchmark
+leakage, report that result and revisit the product claim. Do not hide it
+behind another rule expansion.
+
+## 3. THEN — P2 through P4
+
+### P2 — Collapse to Doctor + Editor
+
+Default journey: **open/paste script → coverage report → per-scene fixes →
+export.** Gate OASIS and the ~38 research panels behind one Labs flag. Remove
+NVM/converge/twin/simulation vocabulary from first-run paths.
+
+**Exit:** a new user reaches a first report with zero Labs jargon exposure;
+time-to-first-report is instrumented.
+
+### P3 — Make the report the growth unit
+
+Turn the existing authentic server-side coverage export into a presentable
+PDF/HTML artifact: verdict, five craft dimensions, top five fixes, and a
+third-party verification path that re-derives the score against the script's
+`contentHash`.
+
+**Exit:** a recipient can independently verify a shared report; export/share
+rate is measured.
+
+### P4 — Retention and defensibility
+
+Only after trust: draft-history progress, jump-to-line and deterministic fixes,
+then auth/accounts for durable multi-user use.
+
+**Exit:** returning-user and multi-revision-session rates are measured.
+
+## 4. Frozen / filed — not current work
+
+Do not pull these forward without explicitly changing `ROADMAP.md` sequencing:
+
+- Program v2 / 3-rules-plus-6-tests wave cadence — **retired**.
+- Rule-count growth and Wave 1191-style template expansion — **frozen**.
+- OASIS simulation, OWNE O1–O5, STORY GOD SG1–SG6, D/R/B-wave remnants —
+  **Labs / filed**.
+- Research-paper intake as a roadmap driver — **retired**; adopt a mechanism
+  only when a validated user need requires it.
+- Corpus growth to 150+ and OCR recovery — filed; benchmark usefulness and
+  legal/runnable access matter more than corpus size.
+- Autonomous full-script generation, permanent multi-agent swarm, graph DB,
+  MAP-Elites/RL at launch, LLM-as-judge, TS-SF-as-gate — rejected/deferred for
+  reasons recorded in `ROADMAP.md` §8 and the research-audit documents.
+
+Historical quality documents and research audits remain useful evidence, not
+active work queues.
+
+## 5. Preserve these foundations
+
+Every phase keeps the assets that are genuinely differentiated:
+
+- No LLM in the verdict path.
+- Keyless-first boot and functional analysis-only mode.
+- Honest degradation — labeled fallback, never silent substitution or 500.
+- `contentHash` determinism and reproducibility receipts.
+- Server-side-only AI calls and secret hygiene.
+- Zod validation, appropriate rate limits, production security controls.
+- Server-side re-run for authentic coverage export.
+- CI no-console rule, keyless test posture, full lint/test/build before push.
+
+These are necessary trust foundations. They are not proof that the score is
+correct or that users want it.
+
+## 6. Expensive cautions — still binding
+
+- **Runnable real evidence, always.** Synthetic fire/no-fire fixtures are
+  necessary but insufficient. An env-gated test that skips in CI cannot be
+  the sole evidence for a product claim.
+- **Do not tune and evaluate on the same examples.** Preserve a held-out set
+  and record benchmark/version hashes with results.
+- **Density normalization eats rule families at feature scale.** Structural
+  document findings require bounded deductions, not more issue instances.
+- **Lexicon detects content, not position.** Arc-order claims require
+  position-aware channels and held-out proof.
+- **Parallel sessions are real.** Read the current branch, pull its integration
+  target, and check `git log` before implementation; never hardcode a branch.
+- **OneDrive can truncate files and inflate CRLF diffs.** Use the safest
+  available working path, verify byte counts for large transfers, and inspect
+  diffs before committing.
+- **No destructive cleanup by implication.** "Kill" means hide or stop
+  investing. File deletion requires dependency review and explicit approval.
+
+## 7. Definition of done for this roadmap
+
+There is no single engineering finish line called "v1.0-north-star." The
+roadmap advances only when evidence clears each phase gate:
+
+1. Writers show real pull toward running their own drafts.
+2. The score separates strong from weak real writing on a runnable held-out
+   benchmark.
+3. The default product exposes one clear Doctor + Editor journey.
+4. The report is shareable and independently verifiable.
+5. Returning writers use it across revisions.
+
+Until P0 clears, **the next task is user validation — not another detector,
+rule, panel, agent, research intake, or architecture layer.**

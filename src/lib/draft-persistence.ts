@@ -64,7 +64,8 @@ export type SaveStatus =
   | 'saved-local'
   | 'saving-server'
   | 'saved-server'
-  | 'save-failed';
+  | 'save-failed'
+  | 'save-conflict';
 
 export function saveStatusLabel(status: SaveStatus): string {
   switch (status) {
@@ -74,5 +75,6 @@ export function saveStatusLabel(status: SaveStatus): string {
     case 'saving-server': return 'Saving to server…';
     case 'saved-server': return 'Saved to server';
     case 'save-failed': return 'Save failed';
+    case 'save-conflict': return 'Save conflict';
   }
 }

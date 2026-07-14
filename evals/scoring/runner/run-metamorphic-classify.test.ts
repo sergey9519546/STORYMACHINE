@@ -9,6 +9,7 @@ import {
   check,
 } from './metamorphic-lib.ts';
 import type { MetamorphicResult } from '../contracts/scoring-eval-case.ts';
+import { METAMORPHIC_CASES } from './metamorphic-cases.ts';
 
 function result(id: string, passed: boolean): MetamorphicResult {
   return {
@@ -49,19 +50,27 @@ describe('metamorphic classifyResults', () => {
     assert.deepEqual(unexpectedPasses.map(r => r.id), ['empty_verbosity']);
   });
 
-  it('HARD and KNOWN_FAILING partitions are disjoint and cover the suite ids', () => {
-    for (const id of KNOWN_FAILING_CASE_IDS) {
-      assert.equal(HARD_CASE_IDS.has(id), false, `${id} must not be both hard and known-failing`);
-    }
-    assert.ok(HARD_CASE_IDS.has('scene_shuffle'));
-    assert.ok(KNOWN_FAILING_CASE_IDS.has('empty_verbosity'));
+  it('case definitions are the exact single source of policy truth', () => {
+    const ids = METAMORPHIC_CASES.map(c => c.id);
+    assert.equal(new Set(ids).size, ids.length, 'case ids must be unique');
+    assert.deepEqual(ids, [
+      'identity',
+      'whitespace_reflow',
+      'rename_character',
+      'empty_verbosity',
+      'scene_shuffle',
+      'scene_reverse',
+      'scene_dup_padding',
+    ]);
+    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity']);
+    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity'));
   });
 });
 
 describe('metamorphic check()', () => {
   it('not_increase fails when health rises past epsilon', () => {
     const r = check(
-      { id: 'x', category: 'invariance', description: '', transform: b => b, expect: { kind: 'not_increase', epsilon: 0.5 }, provenance: { author: 't', created: '2026-07-14' } },
+      { id: 'x', category: 'invariance', disposition: 'hard', description: '', transform: b => b, expect: { kind: 'not_increase', epsilon: 0.5 }, provenance: { author: 't', created: '2026-07-14' } },
       66.4,
       72.9,
     );
@@ -70,7 +79,7 @@ describe('metamorphic check()', () => {
 
   it('decrease passes when drop meets minDrop', () => {
     const r = check(
-      { id: 'x', category: 'sensitivity', description: '', transform: b => b, expect: { kind: 'decrease', minDrop: 0.1 }, provenance: { author: 't', created: '2026-07-14' } },
+      { id: 'x', category: 'sensitivity', disposition: 'hard', description: '', transform: b => b, expect: { kind: 'decrease', minDrop: 0.1 }, provenance: { author: 't', created: '2026-07-14' } },
       66.4,
       63.8,
     );

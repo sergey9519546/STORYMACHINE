@@ -40,25 +40,24 @@ export function appendUploadedFiles(prev: UploadedFile[], batch: UploadedFile[])
  * Failures on individual files are skipped (caller may surface a notice later).
  */
 export async function readUploadedFiles(files: File[]): Promise<UploadedFile[]> {
-  const out: UploadedFile[] = [];
-  for (const file of files) {
+  const records = await Promise.all(files.map(async (file): Promise<UploadedFile | null> => {
     try {
       const content = typeof file.text === 'function'
         ? await file.text()
         : await readFileAsText(file);
-      if (typeof content === 'string') {
-        out.push({
-          name: file.name,
-          content,
-          size: file.size,
-          category: inferUploadCategory(file.name),
-        });
-      }
+      if (typeof content !== 'string') return null;
+      return {
+        name: file.name,
+        content,
+        size: file.size,
+        category: inferUploadCategory(file.name),
+      };
     } catch {
       // Skip unreadable file — do not abort the rest of the batch.
+      return null;
     }
-  }
-  return out;
+  }));
+  return records.filter((record): record is UploadedFile => record !== null);
 }
 
 function readFileAsText(file: File): Promise<string> {

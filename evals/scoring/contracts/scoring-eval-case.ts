@@ -8,6 +8,7 @@
 export interface MetamorphicCase {
   id: string;
   category: 'invariance' | 'sensitivity';
+  disposition: 'hard' | 'known-failing';
   description: string;
   /** pure text transform of a base Fountain script */
   transform: (base: string) => string;
