@@ -54,6 +54,10 @@ export interface RevisionResult {
   totalIssuesFound: number;
   /** How many passes actually changed the text */
   passesWithChanges: number;
+  /** P0.3: passes that threw and were skipped. When non-empty, the caller
+   *  must treat the report as incomplete — health/verdict/percentiles should
+   *  be withheld because the issue count may be artificially low. */
+  failedPasses: PassName[];
   /** ISO timestamp */
   completedAt: number;
 }
@@ -88,6 +92,7 @@ async function runDiagnosePass(
   totalPasses: number,
   input: PassInput,
   resultsByIndex: PassResult[],
+  failedPasses: PassName[],
   onProgress?: (event: RevisionProgressEvent) => void,
 ): Promise<void> {
   const { name, fn } = entry;
@@ -104,6 +109,7 @@ async function runDiagnosePass(
   } catch (err) {
     logger.error('revision_pass_failed', { passIndex: index, passName: name, error: (err as Error).message });
     result = { pass: name, issues: [], revisedFountain: input.fountain, changed: false, summary: `Pass skipped due to error` };
+    failedPasses.push(name);
   }
   resultsByIndex[index] = result;
   onProgress?.({ type: 'pass_complete', passIndex: index, totalPasses, passResult: result });
@@ -146,7 +152,7 @@ export async function runRevisionPipeline(
     return {
       passResults: [], finalFountain: originalFountain ?? '',
       originalFountain: originalFountain ?? '',
-      totalIssuesFound: 0, passesWithChanges: 0,
+      totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [],
       completedAt: Date.now(),
     };
   }
@@ -172,6 +178,7 @@ export async function runRevisionPipeline(
   ];
 
   const passResults: PassResult[] = [];
+  const failedPasses: PassName[] = [];
   let currentFountain = originalFountain;
 
   if (isDiagnoseOnly() && !forceSequentialForTest) {
@@ -220,7 +227,7 @@ export async function runRevisionPipeline(
       priorPassResults: undefined,
     };
     await Promise.all(
-      passes.map((entry, i) => runDiagnosePass(entry, i, passes.length, sharedInput, resultsByIndex, onProgress)),
+      passes.map((entry, i) => runDiagnosePass(entry, i, passes.length, sharedInput, resultsByIndex, failedPasses, onProgress)),
     );
     passResults.push(...resultsByIndex);
   } else {
@@ -251,6 +258,7 @@ export async function runRevisionPipeline(
         logger.error('revision_pass_failed', { passIndex: i, passName: name, error: (err as Error).message });
         const noopResult: PassResult = { pass: name, issues: [], revisedFountain: currentFountain, changed: false, summary: `Pass skipped due to error` };
         passResults.push(noopResult);
+        failedPasses.push(name);
         onProgress?.({ type: 'pass_complete', passIndex: i, totalPasses: passes.length, passResult: noopResult });
       }
     }
@@ -265,6 +273,7 @@ export async function runRevisionPipeline(
     originalFountain,
     totalIssuesFound,
     passesWithChanges,
+    failedPasses,
     completedAt: Date.now(),
   };
 }

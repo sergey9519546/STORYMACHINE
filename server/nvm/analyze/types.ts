@@ -222,9 +222,13 @@ export interface ScriptDoctorReport {
    *  constants and their empirical tuning live in doctor.ts's craftPenalty —
    *  that function is the single source of truth; this comment describes
    *  shape, not constants, so it can't silently drift. Length-invariant by
-   *  regression test: same craft at 1×/2×/3× length scores within ~10 pts. */
+   *  regression test: same craft at 1×/2×/3× length scores within ~10 pts.
+   *  P0.3: when analysisComplete is false, this is a degraded value (0) and
+   *  should not be presented as a real score — show the incomplete banner. */
   health: number;
-  /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled */
+  /** health ≥ 90 excellent · ≥ 75 strong · ≥ 55 solid · ≥ 35 uneven · else troubled.
+   *  P0.3: when analysisComplete is false, this is 'troubled' and should not
+   *  be presented as a real grade — show the incomplete banner. */
   grade: DoctorGrade;
   totalIssues: number;
   bySeverity: { critical: number; major: number; minor: number };
@@ -292,6 +296,15 @@ export interface ScriptDoctorReport {
      *  annotation), so the panel can mark them honestly. Empty when all read. */
     fallbackScenes: number[];
   };
+  /** P0.3: false when any revision pass threw and was skipped. When false,
+   *  health/verdict/percentiles are withheld because the issue count may be
+   *  artificially low — a failed detector returning zero issues can make a
+   *  script look healthier than one where the detector ran. The client must
+   *  show an incomplete-analysis banner instead of a score. */
+  analysisComplete?: boolean;
+  /** P0.3: passes that threw during execution. Only populated when
+   *  analysisComplete === false. */
+  failedPasses?: PassName[];
   /** sha256 hex of the trimmed analyzed Fountain text. The determinism
    *  receipt: two reports with equal contentHash came from the identical
    *  script, so their verdicts are comparable draft-over-draft, and an

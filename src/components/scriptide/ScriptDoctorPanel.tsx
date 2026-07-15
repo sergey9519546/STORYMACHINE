@@ -2417,10 +2417,31 @@ export default function ScriptDoctorPanel({
         {/* ── Success state ── */}
         {status === "success" && report && (
           <div className="space-y-6">
-            {/* Report header: verdict banner when the coverage layer is present
-                (report.verdict), else the original health/grade box — so older
-                doctor responses (verdict absent) still render exactly as before. */}
-            {report.verdict ? (
+            {/* P0.3: incomplete analysis — one or more revision passes failed.
+                Health/grade sentinels (0 / troubled) are NOT real scores and
+                must not be shown as if they were. */}
+            {report.analysisComplete === false ? (
+              <div className="sm-panel border-2 border-stamp bg-paper p-5 space-y-3">
+                <div className="sm-sub text-stamp">Analysis incomplete</div>
+                <div className="font-display text-xl uppercase tracking-wide text-ink">
+                  Score withheld
+                </div>
+                <p className="text-xs font-mono leading-relaxed text-ink/80">
+                  {report.plainSummary ||
+                    "One or more diagnostic passes failed. Health, verdict, and percentiles are withheld because the issue count may be artificially low."}
+                </p>
+                {Array.isArray(report.failedPasses) && report.failedPasses.length > 0 && (
+                  <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-ink/70">
+                    Failed passes: {report.failedPasses.join(", ")}
+                  </div>
+                )}
+                <div className="text-[10px] font-mono text-ink/60">
+                  {report.sceneCount} scene{report.sceneCount === 1 ? "" : "s"} ·{" "}
+                  {report.wordCount.toLocaleString()} words · {report.totalIssues} issue
+                  {report.totalIssues === 1 ? "" : "s"} observed before failure
+                </div>
+              </div>
+            ) : report.verdict ? (
               /* 1c Coverage — the honest read: paper card, rotated verdict
                  stamp, big ink health number, decomposition, determinism line. */
               <div className="sm-panel p-5">
