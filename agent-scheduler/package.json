@@ -1,0 +1,27 @@
+{
+  "name": "@storymachine/agent-scheduler",
+  "version": "1.0.0",
+  "description": "Automated agent scheduling system for STORYMACHINE 12,700 systems implementation",
+  "type": "module",
+  "main": "scheduler.js",
+  "scripts": {
+    "start": "node scheduler.js",
+    "demo": "node demo.js",
+    "test": "node --test",
+    "implement": "node implementation-agent.js"
+  },
+  "keywords": [
+    "storymachine",
+    "agent",
+    "scheduler",
+    "automation",
+    "cron"
+  ],
+  "author": "STORYMACHINE",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

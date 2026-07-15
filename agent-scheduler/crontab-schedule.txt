@@ -1,0 +1,116 @@
+# Crontab Configuration for STORYMACHINE Agent Scheduler
+# 
+# This crontab file schedules the automated system implementation agents
+# across the 12,700 system catalog from MEGA_CATALOG_12700_SYSTEMS.md
+#
+# Installation:
+#   On Unix/Linux/Mac: crontab < crontab-schedule.txt
+#   On Windows: Use Task Scheduler or WSL
+#
+# Format: minute hour day month weekday command
+#
+# =============================================================================
+# CRITICAL PRIORITY - Meta Agents
+# =============================================================================
+
+# Progress Tracker - Every hour
+0 * * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent progress-tracker >> agent-scheduler/logs/cron.log 2>&1
+
+# Quality Assurance - Every 2 hours
+0 */2 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent quality-assurance >> agent-scheduler/logs/cron.log 2>&1
+
+# Integration Agent - Daily at midnight
+0 0 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent integration >> agent-scheduler/logs/cron.log 2>&1
+
+# Documentation Agent - Every 3 hours
+0 */3 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent documentation >> agent-scheduler/logs/cron.log 2>&1
+
+# =============================================================================
+# HIGH PRIORITY - Core Systems (Genre, Character, Dialogue, Structure)
+# =============================================================================
+
+# Genre Systems Agent - Every 4 hours (3,000 systems)
+0 */4 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent genre-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Character Systems Agent - Every 4 hours at :30 (2,000 systems)
+30 */4 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent character-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Dialogue Systems Agent - Every 6 hours (1,200 systems)
+0 */6 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent dialogue-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Structure Systems Agent - Every 5 hours (1,500 systems)
+0 */5 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent structure-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# =============================================================================
+# MEDIUM PRIORITY - Production Systems
+# =============================================================================
+
+# Cinematic Systems Agent - Every 5 hours at :15 (1,800 systems)
+15 */5 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent cinematic-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Audio Systems Agent - Every 8 hours (800 systems)
+0 */8 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent audio-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Production Systems Agent - Every 6 hours at :30 (1,200 systems)
+30 */6 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent production-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Audience Systems Agent - Every 7 hours (1,000 systems)
+0 */7 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent audience-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Cultural Systems Agent - Every 8 hours (800 systems)
+0 */8 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent cultural-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Technical Innovation Agent - Every 10 hours (500 systems)
+0 */10 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent technical-innovation >> agent-scheduler/logs/cron.log 2>&1
+
+# =============================================================================
+# LOW PRIORITY - Supplementary Systems
+# =============================================================================
+
+# Distribution Systems Agent - Every 12 hours (500 systems)
+0 */12 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent distribution-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# Format Systems Agent - Every 12 hours at :30 (400 systems)
+30 */12 * * * cd /path/to/STORYMACHINE && node agent-scheduler/scheduler.js --agent format-systems >> agent-scheduler/logs/cron.log 2>&1
+
+# =============================================================================
+# MAINTENANCE TASKS
+# =============================================================================
+
+# Log rotation - Daily at 3 AM
+0 3 * * * cd /path/to/STORYMACHINE && find agent-scheduler/logs -name "*.log" -mtime +7 -delete
+
+# Progress backup - Every 6 hours
+0 */6 * * * cd /path/to/STORYMACHINE && cp agent-scheduler/progress-tracker.json agent-scheduler/backups/progress-$(date +\%Y\%m\%d-\%H\%M).json
+
+# Health check - Every 15 minutes
+*/15 * * * * cd /path/to/STORYMACHINE && node agent-scheduler/health-check.js >> agent-scheduler/logs/health.log 2>&1
+
+# =============================================================================
+# REPORTING
+# =============================================================================
+
+# Weekly progress report - Sundays at 9 AM
+0 9 * * 0 cd /path/to/STORYMACHINE && node agent-scheduler/generate-report.js --type weekly >> agent-scheduler/logs/reports.log 2>&1
+
+# Monthly progress report - 1st of month at 10 AM
+0 10 1 * * cd /path/to/STORYMACHINE && node agent-scheduler/generate-report.js --type monthly >> agent-scheduler/logs/reports.log 2>&1
+
+# =============================================================================
+# NOTES
+# =============================================================================
+#
+# 1. Replace /path/to/STORYMACHINE with actual project path
+# 2. Ensure Node.js is in PATH
+# 3. Check logs in agent-scheduler/logs/
+# 4. Emergency stop: touch agent-scheduler/.emergency-stop
+# 5. Adjust timing based on system resources and requirements
+#
+# Estimated Performance (24/7 operation):
+# - Systems per day: ~144
+# - Tier 1 (200 systems): ~1.4 days
+# - Tier 2 (800 systems): ~5.5 days
+# - Tier 3 (3,000 systems): ~21 days
+# - Complete (12,700 systems): ~88 days
+#
+# =============================================================================

@@ -9,6 +9,7 @@ import {
   type AxisOption,
 } from "../lib/story-axes";
 import { AIProviderSettings } from "./AIProviderSettings";
+import { getLabsEnabled, setLabsEnabled } from "../lib/feature-flags";
 
 type AiProviderName  = "gemini" | "openai-compat";
 type AiMediaProvider = "gemini" | "openai-compat" | "none";
@@ -43,7 +44,7 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers";
+type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers" | "labs";
 
 const TAB_LABELS: Record<Tab, string> = {
   providers:  "Providers",
@@ -52,6 +53,7 @@ const TAB_LABELS: Record<Tab, string> = {
   tts:        "TTS",
   embeddings: "Embeddings",
   story:      "Story",
+  labs:       "Labs",
 };
 
 // ── Story-axis config (server-persisted, saves immediately per control) ──────
@@ -530,6 +532,69 @@ function StoryTab() {
   );
 }
 
+// ── Labs tab ──────────────────────────────────────────────────────────────────
+// ROADMAP P2 requirement: Gate OASIS and research panels behind a Labs toggle.
+// Default OFF — writers see Doctor + Editor only. Enabling Labs reveals
+// experimental features like OASIS Story Machine and NVM research surfaces.
+
+function LabsTab() {
+  const [labsEnabled, setLabsEnabledState] = useState(getLabsEnabled());
+  
+  const handleToggle = (enabled: boolean) => {
+    setLabsEnabled(enabled);
+    setLabsEnabledState(enabled);
+    // Immediate feedback — no page reload required, App.tsx checks on render
+  };
+  
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
+        Labs features are experimental research surfaces. Default experience is
+        Doctor + Editor only (ROADMAP P2). Changes take effect immediately.
+      </p>
+      
+      <div className="flex items-start gap-3 border-2 border-black p-4">
+        <input
+          type="checkbox"
+          id="labs-toggle"
+          checked={labsEnabled}
+          onChange={(e) => handleToggle(e.target.checked)}
+          className="mt-1 h-5 w-5 border-2 border-black focus:ring-2 focus:ring-black cursor-pointer"
+        />
+        <label htmlFor="labs-toggle" className="flex-1 cursor-pointer">
+          <div className="font-bold text-sm uppercase tracking-wider mb-1">
+            Enable Labs Features
+          </div>
+          <div className="text-xs text-gray-600 font-mono leading-relaxed">
+            Unlocks OASIS Story Machine (multi-agent simulation) and NVM research
+            panels (converge, twin, epistemic map, etc.). These are experimental
+            surfaces not yet validated with users.
+          </div>
+        </label>
+      </div>
+      
+      <div className="text-xs font-mono text-gray-500 border-l-4 border-black pl-3">
+        <p className="font-bold mb-1">What's behind Labs:</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>OASIS Story Machine — Multi-agent narrative simulation</li>
+          <li>Research panels — NVM, converge, twin, room, etc.</li>
+          <li>Experimental generation features</li>
+        </ul>
+      </div>
+      
+      <div className="text-xs font-mono text-gray-500 border-l-4 border-gray-300 pl-3">
+        <p className="font-bold mb-1">Not affected by Labs:</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>Script Doctor — Always available</li>
+          <li>Script IDE — Always available</li>
+          <li>Coverage export — Always available</li>
+          <li>Deterministic core — Always available</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
@@ -722,11 +787,12 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 />
               )}
               {activeTab === "story" && <StoryTab />}
+              {activeTab === "labs" && <LabsTab />}
             </div>
 
-            {/* Footer — AI-config actions only; the Story tab and Providers tab save
-                immediately, so Test/Save would be misleading there. */}
-            {activeTab !== "story" && activeTab !== "providers" && (
+            {/* Footer — AI-config actions only; the Story tab, Providers tab, and
+                Labs tab save immediately, so Test/Save would be misleading there. */}
+            {activeTab !== "story" && activeTab !== "providers" && activeTab !== "labs" && (
             <div className="px-6 py-4 border-t-4 border-black flex flex-col gap-2">
               {/* Status messages */}
               <div className="flex items-center min-h-[20px]">
