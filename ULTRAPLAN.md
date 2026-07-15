@@ -32,6 +32,10 @@ Do not parallelize phases. The ordering is the strategy.
 P0 blocks new product and engine work. Critical security fixes are the only
 exception.
 
+**Field materials:** [operating kit](docs/user-validation/P0_OPERATING_KIT.md)
+· [session template](docs/user-validation/P0_SESSION_TEMPLATE.md) ·
+[phase tracker](docs/user-validation/PHASE_TRACKER.md)
+
 **Core question:**
 
 > After seeing the existing sample coverage report, does a screenwriter want

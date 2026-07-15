@@ -150,7 +150,31 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
     const blocks = parsedBlocks;
     return blocks
       .map((b, i) => ({ ...b, index: i }))
-      .filter(b => b.type === 'scene_heading');
+      .filter(b => b.type === 'scene_heading')
+      .map((b, sceneOrdinal) => {
+        // Parse a slugline into its production parts so the rail reads as a
+        // marked-up index rather than a flat text list. Format is typically
+        // "INT. LOCATION - TIME" (or EXT./INT-EXT). Anything that doesn't match
+        // degrades gracefully to the raw heading in `location`.
+        const raw = b.text.trim();
+        const prefixMatch = raw.match(/^(INT\.?\/EXT\.?|EXT\.?\/INT\.?|I\.?\/E\.?|INT\.?|EXT\.?|EST\.?)\s*/i);
+        const prefix = prefixMatch ? prefixMatch[1].replace(/\.$/, '').toUpperCase() : '';
+        let rest = prefixMatch ? raw.slice(prefixMatch[0].length) : raw;
+        // Time-of-day is the trailing segment after the last " - ".
+        let time = '';
+        const dashIdx = rest.lastIndexOf(' - ');
+        if (dashIdx !== -1) {
+          time = rest.slice(dashIdx + 3).trim();
+          rest = rest.slice(0, dashIdx).trim();
+        }
+        return {
+          ...b,
+          sceneNumber: sceneOrdinal + 1,
+          prefix,
+          location: rest || raw,
+          time,
+        };
+      });
   }, [parsedBlocks]);
 
   const filteredScenes = useMemo(() => {
@@ -244,23 +268,62 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-[var(--sm-paper)] p-3">
+      <div className="flex-1 overflow-y-auto bg-[var(--sm-paper)]">
         {activeTab === 'scenes' ? (
-          <div className="space-y-1">
-            {filteredScenes.map((scene) => (
-              <button
-                key={scene.index}
-                onClick={() => handleNavigate(scene.index)}
-                className="group flex w-full items-center justify-between border border-transparent bg-transparent p-2.5 text-left transition-colors hover:border-[var(--sm-ink)] hover:bg-[var(--sm-panel)]"
-              >
-                <span className="truncate pr-2 font-[family-name:var(--sm-font-mono)] text-[10px] font-bold uppercase tracking-wider">
-                  {scene.text}
-                </span>
-                <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
-              </button>
-            ))}
+          <div>
+            <div className="flex items-center justify-between border-b border-[var(--sm-hair)] px-3 py-2">
+              <span className="font-[family-name:var(--sm-font-mono)] text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--sm-ink-faint)]">
+                Scene Index
+              </span>
+              <span className="font-[family-name:var(--sm-font-mono)] text-[9px] tabular-nums text-[var(--sm-ink-faint)]">
+                {filteredScenes.length}
+              </span>
+            </div>
+            <ol className="divide-y divide-[var(--sm-hair)]">
+              {filteredScenes.map((scene) => (
+                <li key={scene.index}>
+                  <button
+                    onClick={() => handleNavigate(scene.index)}
+                    className="group relative flex w-full items-start gap-3 py-2.5 pl-3 pr-2 text-left transition-colors hover:bg-[var(--sm-panel)]"
+                  >
+                    {/* stamp left-edge cue on hover, echoing sm-card--sel */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-[3px] bg-[var(--sm-stamp)] opacity-0 transition-opacity group-hover:opacity-100"
+                    />
+                    <span className="mt-0.5 w-5 shrink-0 font-[family-name:var(--sm-font-mono)] text-[10px] tabular-nums text-[var(--sm-ink-faint)]">
+                      {String(scene.sceneNumber).padStart(2, '0')}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-wide text-[var(--sm-ink)]">
+                        {scene.location}
+                      </span>
+                      {(scene.prefix || scene.time) && (
+                        <span className="mt-0.5 flex items-center gap-1.5">
+                          {scene.prefix && (
+                            <span className="border border-[var(--sm-hair)] px-1 py-px font-[family-name:var(--sm-font-mono)] text-[8px] font-bold uppercase tracking-wider text-[var(--sm-ink-mute)]">
+                              {scene.prefix}
+                            </span>
+                          )}
+                          {scene.time && (
+                            <span className="truncate font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-wider text-[var(--sm-ink-faint)]">
+                              {scene.time}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronRight className="mt-1 h-3 w-3 shrink-0 text-[var(--sm-ink-faint)] opacity-0 transition-opacity group-hover:opacity-100" />
+                  </button>
+                </li>
+              ))}
+            </ol>
             {filteredScenes.length === 0 && (
-              <div className="sm-ph py-10">No scenes yet</div>
+              <div className="p-3">
+                <div className="sm-ph py-10">
+                  {searchQuery ? 'No scenes match' : 'No scenes yet'}
+                </div>
+              </div>
             )}
           </div>
         ) : (

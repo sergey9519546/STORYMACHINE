@@ -105,6 +105,8 @@ report doesn't create that pull, no amount of AUC fixes matters — we'd be
 optimizing rigor in isolation from a user again, which is exactly the mistake
 that got us here.
 
+**Operational artifacts:** [P0 evidence summary](docs/user-validation/P0_EVIDENCE_SUMMARY.md) · [phase tracker](docs/user-validation/PHASE_TRACKER.md)
+
 **Work:**
 - Recruit >=5 real screenwriters (any career tier, real drafts in hand).
 - Show them the existing sample coverage report; watch, don't pitch.
