@@ -50,7 +50,7 @@ export default function ResearchNotes({
           <button
             onClick={onAddNote}
             aria-label="Add new research note"
-            className="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase brutal-border"
+            className="sm-btn--ink px-3 py-1 text-[10px] font-bold uppercase sm-btn"
           >
             Add Note
           </button>
@@ -60,7 +60,7 @@ export default function ResearchNotes({
         {notes.map((note) => (
           <div
             key={note.id}
-            className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow"
+            className="bg-white dark:bg-zinc-800 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)]"
           >
             <input
               value={note.title}

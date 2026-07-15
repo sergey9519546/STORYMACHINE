@@ -99,7 +99,7 @@ export function StoryConfigForm({
           value={theme}
           onChange={(e) => onThemeChange(e.target.value)}
           placeholder="e.g., A detective haunted by a cold case in a neon city..."
-          className="w-full bg-panel brutal-border-thick px-8 py-6 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-xl brutal-shadow-focus"
+          className="w-full bg-panel border-[2px] border-[var(--sm-ink)] px-8 py-6 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-xl shadow-[var(--sm-shadow)]-focus"
           disabled={isGenerating}
         />
         <p className="text-sm font-mono text-faint mt-2">
@@ -127,7 +127,7 @@ export function StoryConfigForm({
           </label>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-ink text-cream px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-stamp brutal-border-thick brutal-shadow-hover"
+            className="flex items-center justify-center gap-2 bg-ink text-cream px-4 py-2 font-mono text-sm uppercase tracking-wider hover:bg-stamp border-[2px] border-[var(--sm-ink)] "
             disabled={isGenerating}
           >
             <Upload className="w-4 h-4" /> Upload Documents
@@ -148,12 +148,12 @@ export function StoryConfigForm({
               value={backstory}
               onChange={(e) => onBackstoryChange(e.target.value)}
               placeholder="Type manual context here... (e.g., character motivations, specific plot points, world rules)"
-              className="w-full bg-panel brutal-border-thick px-6 py-4 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-sm min-h-[200px] resize-y brutal-shadow-focus"
+              className="w-full bg-panel border-[2px] border-[var(--sm-ink)] px-6 py-4 text-ink placeholder-faint focus:outline-none focus:ring-0 focus:bg-panel2 font-mono text-sm min-h-[200px] resize-y shadow-[var(--sm-shadow)]-focus"
               disabled={isGenerating}
             />
           </div>
 
-          <div className="bg-panel2 brutal-border-thick p-4 flex flex-col h-[200px] overflow-y-auto">
+          <div className="bg-panel2 border-[2px] border-[var(--sm-ink)] p-4 flex flex-col h-[200px] overflow-y-auto">
             <h4 className="font-bold uppercase tracking-widest text-xs border-b-2 border-ink pb-2 mb-3 flex justify-between items-center">
               <span>Ingested Files</span>
               <div className="flex items-center gap-3">
@@ -172,7 +172,7 @@ export function StoryConfigForm({
             ) : (
               <div className="space-y-2">
                 {uploadedFiles.map((file) => (
-                  <div key={file.id} className="flex flex-col gap-2 bg-panel brutal-border p-2 group hover:border-stamp brutal-shadow-hover">
+                  <div key={file.id} className="flex flex-col gap-2 bg-panel sm-btn p-2 group hover:border-stamp ">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 overflow-hidden">
                         <FileText className="w-3 h-3 flex-shrink-0 text-stamp" />
@@ -191,7 +191,7 @@ export function StoryConfigForm({
                     <select
                       value={file.category}
                       onChange={(e) => updateFileCategory(file.id, e.target.value as FileCategory)}
-                      className="text-[10px] font-mono p-1 brutal-border bg-panel2 focus:outline-none cursor-pointer w-full"
+                      className="text-[10px] font-mono p-1 sm-btn bg-panel2 focus:outline-none cursor-pointer w-full"
                     >
                       <option value="Lore">Lore / Worldbuilding</option>
                       <option value="Character">Character Sheet</option>
@@ -207,7 +207,7 @@ export function StoryConfigForm({
         </div>
 
         {/* Context Size Indicator */}
-        <div className="flex items-center gap-2 bg-ink text-cream p-2 brutal-border-thick w-full max-w-[200px] ml-auto">
+        <div className="flex items-center gap-2 bg-ink text-cream p-2 border-[2px] border-[var(--sm-ink)] w-full max-w-[200px] ml-auto">
           <div className="flex-1">
             <div className="flex justify-between text-[10px] font-mono uppercase tracking-widest mb-1">
               <span className="opacity-0 w-0 overflow-hidden">Context Volume</span>

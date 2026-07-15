@@ -405,7 +405,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
+      className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white border-[2px] border-[var(--sm-ink)] text-black p-0 overflow-y-auto z-50 shadow-[var(--sm-shadow)] flex flex-col"
     >
       {/* Chrome header */}
       <div className="flex items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
@@ -436,14 +436,14 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
               ? `A slate tops out at ${MAX_SCRIPTS} scripts`
               : "Add .fountain or .txt files (2–20 total)"
           }
-          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Add scripts
         </button>
         <button
           onClick={onClose}
           aria-label="Close Slate panel"
-          className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+          className="p-2 sm-btn hover:bg-black hover:text-white transition-colors"
         >
           <X className="w-5 h-5" aria-hidden="true" />
         </button>
@@ -500,7 +500,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                   <button
                     onClick={() => removeFile(f.id)}
                     aria-label={`Remove ${f.title}`}
-                    className="p-1 brutal-border hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
+                    className="p-1 sm-btn hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors shrink-0"
                   >
                     <Trash2 className="w-3 h-3" aria-hidden="true" />
                   </button>
@@ -517,7 +517,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
             disabled={!canRank || rankStatus === "loading"}
             aria-label="Rank slate"
             title={rankDisabledReason}
-            className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest brutal-border bg-black text-white hover:bg-purple-700 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn--ink hover:bg-purple-700 transition-colors disabled:opacity-40 flex items-center gap-1.5"
           >
             {rankStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -535,7 +535,7 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
               disabled={!canRank || downloadStatus === "loading"}
               aria-label="Download comparison as HTML"
               title="Re-runs the same ranking server-side and downloads it as a standalone HTML comparison document"
-              className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+              className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest sm-btn sm-btn hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
             >
               {downloadStatus === "loading" ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -616,10 +616,10 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
             <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
               Ranked {new Date(result.rankedAt).toLocaleString()}
             </p>
-            <div className="overflow-x-auto brutal-border">
+            <div className="overflow-x-auto sm-btn">
               <table className="w-full text-xs font-mono border-collapse">
                 <thead>
-                  <tr className="bg-black text-white">
+                  <tr className="sm-btn--ink">
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">#</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Title</th>
                     <th className="px-2 py-2 text-left font-bold uppercase tracking-widest text-[9px]">Health</th>

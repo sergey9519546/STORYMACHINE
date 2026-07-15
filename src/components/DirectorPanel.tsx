@@ -371,7 +371,7 @@ export default function DirectorPanel({
           <div
             key={i}
             className={`flex-1 border-2 border-black transition-colors ${
-              i < filledSegments ? "bg-[#FF4444]" : "bg-transparent hover:bg-gray-200"
+              i < filledSegments ? "bg-[var(--sm-stamp)]" : "bg-transparent hover:bg-gray-200"
             }`}
           />
         ))}
@@ -382,9 +382,9 @@ export default function DirectorPanel({
   // ── Styles ────────────────────────────────────────────────────────────────
 
   const inputClass =
-    "w-full bg-white brutal-border-thick px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 font-mono text-sm brutal-shadow-focus";
+    "w-full bg-white border-[2px] border-[var(--sm-ink)] px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 font-mono text-sm shadow-[var(--sm-shadow)]-focus";
   const textareaClass =
-    "w-full bg-white brutal-border-thick px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 min-h-[80px] resize-y font-mono text-sm brutal-shadow-focus";
+    "w-full bg-white border-[2px] border-[var(--sm-ink)] px-3 py-2 mt-1 text-black focus:outline-none focus:ring-0 focus:bg-gray-50 min-h-[80px] resize-y font-mono text-sm shadow-[var(--sm-shadow)]-focus";
 
   const saveOutline = useCallback(async () => {
     try {
@@ -506,7 +506,7 @@ export default function DirectorPanel({
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white brutal-border-thick text-black p-8 overflow-y-auto font-mono text-sm z-50 brutal-shadow"
+      className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white border-[2px] border-[var(--sm-ink)] text-black p-8 overflow-y-auto font-mono text-sm z-50 shadow-[var(--sm-shadow)]"
     >
       {/* Header */}
       <div className="flex items-center gap-4 mb-6 pb-4 border-b-[8px] border-black">
@@ -521,7 +521,7 @@ export default function DirectorPanel({
           <button
             onClick={onClose}
             aria-label="Close Director panel"
-            className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+            className="p-2 sm-btn hover:bg-black hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -535,10 +535,10 @@ export default function DirectorPanel({
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             aria-pressed={activeTab === tab.id}
-            className={`px-3 py-2 text-xs font-bold uppercase tracking-widest brutal-border-thick transition-colors flex items-center gap-2 brutal-shadow-hover ${
+            className={`px-3 py-2 text-xs font-bold uppercase tracking-widest border-[2px] border-[var(--sm-ink)] transition-colors flex items-center gap-2  ${
               activeTab === tab.id
-                ? "bg-[#FF4444] text-white border-[#FF4444]"
-                : "bg-white text-black hover:bg-gray-100"
+                ? "bg-[var(--sm-stamp)] text-white border-[var(--sm-stamp)]"
+                : "sm-btn hover:bg-gray-100"
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -552,7 +552,7 @@ export default function DirectorPanel({
         {/* ── Scene ── */}
         {activeTab === "scene" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               <div>
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Narrative Text:</label>
                 <textarea value={currentScene.narrativeText} onChange={(e) => updateScene("narrativeText", e.target.value)} className={textareaClass} rows={4} />
@@ -578,12 +578,12 @@ export default function DirectorPanel({
                 </select>
               </div>
               {currentScene.isQBNMode && (
-                <div className="bg-black text-white p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
+                <div className="sm-btn--ink p-3 border-[2px] border-[var(--sm-ink)] font-bold uppercase tracking-widest text-xs">
                   QBN Mode Active (Investigation)
                 </div>
               )}
               {currentScene.comedyMisdirection && (
-                <div className="bg-yellow-400 text-black p-3 brutal-border-thick font-bold uppercase tracking-widest text-xs">
+                <div className="bg-yellow-400 text-black p-3 border-[2px] border-[var(--sm-ink)] font-bold uppercase tracking-widest text-xs">
                   Comedy Misdirection: {currentScene.comedyMisdirection.replace("_", " ")}
                 </div>
               )}
@@ -604,16 +604,16 @@ export default function DirectorPanel({
               <div className="pt-4 border-t-[4px] border-black">
                 <div className="flex justify-between items-center mb-4">
                   <label className="text-black font-bold uppercase tracking-wider text-xs">Choices:</label>
-                  <button onClick={addChoice} className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-white hover:text-black transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover">
+                  <button onClick={addChoice} className="px-3 py-2 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-white hover:text-black transition-colors uppercase font-bold tracking-widest text-xs ">
                     + Add
                   </button>
                 </div>
                 <div className="space-y-4">
                   {currentScene.choices.map((choice, idx) => (
-                    <div key={`choice-${choice.text.slice(0, 20)}-${idx}`} className={`bg-white p-4 brutal-border-thick brutal-shadow relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
+                    <div key={`choice-${choice.text.slice(0, 20)}-${idx}`} className={`bg-white p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] relative ${!availableIndices.has(idx) ? "opacity-60" : ""}`}>
                       {!availableIndices.has(idx) && (
                         <span
-                          className="absolute top-2 left-2 bg-[#FF4444] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest cursor-help"
+                          className="absolute top-2 left-2 bg-[var(--sm-stamp)] text-white text-[8px] px-2 py-0.5 font-bold uppercase tracking-widest cursor-help"
                           title={choice.qbnRequirements && Object.keys(choice.qbnRequirements).length > 0
                             ? `Requires: ${Object.entries(choice.qbnRequirements).map(([k, v]) => `${k} ≥ ${v}`).join(', ')} — current values: ${Object.entries(choice.qbnRequirements).map(([k, v]) => `${k}=${directorState.qbnQualities?.[k] ?? 0}/${v}`).join(', ')}`
                             : 'Locked by QBN quality requirements — check QBN tab for current values'}
@@ -659,7 +659,7 @@ export default function DirectorPanel({
         {/* ── Character ── */}
         {activeTab === "character" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               {(["name", "ghost", "lie", "want", "need"] as const).map((field) => (
                 <div key={field}>
                   <label className="text-black font-bold uppercase tracking-wider text-xs">{field}:</label>
@@ -677,7 +677,7 @@ export default function DirectorPanel({
         {/* ── Psychology ── */}
         {activeTab === "psychology" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-6">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-6">
               <h3 className="font-display text-xl uppercase tracking-widest border-b-[4px] border-black pb-2">Dark Triad</h3>
               {(["machiavellianism", "narcissism", "psychopathy"] as const).map((trait) => (
                 <div key={trait}>
@@ -762,8 +762,8 @@ export default function DirectorPanel({
                         key={mech}
                         onClick={() => toggleDefenseMech(mech)}
                         aria-pressed={active}
-                        className={`px-2 py-1 text-[10px] font-bold uppercase brutal-border transition-colors ${
-                          active ? "bg-black text-white" : "bg-white text-gray-400 border-gray-300 hover:border-black hover:text-black"
+                        className={`px-2 py-1 text-[10px] font-bold uppercase sm-btn transition-colors ${
+                          active ? "sm-btn--ink" : "bg-white text-gray-400 border-gray-300 hover:border-black hover:text-black"
                         }`}
                       >
                         {mech}
@@ -779,10 +779,10 @@ export default function DirectorPanel({
                         key={lvl}
                         onClick={() => setDefenseLevel(lvl)}
                         aria-pressed={protagonist.psychology.currentDefenseLevel === lvl}
-                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase brutal-border transition-colors ${
+                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase sm-btn transition-colors ${
                           protagonist.psychology.currentDefenseLevel === lvl
                             ? lvl === "breaking_point"
-                              ? "bg-[#FF4444] text-white"
+                              ? "bg-[var(--sm-stamp)] text-white"
                               : lvl === "high"
                               ? "bg-orange-500 text-white"
                               : lvl === "medium"
@@ -804,7 +804,7 @@ export default function DirectorPanel({
         {/* ── Arc ── */}
         {activeTab === "arc" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-6">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-6">
               <div>
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Structural Node:</label>
                 <input
@@ -839,11 +839,11 @@ export default function DirectorPanel({
               {tensionHistoryRef.current.length >= 2 && (
                 <div className="pt-4 border-t-[4px] border-black">
                   <span className="text-black font-bold uppercase tracking-wider text-xs block mb-2">Tension History</span>
-                  <div className="bg-gray-50 brutal-border p-2 space-y-2">
-                    <SparkLine data={tensionHistoryRef.current.map((d) => d.tension)} color="#FF4444" height={36} />
+                  <div className="bg-gray-50 sm-btn p-2 space-y-2">
+                    <SparkLine data={tensionHistoryRef.current.map((d) => d.tension)} color="var(--sm-stamp)" height={36} />
                     <SparkLine data={tensionHistoryRef.current.map((d) => d.menace)} color="#000000" height={24} />
                     <div className="flex gap-4 text-[9px] font-mono text-gray-500">
-                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#FF4444] inline-block" />tension</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[var(--sm-stamp)] inline-block" />tension</span>
                       <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-black inline-block" />menace</span>
                     </div>
                   </div>
@@ -874,7 +874,7 @@ export default function DirectorPanel({
         {/* ── Metrics ── */}
         {activeTab === "metrics" && currentScene.metrics && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-4">
               {(
                 [
                   ["pivotStrength", "Pivot Strength"],
@@ -886,7 +886,7 @@ export default function DirectorPanel({
               ).map(([field, label]) => (
                 <div key={field} className="flex justify-between items-center">
                   <span className="font-bold text-xs uppercase tracking-widest">{label}</span>
-                  <span className="font-mono bg-black text-white px-2 py-1">{currentScene.metrics[field]?.toFixed(2)}</span>
+                  <span className="font-mono sm-btn--ink px-2 py-1">{currentScene.metrics[field]?.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -896,7 +896,7 @@ export default function DirectorPanel({
         {/* ── Commentary ── */}
         {activeTab === "commentary" && currentScene.commentary && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-4">
               {(
                 [
                   ["tensionRationale", "Tension Rationale"],
@@ -943,7 +943,7 @@ export default function DirectorPanel({
         {/* ── Throughlines ── */}
         {activeTab === "throughlines" && directorState.throughlines && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-4">
               {(
                 [
                   ["objectiveStory", "Objective Story (They)"],
@@ -954,7 +954,7 @@ export default function DirectorPanel({
               ).map(([field, label]) => {
                 const active = directorState.throughlines.activeThroughlines?.includes(field as "objectiveStory");
                 return (
-                  <div key={field} className={`p-3 border-2 border-black ${active ? "bg-black text-white" : "bg-white text-black"}`}>
+                  <div key={field} className={`p-3 border-2 border-black ${active ? "sm-btn--ink" : "sm-btn"}`}>
                     <span className="font-bold text-xs uppercase tracking-widest block mb-1">{label}</span>
                     <p className="text-sm">{directorState.throughlines[field as keyof typeof directorState.throughlines] as string}</p>
                   </div>
@@ -967,7 +967,7 @@ export default function DirectorPanel({
         {/* ── Player ── */}
         {activeTab === "player" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               <div>
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Inferred Intent:</label>
                 <input type="text" value={directorState.playerModel.inferredIntent} onChange={(e) => updatePlayerModel("inferredIntent", e.target.value)} className={inputClass} />
@@ -1005,7 +1005,7 @@ export default function DirectorPanel({
         {/* ── Quality ── */}
         {activeTab === "quality" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               <div className="flex items-center gap-3">
                 <label className="text-black font-bold uppercase tracking-wider text-xs">Status (Passed):</label>
                 <input type="checkbox" checked={directorState.qualityValidation.passed} onChange={(e) => updateQuality("passed", e.target.checked)} className="w-5 h-5 accent-black" />
@@ -1029,7 +1029,7 @@ export default function DirectorPanel({
         {/* ── Memory ── */}
         {activeTab === "memory" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               {(["episodic", "semantic", "procedural"] as const).map((field) => (
                 <div key={field}>
                   <label className="text-black font-bold uppercase tracking-wider text-xs block mb-2">
@@ -1080,7 +1080,7 @@ export default function DirectorPanel({
           <section className="space-y-4">
 
             {/* ── Story Architecture ── */}
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-4">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-4">
               <span className="font-bold text-xs uppercase tracking-widest block">Story Architecture</span>
               <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
                 Select a narrative structure to auto-populate the beat sheet below. Choose an emotional arc so the engine steers tension toward the right curve. Set a cinematic style to modulate agent tone and director pressure.
@@ -1120,12 +1120,12 @@ export default function DirectorPanel({
                     <button
                       onClick={applyStructurePreset}
                       disabled={applyingPreset}
-                      className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover disabled:opacity-40"
+                      className="flex-1 py-2 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest text-xs  disabled:opacity-40"
                     >
                       {applyingPreset ? 'Applying…' : 'Apply Preset → Beats'}
                     </button>
                     {presetSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest shrink-0">Applied ✓</span>}
-                    {presetSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest shrink-0">Error ✗</span>}
+                    {presetSaved === false && <span className="text-[var(--sm-stamp)] font-bold uppercase text-[10px] tracking-widest shrink-0">Error ✗</span>}
                   </div>
                 </div>
               )}
@@ -1159,7 +1159,7 @@ export default function DirectorPanel({
                 return (
                   <div className="bg-gray-50 border-2 border-black p-2">
                     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label={`Tension curve for ${emotionalArc}`}>
-                      <polyline points={pts} fill="none" stroke="#FF4444" strokeWidth="2.5" strokeLinejoin="round" />
+                      <polyline points={pts} fill="none" stroke="var(--sm-stamp)" strokeWidth="2.5" strokeLinejoin="round" />
                       <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="#ccc" strokeWidth="1" strokeDasharray="4,4" />
                     </svg>
                     <div className="flex justify-between text-[9px] font-mono text-gray-400 uppercase mt-0.5">
@@ -1211,11 +1211,11 @@ export default function DirectorPanel({
             </div>
 
             {/* Pacing Target */}
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-3">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs uppercase tracking-widest">Pacing Target</span>
                 {pacingSaved === true && <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>}
-                {pacingSaved === false && <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>}
+                {pacingSaved === false && <span className="text-[var(--sm-stamp)] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>}
               </div>
               <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
                 Controls how aggressively the Pacing Controller fires pressure. "Fast" forces urgency; "slow" allows contemplation; "medium" fires only when clearly adrift.
@@ -1225,10 +1225,10 @@ export default function DirectorPanel({
                   <button
                     key={opt}
                     onClick={() => savePacingTarget(opt)}
-                    className={`py-2 brutal-border-thick uppercase font-bold tracking-widest text-xs transition-colors ${
+                    className={`py-2 border-[2px] border-[var(--sm-ink)] uppercase font-bold tracking-widest text-xs transition-colors ${
                       pacingTarget === opt
-                        ? 'bg-black text-white'
-                        : 'bg-white text-black hover:bg-gray-100'
+                        ? 'sm-btn--ink'
+                        : 'sm-btn hover:bg-gray-100'
                     }`}
                   >
                     {opt}
@@ -1237,14 +1237,14 @@ export default function DirectorPanel({
               </div>
             </div>
 
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
                 Author beats that override Director prompts when the engine enters the matching phase and turn range. Saved beats persist across room rounds.
               </p>
 
               <button
                 onClick={addOutlineBeat}
-                className="w-full py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                className="w-full py-2 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest text-xs "
               >
                 + Add Beat
               </button>
@@ -1256,11 +1256,11 @@ export default function DirectorPanel({
               ) : (
                 <div className="space-y-4">
                   {outlineBeats.map((beat, idx) => (
-                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-gray-50 p-4 brutal-border-thick brutal-shadow relative space-y-3">
+                    <div key={`beat-${beat.phase ?? ''}-${beat.turn_start ?? ''}-${beat.turn_end ?? ''}-${idx}`} className="bg-gray-50 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] relative space-y-3">
                       <button
                         onClick={() => removeOutlineBeat(idx)}
                         aria-label={`Remove beat ${idx + 1}`}
-                        className="absolute top-3 right-3 text-gray-400 hover:text-[#FF4444] font-bold text-xl leading-none transition-colors"
+                        className="absolute top-3 right-3 text-gray-400 hover:text-[var(--sm-stamp)] font-bold text-xl leading-none transition-colors"
                       >
                         ×
                       </button>
@@ -1350,7 +1350,7 @@ export default function DirectorPanel({
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={saveOutline}
-                  className="flex-1 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold tracking-widest text-xs brutal-shadow-hover"
+                  className="flex-1 py-2 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest text-xs "
                 >
                   Save to Engine
                 </button>
@@ -1358,7 +1358,7 @@ export default function DirectorPanel({
                   <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">Saved ✓</span>
                 )}
                 {outlineSaved === false && (
-                  <span className="text-[#FF4444] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>
+                  <span className="text-[var(--sm-stamp)] font-bold uppercase text-[10px] tracking-widest">Error ✗</span>
                 )}
               </div>
 
@@ -1373,13 +1373,13 @@ export default function DirectorPanel({
                         } catch { /* delete failed — keep beats so the UI matches server state */ }
                         setConfirmClearBeats(false);
                       }}
-                      className="flex-1 py-1.5 bg-[#FF4444] text-white brutal-border hover:bg-red-700 transition-colors uppercase font-bold tracking-widest text-[10px]"
+                      className="flex-1 py-1.5 bg-[var(--sm-stamp)] text-white sm-btn hover:bg-red-700 transition-colors uppercase font-bold tracking-widest text-[10px]"
                     >
                       Confirm Clear
                     </button>
                     <button
                       onClick={() => setConfirmClearBeats(false)}
-                      className="flex-1 py-1.5 bg-white text-black brutal-border hover:bg-gray-100 transition-colors uppercase font-bold tracking-widest text-[10px]"
+                      className="flex-1 py-1.5 sm-btn sm-btn hover:bg-gray-100 transition-colors uppercase font-bold tracking-widest text-[10px]"
                     >
                       Cancel
                     </button>
@@ -1387,7 +1387,7 @@ export default function DirectorPanel({
                 ) : (
                   <button
                     onClick={() => setConfirmClearBeats(true)}
-                    className="w-full py-1.5 bg-white text-gray-400 brutal-border hover:text-[#FF4444] hover:border-[#FF4444] transition-colors uppercase font-bold tracking-widest text-[10px]"
+                    className="w-full py-1.5 bg-white text-gray-400 sm-btn hover:text-[var(--sm-stamp)] hover:border-[var(--sm-stamp)] transition-colors uppercase font-bold tracking-widest text-[10px]"
                   >
                     Clear All Beats
                   </button>
@@ -1400,7 +1400,7 @@ export default function DirectorPanel({
         {/* ── QBN Qualities ── */}
         {activeTab === "qbn" && (
           <section className="space-y-4">
-            <div className="bg-white p-6 brutal-border-thick brutal-shadow space-y-5">
+            <div className="bg-white p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] space-y-5">
               <p className="text-[10px] font-mono text-gray-500 uppercase leading-relaxed">
                 Quality-Based Narrative values used to gate choices. Edit directly or add new qualities below.
               </p>
@@ -1440,7 +1440,7 @@ export default function DirectorPanel({
                     setNewQualityKey("");
                     setNewQualityValue("0");
                   }}
-                  className="px-3 py-2 bg-black text-white brutal-border-thick hover:bg-[#FF4444] transition-colors uppercase font-bold text-xs brutal-shadow-hover shrink-0"
+                  className="px-3 py-2 sm-btn--ink border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] transition-colors uppercase font-bold text-xs  shrink-0"
                 >
                   Add
                 </button>
@@ -1454,19 +1454,19 @@ export default function DirectorPanel({
               ) : (
                 <div className="space-y-2">
                   {Object.entries(directorState.qbnQualities ?? {}).map(([key, val]) => (
-                    <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 brutal-border">
+                    <div key={key} className="flex items-center gap-2 bg-gray-50 p-2 sm-btn">
                       <span className="flex-1 font-mono text-xs font-bold uppercase truncate" title={key}>{key}</span>
                       <input
                         type="number"
                         value={val}
                         onChange={(e) => updateQbnQuality(key, Number(e.target.value))}
                         aria-label={`Value for quality ${key}`}
-                        className="w-20 bg-white brutal-border px-2 py-1 text-xs font-mono text-right focus:outline-none"
+                        className="w-20 bg-white sm-btn px-2 py-1 text-xs font-mono text-right focus:outline-none"
                       />
                       <button
                         onClick={() => removeQbnQuality(key)}
                         aria-label={`Remove quality ${key}`}
-                        className="text-gray-400 hover:text-[#FF4444] font-bold text-xl leading-none transition-colors"
+                        className="text-gray-400 hover:text-[var(--sm-stamp)] font-bold text-xl leading-none transition-colors"
                       >
                         ×
                       </button>
@@ -1478,7 +1478,7 @@ export default function DirectorPanel({
               {/* Active secrets with QBN context */}
               {currentScene.isQBNMode && (
                 <div className="pt-4 border-t-[4px] border-black">
-                  <div className="bg-black text-white p-3 font-bold uppercase tracking-widest text-xs">
+                  <div className="sm-btn--ink p-3 font-bold uppercase tracking-widest text-xs">
                     QBN Mode Active — {Object.keys(directorState.qbnQualities ?? {}).length} qualities governing {currentScene.choices.length} choices
                   </div>
                 </div>

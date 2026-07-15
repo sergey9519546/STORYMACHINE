@@ -63,7 +63,7 @@ const RoomPanel = lazy(() => import("./RoomPanel").then(m => ({ default: m.RoomP
 // dark-HUD styling) get a small dark card matching that idiom instead.
 const PanelLoadingOverlay = () => (
   <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-    <div className="bg-white text-black px-6 py-4 brutal-border-thick brutal-shadow font-mono text-xs font-bold uppercase tracking-widest animate-pulse">
+    <div className="sm-btn px-6 py-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] font-mono text-xs font-bold uppercase tracking-widest animate-pulse">
       Loading…
     </div>
   </div>

@@ -68,10 +68,10 @@ const CoverageSummary = lazy(() => import("./scriptide/CoverageSummary"));
 const SlatePanel = lazy(() => import("./SlatePanel"));
 
 // Matches the DirectorPanel/ScriptDoctorPanel shell (fixed right-side drawer,
-// same brutal-border/white-bg idiom) so first-open doesn't flash blank space
+// same sm-btn/white-bg idiom) so first-open doesn't flash blank space
 // before sliding in.
 const DrawerPanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] text-[var(--sm-ink)] p-8 flex items-center justify-center font-mono text-sm z-50 shadow-[var(--sm-shadow)]">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -81,7 +81,7 @@ const DrawerPanelFallback = () => (
 // DrawerPanelFallback's 500px — a mismatched fallback width would flash a
 // narrower box for a moment before the real panel snaps wider.
 const SlatePanelFallback = () => (
-  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-white brutal-border-thick text-black p-8 flex items-center justify-center font-mono text-sm z-50 brutal-shadow">
+  <div className="fixed top-0 right-0 w-[880px] max-w-[96vw] h-dvh bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] text-[var(--sm-ink)] p-8 flex items-center justify-center font-mono text-sm z-50 shadow-[var(--sm-shadow)]">
     <span className="uppercase tracking-widest text-xs animate-pulse">Loading…</span>
   </div>
 );
@@ -1316,7 +1316,7 @@ export default function ScriptIDE({
 
   // ── Title page ───────────────────────────────────────────────────────────────
   const renderTitlePage = () => (
-    <div className="p-12 bg-white dark:bg-zinc-900 dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
+    <div className="p-12 bg-[var(--sm-panel)] dark:text-white h-full flex flex-col items-center justify-center text-center font-courier">
       <div className="w-full max-w-md space-y-12">
         <input
           value={titlePage.title}
@@ -1357,8 +1357,8 @@ export default function ScriptIDE({
   // ── Guard ────────────────────────────────────────────────────────────────────
   if (!engineState) {
     return (
-      <div className="flex h-dvh w-full items-center justify-center bg-[#f4f4f0] font-mono text-sm uppercase tracking-widest text-black">
-        <div className="flex items-center gap-3 border-2 border-black bg-white px-6 py-4">
+      <div className="flex h-dvh w-full items-center justify-center bg-[#f4f4f0] font-mono text-sm uppercase tracking-widest text-[var(--sm-ink)]">
+        <div className="flex items-center gap-3 border-2 border-black bg-[var(--sm-panel)] px-6 py-4">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           Opening script desk…
         </div>
@@ -1396,7 +1396,7 @@ export default function ScriptIDE({
           </div>
         )}
         {fdxImportNotice && (
-          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-black text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
+          <div className="absolute top-2 right-2 z-50 max-w-sm bg-amber-500 text-[var(--sm-ink)] text-xs font-bold px-3 py-1.5 border-2 border-black flex items-start gap-2">
             <span>{fdxImportNotice}</span>
             <button onClick={() => setFdxImportNotice(null)} className="ml-1 leading-none hover:opacity-70 shrink-0" aria-label="Dismiss">✕</button>
           </div>
@@ -1596,15 +1596,15 @@ export default function ScriptIDE({
 
         {/* Progressive depth: prefs only when requested from overflow */}
         {prefsOpen === "copilot" && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
-            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-black/60">
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
+            <label htmlFor="copilot-persona" className="font-mono text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink)]/60">
               Copilot
             </label>
             <select
               id="copilot-persona"
               value={copilotPersona}
               onChange={(e) => setCopilotPersona(e.target.value)}
-              className="border border-black bg-white px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
+              className="border border-black bg-[var(--sm-panel)] px-2 py-1 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-black"
             >
               {(personaList.length > 0
                 ? personaList
@@ -1623,7 +1623,7 @@ export default function ScriptIDE({
           </div>
         )}
         {prefsOpen === "collab" && !collabRoom && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-white px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 border-b border-black/15 bg-[var(--sm-panel)] px-3 py-2">
             <input
               value={collabNameInput}
               onChange={(e) => setCollabNameInput(e.target.value)}
@@ -1769,7 +1769,7 @@ export default function ScriptIDE({
                 <motion.div
                   initial={{ scale: 0.9, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
-                  className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full"
+                  className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full"
                 >
                   <h2 className="font-bold uppercase tracking-widest text-xl mb-2 border-b-4 border-black pb-2">
                     Action Required
@@ -1805,7 +1805,7 @@ export default function ScriptIDE({
                     </button>
                     <button
                       onClick={() => submitActionModal(false)}
-                      className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                      className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                     >
                       Insert Action
                     </button>
@@ -1832,7 +1832,7 @@ export default function ScriptIDE({
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-white border-4 border-black p-6 brutal-shadow max-w-md w-full mx-4"
+              className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)] max-w-md w-full mx-4"
             >
               <h2 id="new-story-confirm-title" className="font-bold uppercase tracking-widest text-lg mb-3 border-b-4 border-black pb-2">
                 Start a new story?
@@ -1849,7 +1849,7 @@ export default function ScriptIDE({
                 </button>
                 <button
                   onClick={() => { setNewStoryConfirm(false); onNewStory?.(); }}
-                  className="px-4 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-red-600 transition-colors brutal-border"
+                  className="px-4 py-2 sm-btn--ink font-bold uppercase text-xs hover:bg-red-600 transition-colors sm-btn"
                 >
                   New Story
                 </button>
@@ -1876,11 +1876,11 @@ export default function ScriptIDE({
             <button
               onClick={() => openToolSlot("studio")}
               aria-label="Close studio panel"
-              className="md:hidden absolute top-2 right-2 z-10 p-2 brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors"
+              className="md:hidden absolute top-2 right-2 z-10 p-2 sm-btn bg-[var(--sm-panel)] text-[var(--sm-ink)] hover:bg-black hover:text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
-        <div className="flex bg-black text-white overflow-x-auto">
+        <div className="flex sm-btn--ink overflow-x-auto">
           {(
             [
               { id: "production", icon: Film, label: "Production" },
@@ -1898,7 +1898,7 @@ export default function ScriptIDE({
               aria-pressed={activeTab === id}
               className={`px-3 py-3 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2 transition-colors whitespace-nowrap ${
                 activeTab === id
-                  ? "bg-[#e8e8e3] text-black"
+                  ? "bg-[#e8e8e3] text-[var(--sm-ink)]"
                   : "hover:bg-gray-800"
               }`}
             >
@@ -1924,7 +1924,7 @@ export default function ScriptIDE({
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-6 border-b-4 border-black pb-2 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-[#FF4444]" /> Story Engine
                     Diagnostics
@@ -1935,11 +1935,11 @@ export default function ScriptIDE({
                       <h3 className="text-[10px] font-bold uppercase opacity-50">
                         Narrative Tension
                       </h3>
-                      <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 brutal-border">
+                      <div className="h-40 flex items-end gap-1 bg-zinc-50 dark:bg-zinc-950 p-2 sm-btn">
                         {TENSION_BARS.map((h, i) => (
                           <div
                             key={i}
-                            className="flex-1 bg-black dark:bg-white"
+                            className="flex-1 bg-black dark:bg-[var(--sm-panel)]"
                             style={{ height: `${h}%`, opacity: 0.1 + i * 0.04 }}
                           />
                         ))}
@@ -1960,7 +1960,7 @@ export default function ScriptIDE({
                         ].map((beat) => (
                           <div
                             key={beat}
-                            className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 brutal-border-thin"
+                            className="flex items-center justify-between text-[10px] font-mono p-2 bg-zinc-100 dark:bg-zinc-800 border border-[var(--sm-ink)]"
                           >
                             <span>{beat}</span>
                             <span className="text-green-600 font-bold">
@@ -1972,7 +1972,7 @@ export default function ScriptIDE({
                     </div>
                   </div>
 
-                  <div className="mt-8 p-4 bg-black text-white brutal-border">
+                  <div className="mt-8 p-4 sm-btn--ink sm-btn">
                     <p className="text-[10px] font-mono leading-relaxed">
                       SYSTEM STATUS: THE STORY MIND IS ACTIVE. NARRATIVE
                       COHESION AT 94%. DETECTED THEME:{" "}
@@ -1988,7 +1988,7 @@ export default function ScriptIDE({
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-zinc-900 border-4 border-black p-6 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-6 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-sm mb-4">
                     Active Throughlines
                   </h2>
@@ -2025,7 +2025,7 @@ export default function ScriptIDE({
               className="space-y-6"
             >
               {directorsLayer && (
-                <div className="bg-white border-4 border-black p-4 brutal-shadow">
+                <div className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]">
                   <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2 text-purple-600">
                     <Camera className="w-4 h-4" /> Director&apos;s Shot List
                   </h2>
@@ -2060,7 +2060,7 @@ export default function ScriptIDE({
 
               {/* MEDIA PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
                 <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
@@ -2114,7 +2114,7 @@ export default function ScriptIDE({
 
               {/* AUDIO PRODUCTION */}
               <div
-                className="bg-white border-4 border-black p-4 brutal-shadow"
+                className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-4 shadow-[var(--sm-shadow)]"
                 aria-busy={engineState.isGeneratingMedia ? "true" : "false"}
               >
                 <h2 className="font-bold uppercase tracking-widest text-xs mb-4 border-b-2 border-black pb-2 flex items-center gap-2">
@@ -2176,13 +2176,13 @@ export default function ScriptIDE({
                 engineState.directorState.activeCodexEntries.map((entry, i) => (
                   <div
                     key={i}
-                    className="bg-white border-4 border-black p-3 brutal-shadow"
+                    className="bg-[var(--sm-panel)] border-[2px] border-[var(--sm-ink)] p-3 shadow-[var(--sm-shadow)]"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-bold uppercase text-xs">
                         {entry.title}
                       </h3>
-                      <span className="bg-black text-white px-2 py-0.5 text-[8px] uppercase">
+                      <span className="sm-btn--ink px-2 py-0.5 text-[8px] uppercase">
                         {entry.category}
                       </span>
                     </div>
