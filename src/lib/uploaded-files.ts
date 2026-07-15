@@ -4,6 +4,8 @@
 export type FileCategory = 'Lore' | 'Character' | 'Plot' | 'Rules' | 'Other';
 
 export interface UploadedFile {
+  /** Stable identity for row keys and concurrent remove/category updates. */
+  id: string;
   name: string;
   content: string;
   size: number;
@@ -15,6 +17,16 @@ export const UPLOAD_ALLOWED_EXTS = /\.(txt|fountain|fdx|md|htm|html|json|csv)$/i
 
 /** Per-file size cap (bytes) — same 2 MB as StartScreen drag/drop. */
 export const UPLOAD_MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+let uploadIdCounter = 0;
+
+export function createUploadId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  uploadIdCounter += 1;
+  return `upload-${Date.now()}-${uploadIdCounter}`;
+}
 
 export function inferUploadCategory(filename: string): FileCategory {
   const ext = filename.toLowerCase().split('.').pop() ?? '';
@@ -34,6 +46,24 @@ export function appendUploadedFiles(prev: UploadedFile[], batch: UploadedFile[])
   return prev.concat(batch);
 }
 
+export function removeUploadedFile(prev: UploadedFile[], id: string): UploadedFile[] {
+  return prev.filter((file) => file.id !== id);
+}
+
+export function updateUploadedFileCategory(
+  prev: UploadedFile[],
+  id: string,
+  category: FileCategory,
+): UploadedFile[] {
+  let changed = false;
+  const next = prev.map((file) => {
+    if (file.id !== id || file.category === category) return file;
+    changed = true;
+    return { ...file, category };
+  });
+  return changed ? next : prev;
+}
+
 /**
  * Read a batch of Files into UploadedFile records.
  * Uses File.text() when available; falls back to FileReader for older runtimes.
@@ -47,6 +77,7 @@ export async function readUploadedFiles(files: File[]): Promise<UploadedFile[]> 
         : await readFileAsText(file);
       if (typeof content !== 'string') return null;
       return {
+        id: createUploadId(),
         name: file.name,
         content,
         size: file.size,

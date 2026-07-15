@@ -18,6 +18,8 @@ import {
   shouldStartScriptIDESave,
 } from "../lib/scriptide-autosave";
 import {
+  applyServerScriptIDEDraft,
+  decideScriptIDERestore,
   loadScriptIDEDraft,
   readScriptIDEDraft,
   scriptIDEDraftStatesEqual,
@@ -25,6 +27,7 @@ import {
   writeScriptIDEDraft,
   type ScriptIDEDraftEnvelope,
   type ScriptIDEDraftState,
+  type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
 import {
   Loader2,
@@ -91,9 +94,7 @@ const TabPanelFallback = () => (
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface ScriptIDEServerDraft extends ScriptIDEDraftState {
-  updatedAt: number;
-}
+type ScriptIDEServerDraft = ScriptIDEServerSnapshot;
 
 interface ScriptIDEProps {
   initialConfig: StoryConfig;
@@ -317,10 +318,10 @@ export default function ScriptIDE({
   draftRef.current = { scriptText, snapshots, characters, researchNotes, isDarkMode };
 
   // Sync document class for Tailwind `dark:` variants + CodeMirror theme.
+  // Theme storage is mirrored from the draft envelope write path only.
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
-    lsSet("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   useEffect(() => {
@@ -397,48 +398,44 @@ export default function ScriptIDE({
           updatedAt: data.updatedAt,
         };
         const local = draftEnvelopeRef.current;
-        const serverChanged = local.serverRevision !== server.updatedAt;
-        const versionedConflict = hadVersionedDraftRef.current && local.dirty && serverChanged;
         const legacyDecision = resolveDraftConflict(
           { text: local.scriptText, updatedAt: local.contentUpdatedAt },
           { text: server.scriptText, updatedAt: server.updatedAt },
         );
-        const useServer = hadVersionedDraftRef.current
-          ? !local.dirty || local.serverRevision === null
-          : legacyDecision.source === 'server';
+        const decision = decideScriptIDERestore(local, server, {
+          hadVersionedDraft: hadVersionedDraftRef.current,
+          legacySource: legacyDecision.source,
+        });
 
-        if (versionedConflict) {
-          saveConflictRef.current = server;
-          setSaveConflict(server);
+        if (decision.action === 'conflict') {
+          saveConflictRef.current = decision.server;
+          setSaveConflict(decision.server);
           setSaveStatus('save-conflict');
           return;
         }
-        if (useServer) {
-          const cleanEnvelope: ScriptIDEDraftEnvelope = {
-            ...server,
-            schemaVersion: 1,
-            contentUpdatedAt: server.updatedAt,
-            serverRevision: server.updatedAt,
-            dirty: false,
-          };
+        if (decision.action === 'use-server') {
+          const cleanEnvelope = applyServerScriptIDEDraft(decision.server);
           draftEnvelopeRef.current = cleanEnvelope;
           skipNextLocalWriteRef.current = true;
           persistedGenerationRef.current = draftGenerationRef.current;
-          setScriptText(server.scriptText);
-          setSnapshots(server.snapshots as { id: string; name: string; text: string; date: string }[]);
-          setCharacters(server.characters as typeof characters);
-          setResearchNotes(server.researchNotes as typeof researchNotes);
-          setIsDarkMode(server.isDarkMode);
+          setScriptText(decision.server.scriptText);
+          setSnapshots(decision.server.snapshots as { id: string; name: string; text: string; date: string }[]);
+          setCharacters(decision.server.characters as typeof characters);
+          setResearchNotes(decision.server.researchNotes as typeof researchNotes);
+          setIsDarkMode(decision.server.isDarkMode);
           writeScriptIDEDraft(lsSet, cleanEnvelope);
           return;
         }
 
-        draftEnvelopeRef.current = {
-          ...local,
-          serverRevision: server.updatedAt,
-          dirty: true,
-        };
-        writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+        if (decision.action === 'keep-local') {
+          draftEnvelopeRef.current = {
+            ...local,
+            serverRevision: decision.serverRevision,
+            // Legacy multi-key imports must still server-save after migration.
+            dirty: local.dirty || hadVersionedDraftRef.current === false,
+          };
+          writeScriptIDEDraft(lsSet, draftEnvelopeRef.current);
+        }
       })
       .catch(() => { /* non-critical — continue with local envelope */ })
       .finally(() => {
@@ -1280,13 +1277,7 @@ export default function ScriptIDE({
   const useServerConflictDraft = () => {
     const server = saveConflictRef.current;
     if (!server) return;
-    const cleanEnvelope: ScriptIDEDraftEnvelope = {
-      ...server,
-      schemaVersion: 1,
-      contentUpdatedAt: server.updatedAt,
-      serverRevision: server.updatedAt,
-      dirty: false,
-    };
+    const cleanEnvelope = applyServerScriptIDEDraft(server);
     draftEnvelopeRef.current = cleanEnvelope;
     skipNextLocalWriteRef.current = true;
     persistedGenerationRef.current = draftGenerationRef.current;

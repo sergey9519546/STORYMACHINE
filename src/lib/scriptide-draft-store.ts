@@ -88,7 +88,68 @@ export function writeScriptIDEDraft(
   write: StorageWriter,
   draft: ScriptIDEDraftEnvelope,
 ): boolean {
-  return write(SCRIPTIDE_DRAFT_KEY, JSON.stringify(draft));
+  // Envelope is authoritative. Mirror legacy `theme` so older readers stay aligned
+  // without treating theme as a separate revision domain.
+  return write(SCRIPTIDE_DRAFT_KEY, JSON.stringify(draft)) &&
+    write('theme', draft.isDarkMode ? 'dark' : 'light');
+}
+
+export type ScriptIDEServerSnapshot = ScriptIDEDraftState & { updatedAt: number };
+
+export type ScriptIDERestoreDecision =
+  | { action: 'empty' }
+  | { action: 'use-server'; server: ScriptIDEServerSnapshot }
+  | { action: 'keep-local'; serverRevision: number | null }
+  | { action: 'conflict'; server: ScriptIDEServerSnapshot };
+
+/**
+ * Pure restore policy for mount-time local vs server drafts.
+ * Versioned envelopes use dirty + serverRevision; legacy one-shot migration
+ * still uses timestamp/length via the provided legacySource when needed.
+ */
+export function decideScriptIDERestore(
+  local: ScriptIDEDraftEnvelope,
+  server: ScriptIDEServerSnapshot | null,
+  opts: {
+    hadVersionedDraft: boolean;
+    legacySource?: 'local' | 'server' | 'none';
+  },
+): ScriptIDERestoreDecision {
+  if (!server) return { action: 'empty' };
+
+  if (opts.hadVersionedDraft) {
+    const serverChanged = local.serverRevision !== server.updatedAt;
+    if (local.dirty && serverChanged) {
+      return { action: 'conflict', server };
+    }
+    if (!local.dirty && serverChanged) {
+      return { action: 'use-server', server };
+    }
+    // Same base revision: keep local (dirty or clean). Adopt serverRevision when known.
+    return { action: 'keep-local', serverRevision: server.updatedAt };
+  }
+
+  // Legacy multi-key drafts: one-shot length/timestamp decision.
+  if (opts.legacySource === 'server') {
+    return { action: 'use-server', server };
+  }
+  return { action: 'keep-local', serverRevision: server.updatedAt };
+}
+
+export function applyServerScriptIDEDraft(
+  server: ScriptIDEServerSnapshot,
+): ScriptIDEDraftEnvelope {
+  return {
+    schemaVersion: SCRIPTIDE_DRAFT_SCHEMA_VERSION,
+    scriptText: server.scriptText,
+    snapshots: server.snapshots,
+    characters: server.characters,
+    researchNotes: server.researchNotes,
+    isDarkMode: server.isDarkMode,
+    contentUpdatedAt: server.updatedAt,
+    serverRevision: server.updatedAt,
+    dirty: false,
+  };
 }
 
 export function scriptIDEDraftStatesEqual(

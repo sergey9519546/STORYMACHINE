@@ -4,6 +4,8 @@ import {
   appendUploadedFiles,
   filterUploadableFiles,
   readUploadedFiles,
+  removeUploadedFile,
+  updateUploadedFileCategory,
   type FileCategory,
   type UploadedFile,
 } from "../../lib/uploaded-files";
@@ -43,14 +45,18 @@ export function StoryConfigForm({
   onDrop,
 }: StoryConfigFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Bumps on Clear All so a pending multi-file read cannot re-append after wipe.
+  const uploadGenerationRef = useRef(0);
 
   // Batch-read every selected file, then append once via a functional update so
   // concurrent FileReader completions cannot overwrite each other (stale-closure race).
   const processFiles = async (files: File[]) => {
     const allowed = filterUploadableFiles(files);
     if (allowed.length === 0) return;
+    const generation = uploadGenerationRef.current;
     const batch = await readUploadedFiles(allowed);
     if (batch.length === 0) return;
+    if (generation !== uploadGenerationRef.current) return;
     onUploadedFilesChange((prev) => appendUploadedFiles(prev, batch));
   };
 
@@ -61,17 +67,17 @@ export function StoryConfigForm({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeFile = (index: number) => {
-    onUploadedFilesChange((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = (id: string) => {
+    onUploadedFilesChange((prev) => removeUploadedFile(prev, id));
   };
 
-  const updateFileCategory = (index: number, category: FileCategory) => {
-    onUploadedFilesChange((prev) => {
-      const next = prev.slice();
-      if (!next[index]) return prev;
-      next[index] = { ...next[index], category };
-      return next;
-    });
+  const updateFileCategory = (id: string, category: FileCategory) => {
+    onUploadedFilesChange((prev) => updateUploadedFileCategory(prev, id, category));
+  };
+
+  const clearAllFiles = () => {
+    uploadGenerationRef.current += 1;
+    onUploadedFilesChange([]);
   };
 
   const estimatedTokens = Math.round((backstory.length + uploadedFiles.reduce((acc, f) => acc + f.content.length, 0)) / 4);
@@ -152,7 +158,7 @@ export function StoryConfigForm({
               <span>Ingested Files</span>
               <div className="flex items-center gap-3">
                 {uploadedFiles.length > 0 && (
-                  <button onClick={() => onUploadedFilesChange([])} className="text-[10px] hover:text-stamp transition-colors uppercase font-bold">Clear All</button>
+                  <button onClick={clearAllFiles} className="text-[10px] hover:text-stamp transition-colors uppercase font-bold">Clear All</button>
                 )}
                 <span className="bg-ink text-cream px-2 py-0.5">{uploadedFiles.length}</span>
               </div>
@@ -161,12 +167,12 @@ export function StoryConfigForm({
             {uploadedFiles.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-faint space-y-2 text-center">
                 <FileText className="w-8 h-8 opacity-50" />
-                <p className="text-xs font-mono">No files attached.<br />Drag &amp; drop .txt or .md</p>
+                <p className="text-xs font-mono">No files attached.<br />Drag &amp; drop lore docs</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {uploadedFiles.map((file, idx) => (
-                  <div key={idx} className="flex flex-col gap-2 bg-panel brutal-border p-2 group hover:border-stamp brutal-shadow-hover">
+                {uploadedFiles.map((file) => (
+                  <div key={file.id} className="flex flex-col gap-2 bg-panel brutal-border p-2 group hover:border-stamp brutal-shadow-hover">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 overflow-hidden">
                         <FileText className="w-3 h-3 flex-shrink-0 text-stamp" />
@@ -177,14 +183,14 @@ export function StoryConfigForm({
                         <button onClick={() => onPreviewFile(file)} className="text-faint hover:text-ink transition-colors" title="Preview">
                           <Eye className="w-3 h-3" />
                         </button>
-                        <button onClick={() => removeFile(idx)} className="text-faint hover:text-stamp transition-colors" title="Remove">
+                        <button onClick={() => removeFile(file.id)} className="text-faint hover:text-stamp transition-colors" title="Remove">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
                     <select
                       value={file.category}
-                      onChange={(e) => updateFileCategory(idx, e.target.value as FileCategory)}
+                      onChange={(e) => updateFileCategory(file.id, e.target.value as FileCategory)}
                       className="text-[10px] font-mono p-1 brutal-border bg-panel2 focus:outline-none cursor-pointer w-full"
                     >
                       <option value="Lore">Lore / Worldbuilding</option>

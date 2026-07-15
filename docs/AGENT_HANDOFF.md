@@ -27,9 +27,9 @@ Known-failing score witness (intentional): `empty_verbosity` via `npm run test:m
 - Product code freezes for P0 except critical security (see `ROADMAP.md`).
 
 ### P1 — ScriptIDE persistence hardening
-1. React lifecycle tests: StrictMode remount, edit-during-in-flight trailing save, slow load + typing, conflict “Use server / Keep mine”.
-2. Dual theme write: envelope `isDarkMode` vs legacy `theme` key in `ScriptIDE.tsx`.
-3. Upload rows still use array indexes (`StoryConfigForm`); add stable IDs if multi-op races matter.
+1. React lifecycle tests: StrictMode remount, edit-during-in-flight trailing save, slow load + typing, conflict “Use server / Keep mine”. Pure restore policy is now in `decideScriptIDERestore` + tests.
+2. Theme dual-write reduced: envelope write mirrors legacy `theme`; ScriptIDE no longer writes theme outside the envelope.
+3. Upload rows now use stable IDs; Clear All invalidates pending multi-file reads.
 4. No live cross-tab broadcast while both tabs stay open (OCC only on save).
 
 ### P1 — security residual

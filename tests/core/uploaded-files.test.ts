@@ -2,9 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   appendUploadedFiles,
+  createUploadId,
   filterUploadableFiles,
   inferUploadCategory,
   readUploadedFiles,
+  removeUploadedFile,
+  updateUploadedFileCategory,
   UPLOAD_MAX_FILE_SIZE,
   type UploadedFile,
 } from '../../src/lib/uploaded-files.ts';
@@ -17,6 +20,16 @@ function deferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+function file(partial: Partial<UploadedFile> & Pick<UploadedFile, 'name'>): UploadedFile {
+  return {
+    id: partial.id ?? createUploadId(),
+    name: partial.name,
+    content: partial.content ?? '',
+    size: partial.size ?? 1,
+    category: partial.category ?? 'Lore',
+  };
 }
 
 describe('uploaded-files helpers', () => {
@@ -41,19 +54,28 @@ describe('uploaded-files helpers', () => {
   });
 
   it('appendUploadedFiles concatenates the whole batch without dropping siblings', () => {
-    const prev: UploadedFile[] = [
-      { name: 'old.md', content: 'x', size: 1, category: 'Lore' },
-    ];
+    const prev: UploadedFile[] = [file({ name: 'old.md', content: 'x' })];
     const batch: UploadedFile[] = [
-      { name: 'a.txt', content: 'a', size: 1, category: 'Lore' },
-      { name: 'b.txt', content: 'b', size: 1, category: 'Lore' },
-      { name: 'c.txt', content: 'c', size: 1, category: 'Lore' },
+      file({ name: 'a.txt', content: 'a' }),
+      file({ name: 'b.txt', content: 'b' }),
+      file({ name: 'c.txt', content: 'c' }),
     ];
     const next = appendUploadedFiles(prev, batch);
     assert.equal(next.length, 4);
     assert.deepEqual(next.map((f) => f.name), ['old.md', 'a.txt', 'b.txt', 'c.txt']);
-    // Immutability: prev unchanged.
     assert.equal(prev.length, 1);
+  });
+
+  it('remove and category update use stable ids, not list indexes', () => {
+    const a = file({ id: 'a', name: 'a.txt', category: 'Lore' });
+    const b = file({ id: 'b', name: 'b.txt', category: 'Lore' });
+    const c = file({ id: 'c', name: 'c.txt', category: 'Lore' });
+    const withoutB = removeUploadedFile([a, b, c], 'b');
+    assert.deepEqual(withoutB.map((f) => f.id), ['a', 'c']);
+    const recategorized = updateUploadedFileCategory([a, b, c], 'c', 'Rules');
+    assert.equal(recategorized[2].category, 'Rules');
+    assert.equal(recategorized[0].category, 'Lore');
+    assert.notEqual(recategorized, [a, b, c]);
   });
 
   it('reads every sibling concurrently and preserves picker order', async () => {
@@ -77,6 +99,7 @@ describe('uploaded-files helpers', () => {
     const result = await resultPromise;
     assert.deepEqual(result.map(file => file.name), ['0.txt', '1.txt', '2.txt']);
     assert.deepEqual(result.map(file => file.content), ['first', 'second', 'third']);
+    assert.equal(new Set(result.map(file => file.id)).size, 3);
   });
 
   it('keeps readable siblings when one file read fails', async () => {
