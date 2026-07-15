@@ -2,12 +2,13 @@ import express from 'express';
 import path from 'path';
 import { logger, requestLogger } from './lib/logger.ts';
 import { ValidationError, gameLimiter } from './lib/session-store.ts';
-import configRouter    from './routes/config.ts';
-import gameRouter      from './routes/game.ts';
-import scriptideRouter from './routes/scriptide.ts';
-import nvmRouter       from './routes/nvm.ts';
-import exportRouter    from './routes/export.ts';
-import collabRouter    from './routes/collab.ts';
+import configRouter      from './routes/config.ts';
+import gameRouter        from './routes/game.ts';
+import scriptideRouter   from './routes/scriptide.ts';
+import nvmRouter         from './routes/nvm.ts';
+import exportRouter      from './routes/export.ts';
+import collabRouter      from './routes/collab.ts';
+import aiProvidersRouter from './routes/ai-providers.ts';
 
 export interface CreateAppOptions {
   /**
@@ -165,6 +166,7 @@ export async function createApp(opts: CreateAppOptions = {}): Promise<express.Ex
   });
 
   app.use(configRouter);
+  app.use(aiProvidersRouter);
   app.use(gameRouter);
   app.use(scriptideRouter);
   app.use(nvmRouter);

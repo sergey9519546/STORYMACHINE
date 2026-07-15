@@ -31,6 +31,19 @@ import type { StoryCommit } from '../nvm/state/StoryCommit.ts';
 import type { StoryOp } from '../nvm/ops/StoryOp.ts';
 import type { ActionType } from './types.ts';
 
+// V5.0 PHASE 1: EventStore shadow mode imports
+import type { EventStore } from '../nvm/kernel/event-store.ts';
+import { getV5Phase1Config } from '../config/v5-flags.ts';
+import { getV5Metrics } from '../monitoring/v5-metrics.ts';
+import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
+// V5.0 PHASE 1: EventStore shadow mode imports
+import type { EventStore } from '../nvm/kernel/event-store.ts';
+import { getV5Phase1Config } from '../config/v5-flags.ts';
+import { getV5Metrics } from '../monitoring/v5-metrics.ts';
+import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
+
+import type { ActionType } from './types.ts';
+
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
 
@@ -70,8 +83,14 @@ export function isAudibleActionType(actionType: ActionType): boolean {
   return !SILENT_ACTION_TYPES.has(actionType);
 }
 
+
 export class Stage {
   private db: Database.Database;
+  
+  // V5.0 PHASE 1: Optional EventStore for shadow writes
+  private eventStore?: EventStore;
+  private v5Config = getV5Phase1Config();
+  private v5Metrics = getV5Metrics();
 
   constructor(dbPath: string = ':memory:') {
     this.db = new Database(dbPath);
@@ -1290,6 +1309,7 @@ export class Stage {
   }
 
   public appendCommit(c: StoryCommit): void {
+    // PRIMARY WRITE: Existing Stage commit (never fails)
     this.db.prepare(`
       INSERT OR IGNORE INTO Story_Commits
         (commit_id, parent_id, scene_idx, ops_json, delta_summary_json, reverted, created_at)
@@ -1299,6 +1319,112 @@ export class Stage {
       JSON.stringify(c.ops), JSON.stringify(c.deltaSummary),
       c.reverted ? 1 : 0, c.createdAt,
     );
+    
+    // V5.0 PHASE 1: SHADOW WRITE to EventStore (non-blocking)
+    this._shadowWriteToEventStore(c);
+  }
+  
+  // V5.0 PHASE 1: Shadow write helper (never throws, never blocks)
+  private _shadowWriteToEventStore(commit: StoryCommit): void {
+    // Guard: feature flag disabled
+    if (!this.v5Config.eventStoreShadow) {
+      return;
+    }
+    
+    // Guard: no EventStore configured
+    if (!this.eventStore) {
+      return;
+    }
+    
+    const startTime = Date.now();
+    let timedOut = false;
+    
+    // Create timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        timedOut = true;
+        reject(new Error('TIMEOUT'));
+      }, this.v5Config.shadowWriteTimeoutMs);
+    });
+    
+    // Shadow write with timeout
+    const shadowWrite = async () => {
+      try {
+        // Convert commit to events
+        const events = commitToEvents(commit);
+        
+        if (events.length === 0) {
+          if (this.v5Config.enableLogging) {
+            console.warn('[V5 Shadow] No events generated from commit:', commit.commitId);
+          }
+          return;
+        }
+        
+        // Write events to EventStore
+        for (const eventInput of events) {
+          this.eventStore!.append(eventInput);
+        }
+        
+        // Success metrics
+        const latency = Date.now() - startTime;
+        const byteSize = estimateEventsByteSize(events);
+        
+        if (this.v5Config.enableMetrics) {
+          this.v5Metrics.recordSuccess(latency, events.length, byteSize);
+        }
+        
+        if (this.v5Config.enableLogging) {
+          console.log(`[V5 Shadow] ✓ Wrote ${events.length} events in ${latency}ms (commit: ${commit.commitId})`);
+        }
+        
+      } catch (err) {
+        const latency = Date.now() - startTime;
+        const errorType = timedOut ? 'TIMEOUT' : (err instanceof Error ? err.name : 'UNKNOWN');
+        
+        if (this.v5Config.enableMetrics) {
+          if (timedOut) {
+            this.v5Metrics.recordTimeout(latency);
+          } else {
+            this.v5Metrics.recordFailure(latency, errorType);
+          }
+        }
+        
+        if (this.v5Config.enableLogging) {
+          console.error('[V5 Shadow] ✗ Shadow write failed:', err);
+          console.error('[V5 Shadow]   Commit:', commit.commitId);
+          console.error('[V5 Shadow]   Latency:', latency + 'ms');
+        }
+        
+        // CRITICAL: Never throw - shadow writes must not block
+      }
+    };
+    
+    // Fire and forget (don't await)
+    Promise.race([shadowWrite(), timeoutPromise])
+      .catch(() => {
+        // Already logged in shadowWrite catch block
+      });
+  }
+  
+  // V5.0 PHASE 1: Enable EventStore shadow mode
+  public enableEventStoreShadow(eventStore: EventStore): void {
+    this.eventStore = eventStore;
+    if (this.v5Config.enableLogging) {
+      console.log('[V5 Shadow] EventStore shadow mode enabled');
+    }
+  }
+  
+  // V5.0 PHASE 1: Disable EventStore shadow mode
+  public disableEventStoreShadow(): void {
+    this.eventStore = undefined;
+    if (this.v5Config.enableLogging) {
+      console.log('[V5 Shadow] EventStore shadow mode disabled');
+    }
+  }
+  
+  // V5.0 PHASE 1: Check if shadow mode is active
+  public isEventStoreShadowActive(): boolean {
+    return this.v5Config.eventStoreShadow && this.eventStore !== undefined;
   }
 
   public getCommits(): StoryCommit[] {

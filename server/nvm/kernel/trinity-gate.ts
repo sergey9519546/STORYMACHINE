@@ -72,8 +72,11 @@ export interface TrinityGateOptions {
  * Returns comprehensive verification result with:
  * - Pass/fail status (all 3 must pass)
  * - Violations from each layer with repair suggestions
- * - Overall health score
+ * - Overall health score (weighted composite)
  * - Detailed breakdown by layer
+ * 
+ * Performance: Executes all three layers in parallel for maximum throughput.
+ * Target: < 100ms for typical screenplay event verification.
  * 
  * Usage:
  * ```typescript
@@ -85,6 +88,12 @@ export interface TrinityGateOptions {
  *   }
  * }
  * ```
+ * 
+ * @param event - The proposed narrative event to verify
+ * @param currentState - Current narrative state (beliefs, emotions, facts)
+ * @param allEvents - All events in story so far (for causal/knowledge tracking)
+ * @param options - Configuration options (strict mode, logging, repair mode)
+ * @returns Comprehensive verification result with violations and repair suggestions
  */
 export async function runTrinityGate(
   event: NarrativeEvent,
@@ -100,7 +109,8 @@ export async function runTrinityGate(
     console.log(`[Trinity Gate] Verifying event ${event.eventId} at story-time ${event.storyTime}`);
   }
   
-  // Run all three layers in parallel for performance
+  // Run all three layers in parallel for maximum performance
+  // This is safe because verifiers are pure functions with no side effects
   const [storyGraphResult, owneResult, preflightResult] = await Promise.all([
     Promise.resolve(verifyStoryGraph(event, currentState, allEvents)),
     Promise.resolve(verifyOwne(event, currentState, allEvents)),
@@ -420,10 +430,5 @@ export function formatVerificationReport(verification: TrinityVerification): str
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
+// Types are already exported inline above, no need to re-export
 
-export type {
-  TrinityViolation,
-  TrinityVerification,
-  TrinityGateOptions,
-  VerificationLayer,
-};

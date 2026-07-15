@@ -10,6 +10,7 @@
 import type { NarrativeEvent } from '../types.ts';
 import type { NarrativeState } from '../../state/NarrativeState.ts';
 import type { AtomicFact } from '../../ops/StoryOp.ts';
+import { parseSemanticTriple, type SemanticTriple } from '../adapters/nlp-helpers.ts';
 
 // ── Type Definitions ──────────────────────────────────────────────────────────
 
@@ -119,11 +120,33 @@ function checkEpistemicConsistency(
     const charId = op.charId;
     const belief = op.belief;
     
+    // Parse belief proposition into semantic triple for knowledge tracking
+    const triple = parseSemanticTriple(belief.proposition);
+    
+    if (!triple) {
+      // Can't parse belief - lenient check
+      if (belief.confidence > 0.8) {
+        violations.push({
+          type: 'epistemic',
+          severity: 'low',
+          message: `Character ${charId} has unparseable belief "${belief.proposition}" with very high confidence`,
+          characterIds: [charId],
+          repairSuggestions: [
+            'Clarify the belief to be more specific',
+            'Add context showing how belief was formed',
+            'Lower confidence if uncertain',
+          ],
+          confidence: 0.5,
+        });
+      }
+      return violations;
+    }
+    
     // Build knowledge graph: who knows what and when
     const knowledgePath = traceKnowledgePath(
-      belief.subject,
-      belief.predicate,
-      belief.object,
+      triple.subject,
+      triple.predicate,
+      triple.object,
       charId,
       event.storyTime,
       allEvents,
@@ -134,7 +157,7 @@ function checkEpistemicConsistency(
       violations.push({
         type: 'knowledge-path',
         severity: 'critical',
-        message: `Character ${charId} believes "${belief.subject} ${belief.predicate} ${belief.object}" without valid knowledge path`,
+        message: `Character ${charId} believes "${belief.proposition}" without valid knowledge path`,
         characterIds: [charId],
         repairSuggestions: [
           'Show character observing this fact directly',
@@ -324,11 +347,14 @@ function findKnowledgeTransfer(
         
         // Check if other character has the belief
         const otherBeliefs = state.characterBeliefs[otherChar] || [];
-        const hasBelief = otherBeliefs.some(b =>
-          b.subject === subject &&
-          b.predicate === predicate &&
-          b.object === object
-        );
+        const hasBelief = otherBeliefs.some(b => {
+          // Parse belief to check if it matches the fact
+          const triple = parseSemanticTriple(b.proposition);
+          return triple &&
+            triple.subject === subject &&
+            triple.predicate === predicate &&
+            triple.object === object;
+        });
         
         if (hasBelief) {
           return [otherChar, targetChar];
@@ -350,10 +376,13 @@ function hasKnowledgeOfObjectLocation(
   
   // Check if character has belief about object location
   const beliefs = state.characterBeliefs[charId] || [];
-  const hasLocationBelief = beliefs.some(b =>
-    b.subject === objectId &&
-    b.predicate === 'located_at'
-  );
+  const hasLocationBelief = beliefs.some(b => {
+    // Parse belief to check if it mentions object location
+    const triple = parseSemanticTriple(b.proposition);
+    return triple &&
+      triple.subject === objectId &&
+      (triple.predicate.includes('located') || triple.predicate.includes('at') || triple.predicate.includes('in'));
+  });
   
   if (hasLocationBelief) return true;
   
@@ -679,5 +708,4 @@ function computeSpatialScore(violations: PreFlightViolation[]): number {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-
-export type { PreFlightViolation, PreFlightAudit };
+// Types are already exported inline above, no need to re-export

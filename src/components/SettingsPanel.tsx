@@ -8,6 +8,7 @@ import {
   CHARACTER_ARC_MODE_OPTIONS,
   type AxisOption,
 } from "../lib/story-axes";
+import { AIProviderSettings } from "./AIProviderSettings";
 
 type AiProviderName  = "gemini" | "openai-compat";
 type AiMediaProvider = "gemini" | "openai-compat" | "none";
@@ -42,9 +43,10 @@ interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type Tab = "llm" | "image" | "tts" | "embeddings" | "story";
+type Tab = "llm" | "image" | "tts" | "embeddings" | "story" | "providers";
 
 const TAB_LABELS: Record<Tab, string> = {
+  providers:  "Providers",
   llm:        "Text LLM",
   image:      "Image",
   tts:        "TTS",
@@ -531,7 +533,7 @@ function StoryTab() {
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("llm");
+  const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [cfg, setCfg]             = useState<AiConfig | null>(null);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -657,6 +659,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
             {/* Tab body */}
             <div className="flex-1 overflow-y-auto p-6">
+              {activeTab === "providers" && <AIProviderSettings />}
               {activeTab === "llm" && (
                 <LLMTab
                   cfg={cfg}
@@ -721,9 +724,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               {activeTab === "story" && <StoryTab />}
             </div>
 
-            {/* Footer — AI-config actions only; the Story tab saves each
-                control immediately, so Test/Save would be misleading there. */}
-            {activeTab !== "story" && (
+            {/* Footer — AI-config actions only; the Story tab and Providers tab save
+                immediately, so Test/Save would be misleading there. */}
+            {activeTab !== "story" && activeTab !== "providers" && (
             <div className="px-6 py-4 border-t-4 border-black flex flex-col gap-2">
               {/* Status messages */}
               <div className="flex items-center min-h-[20px]">

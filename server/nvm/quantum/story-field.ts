@@ -44,7 +44,7 @@ export class QuantumNarrativeField {
   private entanglementBuilder: EntanglementGraphBuilder;
   
   // Trinity Gate validator (stubbed for now)
-  private trinityGate: TrinityGateValidator;
+  private narrativeState: NarrativeState;
   
   // Performance tracking
   private lastValidationTimeMs: number = 0;
@@ -53,7 +53,7 @@ export class QuantumNarrativeField {
   constructor(config: Partial<QuantumFieldConfig> = {}) {
     this.config = { ...this.getDefaultConfig(), ...config };
     this.entanglementBuilder = new EntanglementGraphBuilder();
-    this.trinityGate = new TrinityGateValidator();
+    this.narrativeState = new NarrativeState();
   }
   
   // ── State Management ──────────────────────────────────────────────────────────

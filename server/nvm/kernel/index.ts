@@ -34,6 +34,41 @@ export {
 // Re-export for convenience
 export type { EventStoreWithAdapters } from './adapters.ts';
 
+// ── Type Enrichment Adapters ──────────────────────────────────────────────────
+
+export {
+  // Core Adapters
+  parseSemanticTriple,
+  enrichAtomicFact,
+  enrichBelief,
+  enrichEmotion,
+  enrichAtomicFactsBatch,
+  enrichBeliefsBatch,
+  
+  // Validation
+  validateSemanticFact,
+  validateStructuredBelief,
+  validateDimensionalEmotion,
+  
+  // NLP Helpers
+  recognizeEntities,
+  extractTemporal,
+  extractManner,
+  extractLocation,
+  occToVAD,
+  computeEmotionalIntensity,
+  estimateBeliefConfidence,
+} from './adapters/index.ts';
+
+export type {
+  SemanticAtomicFact,
+  StructuredBelief,
+  DimensionalEmotionState,
+  SemanticTriple,
+  Entity,
+  DimensionalEmotion,
+} from './adapters/index.ts';
+
 // ── Trinity Verification Gate ─────────────────────────────────────────────────
 
 export {

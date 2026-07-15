@@ -1,0 +1,196 @@
+
+
+@dataclass
+class BlockingPosition:
+    """Character position and orientation in frame."""
+    character_name: str
+    x_position: float
+    y_position: float
+    z_position: float
+    facing_direction: float
+    body_angle: float
+    eye_line: Tuple[float, float, float]
+    posture: str = 'neutral'
+    gesture: str = ''
+    props: List[str] = field(default_factory=list)
+
+
+@dataclass
+class EditDecision:
+    """Editorial decision for scene assembly."""
+    edit_number: int
+    shot_in: int
+    shot_out: int
+    edit_type: EditType
+    duration: float
+    rhythm_intent: str
+    emotional_effect: str
+
+
+# ============================================================================
+# CAMERA ENGINE - Professional Camera Control System
+# ============================================================================
+
+class CameraEngine:
+    """
+    Professional camera control and shot design system.
+    
+    Provides comprehensive cinematography capabilities including:
+    - Shot type selection and specification
+    - Camera angle psychology
+    - Camera movement design
+    - Lens selection for emotional effect
+    - Composition rule application
+    - Technical specifications for production
+    """
+    
+    def __init__(self):
+        self.shot_library = {}
+        self.angle_library = {}
+        self.movement_library = {}
+        self.lens_library = {}
+        self.composition_library = {}
+        self.shot_history: List[ShotSpecification] = []
+        
+    def design_shot(
+        self,
+        narrative_intent: str,
+        emotional_goal: str,
+        characters: List[str],
+        location: str,
+        scene_context: str
+    ) -> ShotSpecification:
+        """Design optimal shot based on narrative requirements."""
+        shot_type = self._select_shot_type(narrative_intent, emotional_goal)
+        angle = self._select_camera_angle(emotional_goal, characters)
+        movement = self._select_camera_movement(scene_context, emotional_goal)
+        lens = self._select_lens(shot_type, emotional_goal)
+        composition = self._select_composition_rules(shot_type, characters)
+        
+        shot = ShotSpecification(
+            shot_number=len(self.shot_history) + 1,
+            shot_type=shot_type,
+            camera_angle=angle,
+            camera_movement=movement,
+            lens_type=lens,
+            duration_seconds=self._calculate_duration(shot_type, narrative_intent),
+            focal_length_mm=self._calculate_focal_length(lens, shot_type),
+            aperture=self._calculate_aperture(shot_type, emotional_goal),
+            composition_rules=composition,
+            psychological_intent=emotional_goal,
+            narrative_purpose=narrative_intent
+        )
+        
+        self.shot_history.append(shot)
+        return shot
+        
+    def _select_shot_type(self, narrative_intent: str, emotional_goal: str) -> ShotType:
+        """Select appropriate shot type based on narrative needs."""
+        intent_lower = narrative_intent.lower()
+        emotion_lower = emotional_goal.lower()
+        
+        if 'establish' in intent_lower or 'location' in intent_lower:
+            return ShotType.WIDE_SHOT
+        elif 'emotion' in emotion_lower or 'feeling' in emotion_lower:
+            return ShotType.CLOSE_UP
+        elif 'detail' in intent_lower or 'object' in intent_lower:
+            return ShotType.INSERT
+        elif 'dialogue' in intent_lower or 'conversation' in intent_lower:
+            return ShotType.MEDIUM_SHOT
+        elif 'reaction' in intent_lower:
+            return ShotType.MEDIUM_CLOSE_UP
+        elif 'epic' in emotion_lower or 'scope' in intent_lower:
+            return ShotType.EXTREME_WIDE
+        else:
+            return ShotType.MEDIUM_SHOT
+            
+    def _select_camera_angle(self, emotional_goal: str, characters: List[str]) -> CameraAngle:
+        """Select camera angle based on emotional intent."""
+        emotion_lower = emotional_goal.lower()
+        
+        if 'power' in emotion_lower or 'dominant' in emotion_lower:
+            return CameraAngle.LOW_ANGLE
+        elif 'vulnerable' in emotion_lower or 'weak' in emotion_lower:
+            return CameraAngle.HIGH_ANGLE
+        elif 'unease' in emotion_lower or 'tension' in emotion_lower:
+            return CameraAngle.DUTCH_ANGLE
+        elif 'overview' in emotion_lower or 'fate' in emotion_lower:
+            return CameraAngle.BIRDS_EYE
+        else:
+            return CameraAngle.EYE_LEVEL
+            
+    def _select_camera_movement(self, scene_context: str, emotional_goal: str) -> CameraMovement:
+        """Select camera movement based on scene requirements."""
+        context_lower = scene_context.lower()
+        emotion_lower = emotional_goal.lower()
+        
+        if 'action' in context_lower or 'chase' in context_lower:
+            return CameraMovement.HANDHELD
+        elif 'dramatic' in emotion_lower or 'reveal' in context_lower:
+            return CameraMovement.PUSH_IN
+        elif 'follow' in context_lower or 'walk' in context_lower:
+            return CameraMovement.STEADICAM
+        elif 'fluid' in emotion_lower or 'grace' in emotion_lower:
+            return CameraMovement.CRANE
+        elif 'stable' in context_lower or 'composed' in context_lower:
+            return CameraMovement.STATIC
+        else:
+            return CameraMovement.STATIC
+            
+    def _select_lens(self, shot_type: ShotType, emotional_goal: str) -> LensType:
+        """Select appropriate lens for shot type and emotion."""
+        if shot_type in [ShotType.EXTREME_CLOSE_UP, ShotType.CLOSE_UP]:
+            return LensType.PORTRAIT
+        elif shot_type in [ShotType.WIDE_SHOT, ShotType.EXTREME_WIDE]:
+            return LensType.WIDE
+        elif shot_type == ShotType.INSERT:
+            return LensType.MACRO
+        else:
+            return LensType.NORMAL
+            
+    def _select_composition_rules(self, shot_type: ShotType, characters: List[str]) -> List[CompositionRule]:
+        """Select composition rules appropriate for shot."""
+        rules = []
+        
+        if len(characters) == 1:
+            rules.append(CompositionRule.RULE_OF_THIRDS)
+        elif len(characters) == 2:
+            rules.extend([CompositionRule.BALANCE, CompositionRule.RULE_OF_THIRDS])
+        else:
+            rules.append(CompositionRule.DEPTH_LAYERING)
+            
+        if shot_type in [ShotType.WIDE_SHOT, ShotType.EXTREME_WIDE]:
+            rules.append(CompositionRule.LEADING_LINES)
+            rules.append(CompositionRule.FOREGROUND_INTEREST)
+            
+        return rules
+        
+    def _calculate_duration(self, shot_type: ShotType, narrative_intent: str) -> float:
+        """Calculate optimal shot duration."""
+        base_durations = {
+            ShotType.EXTREME_CLOSE_UP: 2.0,
+            ShotType.CLOSE_UP: 4.0,
+            ShotType.MEDIUM_CLOSE_UP: 5.0,
+            ShotType.MEDIUM_SHOT: 6.0,
+            ShotType.WIDE_SHOT: 8.0,
+            ShotType.EXTREME_WIDE: 12.0,
+        }
+        return base_durations.get(shot_type, 5.0)
+        
+    def _calculate_focal_length(self, lens_type: LensType, shot_type: ShotType) -> int:
+        """Calculate focal length in mm."""
+        lens_ranges = {
+            LensType.ULTRA_WIDE: 20,
+            LensType.WIDE: 28,
+            LensType.NORMAL: 40,
+            LensType.PORTRAIT: 75,
+            LensType.TELEPHOTO: 100,
+            LensType.MACRO: 90,
+        }
+        return lens_ranges.get(lens_type, 50)
+        
+    def _calculate_aperture(self, shot_type: ShotType, emotional_goal: str) -> float:
+        """Calculate aperture f-stop."""
+        if shot_type in [ShotType.CLOSE_UP, ShotType.EXTREME_CLOSE_UP]:
+            return 2.8
+        elif shot_type in [ShotType.WIDE_SHOT, ShotType.EXTREME_WIDE]:

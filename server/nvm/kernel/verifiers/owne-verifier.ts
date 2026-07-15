@@ -14,6 +14,7 @@
 import type { NarrativeEvent } from '../types.ts';
 import type { NarrativeState } from '../../state/NarrativeState.ts';
 import type { AtomicFact } from '../../ops/StoryOp.ts';
+import { parseSemanticTriple, occToVAD, type SemanticTriple } from '../adapters/nlp-helpers.ts';
 
 // ── Type Definitions ──────────────────────────────────────────────────────────
 
@@ -289,11 +290,33 @@ function checkIntentionality(
     const charId = op.charId;
     const belief = op.belief;
     
+    // Parse belief proposition into semantic triple for validation
+    const triple = parseSemanticTriple(belief.proposition);
+    
+    if (!triple) {
+      // Can't parse - assume low confidence belief is acceptable
+      if (belief.confidence > 0.7) {
+        violations.push({
+          type: 'unmotivated-action',
+          severity: 'low',
+          message: `Character ${charId} forms unparseable belief "${belief.proposition}" with high confidence`,
+          characterIds: [charId],
+          repairSuggestions: [
+            'Clarify the belief statement to be more specific',
+            'Lower confidence if belief is speculative',
+            'Add context showing how this belief was formed',
+          ],
+          confidence: 0.5,
+        });
+      }
+      return violations;
+    }
+    
     // Belief should come from perception or inference
     // Check if there's a fact in objective reality that supports this belief
     const hasSupportingFact = state.objectiveReality.some(f =>
-      f.subject === belief.subject &&
-      f.predicate === belief.predicate &&
+      f.subject === triple.subject &&
+      f.predicate === triple.predicate &&
       f.validFrom <= event.storyTime
     );
     
@@ -304,7 +327,7 @@ function checkIntentionality(
       violations.push({
         type: 'unmotivated-action',
         severity: 'low',
-        message: `Character ${charId} forms belief "${belief.subject} ${belief.predicate} ${belief.object}" without apparent source`,
+        message: `Character ${charId} forms belief "${belief.proposition}" without apparent source`,
         characterIds: [charId],
         repairSuggestions: [
           'Show how the character learned this information',
@@ -342,14 +365,25 @@ function hasRelevantEmotion(charId: string, state: NarrativeState): boolean {
   const emotion = state.characterEmotions[charId];
   if (!emotion) return false;
   
-  // High valence emotions (positive or negative) count as motivation
-  return Math.abs(emotion.valence) > 0.5 || emotion.arousal > 0.5;
+  // Use OCC emotion dimensions - convert to VAD for threshold checking
+  // High intensity or dominant emotion counts as motivation
+  const vad = occToVAD(emotion.dominant, emotion.intensity);
+  return Math.abs(vad.valence) > 0.5 || vad.arousal > 0.5 || emotion.intensity > 50;
 }
 
 function hasActiveGoal(charId: string, state: NarrativeState): boolean {
   // Check if character has recent goal-related beliefs
   const beliefs = state.characterBeliefs[charId] || [];
-  return beliefs.some(b => b.predicate === 'wants' || b.predicate === 'intends');
+  
+  // Parse belief propositions to check for goal-indicating patterns
+  return beliefs.some(b => {
+    const lower = b.proposition.toLowerCase();
+    return lower.includes('want') || 
+           lower.includes('intend') || 
+           lower.includes('plan') ||
+           lower.includes('goal') ||
+           lower.includes('need');
+  });
 }
 
 function checkCharacterPresence(
@@ -538,5 +572,4 @@ function computePromiseIntegrity(violations: OwneViolation[]): number {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-
-export type { OwneViolation, OwneVerification };
+// Types are already exported inline above, no need to re-export
