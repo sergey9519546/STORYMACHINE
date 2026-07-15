@@ -338,27 +338,32 @@ function densityPenalty(
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER = 3.75;
   const DENSITY_SCALE = 2.5;
-  // Sub-1.0-density branch — a logistic, not a power law, so its scale is
-  // independent of DENSITY_SCALE above. KNOWN DISCONTINUITY: at density=1,
-  // this branch saturates near SUB_DENSITY_SCALE=10 while the >=1 branch
-  // starts at DENSITY_SCALE=2.5 — a ~7.5-point jump. This is monotonic
-  // WITHIN each branch (adding issues always increases penalty) but has a
-  // discontinuity at the seam. Documented trade: the sub-1 band [0.65, 1.0)
-  // is a low-confidence zone where no corpus sample or discrimination pair
-  // lands. A continuous monotonic replacement requires re-tuning calibration
-  // constants — filed as a follow-up.
+  // CONTINUITY FIX (P0.1, 2026-07-15): the prior piecewise formula had a
+  // ~7.5-point discontinuity at density=1 — logistic sub-1 branch saturated
+  // near SUB_DENSITY_SCALE=10 while the power branch started at
+  // DENSITY_SCALE=2.5. Crossing the seam could IMPROVE health despite more
+  // weighted issues (non-monotonic at the branch boundary).
+  //
+  // Fix: keep the calibrated logistic for density < 1 (unchanged shape in the
+  // band where discrimination pairs live), and for density >= 1 use a power
+  // curve that starts at the same value the logistic reaches at density=1:
+  //   SUB_DENSITY_SCALE + DENSITY_SCALE * (density^DENSITY_POWER - 1)
+  // At density=1 both sides equal 10. Both sides are increasing, so the full
+  // function is continuous and monotonic. Above density=1 the penalty is
+  // higher than the old 2.5*density^3.75 by a constant +7.5 offset — denser
+  // scripts are scored more harshly, but never rewarded for crossing the seam.
   const SUB_DENSITY_SCALE = 10;
   const SUB_DENSITY_MIDPOINT = 0.52;
   const SUB_DENSITY_STEEPNESS = 50;
 
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
   const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
-  const density = weightedIssues / opportunityWords;
+  const density = weightedIssues / Math.max(opportunityWords, 1e-10);
 
   if (density < 1) {
     return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
   }
-  return DENSITY_SCALE * Math.pow(density, DENSITY_POWER);
+  return SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
 }
 
 /** The scene-scarcity half of craftPenalty, factored out on its own (Wave

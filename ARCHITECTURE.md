@@ -115,7 +115,7 @@ relationship-arc
 |---|---|
 | Same text → same `contentHash` and deterministic findings | Supported |
 | Health is opportunity-normalized and length-checked | Supported by regression tests |
-| Health is continuous/monotonic across all densities | Known seam at density≈1; do not over-claim |
+| Health density penalty is continuous and monotonic | Supported (P0.1 continuous join at density=1) |
 | Percentiles are industry-representative | No — internal calibration corpus only |
 | Human agreement / PMF | Unknown — not validated |
 
