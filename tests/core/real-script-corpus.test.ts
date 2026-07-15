@@ -26,7 +26,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
@@ -44,14 +44,35 @@ const CORPUS_DIR = process.env.REAL_SCRIPT_CORPUS_DIR ?? '';
  *  ORPHAN_CLUE flood (which produced health 0, not 80). */
 const PRODUCED_FLOOR = 80;
 
+// Three distinct states, kept distinct on purpose so a misconfiguration reads
+// as a hard failure rather than a silent skip that looks like a pass:
+//   1. unset      → the copyright-boundary skip (honest, expected in CI).
+//   2. set-broken → the env var points at a path that doesn't exist or isn't a
+//                   directory. This is almost always a typo'd path, and the old
+//                   code surfaced it only as N confusing per-file "missing from
+//                   it" failures. Fail once, early, with the offending path.
+//   3. set-valid  → run the assertions below.
+const CORPUS_DIR_STATE: 'unset' | 'broken' | 'valid' = !CORPUS_DIR
+  ? 'unset'
+  : (existsSync(CORPUS_DIR) && statSync(CORPUS_DIR).isDirectory() ? 'valid' : 'broken');
+const SKIP_REASON = CORPUS_DIR_STATE === 'unset'
+  ? 'REAL_SCRIPT_CORPUS_DIR not set — corpus text is local-only (copyright)'
+  : false;
+
 describe('real-script corpus — produced features through the full doctor', () => {
   it('manifest sanity: at least 8 scripts, unique hashes', () => {
     assert.ok(MANIFEST.length >= 8, `manifest has ${MANIFEST.length} entries`);
     assert.equal(new Set(MANIFEST.map(m => m.contentHash)).size, MANIFEST.length);
   });
 
+  // Fail fast on a set-but-broken path so the run doesn't masquerade as a skip
+  // (unset) or bury the real cause under one failure per manifest entry.
+  it('corpus dir integrity: set path must exist and be a directory', { skip: CORPUS_DIR_STATE !== 'broken' && 'only runs when REAL_SCRIPT_CORPUS_DIR is set to a bad path' }, () => {
+    assert.fail(`REAL_SCRIPT_CORPUS_DIR is set to "${CORPUS_DIR}" but that path does not exist or is not a directory — fix the path, or unset it to skip the copyright-gated corpus`);
+  });
+
   for (const entry of MANIFEST) {
-    it(`${entry.name}: exact when byte-identical, floor otherwise`, { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set — corpus text is local-only (copyright)' }, async () => {
+    it(`${entry.name}: exact when byte-identical, floor otherwise`, { skip: SKIP_REASON }, async () => {
       const file = path.join(CORPUS_DIR, entry.file);
       if (!existsSync(file)) {
         assert.fail(`REAL_SCRIPT_CORPUS_DIR is set but ${entry.file} is missing from it`);
@@ -111,7 +132,7 @@ describe('real-script corpus — produced features through the full doctor', () 
 // todo still names the 0.9 target that feature-scale structural detectors
 // (setup-before-payoff ordering, act shape, escalation coherence) must
 // reach. This is the north-star separation metric made executable.
-describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+describe('real-script corpus — structural-degradation AUC', { skip: SKIP_REASON }, () => {
   const SUBSET = 24; // grown from 12 (AUC-conversion wave, 2026-07-10)
   async function measure() {
     const { makePrng, seedFromString, shuffle } = await import('../../server/nvm/repro/seed.ts');
@@ -182,7 +203,7 @@ describe('real-script corpus — structural-degradation AUC', { skip: !CORPUS_DI
 // (act shape, setup-before-payoff ordering, or a less lexicon-noisy
 // escalation measure than suspenseDelta) has an honest, already-measured
 // baseline to improve against instead of discovering this gap cold.
-describe('real-script corpus — act-swap-degradation AUC (second recipe)', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+describe('real-script corpus — act-swap-degradation AUC (second recipe)', { skip: SKIP_REASON }, () => {
   const SUBSET = 24;
   function actSwap(t: string): string {
     const parts = t.split(/^(?=INT\.|EXT\.)/mi);
@@ -226,7 +247,7 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
 // TARGET: forwardEdgeRatio and arcCoherence should each achieve AUC >= 0.70 on
 // the act-swap recipe, proving graph-native scoring solves the position-
 // blindness that lexical rules cannot (DEEP_AUDIT findings #2, #9).
-describe('real-script corpus — Story Graph act-swap discrimination (Wave SG-1)', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+describe('real-script corpus — Story Graph act-swap discrimination (Wave SG-1)', { skip: SKIP_REASON }, () => {
   const SUBSET = 24;
   function actSwap(t: string): string {
     const parts = t.split(/^(?=INT\.|EXT\.)/mi);

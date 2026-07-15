@@ -105,7 +105,7 @@ report doesn't create that pull, no amount of AUC fixes matters — we'd be
 optimizing rigor in isolation from a user again, which is exactly the mistake
 that got us here.
 
-**Operational artifacts:** [P0 evidence summary](docs/user-validation/P0_EVIDENCE_SUMMARY.md) · [phase tracker](docs/user-validation/PHASE_TRACKER.md)
+**Operational artifacts:** [quick-start](docs/user-validation/P0_QUICK_START.md) · [P0 evidence summary](docs/user-validation/P0_EVIDENCE_SUMMARY.md) · [phase tracker](docs/user-validation/PHASE_TRACKER.md) · [static stimulus report](docs/user-validation/sample-coverage-report.html) (regen: `npm run generate-p0-sample`)
 
 **Work:**
 - Recruit >=5 real screenwriters (any career tier, real drafts in hand).

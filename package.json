@@ -14,6 +14,7 @@
     "test": "node --experimental-strip-types --test",
     "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
     "rulebook": "node --experimental-strip-types scripts/generate-rulebook.ts",
+    "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",
     "backup": "node --experimental-strip-types scripts/backup-sessions.ts"
   },
   "dependencies": {

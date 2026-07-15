@@ -36,11 +36,6 @@ import type { EventStore } from '../nvm/kernel/event-store.ts';
 import { getV5Phase1Config } from '../config/v5-flags.ts';
 import { getV5Metrics } from '../monitoring/v5-metrics.ts';
 import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
-// V5.0 PHASE 1: EventStore shadow mode imports
-import type { EventStore } from '../nvm/kernel/event-store.ts';
-import { getV5Phase1Config } from '../config/v5-flags.ts';
-import { getV5Metrics } from '../monitoring/v5-metrics.ts';
-import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
 
 import type { ActionType } from './types.ts';
 

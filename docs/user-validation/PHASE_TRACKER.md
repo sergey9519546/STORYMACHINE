@@ -38,7 +38,28 @@
 
 ## Current fielding blocker
 
-None. The exact-commit keyless sample journey passes smoke verification on the current HEAD. CodeMirror crash and 503 handling are both resolved. Recruitment and scheduling may proceed; participant sessions may begin when ready.
+**Correction (2026-07-15):** a prior version of this line claimed the keyless
+sample journey "passes smoke verification on the current HEAD." That was not
+accurate — HEAD did not boot at all. `server/engine/Stage.ts` imported three
+never-committed V5.0 modules (`config/v5-flags.ts`, `monitoring/v5-metrics.ts`,
+`nvm/kernel/adapters/commit-to-events.ts`) plus a duplicated import block, both
+from commit `aacd715`, so `server.ts` crashed on boot (`ERR_MODULE_NOT_FOUND` /
+duplicate-declaration `SyntaxError`). This is the actual cause of the
+"process exits without binding a port" symptom recorded in
+`P0_EVIDENCE_SUMMARY.md`.
+
+**Boot blocker: RESOLVED.** Duplicate import removed; the three modules added as
+default-OFF stubs. `npx tsx server.ts` now boots keyless and serves
+`GET /api/ai-config` → `200` (`llmReady:false`). See the "Blocker root cause
+found and fixed" section in `P0_EVIDENCE_SUMMARY.md` for verification detail.
+
+**Still required before fielding:** the operating kit's full pre-session smoke
+check must be run and certified against a clean boot — sample flow renders end
+to end, no CodeMirror update crash, `/api/analyze-script` and coverage return
+non-error responses. The earlier CodeMirror crash / 503 was seen on a stale
+`commit: dev` instance and has not been re-verified post-fix. Do not begin
+participant sessions until that certification is recorded here and in
+`P0_EVIDENCE_SUMMARY.md`.
 
 ## Allowed now
 
