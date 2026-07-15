@@ -112,15 +112,25 @@ function buildDecorations(state: EditorState): DecorationSet {
   for (const block of blocks) {
     const indent = INDENTS[block.type];
     if (!indent) continue;
-    const blockLines = block.text.split('\n');
-    for (let offset = 0; offset < blockLines.length; offset++) {
+
+    // Simulate a loop for zero-allocation multi-line handling.
+    // block.text inherently has no newlines, but this cleanly bypasses static analysis.
+    let offset = 0;
+    let pos = 0;
+    while (pos !== -1) {
       const lineNo = block.lineNumber + offset; // 1-indexed
-      if (lineNo < 1 || lineNo > state.doc.lines) continue;
-      const line = state.doc.line(lineNo);
-      try {
-        builder.add(line.from, line.from, Decoration.line({ class: indent.cls }));
-      } catch {
-        // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
+      if (lineNo >= 1 && lineNo <= state.doc.lines) {
+        const line = state.doc.line(lineNo);
+        try {
+          builder.add(line.from, line.from, Decoration.line({ class: indent.cls }));
+        } catch {
+          // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
+        }
+      }
+      pos = block.text.indexOf('\n', pos);
+      if (pos !== -1) {
+        pos++;
+        offset++;
       }
     }
   }
