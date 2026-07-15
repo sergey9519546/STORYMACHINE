@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
+  CheckCircle2,
   ChevronDown,
   Download,
   Home,
@@ -213,16 +215,54 @@ export default function Toolbar({
         >
           {statusLabel}
         </span>
-        {saveStatusLabel ? (
+        
+        {/* Save status chip - now prominent with icons and colors */}
+        {saveStatusLabel && (
           <span
-            className="max-w-[7rem] truncate font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-wider text-[var(--sm-cream)]/55 sm:max-w-[8rem]"
-            title={saveStatusLabel}
+            className={`inline-flex min-h-[28px] items-center gap-1.5 border px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.1em] transition-colors ${
+              saveStatusLabel === "saved-server"
+                ? "border-[var(--sm-ok)] text-[var(--sm-ok)]"
+                : saveStatusLabel === "saving-local"
+                  ? "border-[var(--sm-warn)] text-[var(--sm-warn)]"
+                  : saveStatusLabel === "save-conflict"
+                    ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
+                    : saveStatusLabel === "save-failed"
+                      ? "border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 text-[var(--sm-stamp)]"
+                      : "border-[var(--sm-cream)]/30 text-[var(--sm-cream)]/60"
+            }`}
             role="status"
             aria-live="polite"
+            aria-atomic="true"
+            title={
+              saveStatusLabel === "saved-server"
+                ? "All changes saved to server"
+                : saveStatusLabel === "saving-local"
+                  ? "Saving changes..."
+                  : saveStatusLabel === "save-conflict"
+                    ? "Conflict detected - resolve below"
+                    : saveStatusLabel === "save-failed"
+                      ? "Failed to save - your work may be at risk"
+                      : saveStatusLabel
+            }
           >
-            {saveStatusLabel}
+            {saveStatusLabel === "saved-server" && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+            {saveStatusLabel === "saving-local" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+            {(saveStatusLabel === "save-conflict" || saveStatusLabel === "save-failed") && (
+              <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">
+              {saveStatusLabel === "saved-server"
+                ? "Saved"
+                : saveStatusLabel === "saving-local"
+                  ? "Saving"
+                  : saveStatusLabel === "save-conflict"
+                    ? "Conflict"
+                    : saveStatusLabel === "save-failed"
+                      ? "Not Saved"
+                      : saveStatusLabel}
+            </span>
           </span>
-        ) : null}
+        )}
 
         <div className="relative" ref={exportRef}>
           <button
@@ -276,14 +316,17 @@ export default function Toolbar({
           onClick={onSimulateScript}
           disabled={isSimulating || !onSimulateScript}
           aria-label={isSimulating ? "Simulating script" : "Simulate in Story Machine"}
-          className="flex min-h-[40px] min-w-[40px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] disabled:cursor-wait disabled:opacity-40"
+          aria-busy={isSimulating}
+          className={`flex min-h-[40px] min-w-[40px] items-center gap-1.5 border border-[var(--sm-cream)]/30 px-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--sm-cream)] transition-colors hover:border-[var(--sm-cream)] ${
+            isSimulating ? "cursor-wait opacity-50" : "disabled:opacity-40"
+          }`}
         >
           {isSimulating ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
           ) : (
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          <span className="hidden sm:inline">{isSimulating ? "…" : "Simulate"}</span>
+          <span className="hidden sm:inline">{isSimulating ? "Simulating" : "Simulate"}</span>
         </button>
 
         <div className="relative" ref={overflowRef}>

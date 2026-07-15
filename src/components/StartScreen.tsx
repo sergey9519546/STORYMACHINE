@@ -254,46 +254,62 @@ export default function StartScreen({
                     Start here
                   </h2>
 
-                  {/* One primary path: sample → coverage. Everything else is secondary. */}
+                  {/* Primary CTA: Try sample coverage - this is the golden path for P0 validation */}
                   <button
                     type="button"
                     onClick={handleSample}
                     disabled={isGenerating}
-                    className={`sm-btn sm-btn--stamp group relative flex min-h-[56px] w-full flex-col items-start gap-2 px-7 py-8 text-left sm:px-9 sm:py-9 ${FOCUS_RING}`}
+                    aria-busy={isGenerating}
+                    className={`sm-btn sm-btn--stamp group relative flex min-h-[72px] w-full flex-col items-start gap-2.5 px-8 py-10 text-left sm:px-10 sm:py-12 ${FOCUS_RING} ${
+                      isGenerating ? "cursor-wait opacity-50" : ""
+                    }`}
                   >
-                    <span className="sm-stamp absolute -right-3 -top-3 rotate-[6deg] text-[10px]">
+                    <span className="sm-stamp absolute -right-3 -top-3 rotate-[6deg] text-[11px] font-bold">
                       Recommended
                     </span>
-                    <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]/60">
-                      One click · full coverage
+                    <span className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.3em] text-[var(--sm-cream)]/70">
+                      One click · instant feedback
                     </span>
-                    <span className="flex items-center gap-3 font-[family-name:var(--sm-font-display)] text-2xl uppercase tracking-wide text-[var(--sm-cream)] sm:text-3xl">
-                      <Sparkles className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    <span className="flex items-center gap-3 font-[family-name:var(--sm-font-display)] text-3xl uppercase tracking-wide text-[var(--sm-cream)] sm:text-4xl">
+                      <Sparkles className="h-7 w-7 shrink-0" aria-hidden="true" />
                       Try sample coverage
                     </span>
-                    <span className="max-w-[42ch] text-sm text-[var(--sm-cream)]/70">
-                      Load a script, open the desk, run Script Doctor. No setup.
+                    <span className="max-w-[46ch] text-[15px] leading-relaxed text-[var(--sm-cream)]/80">
+                      See Script Doctor in action. Load a professional screenplay, get instant analysis with verdict, craft dimensions, and top issues. No setup required.
                     </span>
                   </button>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {/* Secondary actions: Open existing work or start fresh */}
+                  <div className="flex flex-col gap-2.5 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => openFileInputRef.current?.click()}
                       disabled={isGenerating}
-                      className={`sm-btn flex items-center justify-center gap-2 ${FOCUS_RING}`}
+                      aria-busy={isGenerating}
+                      className={`sm-btn flex flex-1 items-center justify-center gap-2.5 py-4 ${FOCUS_RING} ${
+                        isGenerating ? "cursor-wait opacity-50" : ""
+                      }`}
                     >
-                      <Upload className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      Open my script
+                      <Upload className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      <span className="flex flex-col items-start gap-0.5 text-left">
+                        <span className="font-bold">Open my script</span>
+                        <span className="text-[9px] opacity-70">Fountain, TXT, or FDX</span>
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                       disabled={isGenerating}
-                      className={`sm-btn flex items-center justify-center gap-2 ${FOCUS_RING}`}
+                      aria-busy={isGenerating}
+                      className={`sm-btn flex flex-1 items-center justify-center gap-2.5 py-4 ${FOCUS_RING} ${
+                        isGenerating ? "cursor-wait opacity-50" : ""
+                      }`}
                     >
-                      <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      Blank page
+                      <FileText className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      <span className="flex flex-col items-start gap-0.5 text-left">
+                        <span className="font-bold">Start fresh</span>
+                        <span className="text-[9px] opacity-70">Blank page</span>
+                      </span>
                     </button>
                     <input
                       type="file"
@@ -322,20 +338,8 @@ export default function StartScreen({
                   )}
                 </section>
 
-                <div className="flex flex-col items-start gap-3 border-t border-ink/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setView("wizard")}
-                    disabled={isGenerating}
-                    className={`group inline-flex min-h-[40px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/50 transition-colors ${MICRO_TRANSITION} hover:text-ink disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
-                  >
-                    <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    New story wizard
-                    <ChevronRight
-                      className={`h-3.5 w-3.5 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
-                      aria-hidden="true"
-                    />
-                  </button>
+                {/* Tertiary/advanced actions - visually de-emphasized */}
+                <div className="flex flex-col items-start gap-3 border-t border-ink/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-4">
                     <a
                       href="#how-it-works"
@@ -343,15 +347,30 @@ export default function StartScreen({
                     >
                       How it works
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => onOpenStoryMachine?.()}
-                      className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/45 transition-colors ${MICRO_TRANSITION} hover:text-ink ${FOCUS_RING}`}
-                    >
-                      <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
-                      Simulate later
-                    </button>
+                    {onOpenStoryMachine && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenStoryMachine()}
+                        className={`inline-flex min-h-[40px] items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/35 transition-colors ${MICRO_TRANSITION} hover:text-ink/60 ${FOCUS_RING}`}
+                      >
+                        <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+                        Advanced: Simulation
+                      </button>
+                    )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setView("wizard")}
+                    disabled={isGenerating}
+                    className={`group inline-flex min-h-[40px] items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-ink/35 transition-colors ${MICRO_TRANSITION} hover:text-ink/60 disabled:pointer-events-none disabled:opacity-40 ${FOCUS_RING}`}
+                  >
+                    <FilePlus2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Advanced: Story wizard
+                    <ChevronRight
+                      className={`h-3.5 w-3.5 transition-transform ${MICRO_TRANSITION} group-hover:translate-x-1`}
+                      aria-hidden="true"
+                    />
+                  </button>
                 </div>
               </motion.main>
             </div>
@@ -509,7 +528,7 @@ export default function StartScreen({
                       Back to the page
                     </h2>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {["3,216 rules", "Keyless analysis", "Inspectable"].map((chip) => (
+                      {["Keyless analysis", "Inspectable", "Reproducible"].map((chip) => (
                         <span key={chip} className="sm-chip">
                           {chip}
                         </span>

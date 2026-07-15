@@ -30,6 +30,7 @@ import {
   type ScriptIDEServerSnapshot,
 } from "../lib/scriptide-draft-store";
 import {
+  AlertCircle,
   Loader2,
   BookOpen,
   Film,
@@ -38,6 +39,7 @@ import {
   Sparkles,
   Camera,
   Layers,
+  Upload,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -1401,25 +1403,34 @@ export default function ScriptIDE({
         )}
         {saveConflict && (
           <div
-            className="z-30 flex flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-warn)] px-3 py-2 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]"
+            className="z-30 flex flex-wrap items-center gap-3 border-b-[2px] border-[var(--sm-stamp)] bg-[var(--sm-stamp)]/10 px-4 py-3 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]"
             role="alert"
+            aria-live="assertive"
           >
-            <span className="mr-auto font-bold uppercase tracking-wider">
-              This draft changed in another tab.
-            </span>
+            <AlertCircle className="h-5 w-5 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
+            <div className="mr-auto flex flex-col gap-1">
+              <span className="font-bold uppercase tracking-wider text-[var(--sm-stamp)]">
+                Save Conflict Detected
+              </span>
+              <span className="text-[10px] text-[var(--sm-ink)]/70">
+                This draft was modified in another tab or window. Choose which version to keep.
+              </span>
+            </div>
             <button
               type="button"
               onClick={useServerConflictDraft}
-              className="min-h-8 border border-[var(--sm-ink)] bg-[var(--sm-panel)] px-3 font-bold uppercase"
+              className="sm-btn min-h-9 border-[var(--sm-ink)] bg-[var(--sm-panel)] px-4 text-[10px]"
+              title="Discard your local changes and use the server version"
             >
-              Use server
+              Use Server Version
             </button>
             <button
               type="button"
               onClick={keepLocalConflictDraft}
-              className="min-h-8 bg-[var(--sm-ink)] px-3 font-bold uppercase text-[var(--sm-cream)]"
+              className="sm-btn sm-btn--stamp min-h-9 px-4 text-[10px] font-extrabold"
+              title="Overwrite server with your local changes"
             >
-              Keep mine
+              Keep My Changes
             </button>
           </div>
         )}
@@ -1701,33 +1712,42 @@ export default function ScriptIDE({
           {/* Empty draft coach — Write mode only; disappears on first keystroke */}
           {isEmptyDraft && task === "write" && toolSlot === "none" && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[16%] sm:pt-[12%]">
-              <div className="pointer-events-auto mx-4 max-w-[42ch] text-center">
+              <div className="pointer-events-auto sm-panel mx-4 max-w-[48ch] px-8 py-8 text-center shadow-[var(--sm-shadow-lg)]">
                 <p className="font-[family-name:var(--sm-font-hand)] text-lg text-[var(--sm-ink-faint)]">
                   the page is yours
                 </p>
                 <h2 className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none tracking-[0.04em] text-[var(--sm-ink)]">
-                  Start writing
+                  Start Your Script
                 </h2>
-                <p className="mt-3 font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)]">
-                  Type FADE IN: to begin, or load the sample.
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <div className="mt-5 rounded border border-[var(--sm-hair)] bg-[var(--sm-panel-2)] px-4 py-4 text-left">
+                  <p className="font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)]">
+                    Type or paste Fountain format:
+                  </p>
+                  <pre className="mt-2 font-[family-name:Courier_Prime] text-[13px] leading-relaxed text-[var(--sm-ink-soft)]">
+                    FADE IN:
+                    <br />
+                    <br />
+                    INT. COFFEE SHOP - DAY
+                  </pre>
+                </div>
+                <div className="mt-6 flex flex-wrap justify-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => {
                       setDoctorAutoSample(true);
                       handleTaskChange("coverage");
                     }}
-                    className="sm-btn sm-btn--stamp min-h-[44px]"
+                    className="sm-btn sm-btn--stamp min-h-[44px] px-5"
                   >
-                    Sample coverage
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Try Sample Script
                   </button>
                   <button
                     type="button"
                     onClick={() => editorRef.current?.getView()?.focus()}
-                    className="sm-btn min-h-[44px]"
+                    className="sm-btn min-h-[44px] px-5"
                   >
-                    Focus editor
+                    Start Typing
                   </button>
                 </div>
               </div>
