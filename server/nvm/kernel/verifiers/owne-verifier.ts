@@ -21,10 +21,11 @@ export interface OwneViolation {
   type: 'world-inconsistency' | 'unmotivated-action' | 'unearned-payoff' | 'continuity-break' | 'logic-violation';
   severity: 'critical' | 'medium' | 'low';
   message: string;
-  factIds?: string[];  // Conflicting facts
-  characterIds?: string[];  // Characters involved
+  factIds?: string[];
+  characterIds?: string[];
+  objectIds?: string[];  // Added for Trinity Gate metadata compatibility
   repairSuggestions: string[];
-  confidence: number;  // 0-1
+  confidence: number;
 }
 
 export interface OwneVerification {
