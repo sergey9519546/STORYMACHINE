@@ -208,6 +208,9 @@ export default function ScriptIDE({
   const [coverageStale, setCoverageStale] = useState(false);
   /** Progressive depth: summary first; full Script Doctor is opt-in. */
   const [coverageFull, setCoverageFull] = useState(false);
+  /** Current cursor line (1-based) for sidebar scene highlighting. */
+  const [currentLine, setCurrentLine] = useState(1);
+  const currentLineRef = useRef(1);
   const [prefsOpen, setPrefsOpen] = useState<"none" | "copilot" | "collab">("none");
   const [directorsLayer, setDirectorsLayer] = useState(false);
   // Live Notes ("ESLint for screenplays") — off by default: a writer drafting
@@ -969,6 +972,25 @@ export default function ScriptIDE({
     return () => document.removeEventListener("keydown", onKey);
   }, [prefsOpen, toolSlot, task, sidebarOpen, coverageFull]);
 
+  // Poll the editor cursor at ~250ms to highlight the active scene in the sidebar.
+  // Uses requestAnimationFrame-gated interval to avoid re-render storm.
+  useEffect(() => {
+    let raf: number;
+    const poll = () => {
+      const view = editorRef.current?.getView();
+      if (view) {
+        const line = view.state.doc.lineAt(view.state.selection.main.head).number;
+        if (line !== currentLineRef.current) {
+          currentLineRef.current = line;
+          setCurrentLine(line);
+        }
+      }
+      raf = requestAnimationFrame(poll);
+    };
+    raf = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const handleScriptChange = (text: string) => {
     setScriptText(text);
     setCoverageStale(true);
@@ -1365,6 +1387,7 @@ export default function ScriptIDE({
         scriptText={scriptText}
         parsedBlocks={parsedBlocks}
         onNavigate={handleNavigate}
+        currentLine={currentLine}
         mobileOpen={sidebarOpen}
         onCloseMobile={() => setSidebarOpen(false)}
       />
@@ -1677,11 +1700,11 @@ export default function ScriptIDE({
           {/* Page furniture — quiet manuscript metadata in the right gutter */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-4 right-4 hidden items-end gap-3 font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-ink-faint)]/50 md:flex"
+            className="pointer-events-none absolute bottom-3 right-5 z-10 hidden items-end gap-2 font-[family-name:var(--sm-font-mono)] text-[10px] uppercase tracking-[0.14em] text-[var(--sm-ink-faint)]/60 md:flex"
           >
-            <span className="tabular-nums">{pageCount} {pageCount === 1 ? "page" : "pages"}</span>
-            <span className="text-[var(--sm-ink-faint)]/20">·</span>
             <span className="tabular-nums">{stats.wordCount}w</span>
+            <span className="text-[var(--sm-ink-faint)]/30">·</span>
+            <span className="tabular-nums">{pageCount} {pageCount === 1 ? "page" : "pages"}</span>
           </div>
 
           {/* Empty draft coach — Write mode only; disappears on first keystroke */}

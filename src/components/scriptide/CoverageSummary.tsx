@@ -126,7 +126,8 @@ export default function CoverageSummary({
 
   return (
     <aside
-      className="fixed top-0 right-0 z-50 flex h-dvh w-full max-w-[400px] flex-col border-l-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] text-[var(--sm-ink)] shadow-[-6px_0_24px_rgba(33,29,21,0.08)] sm:w-[380px]"
+      className="fixed top-0 right-0 z-50 flex h-dvh w-full max-w-[400px] flex-col border-l-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-panel)] text-[var(--sm-ink)] sm:w-[380px]"
+      style={{ boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.6), -24px 0 48px -20px rgba(33,29,21,0.25)' }}
       role="region"
       aria-labelledby="coverage-summary-title"
     >

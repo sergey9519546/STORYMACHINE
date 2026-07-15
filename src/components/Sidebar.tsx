@@ -41,6 +41,8 @@ interface SidebarProps {
   scriptText: string;
   parsedBlocks: FountainBlock[];
   onNavigate: (lineIndex: number) => void;
+  /** 1-based cursor line from the editor — used to highlight the active scene. */
+  currentLine?: number;
   /**
    * Mobile drawer mode. When true (and the viewport is below md), the Sidebar
    * renders as a left-sliding overlay with a dismiss button and backdrop,
@@ -142,7 +144,7 @@ function LongTextField({
   );
 }
 
-export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate, mobileOpen = false, onCloseMobile }: SidebarProps) {
+export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter, scriptText, parsedBlocks, onNavigate, currentLine = 1, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'scenes' | 'characters'>('scenes');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -181,6 +183,14 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
     const query = searchQuery.toLowerCase();
     return scenes.filter(s => s.location.toLowerCase().includes(query) || s.text.toLowerCase().includes(query));
   }, [scenes, searchQuery]);
+
+  /** Which filtered scene contains the cursor, or -1 if none. */
+  const activeSceneIdx = useMemo(() => {
+    for (let i = filteredScenes.length - 1; i >= 0; i--) {
+      if (currentLine >= filteredScenes[i].lineNumber) return i;
+    }
+    return -1;
+  }, [filteredScenes, currentLine]);
 
   const filteredCharacters = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -280,22 +290,32 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
               </span>
             </div>
             <ol className="divide-y divide-[var(--sm-hair)]">
-              {filteredScenes.map((scene) => (
+              {filteredScenes.map((scene, idx) => (
                 <li key={scene.index}>
                   <button
                     onClick={() => handleNavigate(scene.index)}
-                    className="group relative flex w-full items-start gap-3 py-2.5 pl-3 pr-2 text-left transition-colors hover:bg-[var(--sm-panel)]"
+                    className={`group relative flex w-full items-start gap-3 py-2.5 pl-3 pr-2 text-left transition-colors ${
+                      idx === activeSceneIdx
+                        ? "bg-[var(--sm-panel)]"
+                        : "hover:bg-[var(--sm-panel)]"
+                    }`}
                   >
-                    {/* stamp left-edge cue on hover, echoing sm-card--sel */}
+                    {/* stamp left-edge cue — always visible when active, hover otherwise */}
                     <span
                       aria-hidden="true"
-                      className="absolute inset-y-0 left-0 w-[3px] bg-[var(--sm-stamp)] opacity-0 transition-opacity group-hover:opacity-100"
+                      className={`absolute inset-y-0 left-0 w-[3px] bg-[var(--sm-stamp)] transition-opacity ${
+                        idx === activeSceneIdx ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      }`}
                     />
-                    <span className="mt-0.5 w-5 shrink-0 font-[family-name:var(--sm-font-mono)] text-[10px] tabular-nums text-[var(--sm-ink-faint)]">
+                    <span className={`mt-0.5 w-5 shrink-0 font-[family-name:var(--sm-font-mono)] text-[10px] tabular-nums ${
+                      idx === activeSceneIdx ? "text-[var(--sm-stamp)]" : "text-[var(--sm-ink-faint)]"
+                    }`}>
                       {String(scene.sceneNumber).padStart(2, '0')}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-wide text-[var(--sm-ink)]">
+                      <span className={`block truncate font-[family-name:var(--sm-font-mono)] text-[11px] font-bold uppercase tracking-wide ${
+                        idx === activeSceneIdx ? "text-[var(--sm-ink)]" : "text-[var(--sm-ink)]"
+                      }`}>
                         {scene.location}
                       </span>
                       {(scene.prefix || scene.time) && (

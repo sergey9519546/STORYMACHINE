@@ -30,6 +30,8 @@ import { scriptDiagnostics } from './diagnostics.ts';
 export interface FountainEditorHandle {
   /** Navigate to a specific 1-indexed line number */
   navigateTo(line: number): void;
+  /** Returns the 1-based line number of the cursor, or 1 if unavailable */
+  getCurrentLine(): number;
   /** Returns the EditorView for advanced integrations */
   getView(): EditorView | null;
 }
@@ -204,6 +206,13 @@ const FountainEditor = forwardRef<FountainEditorHandle, FountainEditorProps>(
           effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
         });
         view.focus();
+      },
+      /** Returns the 1-based line number of the cursor, or 1 if unavailable. */
+      getCurrentLine() {
+        const view = viewRef.current;
+        if (!view) return 1;
+        const pos = view.state.selection.main.head;
+        return view.state.doc.lineAt(pos).number;
       },
       getView: () => viewRef.current,
     }));

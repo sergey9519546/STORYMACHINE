@@ -2060,14 +2060,15 @@ export default function ScriptDoctorPanel({
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-dvh bg-white dark:bg-zinc-900 dark:text-white brutal-border-thick text-black p-0 overflow-y-auto z-50 brutal-shadow flex flex-col"
+      className="fixed top-0 right-0 w-[640px] max-w-[94vw] h-dvh bg-[var(--sm-panel)] text-[var(--sm-ink)] border-l-[1.5px] border-[var(--sm-ink)] p-0 overflow-y-auto z-50 flex flex-col"
+      style={{ boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.6), -24px 0 48px -20px rgba(33,29,21,0.25)' }}
     >
       {/* Chrome header */}
-      <div className="flex flex-wrap items-center gap-3 p-6 pb-4 border-b-[8px] border-black shrink-0">
-        <Stethoscope className="w-8 h-8 shrink-0" aria-hidden="true" />
+      <div className="flex flex-wrap items-center gap-3 px-6 py-5 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-night)] text-[var(--sm-cream)] shrink-0">
+        <Stethoscope className="w-5 h-5 shrink-0 opacity-80" aria-hidden="true" />
         <h2
           id="script-doctor-title"
-          className="text-2xl font-display uppercase tracking-widest flex-1"
+          className="font-[family-name:var(--sm-font-display)] text-xl uppercase tracking-widest flex-1"
         >
           Script Doctor
         </h2>
@@ -2093,7 +2094,7 @@ export default function ScriptDoctorPanel({
           disabled={status === "loading"}
           aria-label="Upload script file to diagnose instead of the editor content"
           title="Upload a .fountain, .txt, Final Draft (.fdx), or PDF file to diagnose instead of the editor content"
-          className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+          className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
         >
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> Upload script
         </button>
@@ -2117,7 +2118,7 @@ export default function ScriptDoctorPanel({
                 ? "Export re-verifies deterministically (quick read) — run a quick diagnosis to export"
                 : "Export the current report as a downloadable HTML coverage document"
             }
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {exportStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2138,7 +2139,7 @@ export default function ScriptDoctorPanel({
             disabled={breakdownStatus === "loading"}
             aria-label="Export a scene/character breakdown as CSV"
             title="Download a production breakdown (scenes, characters, locations) as CSV"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {breakdownStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2154,7 +2155,7 @@ export default function ScriptDoctorPanel({
             disabled={pitchkitStatus === "loading"}
             aria-label="Export a standalone pitch kit as HTML"
             title="Download a standalone, shareable pitch kit document (HTML)"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             {pitchkitStatus === "loading" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -2169,7 +2170,7 @@ export default function ScriptDoctorPanel({
             onClick={() => runDiagnosis()}
             disabled={isEmpty}
             aria-label="Re-run diagnosis"
-            className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest brutal-border bg-white text-black hover:bg-black hover:text-white transition-colors disabled:opacity-40 flex items-center gap-1.5"
+            className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Re-run
           </button>
@@ -2177,9 +2178,9 @@ export default function ScriptDoctorPanel({
         <button
           onClick={onClose}
           aria-label="Close Script Doctor panel"
-          className="p-2 brutal-border hover:bg-black hover:text-white transition-colors"
+          className="sm-btn border-[var(--sm-cream)]/30 p-2 text-[var(--sm-cream)] hover:border-[var(--sm-cream)]"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
       </div>
 
