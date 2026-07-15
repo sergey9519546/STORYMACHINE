@@ -48,6 +48,7 @@ import { detectSilence } from './silence-signal.ts';
 import { detectBonding } from './bonding-signal.ts';
 import { detectColdOpenPromise } from './cold-open-promise.ts';
 import { detectPatternEstablishment } from './pattern-establishment.ts';
+import { analyzeStoryGraph } from './story-graph.ts';
 import { getReferenceDistribution } from './calibration/reference.ts';
 import { percentileRank, percentileDescriptor } from './calibration/percentile.ts';
 import { computeNarrativeMetrics } from './metrics.ts';
@@ -1848,6 +1849,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     bonding: detectBonding(fountain),
     coldOpenPromise: detectColdOpenPromise(fountain),
     patternEstablishment: detectPatternEstablishment(fountain),
+    storyGraph: analysis.sceneCount > 0 ? analyzeStoryGraph(analysis) : undefined,
     ...(analysis.truncatedForAnalysis
       ? { truncatedForAnalysis: true, totalSceneCount: analysis.totalSceneCount }
       : {}),

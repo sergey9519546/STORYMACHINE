@@ -213,3 +213,91 @@ describe('real-script corpus — act-swap-degradation AUC (second recipe)', { sk
     assert.ok(m.auc >= 0.9, `AUC ${m.auc.toFixed(3)} < 0.9 target (informational until a global-arc detector exists)`);
   });
 });
+
+// —— Story Graph metrics: graph-native act-swap discrimination (Wave SG-1) ——
+// The Story Graph layer (server/nvm/analyze/story-graph.ts) constructs typed
+// causal-temporal graphs from existing scene signals (seededClueIds,
+// payoffSetupIds, relationshipShifts) and scores graph-native properties that
+// are ORDER-AWARE by construction. Unlike lexical rules (which count words) or
+// even the emotional-arc signal (which reads position via correlation), graph
+// metrics directly measure CAUSAL DIRECTION (setup → payoff vs. payoff →
+// setup) and STRUCTURAL PROGRESSION (tension rising across acts).
+//
+// TARGET: forwardEdgeRatio and arcCoherence should each achieve AUC >= 0.70 on
+// the act-swap recipe, proving graph-native scoring solves the position-
+// blindness that lexical rules cannot (DEEP_AUDIT findings #2, #9).
+describe('real-script corpus — Story Graph act-swap discrimination (Wave SG-1)', { skip: !CORPUS_DIR && 'REAL_SCRIPT_CORPUS_DIR not set' }, () => {
+  const SUBSET = 24;
+  function actSwap(t: string): string {
+    const parts = t.split(/^(?=INT\.|EXT\.)/mi);
+    const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
+    const scenes = parts.filter(x => /^(INT\.|EXT\.)/i.test(x));
+    const n = scenes.length;
+    const a = Math.ceil(n / 3);
+    const b = Math.ceil((n / 3) * 2);
+    const thirds = [scenes.slice(0, a), scenes.slice(a, b), scenes.slice(b)];
+    return head + [...thirds[2], ...thirds[0], ...thirds[1]].join('');
+  }
+  
+  async function measureGraphMetric(metricExtractor: (report: Awaited<ReturnType<typeof runScriptDoctor>>) => number) {
+    const files = MANIFEST.slice(0, SUBSET).map(m => m.file);
+    const goods: number[] = [], bads: number[] = [];
+    for (const f of files) {
+      const t = readFileSync(path.join(CORPUS_DIR, f), 'utf8');
+      const intactReport = await runScriptDoctor(t);
+      const swappedReport = await runScriptDoctor(actSwap(t));
+      
+      const intactMetric = metricExtractor(intactReport);
+      const swappedMetric = metricExtractor(swappedReport);
+      
+      goods.push(intactMetric);
+      bads.push(swappedMetric);
+    }
+    let wins = 0, ties = 0;
+    for (const g of goods) for (const b of bads) { if (g > b) wins++; else if (g === b) ties++; }
+    return { 
+      auc: (wins + ties / 2) / (goods.length * bads.length),
+      goods,
+      bads,
+      meanGood: goods.reduce((a, b) => a + b, 0) / goods.length,
+      meanBad: bads.reduce((a, b) => a + b, 0) / bads.length,
+    };
+  }
+  
+  it('forwardEdgeRatio: intact scripts show higher forward progression than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 0.5; // Fallback if no graph (shouldn't happen)
+      return report.storyGraph.graph.forwardEdgeRatio;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `forwardEdgeRatio AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `graph-native causality metric should detect backward edges in act-swapped scripts`);
+  });
+  
+  it('arcCoherence: intact scripts show higher tension-position correlation than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 0; // Fallback
+      // Normalize arcCoherence from [-1, 1] to [0, 1] for AUC comparison
+      return (report.storyGraph.graph.arcCoherence + 1) / 2;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `arcCoherence AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `position-aware tension correlation should detect act-swap scrambling`);
+  });
+  
+  it('graphHealth composite: intact scripts show higher overall graph quality than act-swapped (AUC >= 0.70)', async () => {
+    const result = await measureGraphMetric(report => {
+      if (!report.storyGraph) return 50; // Fallback
+      return report.storyGraph.graphHealth;
+    });
+    
+    assert.ok(result.auc >= 0.70,
+      `graphHealth AUC ${result.auc.toFixed(3)} < 0.70 target ` +
+      `(meanIntact=${result.meanGood.toFixed(3)}, meanSwapped=${result.meanBad.toFixed(3)}) — ` +
+      `composite graph metric should discriminate structural coherence`);
+  });
+});

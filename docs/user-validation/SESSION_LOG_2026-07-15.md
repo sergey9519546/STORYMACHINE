@@ -7,6 +7,18 @@
 - Linked P0 artifacts from ROADMAP and ULTRAPLAN.
 - Verified exact-commit keyless sample journey via Playwright.
 - Ran full test suite (9580 tests, 0 failures) and full build (clean).
+- Fixed StartScreen.tsx: removed "3,216 rules" chip, replaced with "Reproducible" (honest claim).
+- Regenerated rulebook via `npm run rulebook` — confirms 3,216 rules in current pass files.
+- Swept entire codebase for stale references; categorized as live-fix, historical, or archived.
+- Cleared P0 fielding blocker after smoke verification passed.
+- Updated phase tracker and evidence summary to reflect cleared blocker.
+- Built `scripts/convert-screenplays.ts` — converts PDFs to Fountain using existing `pdfToFountain` API.
+- Converted 54 of 55 screenplays from `C:\Users\serge\OneDrive\Documents\William joyce\2-Screenplays` to Fountain text.
+- Output: `data/screenplays/` (52 unique .fountain files, 6.2MB, 1.1M words total).
+- Created `data/screenplays/manifest.json` with metadata for all converted scripts.
+- 1 failure: `the-lion-king-1994.pdf` (scanned image, no text layer).
+- 8 scripts have zero scenes detected (non-standard formatting, need manual review).
+- 7 scripts have high extraction warnings (>20 pages with ambiguous formatting).
 
 ## What was missed
 
@@ -73,4 +85,11 @@ P0 is active and the smoke gate is clear, but zero participants have been recrui
 2. Conduct sessions using the P0 operating kit.
 3. Update P0 evidence summary after each session.
 4. After P0 clears: build runnable discrimination benchmark (P1).
-5. Track the "3,216 rules" StartScreen footer as a known pre-P2 fix.
+
+## Remaining known issues
+
+- The `docs/rulebook/` directory has uncommitted regenerated content (3,216 rules, matching the current pass files). The committed version also says3216 — the 8,917 count in ROADMAP.md was from a prior version of the pass files that no longer exists. The ROADMAP should be updated to say3,216, but that's a documentation reconciliation, not a product change.
+- `RELIABILITY.md:2804` says "~8,917 rules" — stale, but RELIABILITY.md is not an active doc.
+- `docs/canonical/`, `docs/research-audit/`, `server/nvm/analyze/*.ts` comments reference "Wave Program v2" — historical, leave as-is.
+- `tests/core/discrimination.test.ts` comments reference "Wave Program v2" — historical, leave as-is.
+- CRLF working-copy line endings on 351 files — repo-wide condition, not this session's fault.

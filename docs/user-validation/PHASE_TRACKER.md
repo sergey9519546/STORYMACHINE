@@ -8,7 +8,7 @@
 
 | Phase | Status | Blocked by | Gate state |
 |---|---|---|---|
-| P0 — Validate with real writers | **ACTIVE — FIELDING BLOCKED** | Exact-commit pre-session smoke | Not met |
+| P0 — Validate with real writers | **ACTIVE** | — | Not met |
 | P1 — Make the score provably discriminate on real writing | **BLOCKED** | P0 | Not evaluated |
 | P2 — Collapse the surface to Doctor + Editor | **BLOCKED** | P0 + P1 | Not evaluated |
 | P3 — Ship the shareable, verifiable coverage report | **BLOCKED** | P0 + P1 + P2 | Not evaluated |
@@ -38,7 +38,7 @@
 
 ## Current fielding blocker
 
-The intended stimulus commit is `e7b9a946510da21f2cab4b8b3eaa8621e76e9cf1`, but supported keyless launch attempts exited 0 without binding the requested isolated port in this environment. An older local `commit: dev` instance reached sample coverage provisionally, but logged a CodeMirror update crash and `503` responses from `/api/analyze-script`; it is not certified for sessions. Recruitment and scheduling may continue. **Do not conduct a participant session until the exact-commit sample journey passes smoke verification.** Resolving this blocker requires a separately approved, narrowly scoped reliability task unless an environment-only invocation is found.
+None. The exact-commit keyless sample journey passes smoke verification on the current HEAD. CodeMirror crash and 503 handling are both resolved. Recruitment and scheduling may proceed; participant sessions may begin when ready.
 
 ## Allowed now
 

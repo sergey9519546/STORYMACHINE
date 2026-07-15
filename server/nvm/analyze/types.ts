@@ -14,6 +14,7 @@ import type { SceneAnnotation } from '../screenplay/compile.ts';
 import type { StructureState } from '../screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { NarrativeMetricsReport } from './metrics.ts';
+import type { StoryGraphReport } from './story-graph.ts';
 
 /** Output of the heuristic Fountain analyzer — everything the revision
  *  pipeline needs, reconstructed from raw text instead of StoryCommits. */
@@ -272,6 +273,15 @@ export interface ScriptDoctorReport {
   bonding?: import('./bonding-signal.ts').BondingReport;
   coldOpenPromise?: import('./cold-open-promise.ts').ColdOpenReport;
   patternEstablishment?: import('./pattern-establishment.ts').PatternReport;
+  /** Wave SG-1: Story Graph diagnostic analysis. Constructs typed
+   *  causal-temporal graph from existing scene signals (seededClueIds,
+   *  payoffSetupIds, relationshipShifts), scores graph-native properties
+   *  (promise-payment ratio, arc coherence, escalation monotonicity,
+   *  forward-edge ratio) to solve act-swap AUC 0.48 and rule-channel AUC 0.076
+   *  failures (DEEP_AUDIT findings #2, #9). Diagnostic only — not yet coupled
+   *  to health. Optional so reports serialized before this field existed stay
+   *  valid; the doctor populates it on every non-degenerate run. */
+  storyGraph?: StoryGraphReport;
   /** Set by the HTTP route when it knows the submission format. */
   source?: DoctorSource;
   /** Present ONLY on deep-read reports (POST /api/scriptide/doctor/deep).
