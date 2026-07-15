@@ -182,10 +182,20 @@ Another isolated scene.
     
     const report = await runScriptDoctor(fountain);
     assert.ok(report.storyGraph);
-    assert.ok(Array.isArray(report.storyGraph.findings));
     
-    // Should have some findings array, even if empty
-    assert.ok(report.storyGraph.findings.length >= 0);
+    // Phase 2: Enhanced diagnostics structure
+    assert.ok(report.storyGraph.diagnostics);
+    assert.ok(Array.isArray(report.storyGraph.diagnostics.critical));
+    assert.ok(Array.isArray(report.storyGraph.diagnostics.medium));
+    assert.ok(Array.isArray(report.storyGraph.diagnostics.low));
+    assert.ok(Array.isArray(report.storyGraph.diagnostics.strengths));
+    
+    // Should have summary statistics
+    assert.ok(report.storyGraph.summary);
+    assert.ok(typeof report.storyGraph.summary.totalIssues === 'number');
+    assert.ok(typeof report.storyGraph.summary.criticalCount === 'number');
+    assert.ok(typeof report.storyGraph.summary.strengthCount === 'number');
+    assert.ok(['strong', 'good', 'needs-work', 'weak'].includes(report.storyGraph.summary.overallAssessment));
   });
   
   it('computes graphHealth composite score', async () => {

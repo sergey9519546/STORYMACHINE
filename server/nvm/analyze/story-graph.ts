@@ -75,15 +75,39 @@ export interface StoryGraph {
   scored: boolean;
 }
 
+// Enhanced diagnostic types (Phase 2)
+export type DiagnosticSeverity = 'critical' | 'medium' | 'low' | 'strength';
+
+export interface EnhancedDiagnostic {
+  severity: DiagnosticSeverity;
+  type: 'unpaid-promise' | 'isolated-scene' | 'backward-arc' | 'flat-tension' | 'tight-causality' | 'strong-escalation' | 'high-closure';
+  sceneIdx?: number;
+  sceneRange?: [number, number];  // For multi-scene issues
+  message: string;
+  impact: string;  // Why this matters
+  suggestions: string[];  // How to fix it
+  relatedScenes?: number[];  // Connected scenes
+  confidence?: number;  // 0-1, how sure we are
+}
+
 export interface StoryGraphReport {
   graph: StoryGraph;
   
-  // User-facing findings
-  findings: Array<{
-    type: 'unpaid-promise' | 'isolated-scene' | 'backward-arc' | 'flat-tension';
-    sceneIdx?: number;
-    message: string;
-  }>;
+  // Enhanced diagnostics (Phase 2)
+  diagnostics: {
+    critical: EnhancedDiagnostic[];
+    medium: EnhancedDiagnostic[];
+    low: EnhancedDiagnostic[];
+    strengths: EnhancedDiagnostic[];
+  };
+  
+  // Summary statistics
+  summary: {
+    totalIssues: number;
+    criticalCount: number;
+    strengthCount: number;
+    overallAssessment: 'strong' | 'good' | 'needs-work' | 'weak';
+  };
   
   // Diagnostic scores (not in health yet)
   graphHealth: number;  // 0-100 composite
@@ -336,6 +360,203 @@ function pearsonCorrelation(a: number[], b: number[]): number {
   return denominator > 0 ? numerator / denominator : 0;
 }
 
+// ── Enhanced Diagnostics (Phase 2) ───────────────────────────────────────────
+
+/** Classify severity based on finding type and context */
+function classifySeverity(
+  finding: { type: string; sceneIdx?: number },
+  analysis: FountainAnalysis,
+  graph: StoryGraph
+): DiagnosticSeverity {
+  const sceneCount = analysis.sceneCount;
+  const act1End = Math.floor(sceneCount * 0.25);
+  const act2End = Math.floor(sceneCount * 0.75);
+  
+  if (finding.type === 'unpaid-promise' && finding.sceneIdx !== undefined) {
+    // Critical if setup in Act 1, medium if Act 2, low if Act 3
+    if (finding.sceneIdx < act1End) return 'critical';
+    if (finding.sceneIdx < act2End) return 'medium';
+    return 'low';
+  }
+  
+  if (finding.type === 'isolated-scene' && finding.sceneIdx !== undefined) {
+    // Critical if isolated at key structural positions
+    const position = finding.sceneIdx / Math.max(sceneCount - 1, 1);
+    const isKeyPosition = 
+      position < 0.05 ||  // Opening
+      (position > 0.23 && position < 0.27) ||  // Act 1 break
+      (position > 0.48 && position < 0.52) ||  // Midpoint
+      (position > 0.73 && position < 0.77) ||  // Act 2 break
+      position > 0.95;  // Climax/resolution
+    return isKeyPosition ? 'critical' : 'medium';
+  }
+  
+  if (finding.type === 'backward-arc') {
+    // Critical if > 40% backward, medium otherwise
+    return graph.forwardEdgeRatio < 0.6 ? 'critical' : 'medium';
+  }
+  
+  if (finding.type === 'flat-tension') {
+    // Medium issue (not critical but should address)
+    return 'medium';
+  }
+  
+  return 'medium';
+}
+
+/** Generate impact explanation for a finding */
+function generateImpact(finding: { type: string; sceneIdx?: number }, analysis: FountainAnalysis): string {
+  if (finding.type === 'unpaid-promise') {
+    return 'Audiences remember setups and expect payoffs. Unresolved promises can feel like plot holes or wasted screen time.';
+  }
+  
+  if (finding.type === 'isolated-scene') {
+    return 'This scene doesn\'t affect or get affected by the main plot. It may feel disconnected or unnecessary.';
+  }
+  
+  if (finding.type === 'backward-arc') {
+    return 'Causal relationships should flow forward in story time. Backward links suggest structural confusion or act-order issues.';
+  }
+  
+  if (finding.type === 'flat-tension') {
+    return 'Stories need escalation to maintain engagement. Flat tension across acts can make the story feel static or episodic.';
+  }
+  
+  return 'This structural pattern may affect story clarity or engagement.';
+}
+
+/** Generate actionable suggestions for fixing a finding */
+function generateSuggestions(
+  finding: { type: string; sceneIdx?: number },
+  analysis: FountainAnalysis,
+  graph: StoryGraph
+): string[] {
+  const sceneCount = analysis.sceneCount;
+  const act1End = Math.floor(sceneCount * 0.25);
+  const act2End = Math.floor(sceneCount * 0.75);
+  
+  if (finding.type === 'unpaid-promise' && finding.sceneIdx !== undefined) {
+    const inAct1 = finding.sceneIdx < act1End;
+    const inAct2 = finding.sceneIdx >= act1End && finding.sceneIdx < act2End;
+    
+    if (inAct1) {
+      return [
+        'Add a payoff scene in Act 2 or 3 to resolve this setup',
+        'If this setup is no longer relevant to the main plot, consider removing it',
+        'Connect this promise to an existing climax or resolution scene'
+      ];
+    } else if (inAct2) {
+      return [
+        'Add a payoff scene in Act 3 before the climax',
+        'Weave the resolution into an existing scene\'s events',
+        'If minor, consider whether this setup adds necessary complexity'
+      ];
+    } else {
+      return [
+        'Add a brief payoff in the resolution',
+        'If this is a minor detail, it may be acceptable to leave unresolved',
+        'Consider whether this setup is necessary this late in the story'
+      ];
+    }
+  }
+  
+  if (finding.type === 'isolated-scene') {
+    return [
+      'Add a causal connection: have this scene\'s events affect later scenes',
+      'Seed or pay off a promise in this scene to connect it to the main plot',
+      'Show character growth or relationship changes that carry forward',
+      'If truly standalone, evaluate whether this scene serves the story'
+    ];
+  }
+  
+  if (finding.type === 'backward-arc') {
+    return [
+      'Review scene order: ensure setups come before payoffs',
+      'Check for flashback scenes that might be causing confusion',
+      'Verify that causal chains flow forward in narrative time',
+      'Consider whether act structure needs adjustment'
+    ];
+  }
+  
+  if (finding.type === 'flat-tension') {
+    return [
+      'Raise stakes in Act 2: introduce complications, obstacles, or reversals',
+      'Build toward climax: increase suspense and conflict in the final 25%',
+      'Add pressure points at act breaks to signal escalation',
+      'Ensure protagonist faces increasingly difficult challenges'
+    ];
+  }
+  
+  return ['Review this structural pattern and consider adjustments'];
+}
+
+/** Detect structural strengths in the story */
+function detectStrengths(graph: StoryGraph, analysis: FountainAnalysis): EnhancedDiagnostic[] {
+  const strengths: EnhancedDiagnostic[] = [];
+  
+  // High closure rate
+  if (graph.promisePaymentRatio >= 0.8 && graph.unpaidPromises.length > 0) {
+    strengths.push({
+      severity: 'strength',
+      type: 'high-closure',
+      message: `Strong closure: ${Math.round(graph.promisePaymentRatio * 100)}% of promises are paid off`,
+      impact: 'Audiences feel satisfied when setups are resolved. High closure rates build trust in the storytelling.',
+      suggestions: [
+        'Maintain this attention to setup-payoff structure',
+        'Ensure remaining unpaid promises are intentional (mysteries for sequels, etc.)'
+      ],
+      confidence: 0.9
+    });
+  }
+  
+  // Tight causal chains (long setup-payoff distances)
+  if (graph.setupPayoffDistance > 20 && graph.promisePaymentRatio > 0.5) {
+    strengths.push({
+      severity: 'strength',
+      type: 'tight-causality',
+      message: `Patient setup: Average ${Math.round(graph.setupPayoffDistance)} scenes between setup and payoff`,
+      impact: 'Long setup-payoff distances show patience and trust in the audience. This creates satisfying "aha" moments.',
+      suggestions: [
+        'Continue building anticipation with well-spaced setups and payoffs',
+        'Ensure audiences don\'t forget early setups by providing subtle reminders'
+      ],
+      confidence: 0.8
+    });
+  }
+  
+  // Strong escalation
+  if (graph.escalationMonotonicity >= 1.0) {
+    strengths.push({
+      severity: 'strength',
+      type: 'strong-escalation',
+      message: 'Excellent escalation: Tension rises consistently across all acts',
+      impact: 'Clear escalation keeps audiences engaged and builds toward a satisfying climax.',
+      suggestions: [
+        'Maintain this momentum through the climax',
+        'Ensure the final act delivers on the built-up tension'
+      ],
+      confidence: 0.95
+    });
+  }
+  
+  // Strong forward causality
+  if (graph.forwardEdgeRatio >= 0.95 && graph.edges.filter(e => e.type === 'causal').length > 5) {
+    strengths.push({
+      severity: 'strength',
+      type: 'tight-causality',
+      message: `Clear causality: ${Math.round(graph.forwardEdgeRatio * 100)}% of causal links flow forward`,
+      impact: 'Forward-flowing causality creates clear cause-and-effect chains that audiences can follow.',
+      suggestions: [
+        'Continue maintaining clear causal relationships',
+        'Ensure audiences understand how early actions lead to later consequences'
+      ],
+      confidence: 0.85
+    });
+  }
+  
+  return strengths;
+}
+
 // ── Report Generation ─────────────────────────────────────────────────────────
 
 export function analyzeStoryGraph(analysis: FountainAnalysis): StoryGraphReport | undefined {
@@ -343,8 +564,10 @@ export function analyzeStoryGraph(analysis: FountainAnalysis): StoryGraphReport 
   
   const graph = buildStoryGraph(analysis);
   
-  // Generate findings
-  const findings: StoryGraphReport['findings'] = [];
+  // Enhanced diagnostics with severity classification
+  const critical: EnhancedDiagnostic[] = [];
+  const medium: EnhancedDiagnostic[] = [];
+  const low: EnhancedDiagnostic[] = [];
   
   // Unpaid promises
   for (const clueId of graph.unpaidPromises) {
@@ -352,37 +575,96 @@ export function analyzeStoryGraph(analysis: FountainAnalysis): StoryGraphReport 
     if (promiseNode) {
       // Find the scene that seeded this promise
       const seedingScene = graph.nodes.find(n => n.type === 'scene' && graph.edges.some(e => e.source === n.id && e.target === promiseNode.id));
-      findings.push({
+      const finding = {
+        type: 'unpaid-promise',
+        sceneIdx: seedingScene?.sceneIdx
+      };
+      
+      const severity = classifySeverity(finding, analysis, graph);
+      const diagnostic: EnhancedDiagnostic = {
+        severity,
         type: 'unpaid-promise',
         sceneIdx: seedingScene?.sceneIdx,
         message: `Setup "${clueId}" planted but never resolved`,
-      });
+        impact: generateImpact(finding, analysis),
+        suggestions: generateSuggestions(finding, analysis, graph),
+        confidence: 0.85
+      };
+      
+      if (severity === 'critical') critical.push(diagnostic);
+      else if (severity === 'medium') medium.push(diagnostic);
+      else low.push(diagnostic);
     }
   }
   
   // Isolated scenes
   for (const idx of graph.isolatedScenes) {
-    findings.push({
+    const finding = { type: 'isolated-scene', sceneIdx: idx };
+    const severity = classifySeverity(finding, analysis, graph);
+    
+    const diagnostic: EnhancedDiagnostic = {
+      severity,
       type: 'isolated-scene',
       sceneIdx: idx,
       message: `Scene ${idx + 1} has no causal connections to the story`,
-    });
+      impact: generateImpact(finding, analysis),
+      suggestions: generateSuggestions(finding, analysis, graph),
+      confidence: 0.8
+    };
+    
+    if (severity === 'critical') critical.push(diagnostic);
+    else if (severity === 'medium') medium.push(diagnostic);
+    else low.push(diagnostic);
   }
   
   // Backward arc (act-swap signal)
   if (graph.forwardEdgeRatio < 0.6) {
-    findings.push({
+    const finding = { type: 'backward-arc' };
+    const severity = classifySeverity(finding, analysis, graph);
+    
+    const diagnostic: EnhancedDiagnostic = {
+      severity,
       type: 'backward-arc',
       message: `${Math.round((1 - graph.forwardEdgeRatio) * 100)}% of causal links point backward — possible structural incoherence`,
-    });
+      impact: generateImpact(finding, analysis),
+      suggestions: generateSuggestions(finding, analysis, graph),
+      confidence: 0.7
+    };
+    
+    if (severity === 'critical') critical.push(diagnostic);
+    else medium.push(diagnostic);
   }
   
   // Flat tension
   if (graph.escalationMonotonicity < 0.3) {
-    findings.push({
+    const finding = { type: 'flat-tension' };
+    const diagnostic: EnhancedDiagnostic = {
+      severity: 'medium',
       type: 'flat-tension',
       message: 'Tension does not escalate across acts — story may feel static',
-    });
+      impact: generateImpact(finding, analysis),
+      suggestions: generateSuggestions(finding, analysis, graph),
+      confidence: 0.75
+    };
+    
+    medium.push(diagnostic);
+  }
+  
+  // Detect strengths
+  const strengths = detectStrengths(graph, analysis);
+  
+  // Overall assessment
+  const totalIssues = critical.length + medium.length + low.length;
+  let overallAssessment: 'strong' | 'good' | 'needs-work' | 'weak';
+  
+  if (critical.length === 0 && medium.length <= 2 && strengths.length >= 2) {
+    overallAssessment = 'strong';
+  } else if (critical.length === 0 && totalIssues <= 5) {
+    overallAssessment = 'good';
+  } else if (critical.length <= 2 && totalIssues <= 10) {
+    overallAssessment = 'needs-work';
+  } else {
+    overallAssessment = 'weak';
   }
   
   // Composite graph health (weighted formula)
@@ -396,7 +678,19 @@ export function analyzeStoryGraph(analysis: FountainAnalysis): StoryGraphReport 
   
   return {
     graph,
-    findings,
+    diagnostics: {
+      critical,
+      medium,
+      low,
+      strengths
+    },
+    summary: {
+      totalIssues,
+      criticalCount: critical.length,
+      strengthCount: strengths.length,
+      overallAssessment
+    },
     graphHealth,
   };
 }
+
