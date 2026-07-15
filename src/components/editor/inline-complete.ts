@@ -222,8 +222,12 @@ function createTriggerPlugin(ctx: CompletionContext): ViewPlugin<{
         // Cancel any in-flight request and reset debounce
         this.abortCtrl?.abort();
         if (this.debounceTimer) clearTimeout(this.debounceTimer);
-        // Dismiss any existing ghost text so we don't show stale completion
-        update.view.dispatch({ effects: DismissCompletion.of() });
+        // Dismiss any existing ghost text after the current CodeMirror update
+        // completes; dispatching synchronously from a plugin update crashes.
+        setTimeout(() => {
+          if (!update.view.state.field(completionField)) return;
+          update.view.dispatch({ effects: DismissCompletion.of() });
+        }, 0);
 
         const view = update.view;
         this.debounceTimer = setTimeout(() => {

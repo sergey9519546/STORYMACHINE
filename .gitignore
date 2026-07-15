@@ -8,6 +8,11 @@ coverage/
 !.env.example
 *.wav
 .claude/
+.zcode/
+.playwright-cli/
+output/playwright/**
+!output/playwright/whole_site_qa.py
+docs/user-validation/sessions/
 data/
 
 # The `data/` rule above is for the root runtime dir (per-visitor SQLite

@@ -50,6 +50,16 @@ export async function analyzeScriptBlock(
   clearTimeout(timeoutId);
 
   if (!response.ok) {
+    if (response.status === 503) {
+      // The director is an optional generative surface. Keep the editor usable
+      // in the supported keyless mode instead of surfacing an expected error.
+      return {
+        ...engineState,
+        scriptBlocks,
+        isAnalyzing: false,
+        isGeneratingMedia: false,
+      };
+    }
     const err = await response.json().catch(() => ({ error: response.statusText })) as { error?: string };
     throw new Error(err.error ?? `Analysis request failed (${response.status})`);
   }
