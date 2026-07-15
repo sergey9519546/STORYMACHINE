@@ -9,17 +9,18 @@ artifacts in this directory.
 
 ## 1. Decision in one paragraph
 
-**[Inference]** STORYMACHINE should treat **Future C — the Reflective Draft
-Clinic** as the leading product hypothesis, while treating **Future B — the
-Reader Studio** as the strongest premium/human-context alternative and **Future
-A — the Deterministic Coverage Authority** as a conditional option that is
-ineligible unless P1 first validates its score on real writing. This is a
-choice of what to learn next, not a demand conclusion. All three futures are
-blocked today: P0 has no completed writer sessions; the shared implementation
-has critical content-integrity and security/privacy defects; and public-draft
-data permissions and promises are not yet demonstrated. The authorized next
-move remains: repair only critical gate defects, complete P0 using the existing
-sample report, and branch according to what writers actually say and do.
+**[Inference]** STORYMACHINE has not selected a winning product. The current
+decision is a sequence with a control: certify and run the bounded sample-only
+P0, repair or disable critical trust boundaries in parallel, then branch—or
+stop—according to what writers actually say and do. **Future C — the Reflective
+Draft Clinic** is the next reversible concept to test only if writers show pull
+for located revision evidence while rejecting scalar authority. **Future B —
+the Reader Studio** remains a premium/human-context branch, and **Future A — the
+Deterministic Coverage Authority** remains ineligible unless P1 first validates
+its exact score use on real writing. All three futures are blocked today: P0 has
+no completed writer sessions; the shared implementation has critical
+content-integrity and security/privacy defects; and own-draft/public data
+permissions and promises are not yet demonstrated.
 
 The recommendation is deliberately asymmetric:
 
@@ -336,13 +337,16 @@ is intentionally absent because every future has the same zero direct evidence.
 | Operating feasibility | 4 | 1 | 4 | A and C need software/risk operations; B adds an unfamiliar labor and marketplace/service system. |
 | Reversibility/option value | 2 | 3 | 5 | A's authority branding and benchmark specialization create lock-in. A small B pilot is reversible but service commitments accumulate. C preserves the paths to A and B. |
 | Defensibility ceiling | 5* | 4 | 3 | *A earns 5 only if a licensed benchmark and repeated held-out validity become real; today that moat does not exist. B can build reader relationships/data. C's interaction contract is easier to imitate. |
-| **Weighted total / 100** | **48.8** | **71.4** | **83.0** | **Decision aid only; gates still veto all three today.** |
+| **Weighted total / 100** | **48.8** | **71.4** | **83.0** | **Owner-prior decision aid only; correlated criteria, mixed current/future ratings, and gates prevent product selection.** |
 
-**[Inference]** C leads the base case by 11.6 points over B because it combines
+**[Inference]** The declared owner-prior model scores C 11.6 points above B because it combines
 claim honesty, agency, existing-asset reuse, software economics, and
 reversibility. B's 22.6-point lead over A reflects the current absence of score
 validity and the speed with which a bounded human service can generate richer
-qualitative learning. These margins are judgments, not confidence intervals.
+qualitative learning. These margins are judgments, not confidence intervals,
+writer-elicited utilities, or independent product evidence. Several criteria
+are correlated expressions of the same agency/honesty preference, and the A
+defensibility rating mixes a hypothetical future state with current ratings.
 
 ### 5.3 Rating uncertainty
 
@@ -361,7 +365,10 @@ qualitative learning. These margins are judgments, not confidence intervals.
 ## 6. Sensitivity analysis: three materially different worlds
 
 The same ratings are held constant while priorities change. This isolates
-value disagreement from factual disagreement.
+value disagreement from factual disagreement but cannot represent a world in
+which P1 success also changes capabilities, costs, trust, and reversibility.
+Any real P1 result requires scenario-consistent rerating of every affected
+criterion; S3 is not that rerating.
 
 | Scenario | Priority weights (nonzero) | A | B | C | Winner and interpretation |
 |---|---|---:|---:|---:|---|
@@ -535,8 +542,10 @@ future fails differently when the project collapses those distinctions.
 
 ```text
 NOW
- ├─ Repair only critical security/privacy and content-integrity gate defects
- └─ Complete P0 with the existing sample report; preserve verbatim evidence
+ ├─ Repair or disable critical security/privacy and content-integrity boundaries in parallel
+ └─ Certify one exact-commit sample-only P0; collect no participant draft
+      ├─ Disclose: experimental stimulus, synthetic—not population—percentile,
+      │  and no validated screenplay-quality judgment; preserve verbatim evidence
       ├─ Clear pull for own-draft use, with demand for a consequential verdict
       │    └─ Proceed to P1 benchmark work
       │         ├─ P1 passes + all gates clear → A becomes eligible for comparison
@@ -610,10 +619,12 @@ active roadmap.
 
 ## 13. Final strategic judgment
 
-### Selection
+### Current decision
 
-**Select C as the leading hypothesis; preserve B as the premium branch; place A
-behind an explicit P1 validity option.**
+**Select no product future yet. Run the certified sample-only P0, repair or
+disable critical trust boundaries in parallel, and retain stop/hold as the
+control. Test C next only if the observed job fits it; preserve B as the premium
+branch; keep A behind an explicit P1 validity option.**
 
 This selection does **not** mean:
 
@@ -624,7 +635,7 @@ This selection does **not** mean:
 - that security, privacy, integrity, accessibility, identity, and legal/data
   controls can wait for product-market evidence.
 
-### Why C is the lowest-regret choice
+### Why C is the conditional low-regret concept test
 
 1. **[Fact—repo]** It uses the project's strongest proven substrate—keyless
    deterministic observations, receipts, source locations, recomputation, and
@@ -637,6 +648,10 @@ This selection does **not** mean:
 4. **[Inference]** C keeps failure honest. If writers want a verdict or human
    authority instead, P0/reframed tests can falsify it without first building a
    service organization or laundering a synthetic score into product truth.
+
+These reasons are analyst/owner priors about reversibility and claim risk. They
+do not establish that writers value C, and a negative or ambiguous P0 can make
+stop/hold preferable to every future.
 
 ### What would change the decision
 
@@ -655,4 +670,3 @@ This selection does **not** mean:
 Until those conditions are observed, “C is best” means only this: among three
 serious futures, it is the most evidence-honest, asset-compatible, and
 reversible hypothesis to test after the current gates authorize another test.
-

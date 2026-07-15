@@ -110,7 +110,7 @@ risk score.
 | 7 | FM-09 | Provider/model drift changes deep judgments without a product release | Critical for authoritative deep scores; High otherwise | 5 | Yes—quick deterministic tests remain green | All with deep AI |
 | 8 | FM-12 | Human disagreement is collapsed into false ground truth | Critical for claims; High for service | 5 | Yes—an average label and model fit can look excellent | H; J benchmark; R escalation |
 | 9 | FM-14 | Rights, training, authorship, or regulatory posture changes after launch | Critical gate / High operating | 5 | Yes—software behavior can remain unchanged | All |
-| 10 | FM-03 | Destructive or self-incompatible restore | Critical | 4 | Yes—Stage tests pass while the HTTP round trip fails | All |
+| 10 | FM-03 | Destructive import or over-broad simulation reset | Critical | 4 | Yes—Stage tests pass while HTTP import/reset destroys unrelated authority | All |
 | 11 | FM-08 | Unbounded provider fan-out and cost/latency amplification | Critical | 4 | Yes in keyless CI; request-rate checks miss internal multiplier | All; highest J/H with AI |
 | 12 | FM-10 | Bearer session leakage, shared-default access, or identity creep | Critical public-launch / High private beta | 4 | Yes—authorized route tests use possession as intended | All |
 | 13 | FM-11 | Incomplete authority and backup produce a “successful” lossy recovery | Critical | 4 | Yes—partial export can serialize/import successfully | All |
@@ -211,32 +211,36 @@ risk score.
 - **Ordinary-green-test status:** **invisible**; fixtures confirm the confounded
   formula rather than challenge the construct.
 
-### FM-03 — Destructive or self-incompatible restore
+### FM-03 — Destructive import or over-broad simulation reset
 
-- **Trigger:** a writer posts a current v13 export, a ScriptIDE-only empty-agent
-  snapshot, a corrupt file, an old client artifact, or a hand-edited snapshot
-  to the import route.
-- **Failure chain:** current export is rejected by hard-coded importer v6, or
-  shallow arrays pass validation → live session is destroyed before deeper
-  writes → database constraint/import failure → HTTP 500/422 with the original
-  already gone → the “backup” becomes the destructive action.
-- **Earliest signal:** same-build export→import fails; malformed accepted-version
-  import changes destination agent/location counts; destination DB hash changes
-  on any rejected import.
-- **Preventive control:** one authoritative versioned snapshot contract; deep
-  validation; build in an isolated temporary Stage/database; semantic invariant
-  checks; atomic durable swap only after full success; preserve original until
-  the new authority is reopened and verified.
-- **Detection control:** route-level same-build round trip, supported-old-version
-  migration corpus, malformed and fault-injected imports, byte/state identity
-  assertions on every failure, and production restore drills.
-- **Recovery:** disable import immediately; restore the preserved original or
-  WAL-safe database backup; identify affected sessions; provide assisted
-  recovery and disclose unrecoverable loss honestly.
-- **Residual risk:** storage exhaustion or host failure can still interrupt the
-  atomic boundary; durable backup/restore remains independently required.
-- **Evidence:** **EX+DC**—live HTTP witnesses prove current-export rejection and
-  one-agent/one-location destruction.
+- **Trigger:** a writer posts any body to the current JSON import route, or
+  ScriptIDE invokes `/api/reset` while starting a simulation.
+- **Failure chain:** import shallow validation or a normal simulation-reset
+  intent reaches `destroySession` → the whole per-session database is closed and
+  deleted → `ScriptIDE_State` and unrelated project/editor authority disappear
+  together with simulation state → concurrent save/room/config/turn writes race
+  a turn-only queue that is not a session mutation coordinator → HTTP/UI success
+  or a backup file makes the over-broad operation look controlled.
+- **Earliest signal:** any POST import mutates state; a populated ScriptIDE row
+  disappears after “Simulate this script”; delayed/concurrent writes cross reset;
+  destination DB/hash changes after a rejected operation.
+- **Preventive control:** retire POST JSON import with unconditional non-mutating
+  410; disable `/api/reset` until it becomes a transactional simulation-only
+  clear over a generated declared aggregate. Put separately named/confirmed
+  project deletion behind its own authorization. Serialize reset/import/save/
+  room/config/turn writes through one real per-session mutation coordinator.
+- **Detection control:** 410 preservation fixtures; populated project plus
+  simulation-reset tests; delayed/concurrent mutation tests; exact semantic and
+  byte comparisons for all unrelated authorities; separately authorized project
+  deletion tests.
+- **Recovery:** halt import/reset exposure, preserve all surviving DB/WAL/backup
+  copies, use the verified online backup where available, reconcile the most
+  complete authority, and disclose unrecoverable fields honestly.
+- **Residual risk:** storage/host failure remains; future project import is a
+  separately gated capability with its own envelope/version/transport contract.
+- **Evidence:** **EX+DC+XR**—live HTTP witnesses prove current-export rejection
+  and malformed-import destruction; code trace proves ScriptIDE-triggered reset
+  deletes the DB that owns `ScriptIDE_State`.
 - **Affected future:** **All; Critical**.
 - **Ordinary-green-test status:** **invisible** because Stage-level and v6
   hand-authored fixture tests do not traverse the current HTTP contract.
@@ -469,24 +473,28 @@ risk score.
 
 ### FM-11 — Incomplete authority and “successful” lossy recovery
 
-- **Trigger:** export/import succeeds after version repair; reset backup runs
-  while SQLite WAL contains recent pages; browser reload or device migration;
-  disaster restore from the wrong mechanism.
-- **Failure chain:** multiple content authorities exist → JSON snapshot omits
-  `ScriptIDE_State`, Story Commits, newer ledgers/caches; title page is durable
-  nowhere; Yjs is in memory; raw reset copy omits WAL-safe backup semantics →
-  restore reports success while editor/canonical/metadata state disappears →
-  writer notices only later, after new work overwrites remaining clues.
-- **Earliest signal:** restored semantic inventory differs by table/hash/title;
-  reset backup loses an uncheckpointed WAL write; no single export enumerates
-  every user-relevant authority.
-- **Preventive control:** define one authoritative portable-session aggregate
-  and explicit rebuildable exclusions; use online SQLite backup or a complete
-  versioned projection; persist title metadata; quiesce/snapshot collaboration;
-  state honestly when an artifact is partial.
-- **Detection control:** clean-release restore drills with populated data in
-  every authority, WAL-active tests, semantic equality and draft/title hashes,
-  and automated backup verification rather than backup-file existence.
+- **Trigger:** a schema-compatible partial import is re-enabled; simulation
+  reset uses whole-session deletion; a backup runs while WAL contains recent
+  pages; a future-version DB is opened by older code; a maximum export exceeds
+  the importer transport; browser reload/device migration uses the wrong artifact.
+- **Failure chain:** multiple authorities plus no generated field/relationship
+  manifest → JSON projection drops FK parents, nullable/inactive/history fields,
+  identifiers/timestamps, `ScriptIDE_State`, commits, title and collaboration →
+  database and portable-envelope versions are conflated → old code may execute
+  DDL before refusing a future DB → raw copy or whole-session reset appears
+  recoverable → success is returned while state is missing or changed.
+- **Earliest signal:** manifest/table/field/FK/hash/title/history comparison
+  differs; maximum produced artifact exceeds transport; future `user_version`
+  changes DB/WAL bytes; simulation reset changes any project/editor authority.
+- **Preventive control:** relabel current export a non-recoverable simulation
+  observation and pair it with retired import. Define separate generated
+  `dbSchemaVersion` and `projectEnvelopeVersion`, generated table/field/FK/
+  history/size manifest, future-version refusal before DDL/write, transactional
+  simulation-only reset, per-session mutation coordinator, and verified online
+  backup. A future project envelope is a separate gated design.
+- **Detection control:** all-field/FK/nullable/inactive/history/Unicode/max-size
+  fixtures, future-version byte identity, concurrent mutation tests, WAL-active
+  restore, and clean-release semantic equality across every declared authority.
 - **Recovery:** choose the most complete surviving authority, preserve all
   copies before reconciliation, replay revisions where possible, and disclose
   fields that cannot be restored.
@@ -776,24 +784,31 @@ risk score.
 - **Ordinary-green-test status:** turnaround failure is visible; selection bias,
   full cost, and epistemic variance are often **silent**.
 
-### FM-21 — Curiosity is mistaken for committed demand
+### FM-21 — Directional sample reaction is mistaken for committed demand
 
-- **Trigger:** P0 recruitment counts, free analyses, compliments, waitlist
-  signups, or demo engagement are interpreted as willingness to upload a real
-  draft repeatedly, act on notes, or pay.
-- **Failure chain:** vanity signal is called validation → P1/P2/P4 engineering
-  accelerates → surface and fixed costs expand → real writers do not return or
-  pay → sunk-cost pressure causes more feature work instead of thesis revision.
-- **Earliest signal:** zero/low real-draft completion, failure to schedule,
-  sample-script use dominates, no second-draft behavior, no observed action on
-  a finding, payment conversion and retention absent.
-- **Preventive control:** predeclare P0 behavior gates—real-draft upload,
-  completed workflow, evidence inspection, revision decision, follow-up, and
-  willingness-to-pay test; distinguish curiosity, stated preference, and
-  costly/committed behavior.
-- **Detection control:** cohort funnel from recruitment through repeated real
-  use and payment; interview non-completers/churn; measure time-to-value and
-  actual revision decisions, not report generation.
+- **Trigger:** no-draft sample reactions, recruitment counts, compliments,
+  stated own-draft intent, waitlist signups, or a scheduled next step are
+  interpreted as actual use, payment, return, retention, or selection of A/B/C.
+- **Failure chain:** a polished stimulus primes the solution → directional
+  pre-behavioral evidence is called committed validation → a future is selected
+  or P1/P2/P4 execution accelerates without the separately gated behavior
+  experiment → own-draft/payment/retention behavior never materializes → sunk
+  cost drives more feature work.
+- **Earliest signal:** no unaided pre-stimulus account of job/frequency/urgency/
+  workaround/cost/last behavior; certification or ethics controls missing;
+  sample claims mention “use/payment/return” that the lane cannot observe.
+- **Preventive control:** certify first; obtain jurisdiction/institution-specific
+  ethics determination, accessible consent/data controls, and run unaided need
+  discovery before the sample. Label output only **directional pre-behavioral
+  pull and authority-contract evidence**. It may clear a narrow interview gate
+  or authorize feasibility design of a next gated experiment; it cannot select
+  A/B/C, start P1 execution, or establish committed demand. Only the later
+  experiment may record `TEST A`, `TEST B`, `TEST C`, `STOP`, or
+  `REFRAME-REPEAT`; `TEST A` still requires exact P1 validity before a build.
+- **Detection control:** separate pre-stimulus need evidence, sample
+  comprehension/objection, stated intent, and scheduled next step. Only after
+  the own-draft gate use a separate cohort funnel for actual workflow, evidence
+  inspection/action, return, payment, and retention.
 - **Recovery:** stop gated engineering, return to interviews/concierge tests,
   narrow or change thesis, and preserve reversible components instead of
   defending sunk cost.
@@ -801,9 +816,9 @@ risk score.
   durable retention.
 - **Evidence:** **DC+XR+HYP+INF**—zero valid participant sessions at audit time
   and the Phase 1 boundary that public/repository evidence cannot prove demand.
-  Supplemental S01 makes reflective support plausible in two small professional-
-  screenwriter studies but does not establish payment, retention, or durable
-  revision benefit.
+  Supplemental S01 makes reflective support plausible in two small samples
+  described by its authors as professional screenwriters but does not establish
+  product use, payment, retention, or durable revision benefit.
 - **Affected future:** **All; High**.
 - **Ordinary-green-test status:** **invisible**; product demand is outside CI.
 
@@ -1166,7 +1181,7 @@ systems, not as isolated tickets.
 | FM-01 wrong judgment × deterministic receipts | Provenance makes an invalid interpretation more persuasive and easier to market | Label receipts as computation/provenance, never validity; withhold authority |
 | FM-02 form confound × FM-06 feedback loop | Writers add scenes/pad structure, score rises, and the product records “successful revision” | Collect form/intent; blind outcome; never train on engine delta |
 | FM-05 benchmark leakage × FM-31 governance drift | A contaminated number becomes canonical and survives after its method is forgotten | Locked holdout access log plus expiring decision record |
-| FM-03 destructive import × FM-11 partial recovery | The official recovery artifact both destroys the destination and lacks the state needed to rebuild it | Disable representation/use until atomic complete restore is proven |
+| FM-03 destructive import/reset × FM-11 partial recovery | Current import or simulation reset can destroy unrelated authority while the available artifact lacks the state needed to rebuild it | Retire import; disable reset until transactional simulation-only clear, coordinator, manifest, and verified WAL backup pass |
 | FM-04 lifecycle gap × FM-07 Docker context | A draft is disclosed through a path absent from the product data map, defeating policy and incident scope | Deny context now; inventory build/cache as a processor |
 | FM-04 lifecycle gap × FM-10 bearer identity | The service cannot say who accessed a confidential draft or revoke only that actor | Real ownership/audit identity before public/team use |
 | FM-08 fan-out × FM-26 provider outage | Timeouts trigger retries and turn partial degradation into a cost storm | Engine budget, cancellation, circuit breaker, degraded contract |
@@ -1196,10 +1211,13 @@ The pre-mortem is most cheaply broken in this order:
 3. **Make failure honest:** separate quick/deep lineage, full/partial export,
    liveness/readiness, computation receipts/validity, and local/global craft
    interpretations; abstain when the requested use is unsupported.
-4. **Validate the construct before tuning it:** P0 committed behavior, then a
-   rights-clean P1 with grouped preregistered splits, multiple experienced
-   readers, simple baselines, uncertainty, adversarial cases, and independent
-   outcomes.
+4. **Separate demand from claim assurance:** directional sample-only P0 may
+   authorize feasibility design only. After exposure gates, run a separately
+   gated committed-behavior experiment and record `TEST A`, `TEST B`, `TEST C`,
+   `STOP`, or `REFRAME-REPEAT`. Only a valid need for consequential automated
+   judgment starts rights-clean P1 with grouped preregistered splits, multiple
+   experienced readers, simple baselines, uncertainty, adversarial cases, and
+   independent outcomes.
 5. **Select the product future using non-compensable gates:** J is currently
    disqualified by score-claim honesty; all futures are blocked from public
    launch by recovery/privacy/identity/accessibility gaps; H additionally needs

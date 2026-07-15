@@ -20,7 +20,7 @@
     },
     {
       "claim_id": "C-002",
-      "claim_text": "A reflective, writer-controlled Draft Clinic is the leading low-regret hypothesis under the base and catastrophic-trust-error priority models.",
+      "claim_text": "A reflective, writer-controlled Draft Clinic is a conditional low-regret concept to test only if bounded P0 evidence shows pull for located revision evidence without scalar authority.",
       "intended_evidence_kind": "evidence-informed strategic inference",
       "planned_refs": ["A01", "A02", "A04", "A05", "A06", "A07", "A24", "A25", "A27", "A28", "S01"],
       "negative_constraints": [
@@ -74,7 +74,7 @@
     },
     {
       "claim_id": "C-008",
-      "claim_text": "The strongest potential moat is not detector or report quantity but rights-clean longitudinal evidence, multiple-reader uncertainty, receipt provenance, and enforceable confidentiality operations.",
+      "claim_text": "A potential defensibility hypothesis is rights-clean longitudinal evidence, multiple-reader uncertainty, receipt provenance, and enforceable confidentiality operations; no moat or commercial effect is established.",
       "intended_evidence_kind": "competitive and strategic inference",
       "planned_refs": ["A13", "A14", "A19", "A20", "A21", "A22", "A23", "G08"],
       "negative_constraints": [
@@ -401,13 +401,15 @@ finding, not evidence that a vendor fails in practice (`PHASE_2_COMPETITIVE_INDU
 source-verification disposition for P01–P06).
 
 **Synthesis.** Rule count, pass count, report length, speed, and a fluent model
-perspective are low-defensibility output features. A harder-to-copy stack would
+perspective are visibly common and therefore weak *publicly observable
+differentiation* in the reviewed set. A potentially harder-to-copy stack would
 combine rights-clean real drafts, multiple-reader disagreement, writer intent,
 versioned draft diffs, accepted/rejected/challenged findings, blinded revision
 outcomes, receipt provenance, and demonstrable deletion/confidentiality
 operations (`PHASE_2_COMPETITIVE_INDUSTRY.md:515-530`; truth registry P-08–P-13,
-L-08). This is a hypothesis about future defensibility, not a currently owned
-dataset, network, demand signal, or moat.
+L-08). This is a hypothesis about future defensibility that still requires
+rights, use, retention, imitation-cost, and commercial evidence—not a currently
+owned dataset, network, demand signal, or moat.
 
 ### Theme 7 — The strategic result is conditional, not universal
 
@@ -420,13 +422,16 @@ under catastrophic trust-error minimization (`PHASE_3_COMPETING_FUTURES.md`
 §§5–7). These are ordinal judgments and value sensitivity, not probabilities,
 market forecasts, or measured user utility.
 
-**Synthesis.** C is the lowest-regret *hypothesis* because it can use the
-strongest implemented assets while declining the least-supported authority
-claim and preserving paths to B and A. B remains the best conditional branch
-if writers require accountable contextual interpretation and the fully loaded
-service model works. A remains a real option only if demand and a rigorous P1
-validity program clear its defining claim. No future is currently launch
-eligible; P0 is unmet and all share failed/not-demonstrated noncompensable gates
+**Synthesis.** The numeric model is a transparent owner-prior exercise with
+correlated criteria and mixed current/future ratings, not independent evidence
+that writers prefer C. Its robust current conclusion is a sequence: preserve a
+stop/hold control, repair or disable critical trust boundaries, run the bounded
+P0 stimulus, and branch only on observed evidence. C is a reversible concept to
+test *if* writers reject scalar authority but show pull for located revision
+evidence. B remains a conditional branch if writers require accountable
+contextual interpretation and the fully loaded service model works. A remains
+a real option only after P0 and real P1 validation. No future is currently
+launch eligible; P0 is unmet and all share failed/not-demonstrated noncompensable gates
 (`PHASE_3_COMPETING_FUTURES.md` §4; truth registry F-02/F-04, S-04, T-01/T-02,
 T-16/T-20).
 
@@ -440,7 +445,7 @@ T-16/T-20).
 | Measurement/rater methods | Construct definition, expert match, agreement model, uncertainty, and consequences matter | No universal screenplay construct, cutoff, or reader ground truth | Make P1 plural, grouped, preregistered, held out, and use-specific. |
 | Human–AI reliance | Trust maximization is wrong; complementarity and verification are conditional | Writer-specific reliance and best interface unknown | Measure challenge, override, verification, and better-alone baselines, not stated trust alone. |
 | Standards/regulatory/professional | Lifecycle risk, substantiation, confidentiality, accessibility, rights, and actor/date specificity matter | Applicability, compliance, and legal outcome depend on deployment/jurisdiction | Maintain a claim/data/component inventory and seek qualified review; make no legal verdict here. |
-| Competitive/industry | Feature/report commodity pressure; human accountability, continuity, privacy specificity, evidence, and distribution are stronger mechanisms | Vendor efficacy, retention, costs, private data, and causality unknown | Copy mechanisms selectively; never use vendor claims as efficacy proof or demand proxy. |
+| Competitive/industry | Feature count, speed, and generic report breadth are visibly common and therefore weak publicly observable differentiation; human accountability, continuity, privacy specificity, evidence, and distribution are candidate mechanisms | Vendor efficacy, retention, costs, private data, causality, substitution, and pricing power unknown | Test mechanisms selectively; never use vendor claims as efficacy proof, demand proxy, or proof of commoditization. |
 
 ## Contradictions and resolutions
 
@@ -453,7 +458,7 @@ T-16/T-20).
 | “Explanations build trust” versus “forcing reflection hurts preference” | Buçinca et al. (2021) <!--ref:A27--><!--anchor:page:1-21--> and Vasconcelos et al. (2023) <!--ref:A28--><!--anchor:page:1-38--> show effectiveness depends on friction, task, and incentives. | **Conditional.** Minimize verification cost, apply friction proportionately, and measure correct reliance rather than liking or explanation presence. |
 | “Human in the loop improves quality” versus “no average synergy” | Vaccaro et al. (2024) <!--ref:A26--><!--anchor:page:2293-2303--> finds augmentation but not average synergy over the better member; Hemmer et al. (2025) <!--ref:A30--><!--anchor:page:979-1002--> makes complementarity conditional on asymmetry. | **Conditional.** B must prove that humans add intent/context and machines add reliable observables without anchoring or cost overwhelming the gain. |
 | “3,216 rules is correct” versus “rule-count strategy is false” | Generated rulebook/tests support 3,216; git disproves the 8,917/5,701 history (Protocol Amendment 01; truth registry F-07–F-09). | **Reconcilable.** The current syntactic count is correct; the canonical historical narrative and value inference are not. The freeze remains a policy constraint. |
-| “C leads” versus “nothing is validated” | The decision model favors C under base/trust weights; P0 contains zero completed sessions and every future fails gates. | **Reconcilable.** C is the best hypothesis to test, not validated demand, build authorization, or launch approval. |
+| “C leads” versus “nothing is validated” | An owner-prior decision model favors C under base/trust weights; P0 contains zero completed sessions and every future fails gates. | **Reconcilable only after demotion.** The current decision is critical repair plus a bounded P0 followed by branch/stop. C is merely a conditional concept test if the observed job fits it. |
 | “No public benchmark found” versus “competitors may work” | The audit found no public independent held-out real-screenplay feedback benchmark, but vendor internals/outcomes are private. | **Irreducible with current evidence.** Report the public-evidence gap; do not infer competitor ineffectiveness. |
 
 ## Rival explanations and stress tests
@@ -596,40 +601,58 @@ A can win (`PHASE_3_COMPETING_FUTURES.md` §§6–8).
 
 ## Direct answer to the research question
 
-The most credible route is **not yet a launchable product design**. It is a
-gated learning strategy:
+The most credible route is **not yet a launchable product design or a selected
+product future**. It is a gated learning strategy with an explicit stop/hold
+control:
 
-1. **Immediately repair the noncompensable content/security defects** that can
-   destroy or expose drafts or amplify provider spend—transactional compatible
-   import, a deny-by-default Docker context, AI-route and engine budgets, and
-   sanitized provider-error logging—while preserving the keyless deterministic
-   front door (ST-01–ST-03, ST-06; FM-03, FM-07, FM-08).
-2. **Complete P0 without claiming more than a directional signal.** No writer
-   demand has been established. A negative or ambiguous real-draft signal means
-   stop/reframe, not automatic implementation of C or B (F-02/F-04; FM-21).
-3. **Treat Future C, the Reflective Draft Clinic, as the leading base-case
-   hypothesis** if writers want located evidence and revision help but resist
-   automated authority. Its contract is intent → observable evidence → bounded
-   perspectives → writer choice → before/after verification, with score/verdict
-   experimental or absent by default and OASIS outside the validation surface.
-4. **Branch to Future B** if observed value depends on accountable human
-   interpretation, but validate reader quality, machine anchoring,
+1. **Run the sample-only P0 lane without collecting a participant's draft.**
+   First reconcile one exact commit, owner, timestamp, and certification record;
+   follow the consent/notes rules; state that the stimulus is experimental, that
+   its percentile is synthetic rather than a population percentile, and that it
+   does not validate screenplay quality. Record comprehension and objections
+   separately from desire to try. If the score itself is a research variable,
+   expose it only in a separately consented or later comparative condition.
+   Critical repairs may proceed in parallel rather than delaying this bounded
+   research lane (F-02–F-04, S-17, P-15).
+2. **Immediately repair or disable the noncompensable content/security
+   boundaries.** For import, either disable or explicitly rename and bound the
+   partial operation and remove every “full recovery” claim, or establish one
+   schema authority, deep-validate in isolation, define the exact portable
+   aggregate, prove semantic equality for every included authority, and swap
+   atomically only after verification while preserving the original on every
+   failure. Reset must use the tested SQLite online-backup path under active
+   WAL. Also add a deny-by-default Docker context, AI-route plus per-request
+   engine budgets, and sanitized provider-error logging (ST-01–ST-03, ST-06;
+   FM-03, FM-07, FM-08, FM-11).
+3. **Keep every own-draft or private-beta lane blocked** until the declared
+   recovery aggregate, privacy/data-flow contract, mode-specific provider
+   consent, identity/deletion/rotation controls, content manifest, and relevant
+   accessible critical-path controls pass. “Compatible import” alone cannot
+   clear content integrity.
+4. **Branch or stop after P0.** A negative or ambiguous result means stop,
+   reframe, or repeat the research—not automatic implementation of C or B.
+   Future C becomes the next no-code concept to test only if writers reject
+   scalar authority but show pull for located evidence and revision experiments.
+5. **Branch to Future B** only if observed value depends on accountable human
+   interpretation, then validate reader quality, machine anchoring,
    confidentiality, capacity, and fully loaded unit economics before scaling.
-5. **Keep Future A behind P1.** It becomes eligible only if writers want a
+6. **Keep Future A behind P1.** It becomes eligible only if writers want a
    consequential automated judgment and a rights-cleared, preregistered,
    independently blind-labeled, held-out real-writing benchmark establishes the
    exact score use with uncertainty, subgroup/error evidence, simple-baseline
    superiority, and continuing monitoring.
 
-This answer preserves the sensitivity result: C leads under evidence-first and
-catastrophic-trust-error priorities; B leads when premium nuance and rapid
-qualitative learning dominate; A leads only under a scale-and-defensibility
-priority set that presupposes a strong P1 prior. There is no universal winner.
-Every path remains constrained by security/privacy, content/state integrity,
-score honesty, legal/data permission, and P0. The strongest evidence-backed
-near-term proposition is therefore **“test an inspectable writer-controlled
-diagnostic after critical gate repair,” not “ship an automated screenplay
-judge.”**
+The sensitivity result remains an explicit description of owner priorities,
+not a product-fitness finding: C scores highest under evidence-first and
+catastrophic-trust-error weights; B under premium nuance and rapid qualitative
+learning; and A only under scale/defensibility weights that presuppose a strong
+P1 prior. Scenario-consistent rerating would still be required after any future
+P1 result. There is no universal winner, and hold/stop can dominate all product
+commitments today. Every path remains constrained by security/privacy,
+content/state integrity, score honesty, legal/data permission, and P0. The
+strongest evidence-backed near-term proposition is therefore **“repair or
+disable critical trust boundaries, run a bounded sample-only P0, then branch or
+stop,” not “ship an automated screenplay judge” or “build the Draft Clinic.”**
 
 ## Synthesis limitations and cross-section consistency disposition
 

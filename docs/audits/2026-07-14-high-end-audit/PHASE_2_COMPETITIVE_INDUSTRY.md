@@ -13,9 +13,15 @@ report." That category is already compressed between free peer exchange,
 $19–$79 per-script AI reports, $20/month general-purpose LLMs, and much more
 expensive named-human services. Price, speed, a long report, a scoring grid,
 Pass/Consider/Recommend, follow-up chat, and even a "multi-pass" methodology are
-available off the shelf. None is a credible moat.
+available off the shelf.
 
-The defensible opening is a **trustworthy draft diagnostic and revision system**:
+More precisely, those mechanisms are **visibly common and therefore weak
+publicly observable differentiation in the reviewed set**. Public pages do not
+establish substitution, price elasticity, margins, retention, or private
+operating strength, so this benchmark does not prove economic commoditization.
+
+One defensibility hypothesis worth testing is a **trustworthy draft diagnostic
+and revision system**:
 deterministic observables with source locations; explicit uncertainty and
 disagreement; version-to-version receipts; a strong confidential-draft contract;
 and claims validated against consented real writing and multiple experienced
@@ -261,14 +267,16 @@ This does not prove efficacy. It does show that privacy architecture, a frank
 human-review exception, interactive challenge, export, deletion, and revision
 comparison can be made part of the product—not hidden in a generic policy.
 
-### P06 — GetScriptCoverage: the $19 commodity boundary
+### P06 — GetScriptCoverage: the visible $19 price boundary
 
 The [current product page](https://www.getscriptcoverage.com/) sells one $19
 report, no account required, delivered as a PDF by email in a stated three to
 seven minutes. It includes Pass/Consider/Recommend, eight scores, synopsis,
 characters, structural/pacing/dialogue notes, market/comps, pitch material,
 contest readiness, deadlines, and rewrite priorities. That breadth at $19 makes
-clear that report length and category count cannot support premium pricing.
+clear that report length and category count alone are weak publicly observable
+differentiation. It does not establish price elasticity or rule out premium
+pricing for a different service contract.
 
 The FAQ says scripts are not retained after report generation, shared, or used
 for another purpose. The linked privacy page failed to return content in this
@@ -296,7 +304,7 @@ session deletion and repeated-draft/competition features. The narrow script
 promise and broad notice may apply to different data categories, but the scope is
 not clear enough to verify that from public text.
 
-Distribution is the material moat. [Greenlight Opportunities](https://glcoverage.com/greenlight-opportunities/)
+Distribution is the material public differentiation mechanism. [Greenlight Opportunities](https://glcoverage.com/greenlight-opportunities/)
 attaches the latest coverage report to submissions for producer/distributor/
 sales-agent needs. [The Greenlight List](https://glcoverage.com/the-greenlight-list/)
 offers $100,000 in equity financing and distribution; professional judges read
@@ -393,14 +401,15 @@ revision utility, and publish uncertainty—not to aggregate star ratings.
 
 ## Cross-market findings
 
-### 1. Speed and report breadth are commodities
+### 1. Speed and report breadth are visibly common
 
 The market spans under a minute, three to seven minutes, under an hour, and 24
 hours. At $19, a vendor already bundles verdict, eight scores, synopsis,
 characters, structure, market, pitch, contests, deadlines, and rewrite priorities.
 At $49–$79, another bundles seven passes, page annotations, chat, and revision
-comparison. STORYMACHINE gains no pricing power from adding another category,
-rule, pass, report page, or model call.
+comparison. Adding another category, rule, pass, report page, or model call is
+therefore weak publicly observable differentiation in this reviewed set. The
+available evidence cannot determine STORYMACHINE's pricing power.
 
 ### 2. "Methodology" is positioning until it discriminates
 
@@ -410,7 +419,7 @@ may describe implementation. They do not establish construct validity, reader
 agreement, calibration, or revision improvement. STORYMACHINE's own rule count
 would face the same objection.
 
-### 3. High-stakes decisions remain human
+### 3. Reviewed high-stakes workflows retain human judgment
 
 The market itself rejects full automation at the boundary that matters:
 
@@ -423,11 +432,13 @@ The market itself rejects full automation at the boundary that matters:
 - GetScriptCoverage says a veteran human remains appropriate for major
   submissions.
 
-This convergence supports an escalation architecture: machine observables and
-low-stakes reflection first; multiple human judgments for credentialing,
-professional submission, and benchmark truth.
+This convergence supports testing an escalation architecture: machine
+observables and low-stakes reflection first; independently designed human
+judgments for P1 reference evidence, appeals, and consequential credentialing or
+submission decisions. It does not prove that every low-stakes diagnostic needs
+human escalation or that a multi-reader service is commercially feasible.
 
-### 4. Distribution and continuity are stronger moats than analysis features
+### 4. Distribution and continuity are stronger public differentiation mechanisms than analysis features
 
 Coverfly has a peer/reputation market. The Black List has industry visibility and
 programs. Greenlight has producer requests, ranks, a competition, and
@@ -480,11 +491,12 @@ Copy mechanisms, not claims:
 
 - Keep the deterministic Doctor entry free or extremely low-cost while P0/P1
   evidence is incomplete. It is the acquisition and trust surface.
-- Do **not** race below $19 on an undifferentiated report. That anchors the product
-  as disposable commodity output and leaves no margin for support, privacy
+- Do **not** race below $19 on an undifferentiated report. That risks anchoring the product
+  as disposable low-value output and leaves no margin for support, privacy
   operations, or evaluation.
-- Do not charge a premium for rule count, pass count, report length, instant
-  speed, or Pass/Consider/Recommend. The market has already commoditized them.
+- Do not assume rule count, pass count, report length, instant speed, or
+  Pass/Consider/Recommend justify a premium. They are visibly common; actual
+  willingness to pay remains unmeasured.
 - A future paid tier can justifiably price continuity: private projects,
   longitudinal draft receipts, collaborative review, calibrated multi-reader
   comparison, exportable audit reports, and optional named-human escalation.

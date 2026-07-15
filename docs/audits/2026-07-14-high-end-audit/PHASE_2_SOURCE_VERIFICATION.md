@@ -176,7 +176,7 @@ professional-practice claim; they do not prove product compliance.
 | G09 | Primary PDF | VII | U.S. Copyright Office administrative report | January 2025; current | Public-agency policy mandate | A | **Authoritative for Office position:** human authorship and case-specific AI assistance; not a court holding or global rule. |
 | G10 | Primary PDF | VII | U.S. Copyright Office policy analysis | **Still pre-publication** on 2026-07-14 | Public-agency policy mandate | B pending final | **Supported only with status qualifier:** current Office analysis of training/licensing/remedies; nonjudicial and not final. |
 | G11 | Primary law | VII | Official EUR-Lex text, Regulation (EU) 2024/1689 | Current, staged application | Legislative mandate | A | **Authoritative for the regulation's text:** applicability is actor/feature/date specific and requires legal analysis. |
-| G12 | Primary guild page | VII | WGA explanation of 2023 MBA protections | Page current in 2026 | **Advocacy/institutional:** represents writer members | A for MBA claim | **Authoritative for the bounded MBA summary:** not universal copyright law or rules for every writer/product. |
+| G12 | Primary guild page | VII | WGA explanation of 2023 MBA AI protections | Page current and rechecked 2026-07-15 | **Advocacy/institutional:** represents writer members | A for bounded MBA claim | **Authoritative for the 2023 MBA summary only:** not the source for the 2026 training-license notification, universal copyright law, or rules for every writer/product. |
 
 ## Source quality matrix — product and industry sources
 
@@ -451,3 +451,42 @@ admissible as **supplemental Level VI / Grade B evidence under the narrow
 qualifiers above**. It does not repair the audit's missing direct writer-demand
 evidence or real-screenplay score-validation evidence, and it does not change
 the frozen 48-source verification result.
+
+---
+
+## Supplemental S02 verification (outside frozen 48-source corpus)
+
+**Counting rule:** S02 is a post-freeze exact-source correction added under
+`PROTOCOL_AMENDMENT_03.md`. It is not a forty-ninth frozen-corpus source and
+does not alter the 30 academic / 12 official-professional / 6 product counts.
+
+### Identity and exact-claim verification
+
+- **ID:** S02.
+- **Source:** Writers Guild of America. (2026). *2026 MBA Contract Changes FAQ*.
+- **Official URL:**
+  https://www.wga.org/contracts/contracts/mba/2026-mba-contract-changes-faq
+- **Existence/status:** official WGA contract FAQ page; independently re-opened
+  during the Phase 5 ethics review on 2026-07-15.
+- **Exact effect:** the artificial-intelligence section supports the bounded
+  agreement proposition that a company must notify the Guild when licensing a
+  writer's material to train a commercial generative-AI system and that the
+  Guild may request a meeting to discuss appropriate remuneration.
+
+### Authority, incentives, and limits
+
+| Dimension | Finding | Disposition |
+|---|---|---|
+| Authority | Primary union explanation of negotiated 2026 MBA changes | Level VII; Grade A for the exact agreement proposition |
+| Incentive | WGA advocates for writer members and explains its negotiated agreement | Disclose institutional/advocacy role; not evidence of misconduct |
+| Applicability | MBA-covered and fact-specific | Do not generalize to every writer, product, jurisdiction, copyright question, or STORYMACHINE deployment |
+| Temporal | Verified 2026-07-15 | Refresh on agreement/page/product-use changes |
+| Relationship to G12 | Separate page and effect | G12 remains the 2023 MBA AI-protections summary; never blend IDs or anchors |
+
+### Supplemental S02 disposition
+
+S02 is authentic official primary evidence for the exact 2026 MBA notification
+and remuneration-discussion proposition under its negotiated-agreement scope.
+It corrects a source-to-claim mismatch; it does not establish legal
+applicability to STORYMACHINE, demand, efficacy, or score validity, and it does
+not change the frozen 48-source verification result.

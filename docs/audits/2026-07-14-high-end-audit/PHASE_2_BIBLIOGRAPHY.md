@@ -827,7 +827,7 @@ Journal of the European Union*. https://eur-lex.europa.eu/eli/reg/2024/1689/oj
 
 #### G12 — WGA AI protections
 
-Writers Guild of America. (2026). *Artificial intelligence* [Summary of 2023
+Writers Guild of America. (2023). *Artificial intelligence* [Summary of 2023
 Minimum Basic Agreement protections].
 https://www.wga.org/contracts/know-your-rights/artificial-intelligence
 
@@ -835,8 +835,27 @@ https://www.wga.org/contracts/know-your-rights/artificial-intelligence
   under the MBA, AI output is not literary/source material, and companies must
   disclose AI-generated material supplied to writers.
 - **Limits/incentive/quality:** Applies to MBA-covered work, not every user or
-  product; WGA advocates for its writer membership. Level VII, Grade A for the
-  contract-practice claim.
+  product; this page does not support the distinct 2026 training-license
+  notification claim. WGA advocates for its writer membership. Level VII,
+  Grade A for the bounded 2023 MBA contract-practice claim.
+
+#### S02 — WGA 2026 MBA contract changes (post-freeze supplemental)
+
+Writers Guild of America. (2026). *2026 MBA contract changes FAQ*.
+https://www.wga.org/contracts/contracts/mba/2026-mba-contract-changes-faq
+
+- **Authority/use:** Official union explanation of the negotiated 2026 MBA. Its
+  artificial-intelligence section supports the exact bounded proposition that
+  a company must notify the Guild when licensing a writer's material to train a
+  commercial generative-AI system and that the Guild may request a meeting to
+  discuss appropriate remuneration.
+- **Limits/incentive/quality:** Applies only in the relevant MBA-covered context;
+  it is not universal product law, copyright law, or an applicability finding
+  for STORYMACHINE. WGA advocates for its membership. Level VII; Grade A for
+  the exact agreement proposition.
+- **Protocol status:** Added on 2026-07-15 under
+  `PROTOCOL_AMENDMENT_03.md` after the 48-source corpus freeze. S02 does not
+  change the frozen corpus count.
 
 ## Annotated bibliography — product and industry gray literature
 
