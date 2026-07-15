@@ -260,7 +260,7 @@ export default function StartScreen({
                     onClick={handleSample}
                     disabled={isGenerating}
                     aria-busy={isGenerating}
-                    className={`sm-btn sm-btn--stamp group relative flex min-h-[72px] w-full flex-col items-start gap-2.5 px-8 py-10 text-left sm:px-10 sm:py-12 ${FOCUS_RING} ${
+                    className={`sm-btn sm-btn--stamp group relative flex min-h-[80px] w-full flex-col items-start gap-2 px-8 py-10 text-left sm:px-10 sm:py-12 ${FOCUS_RING} ${
                       isGenerating ? "cursor-wait opacity-50" : ""
                     }`}
                   >
@@ -280,18 +280,18 @@ export default function StartScreen({
                   </button>
 
                   {/* Secondary actions: Open existing work or start fresh */}
-                  <div className="flex flex-col gap-2.5 sm:flex-row">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => openFileInputRef.current?.click()}
                       disabled={isGenerating}
                       aria-busy={isGenerating}
-                      className={`sm-btn flex flex-1 items-center justify-center gap-2.5 py-4 ${FOCUS_RING} ${
+                      className={`sm-btn flex flex-1 items-center justify-center gap-2 py-4 ${FOCUS_RING} ${
                         isGenerating ? "cursor-wait opacity-50" : ""
                       }`}
                     >
                       <Upload className="h-5 w-5 shrink-0" aria-hidden="true" />
-                      <span className="flex flex-col items-start gap-0.5 text-left">
+                      <span className="flex flex-col items-start gap-1 text-left">
                         <span className="font-bold">Open my script</span>
                         <span className="text-[9px] opacity-70">Fountain, TXT, or FDX</span>
                       </span>
@@ -301,12 +301,12 @@ export default function StartScreen({
                       onClick={() => onStart(DEFAULT_STORY_CONFIG)}
                       disabled={isGenerating}
                       aria-busy={isGenerating}
-                      className={`sm-btn flex flex-1 items-center justify-center gap-2.5 py-4 ${FOCUS_RING} ${
+                      className={`sm-btn flex flex-1 items-center justify-center gap-2 py-4 ${FOCUS_RING} ${
                         isGenerating ? "cursor-wait opacity-50" : ""
                       }`}
                     >
                       <FileText className="h-5 w-5 shrink-0" aria-hidden="true" />
-                      <span className="flex flex-col items-start gap-0.5 text-left">
+                      <span className="flex flex-col items-start gap-1 text-left">
                         <span className="font-bold">Start fresh</span>
                         <span className="text-[9px] opacity-70">Blank page</span>
                       </span>

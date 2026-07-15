@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, MessageSquare, Activity, Loader2, User } from 'lucide-react';
 import { motion } from 'motion/react';
 // The ScriptIDE character type (simpler than the full game Character in types.ts)
@@ -23,6 +23,9 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
   const [activeTab, setActiveTab] = useState<'world' | 'dialogue' | 'tension' | 'character'>('world');
   const [selectedChar, setSelectedChar] = useState<string>('');
   const [input, setInput] = useState('');
+  
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const runPrompt = async (endpoint: string, payload: Record<string, unknown>) => {
     setLoading(true);
@@ -34,12 +37,14 @@ export default function AIPanel({ script, characters, onApplySuggestion }: AIPan
         body: JSON.stringify(payload)
       });
       const data = await response.json() as { result?: string; error?: string };
+      if (!mountedRef.current) return;
       if (data.error) throw new Error(data.error);
       setResult(data.result ?? null);
     } catch (err: unknown) {
+      if (!mountedRef.current) return;
       setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion } from "motion/react";
 import { GameState, Choice, DefenseMechanism } from "../types";
 import type { OutlineBeat } from "../../server/engine/types";
+import { OutlineResponseSchema, StoryConfigSchema } from "../lib/api-schemas";
 import {
   GENRE_OPTIONS,
   STRUCTURE_OPTIONS,
@@ -245,6 +246,7 @@ export default function DirectorPanel({
   const [presetSaved, setPresetSaved] = useState<boolean | null>(null);
   const [applyingPreset, setApplyingPreset] = useState(false);
   const [confirmClearBeats, setConfirmClearBeats] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
 
@@ -252,8 +254,26 @@ export default function DirectorPanel({
   const abortRef = useRef<AbortController | null>(null);
   const tensionHistoryRef = useRef<Array<{ tension: number; menace: number }>>([]);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const choicesKey = JSON.stringify(currentScene.choices);
-  const qualitiesKey = JSON.stringify(directorState.qbnQualities);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const showError = useCallback((msg: string) => {
+    setErrorMsg(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorMsg(null), 6000);
+  }, []);
+
+  useEffect(() => () => { 
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current); 
+  }, []);
+  
+  const choicesKey = useMemo(
+    () => JSON.stringify(currentScene.choices),
+    [currentScene.choices]
+  );
+  const qualitiesKey = useMemo(
+    () => JSON.stringify(directorState.qbnQualities),
+    [directorState.qbnQualities]
+  );
 
   // ── Track tension history ─────────────────────────────────────────────────
 
@@ -268,27 +288,41 @@ export default function DirectorPanel({
   // ── Load saved outline + story config from engine on mount ──────────────
 
   useEffect(() => {
-    fetch("/api/outline")
-      .then(r => r.ok ? r.json() as Promise<{ beats: OutlineBeat[] }> : { beats: [] })
-      .then(data => { if (data.beats.length > 0) setOutlineBeats(data.beats); })
-      .catch((e: unknown) => console.error('[DirectorPanel] outline fetch failed:', e));
-    fetch("/api/story-config")
-      .then(r => r.ok ? r.json() as Promise<{
-        structure: string | null; emotional_arc: string | null;
-        director_style: string | null; expected_turns: number; pacing_target: string | null;
-        story_genre: string | null;
-      }> : null)
-      .then(data => {
-        if (!data) return;
-        if (data.structure) setStoryStructure(data.structure);
-        if (data.emotional_arc) setEmotionalArc(data.emotional_arc);
-        if (data.director_style) setDirectorStyle(data.director_style);
-        if (data.expected_turns) setExpectedTurns(data.expected_turns);
-        if (data.pacing_target) setPacingTarget(data.pacing_target as 'slow' | 'medium' | 'fast');
-        if (data.story_genre) setStoryGenre(data.story_genre);
+    const controller = new AbortController();
+    const mountedRef = { current: true };
+
+    Promise.all([
+      fetch("/api/outline", { signal: controller.signal })
+        .then(r => r.ok ? r.json() : { beats: [] })
+        .then(data => OutlineResponseSchema.parse(data)),
+      fetch("/api/story-config", { signal: controller.signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => data ? StoryConfigSchema.parse(data) : null)
+    ])
+      .then(([outlineData, configData]) => {
+        if (!mountedRef.current) return;
+        
+        if (outlineData.beats.length > 0) setOutlineBeats(outlineData.beats);
+        
+        if (configData) {
+          if (configData.structure) setStoryStructure(configData.structure);
+          if (configData.emotional_arc) setEmotionalArc(configData.emotional_arc);
+          if (configData.director_style) setDirectorStyle(configData.director_style);
+          if (configData.expected_turns) setExpectedTurns(configData.expected_turns);
+          if (configData.pacing_target) setPacingTarget(configData.pacing_target as 'slow' | 'medium' | 'fast');
+          if (configData.story_genre) setStoryGenre(configData.story_genre);
+        }
       })
-      .catch((e: unknown) => console.error('[DirectorPanel] story-config fetch failed:', e));
-  }, []);
+      .catch((e: unknown) => {
+        if (!mountedRef.current || controller.signal.aborted) return;
+        showError(`Failed to load story configuration: ${e instanceof Error ? e.message : String(e)}`);
+      });
+
+    return () => {
+      mountedRef.current = false;
+      controller.abort();
+    };
+  }, [showError]);
 
   // ── Escape key ────────────────────────────────────────────────────────────
 
@@ -498,16 +532,26 @@ export default function DirectorPanel({
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="director-panel-title"
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white border-[2px] border-[var(--sm-ink)] text-black p-8 overflow-y-auto font-mono text-sm z-50 shadow-[var(--sm-shadow)]"
-    >
+    <>
+      {errorMsg && (
+        <div
+          role="alert"
+          className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-3 border-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-stamp)] px-5 py-3 font-[family-name:var(--sm-font-mono)] text-sm text-white shadow-[var(--sm-shadow)]"
+        >
+          <span>{errorMsg}</span>
+          <button onClick={() => setErrorMsg(null)} aria-label="Dismiss error" className="ml-2 font-bold leading-none hover:opacity-70">✕</button>
+        </div>
+      )}
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="director-panel-title"
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed top-0 right-0 w-[500px] max-w-[94vw] h-dvh bg-white border-[2px] border-[var(--sm-ink)] text-black p-8 overflow-y-auto font-mono text-sm z-50 shadow-[var(--sm-shadow)]"
+      >
       {/* Header */}
       <div className="flex items-center gap-4 mb-6 pb-4 border-b-[8px] border-black">
         <Brain className="w-8 h-8 text-black shrink-0" />
@@ -1489,5 +1533,6 @@ export default function DirectorPanel({
 
       </div>
     </motion.div>
+    </>
   );
 }

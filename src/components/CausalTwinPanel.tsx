@@ -3,7 +3,8 @@
 // target, fires do(X := ∅) or do(X := Y), and sees exactly which downstream
 // beliefs, emotions, and reveals are now causally invalid.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { SCMDataSchema, CounterfactualReportSchema } from '../lib/api-schemas';
 
 // ── Types mirrored from server-side ──────────────────────────────────────────
 
@@ -51,17 +52,23 @@ export function CausalTwinPanel({ onClose }: Props) {
   const [report, setReport]             = useState<CounterfactualReport | null>(null);
   const [running, setRunning]           = useState(false);
   const [reportError, setReportError]   = useState<string | null>(null);
+  
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const loadSCM = useCallback(async () => {
     setScmLoading(true); setScmError(null);
     try {
       const res = await fetch('/api/nvm/twin/scm');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
-      setScm(await res.json());
+      const data = SCMDataSchema.parse(await res.json()) as SCMData;
+      if (!mountedRef.current) return;
+      setScm(data);
     } catch (e) {
+      if (!mountedRef.current) return;
       setScmError(e instanceof Error ? e.message : String(e));
     } finally {
-      setScmLoading(false);
+      if (mountedRef.current) setScmLoading(false);
     }
   }, []);
 
@@ -77,11 +84,14 @@ export function CausalTwinPanel({ onClose }: Props) {
         body: JSON.stringify({ opId: selectedId, replacement: removal ? null : undefined }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Server error');
-      setReport(await res.json());
+      const data = CounterfactualReportSchema.parse(await res.json()) as CounterfactualReport;
+      if (!mountedRef.current) return;
+      setReport(data);
     } catch (e) {
+      if (!mountedRef.current) return;
       setReportError(e instanceof Error ? e.message : String(e));
     } finally {
-      setRunning(false);
+      if (mountedRef.current) setRunning(false);
     }
   }
 
@@ -103,16 +113,16 @@ export function CausalTwinPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      border: '1px solid #334155', width: 880, maxWidth: '98vw',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      border: '1px solid var(--sm-night-line)', width: 880, maxWidth: '98vw',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-      fontFamily: 'monospace', fontSize: 13,
+      fontFamily: 'var(--sm-font-mono)', fontSize: 13,
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 18px', borderBottom: '1px solid var(--sm-night-line)', flexShrink: 0 }}>
         <div>
           <strong style={{ fontSize: 15 }}>Causal Twin — Pearl's do()-calculus (G4)</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>Select an op · fire do(remove) · see exactly what breaks downstream</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>Select an op · fire do(remove) · see exactly what breaks downstream</div>
         </div>
         <button onClick={onClose} style={iconBtn}>✕</button>
       </div>
@@ -122,16 +132,16 @@ export function CausalTwinPanel({ onClose }: Props) {
 
         {/* Left: Op DAG browser */}
         <div style={{
-          width: 300, flexShrink: 0, borderRight: '1px solid #334155',
+          width: 300, flexShrink: 0, borderRight: '1px solid var(--sm-night-line)',
           overflowY: 'auto', padding: '12px 10px',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ color: '#64748b', fontSize: 11 }}>CAUSAL DAG — {scm?.nodeCount ?? '…'} ops</span>
-            <button onClick={loadSCM} style={{ ...chip('#1e293b'), fontSize: 10 }}>↺</button>
+            <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>CAUSAL DAG — {scm?.nodeCount ?? '…'} ops</span>
+            <button onClick={loadSCM} style={{ ...chip('var(--sm-night-2)'), fontSize: 10 }}>↺</button>
           </div>
 
-          {scmLoading && <div style={{ color: '#64748b', textAlign: 'center', padding: 30 }}>Building SCM…</div>}
-          {scmError  && <div style={{ color: '#f87171', padding: 10 }}>{scmError}</div>}
+          {scmLoading && <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 30 }}>Building SCM…</div>}
+          {scmError  && <div style={{ color: 'var(--sm-stamp)', padding: 10 }}>{scmError}</div>}
 
           {!scmLoading && !scmError && commitGroups.length === 0 && (
             <div style={{ color: '#475569', fontSize: 11, textAlign: 'center', padding: 30 }}>
@@ -151,13 +161,13 @@ export function CausalTwinPanel({ onClose }: Props) {
                 const isTransitive = dist !== undefined && dist > 1;
                 const isIntervened = report && node.opId === selectedId;
 
-                let bg = '#1e293b';
+                let bg = 'var(--sm-night-2)';
                 if (isSelected) bg = '#312e81';
                 else if (isDirect) bg = '#431407';
                 else if (isTransitive) bg = '#1c1008';
                 else if (isIntervened) bg = '#4c1d95';
 
-                let borderColor = '#334155';
+                let borderColor = 'var(--sm-night-line)';
                 if (isSelected) borderColor = '#818cf8';
                 else if (isDirect) borderColor = '#f97316';
                 else if (isTransitive) borderColor = '#78350f';
@@ -173,14 +183,14 @@ export function CausalTwinPanel({ onClose }: Props) {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <span style={{ color: '#64748b', fontSize: 10 }}>{node.opIdx}</span>
+                      <span style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{node.opIdx}</span>
                       <span style={{ color: opColor(node.op.op), fontSize: 11, fontWeight: 700 }}>{node.op.op}</span>
                       {node.parents.length > 0 && <span style={{ color: '#475569', fontSize: 9 }}>↑{node.parents.length}</span>}
                       {node.children.length > 0 && <span style={{ color: '#475569', fontSize: 9 }}>↓{node.children.length}</span>}
                       {isDirect && <span style={{ color: '#f97316', fontSize: 9, marginLeft: 'auto' }}>DIRECT</span>}
                       {isTransitive && <span style={{ color: '#92400e', fontSize: 9, marginLeft: 'auto' }}>D+{dist}</span>}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {opSummary(node.op)}
                     </div>
                   </div>
@@ -195,17 +205,17 @@ export function CausalTwinPanel({ onClose }: Props) {
 
           {/* Intervention controls */}
           {selectedNode ? (
-            <div style={{ background: '#1e293b', borderRadius: 6, padding: '12px 14px' }}>
+            <div style={{ background: 'var(--sm-night-2)', borderRadius: 6, padding: '12px 14px' }}>
               <div style={{ marginBottom: 10 }}>
-                <div style={{ color: '#64748b', fontSize: 10, marginBottom: 3 }}>SELECTED OP</div>
+                <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 3 }}>SELECTED OP</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{ color: opColor(selectedNode.op.op), fontWeight: 700 }}>{selectedNode.op.op}</span>
                   <span style={{ color: '#475569', fontSize: 11 }}>@ {selectedNode.opId}</span>
                   {selectedNode.parents.length > 0 && (
-                    <span style={{ color: '#64748b', fontSize: 11 }}>depends on {selectedNode.parents.length} op(s)</span>
+                    <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>depends on {selectedNode.parents.length} op(s)</span>
                   )}
                   {selectedNode.children.length > 0 && (
-                    <span style={{ color: '#64748b', fontSize: 11 }}>{selectedNode.children.length} downstream dep(s)</span>
+                    <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{selectedNode.children.length} downstream dep(s)</span>
                   )}
                 </div>
                 <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>{opSummary(selectedNode.op)}</div>
@@ -218,7 +228,7 @@ export function CausalTwinPanel({ onClose }: Props) {
                 >
                   {running ? 'Running…' : 'do(remove)'}
                 </button>
-                <div style={{ color: '#334155', fontSize: 11, alignSelf: 'center' }}>
+                <div style={{ color: 'var(--sm-night-line)', fontSize: 11, alignSelf: 'center' }}>
                   Surgically removes this op and propagates causal invalidation through the DAG
                 </div>
               </div>
@@ -232,7 +242,7 @@ export function CausalTwinPanel({ onClose }: Props) {
           )}
 
           {reportError && (
-            <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: 10 }}>{reportError}</div>
+            <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>{reportError}</div>
           )}
 
           {/* Counterfactual Report */}
@@ -258,12 +268,12 @@ function CounterfactualReportView({ report }: { report: CounterfactualReport }) 
         borderRadius: 6, padding: '10px 14px',
       }}>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 8 }}>
-          <Stat label="Total affected" value={String(totalAffected)} color={totalAffected > 0 ? '#f97316' : '#4ade80'} />
-          <Stat label="Direct (d=1)" value={String(report.directlyAffected.length)} color="#fb923c" />
+          <Stat label="Total affected" value={String(totalAffected)} color={totalAffected > 0 ? '#f97316' : 'var(--sm-ok)'} />
+          <Stat label="Direct (d=1)" value={String(report.directlyAffected.length)} color="var(--sm-warn)" />
           <Stat label="Transitive (d>1)" value={String(report.transitivelyAffected.length)} color="#f59e0b" />
         </div>
         {totalAffected === 0 && (
-          <div style={{ color: '#4ade80', fontSize: 12 }}>No downstream ops depend on this one — safe to remove.</div>
+          <div style={{ color: 'var(--sm-ok)', fontSize: 12 }}>No downstream ops depend on this one — safe to remove.</div>
         )}
       </div>
 
@@ -288,9 +298,9 @@ function CounterfactualReportView({ report }: { report: CounterfactualReport }) 
       )}
 
       {/* Full summary text */}
-      <details style={{ background: '#1e293b', borderRadius: 5, padding: 10 }}>
-        <summary style={{ color: '#64748b', fontSize: 11, cursor: 'pointer' }}>Full causal summary</summary>
-        <pre style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
+      <details style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: 10 }}>
+        <summary style={{ color: 'var(--sm-ink-mute)', fontSize: 11, cursor: 'pointer' }}>Full causal summary</summary>
+        <pre style={{ marginTop: 8, fontSize: 11, color: 'var(--sm-cream-mute)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: '8px 0 0' }}>
           {report.summary}
         </pre>
       </details>
@@ -310,7 +320,7 @@ function AffectedGroup({ label, ops, color, bg }: { label: string; ops: Affected
               <span style={{ color: '#475569', fontSize: 10 }}>@ {a.opId}</span>
               <span style={{ color, fontSize: 10, marginLeft: 'auto' }}>d={a.distance}</span>
             </div>
-            <div style={{ color: '#94a3b8', fontSize: 11 }}>{a.reason}</div>
+            <div style={{ color: 'var(--sm-cream-mute)', fontSize: 11 }}>{a.reason}</div>
           </div>
         ))}
       </div>
@@ -321,7 +331,7 @@ function AffectedGroup({ label, ops, color, bg }: { label: string; ops: Affected
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div>
-      <div style={{ color: '#64748b', fontSize: 10 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10 }}>{label}</div>
       <div style={{ color, fontSize: 22, fontWeight: 700 }}>{value}</div>
     </div>
   );
@@ -330,14 +340,14 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function opColor(opKind: string): string {
-  if (opKind === 'ADD_FACT' || opKind === 'EXPIRE_FACT') return '#60a5fa';
-  if (opKind === 'UPDATE_BELIEF') return '#a78bfa';
+  if (opKind === 'ADD_FACT' || opKind === 'EXPIRE_FACT') return 'var(--sm-cool)';
+  if (opKind === 'UPDATE_BELIEF') return 'var(--sm-cool)';
   if (opKind === 'APPRAISE_EMOTION') return '#f472b6';
   if (opKind === 'SHIFT_RELATIONSHIP') return '#34d399';
-  if (opKind === 'SEED_CLUE' || opKind === 'TRIGGER_PAYOFF') return '#fbbf24';
-  if (opKind === 'RECORD_VISUAL_FACT' || opKind === 'RECORD_SONIC_FACT') return '#fb923c';
-  if (opKind === 'RAISE_CLOCK' || opKind === 'EXPIRE_CLOCK') return '#f87171';
-  return '#94a3b8';
+  if (opKind === 'SEED_CLUE' || opKind === 'TRIGGER_PAYOFF') return 'var(--sm-warn)';
+  if (opKind === 'RECORD_VISUAL_FACT' || opKind === 'RECORD_SONIC_FACT') return 'var(--sm-warn)';
+  if (opKind === 'RAISE_CLOCK' || opKind === 'EXPIRE_CLOCK') return 'var(--sm-stamp)';
+  return 'var(--sm-cream-mute)';
 }
 
 function opSummary(op: { op: string; [k: string]: unknown }): string {
@@ -367,13 +377,13 @@ function opSummary(op: { op: string; [k: string]: unknown }): string {
 }
 
 const iconBtn: React.CSSProperties = {
-  background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16,
+  background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16,
 };
 
 function chip(bg: string): React.CSSProperties {
   return {
-    background: bg, border: '1px solid #334155', borderRadius: 4,
-    color: '#e2e8f0', padding: '3px 8px', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 11,
+    background: bg, border: '1px solid var(--sm-night-line)', borderRadius: 4,
+    color: 'var(--sm-cream)', padding: '3px 8px', cursor: 'pointer',
+    fontFamily: 'var(--sm-font-mono)', fontSize: 11,
   };
 }

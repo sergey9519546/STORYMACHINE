@@ -30,24 +30,24 @@ interface TabSpec {
 }
 
 const TABS: TabSpec[] = [
-  { id: 'fountain',     label: 'Screenplay',    icon: '🎬', ext: 'fountain', mime: 'text/plain',       description: 'Fountain-formatted screenplay',                color: '#a78bfa' },
-  { id: 'novel',        label: 'Novel',         icon: '📖', ext: 'md',       mime: 'text/markdown',    description: 'Prose narrative markdown',                     color: '#60a5fa' },
+  { id: 'fountain',     label: 'Screenplay',    icon: '🎬', ext: 'fountain', mime: 'text/plain',       description: 'Fountain-formatted screenplay',                color: 'var(--sm-cool)' },
+  { id: 'novel',        label: 'Novel',         icon: '📖', ext: 'md',       mime: 'text/markdown',    description: 'Prose narrative markdown',                     color: 'var(--sm-cool)' },
   { id: 'stage',        label: 'Stage Play',    icon: '🎭', ext: 'txt',      mime: 'text/plain',       description: 'Stage directions & dialogue',                  color: '#34d399' },
-  { id: 'comic',        label: 'Comic',         icon: '💬', ext: 'json',     mime: 'application/json', description: 'Panel-by-panel storyboard JSON',               color: '#fb923c' },
+  { id: 'comic',        label: 'Comic',         icon: '💬', ext: 'json',     mime: 'application/json', description: 'Panel-by-panel storyboard JSON',               color: 'var(--sm-warn)' },
   { id: 'interactive',  label: 'Living Story',  icon: '⚙️', ext: 'json',     mime: 'application/json', description: 'Replayable executable story JSON',             color: '#f472b6' },
-  { id: 'pitch',        label: 'Pitch',         icon: '📣', ext: 'md',       mime: 'text/markdown',    description: 'One-page pitch document',                      color: '#fbbf24' },
+  { id: 'pitch',        label: 'Pitch',         icon: '📣', ext: 'md',       mime: 'text/markdown',    description: 'One-page pitch document',                      color: 'var(--sm-warn)' },
   { id: 'bible',        label: 'Story Bible',   icon: '📚', ext: 'md',       mime: 'text/markdown',    description: 'Full world & character reference',             color: '#38bdf8' },
   { id: 'rewatch',      label: 'Rewatch',       icon: '🔁', ext: 'md',       mime: 'text/markdown',    description: 'Annotated second-viewing guide',               color: '#a3e635' },
-  { id: 'cutting_room', label: 'Cutting Room',  icon: '✂️', ext: 'md',       mime: 'text/markdown',    description: 'Rejected ghost candidates',                    color: '#94a3b8' },
+  { id: 'cutting_room', label: 'Cutting Room',  icon: '✂️', ext: 'md',       mime: 'text/markdown',    description: 'Rejected ghost candidates',                    color: 'var(--sm-cream-mute)' },
   { id: 'sidecar',      label: 'Sidecar',       icon: '📊', ext: 'json',     mime: 'application/json', description: 'NVM quality metrics for CI/tooling',           color: '#e879f9' },
   // Documents
   { id: 'treatment',           label: 'Treatment',    icon: '📝', ext: 'txt', mime: 'text/plain', description: 'Treatment — prose development document with logline',                        color: '#f59e0b' },
   { id: 'outline',             label: 'Beat Outline', icon: '🗂️', ext: 'txt', mime: 'text/plain', description: 'Beat Outline — numbered beat sheet with act breaks',                          color: '#22d3ee' },
   // Drafts
-  { id: 'dialogue_only',       label: 'Table Read',   icon: '🗣️', ext: 'txt', mime: 'text/plain', description: 'Table Read — spoken lines only, for voice testing',                           color: '#4ade80' },
+  { id: 'dialogue_only',       label: 'Table Read',   icon: '🗣️', ext: 'txt', mime: 'text/plain', description: 'Table Read — spoken lines only, for voice testing',                           color: 'var(--sm-ok)' },
   { id: 'epistolary',          label: 'Epistolary',   icon: '✉️', ext: 'txt', mime: 'text/plain', description: 'Epistolary — the story as first-person letters and journal entries',          color: '#c084fc' },
   // Engine views
-  { id: 'simulation_log',      label: 'Sim Log',      icon: '🧾', ext: 'txt', mime: 'text/plain', description: 'Simulation Log — the objective what-happened ledger',                         color: '#f87171' },
+  { id: 'simulation_log',      label: 'Sim Log',      icon: '🧾', ext: 'txt', mime: 'text/plain', description: 'Simulation Log — the objective what-happened ledger',                         color: 'var(--sm-stamp)' },
   { id: 'director_commentary', label: 'Commentary',   icon: '🎙️', ext: 'txt', mime: 'text/plain', description: "Director's Commentary — what the machinery is doing under each scene",        color: '#fde047' },
 ];
 
@@ -137,22 +137,22 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
 
   return (
     <div style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 0, width: 860, maxWidth: '98vw', fontFamily: 'monospace',
-      fontSize: 13, border: '1px solid #334155',
+      background: 'var(--sm-night)', color: 'var(--sm-cream)', borderRadius: 8,
+      padding: 0, width: 860, maxWidth: '98vw', fontFamily: 'var(--sm-font-mono)',
+      fontSize: 13, border: '1px solid var(--sm-night-line)',
       maxHeight: '90vh', display: 'flex', flexDirection: 'column',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid #334155' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--sm-night-line)' }}>
         <div>
           <strong style={{ fontSize: 15 }}>Projection Gallery — G3 Holographic Output</strong>
-          <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>One canon · every format · pure projection</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginTop: 2 }}>One canon · every format · pure projection</div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>✕</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--sm-cream-mute)', cursor: 'pointer', fontSize: 16 }}>✕</button>
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid #334155', background: '#0c1525', flexShrink: 0 }}>
+      <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--sm-night-line)', background: '#0c1525', flexShrink: 0 }}>
         {TABS.map(tab => {
           const isActive = tab.id === activeTab;
           const hasData = !!artifacts[tab.id];
@@ -162,13 +162,13 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
               key={tab.id}
               onClick={() => handleTabSelect(tab.id)}
               style={{
-                background: isActive ? '#1e293b' : 'transparent',
+                background: isActive ? 'var(--sm-night-2)' : 'transparent',
                 border: 'none',
                 borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
-                color: isActive ? '#e2e8f0' : '#64748b',
+                color: isActive ? 'var(--sm-cream)' : 'var(--sm-ink-mute)',
                 padding: '9px 12px',
                 cursor: 'pointer',
-                fontFamily: 'monospace',
+                fontFamily: 'var(--sm-font-mono)',
                 fontSize: 12,
                 whiteSpace: 'nowrap',
                 display: 'flex',
@@ -180,7 +180,7 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
               {hasData && !isErr && <span style={{ width: 6, height: 6, borderRadius: '50%', background: tab.color, display: 'inline-block' }} />}
-              {isErr && <span style={{ color: '#f87171', fontSize: 10 }}>!</span>}
+              {isErr && <span style={{ color: 'var(--sm-stamp)', fontSize: 10 }}>!</span>}
             </button>
           );
         })}
@@ -193,7 +193,7 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
           <div style={{ flex: 1 }}>
             <span style={{ color: currentTab.color, marginRight: 6 }}>{currentTab.icon}</span>
             <strong>{currentTab.label}</strong>
-            <span style={{ color: '#64748b', marginLeft: 8, fontSize: 11 }}>{currentTab.description}</span>
+            <span style={{ color: 'var(--sm-ink-mute)', marginLeft: 8, fontSize: 11 }}>{currentTab.description}</span>
           </div>
           {!currentArtifact && !isLoading && !currentError && (
             <button onClick={() => loadArtifact(activeTab)} style={btnStyle('#7c3aed')}>
@@ -202,7 +202,7 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
           )}
           {currentArtifact && (
             <>
-              <button onClick={handleRefresh} style={btnStyle('#1e293b')}>↺ Refresh</button>
+              <button onClick={handleRefresh} style={btnStyle('var(--sm-night-2)')}>↺ Refresh</button>
               <button onClick={() => downloadArtifact(currentTab, currentArtifact)} style={btnStyle('#065f46')}>
                 ↓ Download .{currentTab.ext}
               </button>
@@ -219,10 +219,10 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
 
         {/* Metadata bar */}
         {currentArtifact && Object.keys(currentArtifact.metadata).length > 0 && (
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: '#1e293b', borderRadius: 5, padding: '7px 12px' }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--sm-night-2)', borderRadius: 5, padding: '7px 12px' }}>
             {Object.entries(currentArtifact.metadata).map(([k, v]) => (
               <div key={k}>
-                <span style={{ color: '#64748b', fontSize: 11, marginRight: 4 }}>{k}:</span>
+                <span style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginRight: 4 }}>{k}:</span>
                 <span style={{ color: currentTab.color }}>{String(v)}</span>
               </div>
             ))}
@@ -231,12 +231,12 @@ export function ProjectionGalleryPanel({ onClose }: Props) {
 
         {/* States */}
         {isLoading && (
-          <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>
+          <div style={{ color: 'var(--sm-ink-mute)', textAlign: 'center', padding: 40 }}>
             Projecting {currentTab.label}…
           </div>
         )}
         {currentError && (
-          <div style={{ color: '#f87171', background: '#1e293b', borderRadius: 5, padding: '10px 14px' }}>
+          <div style={{ color: 'var(--sm-stamp)', background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 14px' }}>
             {currentError}
           </div>
         )}
@@ -264,8 +264,8 @@ function IdleState({ tab, onLoad }: { tab: TabSpec; onLoad: () => void }) {
       padding: 60, gap: 14, color: '#475569', textAlign: 'center',
     }}>
       <div style={{ fontSize: 48 }}>{tab.icon}</div>
-      <div style={{ fontSize: 14, color: '#64748b' }}>{tab.description}</div>
-      <div style={{ fontSize: 12, color: '#334155' }}>
+      <div style={{ fontSize: 14, color: 'var(--sm-ink-mute)' }}>{tab.description}</div>
+      <div style={{ fontSize: 12, color: 'var(--sm-night-line)' }}>
         Projection is lazy-loaded — click to compile from current canon
       </div>
       <button onClick={onLoad} style={{ ...btnStyle('#7c3aed'), marginTop: 8, padding: '9px 20px' }}>
@@ -299,7 +299,7 @@ function ContentRenderer({ artifact, tab }: { artifact: Artifact; tab: TabSpec }
   // all of which project as plain preformatted text)
   return (
     <pre style={{
-      background: '#0c1525', border: '1px solid #334155', borderRadius: 5,
+      background: '#0c1525', border: '1px solid var(--sm-night-line)', borderRadius: 5,
       padding: 16, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       color: '#cbd5e1', fontSize: 12, lineHeight: 1.7, flex: 1,
     }}>
@@ -328,12 +328,12 @@ function ComicRenderer({ content, color }: { content: string; color: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Object.entries(byScene).map(([scene, ps]) => (
         <div key={scene}>
-          <div style={{ color: '#64748b', fontSize: 11, marginBottom: 6 }}>SCENE {scene}</div>
+          <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11, marginBottom: 6 }}>SCENE {scene}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
             {ps.map((p, i) => (
               <div key={i} style={{
-                background: '#1e293b', borderRadius: 5, padding: '10px 12px',
-                border: `1px solid ${p.visual === 'FULL_BLEED' ? color : '#334155'}`,
+                background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px',
+                border: `1px solid ${p.visual === 'FULL_BLEED' ? color : 'var(--sm-night-line)'}`,
                 minHeight: 80, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
               }}>
                 <div style={{ fontSize: 10, color: '#475569', marginBottom: 6 }}>
@@ -363,9 +363,9 @@ function RewatchRenderer({ content, color }: { content: string; color: string })
           <div key={i} style={{
             padding: isWarning || isClue ? '5px 10px' : isHeading ? '10px 0 2px' : '1px 0',
             background: isWarning ? '#2d1515' : isClue ? '#1a2b1a' : 'transparent',
-            borderLeft: isWarning ? `3px solid #f87171` : isClue ? `3px solid ${color}` : 'none',
+            borderLeft: isWarning ? `3px solid var(--sm-stamp)` : isClue ? `3px solid ${color}` : 'none',
             borderRadius: isWarning || isClue ? 4 : 0,
-            color: isHeading ? '#94a3b8' : '#cbd5e1',
+            color: isHeading ? 'var(--sm-cream-mute)' : '#cbd5e1',
             fontSize: isHeading ? 13 : 12,
             fontWeight: isHeading ? 700 : 400,
           }}>
@@ -392,8 +392,8 @@ function SidecarRenderer({ content, color }: { content: string; color: string })
       {topLevel.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
           {topLevel.map(([k, v]) => (
-            <div key={k} style={{ background: '#1e293b', borderRadius: 5, padding: '10px 12px' }}>
-              <div style={{ color: '#64748b', fontSize: 10, marginBottom: 3 }}>{k}</div>
+            <div key={k} style={{ background: 'var(--sm-night-2)', borderRadius: 5, padding: '10px 12px' }}>
+              <div style={{ color: 'var(--sm-ink-mute)', fontSize: 10, marginBottom: 3 }}>{k}</div>
               <div style={{ color, fontSize: 18, fontWeight: 700 }}>{String(v)}</div>
             </div>
           ))}
@@ -402,8 +402,8 @@ function SidecarRenderer({ content, color }: { content: string; color: string })
       {/* Nested objects as JSON */}
       {nested.length > 0 && (
         <pre style={{
-          background: '#0c1525', border: '1px solid #334155', borderRadius: 5,
-          padding: 14, margin: 0, fontSize: 11, color: '#94a3b8',
+          background: '#0c1525', border: '1px solid var(--sm-night-line)', borderRadius: 5,
+          padding: 14, margin: 0, fontSize: 11, color: 'var(--sm-cream-mute)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
           {JSON.stringify(Object.fromEntries(nested), null, 2)}
@@ -418,10 +418,10 @@ function SidecarRenderer({ content, color }: { content: string; color: string })
 function JsonRenderer({ content, color: _color, label }: { content: string; color: string; label: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ color: '#64748b', fontSize: 11 }}>{label}</div>
+      <div style={{ color: 'var(--sm-ink-mute)', fontSize: 11 }}>{label}</div>
       <pre style={{
-        background: '#0c1525', border: '1px solid #334155', borderRadius: 5,
-        padding: 16, margin: 0, fontSize: 11, color: '#94a3b8',
+        background: '#0c1525', border: '1px solid var(--sm-night-line)', borderRadius: 5,
+        padding: 16, margin: 0, fontSize: 11, color: 'var(--sm-cream-mute)',
         whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1,
       }}>
         {content}
@@ -440,6 +440,6 @@ function btnStyle(bg: string): React.CSSProperties {
   return {
     padding: '6px 12px', border: 'none', borderRadius: 5,
     background: bg, color: '#fff', cursor: 'pointer',
-    fontFamily: 'monospace', fontSize: 12,
+    fontFamily: 'var(--sm-font-mono)', fontSize: 12,
   };
 }

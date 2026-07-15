@@ -209,13 +209,22 @@ export const GoalStackFieldSchema = z.object({
   last_planned_at: z.number().default(0),
 }).passthrough();
 
+// Character display names: non-empty after trim, bounded length.
+// Used by AgentItemSchema and CharacterProfileBodySchema so empty/whitespace
+// names never reach scenario builders or prompt assembly.
+export const CharacterNameSchema = z
+  .string()
+  .min(1, 'name cannot be empty')
+  .max(80, 'name too long')
+  .refine(s => s.trim().length > 0, { message: 'name cannot be blank' });
+
 const AgentItemSchema = z
   .object({
     char_id: z.string().min(1).max(64),
-    name: z.string().min(1).max(256),
+    name: CharacterNameSchema,
     public_mask: z.string().max(2000).default(''),
     hidden_motive: z.string().max(2000).default(''),
-    knowledge_vector: z.array(z.string()).max(50).default([]),
+    knowledge_vector: z.array(z.string().max(500)).max(50).default([]),
     suspicion_score: z.number().min(0).max(100).default(0),
     current_location_id: z.string().max(64).default(''),
     // Fix B: previously accepted by ScenarioBuilder's UI (Dark-Triad sliders,
@@ -930,11 +939,11 @@ export const CleanActionBodySchema = z.object({
 // 'object')` guard this schema replaces.
 export const CharacterProfileBodySchema = z.object({
   profile: z.object({
-    name: requireStringField,
-    ghost: requireStringField,
-    lie: requireStringField,
-    want: requireStringField,
-    need: requireStringField,
+    name: CharacterNameSchema,
+    ghost: requireStringField.max(500),
+    lie: requireStringField.max(2000),
+    want: requireStringField.max(2000),
+    need: requireStringField.max(2000),
   }).passthrough(),
 });
 

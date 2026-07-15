@@ -70,14 +70,8 @@ const PanelLoadingOverlay = () => (
 );
 
 const PanelLoadingInline = () => (
-  <div
-    style={{
-      background: '#0f172a', color: '#e2e8f0', borderRadius: 8,
-      padding: 20, fontFamily: 'monospace', fontSize: 13,
-      border: '1px solid #334155',
-    }}
-  >
-    Loading…
+  <div className="sm-panel sm-panel--ink" style={{ padding: '20px' }}>
+    <p className="font-mono text-sm">Loading…</p>
   </div>
 );
 
@@ -94,11 +88,11 @@ const EMOTION_COLOR: Record<EmotionType, string> = {
 };
 
 const PERSUASION_BADGE: Record<string, string> = {
-  logic:        'bg-blue-600 text-white',
-  emotion:      'bg-pink-500 text-white',
-  authority:    'bg-gray-800 text-white',
-  reciprocity:  'bg-teal-600 text-white',
-  social_proof: 'bg-orange-500 text-white',
+  logic:        'sm-chip',
+  emotion:      'sm-chip sm-chip--stamp',
+  authority:    'sm-chip',
+  reciprocity:  'sm-chip',
+  social_proof: 'sm-chip sm-chip--stamp',
 };
 
 interface StoryMachineProps {
