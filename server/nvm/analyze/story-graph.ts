@@ -221,16 +221,17 @@ function computeGraphMetrics(
     .map(([clueId, _]) => clueId);
   
   // Forward edge ratio (for act-swap discrimination)
-  const causalEdges = edges.filter(e => e.type === 'causal' || e.type === 'character-arc');
-  let forwardEdges = 0;
-  for (const edge of causalEdges) {
-    const sourceIdx = extractSceneIdx(edge.source);
-    const targetIdx = extractSceneIdx(edge.target);
-    if (sourceIdx !== null && targetIdx !== null && sourceIdx < targetIdx) {
-      forwardEdges++;
+  // Use promiseMap directly since it has seedIdx and payoffIdx
+  const paidPromisesArray = Array.from(promiseMap.values()).filter(p => p.payoffIdx !== undefined);
+  let forwardPromises = 0;
+  for (const promise of paidPromisesArray) {
+    if (promise.seedIdx < promise.payoffIdx!) {
+      forwardPromises++;
     }
   }
-  const forwardEdgeRatio = causalEdges.length > 0 ? forwardEdges / causalEdges.length : 0.5;
+  const forwardEdgeRatio = paidPromisesArray.length > 0 
+    ? forwardPromises / paidPromisesArray.length 
+    : 0.5;
   
   // Setup-payoff distance
   const distances = Array.from(promiseMap.values())
