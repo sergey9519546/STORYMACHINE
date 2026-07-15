@@ -415,6 +415,269 @@ function StoryMetricsSection({ metrics }: { metrics: NarrativeMetricsReport }) {
   );
 }
 
+/** Story Graph Section — Phase 2 Enhanced Diagnostics
+ *  Displays structural analysis with severity-based grouping, impact explanations,
+ *  and actionable suggestions. Shows critical/medium/low issues plus strengths. */
+function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server/nvm/analyze/story-graph.ts").StoryGraphReport }) {
+  const { diagnostics, summary, graph } = storyGraph;
+  const [expandedDiagnostic, setExpandedDiagnostic] = useState<string | null>(null);
+
+  // Overall assessment styling
+  const assessmentMeta = {
+    strong: { label: "Strong Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
+    good: { label: "Good Structure", color: "text-green-600 dark:text-green-400", bg: "bg-green-50 dark:bg-green-900/20", icon: CheckCircle2 },
+    "needs-work": { label: "Needs Work", color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20", icon: AlertCircle },
+    weak: { label: "Weak Structure", color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20", icon: AlertTriangle },
+  };
+
+  const assessment = assessmentMeta[summary.overallAssessment];
+
+  // Severity icons
+  const severityIcons = {
+    critical: { Icon: AlertTriangle, color: "text-red-600 dark:text-red-400" },
+    medium: { Icon: AlertCircle, color: "text-amber-600 dark:text-amber-400" },
+    low: { Icon: Info, color: "text-zinc-500 dark:text-zinc-400" },
+    strength: { Icon: CheckCircle2, color: "text-green-600 dark:text-green-400" },
+  };
+
+  return (
+    <div>
+      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-gray-500 dark:text-gray-400">
+        Story Structure Analysis
+      </h3>
+      <p className="text-[11px] font-mono text-gray-600 dark:text-gray-300 leading-snug mb-3">
+        Graph-based structural diagnostics — promise tracking, causal flow, escalation.
+      </p>
+
+      {/* Overall assessment banner */}
+      <div className={`${assessment.bg} border-2 border-black/10 dark:border-white/10 p-3 mb-4`}>
+        <div className="flex items-center gap-2 mb-2">
+          <assessment.icon className={`w-4 h-4 ${assessment.color}`} aria-hidden="true" />
+          <span className={`text-xs font-bold uppercase tracking-widest ${assessment.color}`}>
+            {assessment.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] font-mono text-gray-600 dark:text-gray-400">
+          <span>{summary.totalIssues} issues</span>
+          <span>·</span>
+          <span>{summary.criticalCount} critical</span>
+          <span>·</span>
+          <span>{summary.strengthCount} strengths</span>
+        </div>
+        <div className="mt-2 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+          Health score: {storyGraph.graphHealth}/100 · 
+          Promise closure: {Math.round(graph.promisePaymentRatio * 100)}% · 
+          Forward flow: {Math.round(graph.forwardEdgeRatio * 100)}%
+        </div>
+      </div>
+
+      {/* Critical Issues */}
+      {diagnostics.critical.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-red-600 dark:text-red-400">
+              Critical ({diagnostics.critical.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.critical.map((diag, i) => {
+              const diagId = `critical-${i}`;
+              const isExpanded = expandedDiagnostic === diagId;
+              return (
+                <div
+                  key={i}
+                  className="border-2 border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-2.5"
+                >
+                  <button
+                    onClick={() => setExpandedDiagnostic(isExpanded ? null : diagId)}
+                    className="w-full text-left flex items-start gap-2"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-600" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-red-900 dark:text-red-200 leading-snug">
+                        {diag.message}
+                        {diag.sceneIdx !== undefined && (
+                          <span className="ml-1.5 text-[10px] font-mono text-red-700 dark:text-red-400">
+                            (Scene {diag.sceneIdx + 1})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 pl-5 space-y-2">
+                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {diag.impact}
+                      </p>
+                      {diag.suggestions.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                            Suggestions:
+                          </p>
+                          <ul className="space-y-1">
+                            {diag.suggestions.map((suggestion, si) => (
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                                <span className="text-red-600 shrink-0">→</span>
+                                <span>{suggestion}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Medium Issues */}
+      {diagnostics.medium.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+              Medium ({diagnostics.medium.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.medium.map((diag, i) => {
+              const diagId = `medium-${i}`;
+              const isExpanded = expandedDiagnostic === diagId;
+              return (
+                <div
+                  key={i}
+                  className="border-2 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-2.5"
+                >
+                  <button
+                    onClick={() => setExpandedDiagnostic(isExpanded ? null : diagId)}
+                    className="w-full text-left flex items-start gap-2"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-[11px] font-bold text-amber-900 dark:text-amber-200 leading-snug">
+                        {diag.message}
+                        {diag.sceneIdx !== undefined && (
+                          <span className="ml-1.5 text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                            (Scene {diag.sceneIdx + 1})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="mt-2 pl-5 space-y-2">
+                      <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {diag.impact}
+                      </p>
+                      {diag.suggestions.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-1">
+                            Suggestions:
+                          </p>
+                          <ul className="space-y-1">
+                            {diag.suggestions.map((suggestion, si) => (
+                              <li key={si} className="flex items-start gap-1.5 text-[10px] font-mono text-gray-700 dark:text-gray-300">
+                                <span className="text-amber-600 shrink-0">→</span>
+                                <span>{suggestion}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Low Issues (Collapsed by default, show count) */}
+      {diagnostics.low.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Info className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+              Low Priority ({diagnostics.low.length})
+            </h4>
+          </div>
+          <details className="border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/10 p-2.5">
+            <summary className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 cursor-pointer">
+              Click to expand {diagnostics.low.length} minor issue{diagnostics.low.length === 1 ? '' : 's'}
+            </summary>
+            <div className="mt-2 space-y-2">
+              {diagnostics.low.map((diag, i) => (
+                <div key={i} className="pl-2 border-l-2 border-zinc-300 dark:border-zinc-600">
+                  <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-200 leading-snug">
+                    {diag.message}
+                    {diag.sceneIdx !== undefined && (
+                      <span className="ml-1.5 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
+                        (Scene {diag.sceneIdx + 1})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+
+      {/* Strengths */}
+      {diagnostics.strengths.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
+            <h4 className="text-[9px] font-bold uppercase tracking-widest text-green-600 dark:text-green-400">
+              Strengths ({diagnostics.strengths.length})
+            </h4>
+          </div>
+          <div className="space-y-2">
+            {diagnostics.strengths.map((strength, i) => (
+              <div
+                key={i}
+                className="border-2 border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10 p-2.5"
+              >
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-green-600" aria-hidden="true" />
+                  <div className="flex-1">
+                    <p className="text-[11px] font-bold text-green-900 dark:text-green-200 leading-snug mb-1">
+                      {strength.message}
+                    </p>
+                    <p className="text-[10px] font-mono text-gray-700 dark:text-gray-300 leading-relaxed">
+                      {strength.impact}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {summary.totalIssues === 0 && diagnostics.strengths.length === 0 && (
+        <div className="text-center py-4 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+          No structural issues detected. Graph analysis found clean causal flow.
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Heatmap cell color by issue density — critical presence always wins regardless
  *  of total count, so a single critical issue reads as urgent even in a light scene. */
 function heatmapClass(scene: SceneDiagnostics): string {
@@ -2809,6 +3072,13 @@ export default function ScriptDoctorPanel({
                 before it existed degrade gracefully with no gap — same
                 optional-field convention as report.deepRead/rootCauses. */}
             {report.metrics && <StoryMetricsSection metrics={report.metrics} />}
+
+            {/* Story graph — Phase 2 enhanced structural diagnostics from
+                server/nvm/analyze/story-graph.ts (report.storyGraph). Rendered
+                only when the report carries the field, same optional-field
+                convention as report.metrics above. Shows severity-grouped
+                diagnostics with impact + actionable suggestions. */}
+            {report.storyGraph && <StoryGraphSection storyGraph={report.storyGraph} />}
 
             {/* Top priorities */}
             {report.topPriorities.length > 0 && (
