@@ -48,7 +48,7 @@ export default function SnapshotManager({
           <button
             onClick={onTakeSnapshot}
             aria-label="Save new script version snapshot"
-            className="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase brutal-border flex items-center gap-2"
+            className="sm-btn--ink px-3 py-1 text-[10px] font-bold uppercase sm-btn flex items-center gap-2"
           >
             <Save className="w-3 h-3" /> Save Version
           </button>
@@ -57,7 +57,7 @@ export default function SnapshotManager({
           {snapshots.map((s) => (
             <div
               key={s.id}
-              className="bg-white dark:bg-zinc-800 p-4 brutal-border-thick brutal-shadow flex justify-between items-center"
+              className="bg-white dark:bg-zinc-800 p-4 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] flex justify-between items-center"
             >
               <div>
                 <div className="font-bold uppercase text-xs">{s.name}</div>
@@ -103,7 +103,7 @@ export default function SnapshotManager({
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              className="bg-white dark:bg-zinc-800 p-6 brutal-border-thick brutal-shadow w-80 space-y-4"
+              className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
             >
               <h3 className="font-bold uppercase text-xs tracking-widest">
                 Save Snapshot
@@ -133,7 +133,7 @@ export default function SnapshotManager({
                 </button>
                 <button
                   onClick={onConfirmSnapshot}
-                  className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-gray-800"
+                  className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-gray-800"
                 >
                   Save
                 </button>
@@ -156,7 +156,7 @@ export default function SnapshotManager({
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              className="bg-white dark:bg-zinc-800 p-6 brutal-border-thick brutal-shadow w-80 space-y-4"
+              className="bg-white dark:bg-zinc-800 p-6 border-[2px] border-[var(--sm-ink)] shadow-[var(--sm-shadow)] w-80 space-y-4"
             >
               <h3 className="font-bold uppercase text-xs tracking-widest">
                 Restore Snapshot?
@@ -173,7 +173,7 @@ export default function SnapshotManager({
                 </button>
                 <button
                   onClick={onConfirmRestore}
-                  className="px-4 py-2 text-xs font-bold uppercase bg-black text-white hover:bg-[#FF4444]"
+                  className="px-4 py-2 text-xs font-bold uppercase sm-btn--ink hover:bg-[var(--sm-stamp)]"
                 >
                   Restore
                 </button>

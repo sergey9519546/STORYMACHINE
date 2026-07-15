@@ -120,8 +120,8 @@ function ProviderRadio<T extends string>({
             onClick={() => onChange(opt.value)}
             className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 transition-colors ${
               value === opt.value
-                ? "bg-black text-white border-black"
-                : "bg-white text-black border-black hover:bg-gray-100"
+                ? "sm-btn--ink border-black"
+                : "sm-btn border-black hover:bg-gray-100"
             }`}
           >
             {opt.label}
@@ -518,7 +518,7 @@ function StoryTab() {
           <button
             onClick={() => story.structure && void applyStructure(story.structure)}
             disabled={applying || !story.structure}
-            className="px-4 py-2 font-bold uppercase tracking-wider text-xs bg-black text-white border-2 border-black hover:bg-[#FF4444] transition-colors disabled:opacity-40"
+            className="px-4 py-2 font-bold uppercase tracking-wider text-xs sm-btn--ink border-2 border-black hover:bg-[var(--sm-stamp)] transition-colors disabled:opacity-40"
           >
             {applying ? "Applying…" : "Re-apply"}
           </button>
@@ -615,7 +615,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white brutal-border brutal-shadow w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
+      <div className="bg-white sm-btn shadow-[var(--sm-shadow)] w-full max-w-xl max-h-[90vh] flex flex-col mx-4">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b-4 border-black">
           <h2 className="text-lg font-bold uppercase tracking-widest">Settings</h2>
@@ -646,8 +646,8 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   onClick={() => setActiveTab(tab)}
                   className={`flex-1 py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === tab
-                      ? "bg-black text-white"
-                      : "bg-white text-black hover:bg-gray-100"
+                      ? "sm-btn--ink"
+                      : "sm-btn hover:bg-gray-100"
                   }`}
                 >
                   {TAB_LABELS[tab]}
@@ -753,7 +753,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-black text-white px-6 py-2 font-bold uppercase tracking-wider text-sm brutal-border brutal-shadow-hover hover:bg-[#FF4444] transition-colors disabled:opacity-50"
+                  className="sm-btn--ink px-6 py-2 font-bold uppercase tracking-wider text-sm sm-btn  hover:bg-[var(--sm-stamp)] transition-colors disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
