@@ -179,7 +179,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
 
   const filteredScenes = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return scenes.filter(s => s.text.toLowerCase().includes(query));
+    return scenes.filter(s => s.location.toLowerCase().includes(query) || s.text.toLowerCase().includes(query));
   }, [scenes, searchQuery]);
 
   const filteredCharacters = useMemo(() => {
@@ -327,7 +327,7 @@ export default function Sidebar({ characters, onAddCharacter, onUpdateCharacter,
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 p-3">
             <button
               onClick={onAddCharacter}
               className="sm-btn sm-btn--ink w-full"

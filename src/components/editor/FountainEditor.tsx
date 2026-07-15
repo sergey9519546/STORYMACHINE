@@ -82,13 +82,13 @@ const baseTheme = EditorView.baseTheme({
   },
   '.cm-scroller': {
     overflow: 'auto',
-    // More generous vertical air above/below the page so the sheet reads as an
-    // object resting on a desk, not a box wedged into the viewport.
-    padding: '4rem 2rem 6rem',
+    // Tighten horizontal padding so the page dominates more of the stage;
+    // the right gutter is now used for page furniture, not dead space.
+    padding: '4rem 1.25rem 6rem',
     // Graded warm canvas — a soft radial pool of light behind the page plus a
     // slightly darker desk edge, instead of one flat beige value.
     background:
-      'radial-gradient(120% 60% at 50% 0%, #ECE5D6 0%, #E4DCC9 55%, #DCD3BD 100%)',
+      'radial-gradient(140% 70% at 40% 0%, #ECE5D6 0%, #E4DCC9 45%, #DCD3BD 100%)',
   },
   '.cm-content': {
     // content-box so `width` is the 60ch TEXT column and the 1in page margins

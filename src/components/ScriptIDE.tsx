@@ -1451,8 +1451,8 @@ export default function ScriptIDE({
           onOpenCopilot={() => setPrefsOpen("copilot")}
         />
 
-        {/* Action strip — paper bar; one dominant next step */}
-        <div className="flex min-h-[44px] flex-wrap items-center gap-2 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-3 py-2 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
+        {/* Action strip — director's slate: one context, one dominant CTA, right-aligned */}
+        <div className="flex min-h-[44px] items-center gap-3 border-b-[1.5px] border-[var(--sm-ink)] bg-[var(--sm-bar)] px-4 py-2.5 font-[family-name:var(--sm-font-mono)] text-[11px] text-[var(--sm-ink)]">
           {simulateStatus ? (
             <>
               <span
@@ -1649,7 +1649,9 @@ export default function ScriptIDE({
         )}
 
         <div
-          className="relative flex-1 overflow-hidden bg-[var(--sm-paper)]"
+          className={`relative flex-1 overflow-hidden bg-[var(--sm-paper)] sm-stage-transition ${
+            task === "ship" ? "bg-[#f0ebe0]" : task === "coverage" ? "bg-[#f2ede3]" : "bg-[var(--sm-paper)]"
+          }`}
           aria-busy={engineState.isAnalyzing ? "true" : "false"}
         >
           {/* CodeMirror 6 editor — replaces the textarea + syntax-highlight overlay.
@@ -1672,35 +1674,47 @@ export default function ScriptIDE({
             liveDiagnostics={liveDiagnostics}
           />
 
+          {/* Page furniture — quiet manuscript metadata in the right gutter */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-4 right-4 hidden items-end gap-3 font-[family-name:var(--sm-font-mono)] text-[9px] uppercase tracking-[0.14em] text-[var(--sm-ink-faint)]/50 md:flex"
+          >
+            <span className="tabular-nums">{pageCount} {pageCount === 1 ? "page" : "pages"}</span>
+            <span className="text-[var(--sm-ink-faint)]/20">·</span>
+            <span className="tabular-nums">{stats.wordCount}w</span>
+          </div>
+
           {/* Empty draft coach — Write mode only; disappears on first keystroke */}
           {isEmptyDraft && task === "write" && toolSlot === "none" && (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[18%] sm:pt-[14%]">
-              <div className="sm-panel pointer-events-auto mx-4 max-w-md">
-                <div className="sm-panel-body">
-                  <p className="sm-slug">Script · write</p>
-                  <h2 className="font-[family-name:var(--sm-font-display)] text-2xl uppercase leading-none text-[var(--sm-ink)]">
-                    Start the page
-                  </h2>
-                  <p className="sm-sub">Type a slug line, or load the sample for coverage.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDoctorAutoSample(true);
-                        handleTaskChange("coverage");
-                      }}
-                      className="sm-btn sm-btn--stamp"
-                    >
-                      Sample coverage
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => editorRef.current?.getView()?.focus()}
-                      className="sm-btn"
-                    >
-                      Focus editor
-                    </button>
-                  </div>
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-[16%] sm:pt-[12%]">
+              <div className="pointer-events-auto mx-4 max-w-[42ch] text-center">
+                <p className="font-[family-name:var(--sm-font-hand)] text-lg text-[var(--sm-ink-faint)]">
+                  the page is yours
+                </p>
+                <h2 className="mt-2 font-[family-name:var(--sm-font-display)] text-3xl uppercase leading-none tracking-[0.04em] text-[var(--sm-ink)]">
+                  Start writing
+                </h2>
+                <p className="mt-3 font-[family-name:var(--sm-font-mono)] text-[11px] uppercase tracking-[0.2em] text-[var(--sm-ink-mute)]">
+                  Type FADE IN: to begin, or load the sample.
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDoctorAutoSample(true);
+                      handleTaskChange("coverage");
+                    }}
+                    className="sm-btn sm-btn--stamp min-h-[44px]"
+                  >
+                    Sample coverage
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => editorRef.current?.getView()?.focus()}
+                    className="sm-btn min-h-[44px]"
+                  >
+                    Focus editor
+                  </button>
                 </div>
               </div>
             </div>

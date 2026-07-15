@@ -104,3 +104,11 @@
 @media (prefers-reduced-motion: reduce){.sm-live > i{animation:none}}
 .sm-note{font:600 18px/1.02 var(--sm-font-hand);color:var(--sm-stamp)}
 .sm-note--ink{color:#6a6350}
+
+/* tactile push — design-taste Rule 5: physical feedback on :active */
+.sm-btn:active:not(:disabled){transform:translateY(1px)}
+.sm-btn--stamp:active:not(:disabled){transform:translateY(1px) scale(0.98)}
+.sm-card:active{transform:scale(0.995)}
+
+/* mode-transition — subtle stage background crossfade when task changes */
+.sm-stage-transition{transition:background-color 0.4s cubic-bezier(0.16,1,0.3,1)}
