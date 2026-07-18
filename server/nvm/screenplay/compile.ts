@@ -13,6 +13,7 @@ import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { ScreenplaySceneRecord } from './memory.ts';
 import type { StructureState } from './structure.ts';
 import { project, type Canon } from '../project/index.ts';
+import { fastWordCount } from '../../lib/string-utils.ts';
 
 export interface CompiledScreenplay {
   /** Raw Fountain text */
@@ -82,7 +83,8 @@ export function compileScreenplay(
     openClues: r.unresolvedClues.length,
   }));
 
-  const wordCount = fountain.split(/\s+/).filter(w => w.length > 0).length;
+  // ⚡ Bolt: Zero-allocation word count replacing expensive .split(/\s+/)
+  const wordCount = fastWordCount(fountain);
 
   return {
     fountain,
