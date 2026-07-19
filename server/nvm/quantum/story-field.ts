@@ -30,6 +30,7 @@ import {
   EntanglementAnalyzer,
   createEntanglementGraph,
 } from './entanglement.ts';
+import { NarrativeState } from '../analyze/NarrativeState.ts';
 import { buildStoryGraph, analyzeStoryGraph } from '../analyze/story-graph.ts';
 import type { FountainAnalysis } from '../analyze/types.ts';
 

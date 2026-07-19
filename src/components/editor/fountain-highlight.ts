@@ -32,25 +32,16 @@ function buildDecorations(state: EditorState): DecorationSet {
   for (const block of blocks) {
     const cls = BLOCK_CLASSES[block.type];
     if (!cls) continue;
-
-    let offset = 0;
-    let index = 0;
-    while (index <= block.text.length) {
-      const nextIndex = block.text.indexOf('\n', index);
-
+    const blockLines = block.text.split('\n');
+    for (let offset = 0; offset < blockLines.length; offset++) {
       const lineNo = block.lineNumber + offset;          // 1-indexed
-      if (lineNo >= 1 && lineNo <= state.doc.lines) {
-        const line = state.doc.line(lineNo);
-        try {
-          builder.add(line.from, line.from, Decoration.line({ class: cls }));
-        } catch {
-          // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
-        }
+      if (lineNo < 1 || lineNo > state.doc.lines) continue;
+      const line = state.doc.line(lineNo);
+      try {
+        builder.add(line.from, line.from, Decoration.line({ class: cls }));
+      } catch {
+        // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
       }
-
-      if (nextIndex === -1) break;
-      index = nextIndex + 1;
-      offset++;
     }
   }
 

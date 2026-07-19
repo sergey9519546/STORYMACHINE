@@ -37,6 +37,8 @@ import { getV5Phase1Config } from '../config/v5-flags.ts';
 import { getV5Metrics } from '../monitoring/v5-metrics.ts';
 import { commitToEvents, estimateEventsByteSize } from '../nvm/kernel/adapters/commit-to-events.ts';
 
+import type { ActionType } from './types.ts';
+
 const DEFAULT_DARK_TRIAD: DarkTriad = { machiavellianism: 50, narcissism: 50, psychopathy: 50 };
 const DEFAULT_BIG_FIVE: BigFive = { openness: 50, conscientiousness: 50, extraversion: 50, agreeableness: 50, neuroticism: 50 };
 
