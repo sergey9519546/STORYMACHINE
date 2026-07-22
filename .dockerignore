@@ -1,0 +1,52 @@
+# Deny the entire workspace unless the Dockerfile needs it explicitly.
+**
+
+# Dependency manifests and build configuration.
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!index.html
+
+# Runtime entry point and source trees. Parent directory exceptions are
+# intentional: Docker must traverse them before the recursive rules apply.
+!server.ts
+!server/
+!server/**
+!src/
+!src/**
+!public/
+!public/**
+
+# Defense in depth for confidential, generated, and runtime state. These
+# remain excluded even if a future allow rule is added above.
+.env
+.env.*
+**/.env
+**/.env.*
+/data
+/data/**
+.git
+.git/**
+**/.git
+**/.git/**
+node_modules
+node_modules/**
+**/node_modules
+**/node_modules/**
+*.db
+**/*.db
+*.db-wal
+**/*.db-wal
+*.db-shm
+**/*.db-shm
+*.log
+**/*.log
+dist
+dist/**
+coverage
+coverage/**
+docs
+docs/**
+tests
+tests/**
