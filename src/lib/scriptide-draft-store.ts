@@ -90,8 +90,18 @@ export function writeScriptIDEDraft(
 ): boolean {
   // Envelope is authoritative. Mirror legacy `theme` so older readers stay aligned
   // without treating theme as a separate revision domain.
-  return write(SCRIPTIDE_DRAFT_KEY, JSON.stringify(draft)) &&
+  try {
+    if (!write(SCRIPTIDE_DRAFT_KEY, JSON.stringify(draft))) return false;
+  } catch {
+    return false;
+  }
+
+  try {
     write('theme', draft.isDarkMode ? 'dark' : 'light');
+  } catch {
+    // The compatibility mirror is best-effort after the authoritative write succeeds.
+  }
+  return true;
 }
 
 export type ScriptIDEServerSnapshot = ScriptIDEDraftState & { updatedAt: number };

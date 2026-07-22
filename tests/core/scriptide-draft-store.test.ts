@@ -86,8 +86,66 @@ describe('scriptide draft store', () => {
     });
   });
 
-  it('reports an atomic storage write failure', () => {
-    assert.equal(writeScriptIDEDraft(() => false, envelope), false);
+  it('returns false and skips the legacy mirror when the authoritative write returns false', () => {
+    const writes: string[] = [];
+    const result = writeScriptIDEDraft((key) => {
+      writes.push(key);
+      return false;
+    }, envelope);
+
+    assert.equal(result, false);
+    assert.deepEqual(writes, [SCRIPTIDE_DRAFT_KEY]);
+  });
+
+  it('returns false and skips the legacy mirror when the authoritative write throws', () => {
+    const writes: string[] = [];
+    const result = writeScriptIDEDraft((key) => {
+      writes.push(key);
+      throw new Error('draft store unavailable');
+    }, envelope);
+
+    assert.equal(result, false);
+    assert.deepEqual(writes, [SCRIPTIDE_DRAFT_KEY]);
+  });
+
+  it('returns false without invoking storage when draft serialization fails', () => {
+    const writes: string[] = [];
+    const unserializable = {
+      ...envelope,
+      snapshots: [1n],
+    };
+    const result = writeScriptIDEDraft((key) => {
+      writes.push(key);
+      return true;
+    }, unserializable);
+
+    assert.equal(result, false);
+    assert.deepEqual(writes, []);
+  });
+
+  it('reports success when the authoritative envelope is stored but the legacy theme mirror returns false', () => {
+    const writes: string[] = [];
+    const result = writeScriptIDEDraft((key) => {
+      writes.push(key);
+      return key === SCRIPTIDE_DRAFT_KEY;
+    }, envelope);
+
+    assert.equal(result, true);
+    assert.deepEqual(writes, [SCRIPTIDE_DRAFT_KEY, 'theme']);
+  });
+
+  it('reports success when the authoritative envelope is stored but the legacy theme mirror throws', () => {
+    const writes: string[] = [];
+    const result = writeScriptIDEDraft((key) => {
+      writes.push(key);
+      if (key === 'theme') {
+        throw new Error('legacy mirror unavailable');
+      }
+      return true;
+    }, envelope);
+
+    assert.equal(result, true);
+    assert.deepEqual(writes, [SCRIPTIDE_DRAFT_KEY, 'theme']);
   });
 
   it('updates local content while preserving the server base revision', () => {
