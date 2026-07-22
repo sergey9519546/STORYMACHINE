@@ -1,4 +1,4 @@
-Refactor fountain highlight to avoid split allocation and fix duplicate import
+Refactor fountain highlight to avoid split allocation and fix backend typings
 
 Fixes the GitHub Actions failure caused by duplicate import of `ActionType`
-in `server/engine/Stage.ts`.
+in `server/engine/Stage.ts`, duplicate exported classes in `server/engine/ai-provider.ts` test files, and fixes the 'content' missing on 'AtomicFact' in the compatibility tests by swapping it with 'subject', 'predicate', 'object'.

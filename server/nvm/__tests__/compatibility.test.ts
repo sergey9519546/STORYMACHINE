@@ -32,7 +32,7 @@ function createLegacyCommit(sceneIdx: number, ops: StoryOp[], parentId: string |
 
 function createTestOp(type: string = 'ADD_FACT', overrides: any = {}): StoryOp {
   const ops: Record<string, any> = {
-    ADD_FACT: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test fact', addedAtTurn: 1 } },
+    ADD_FACT: { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'fact', addedAtTurn: 1 } },
     UPDATE_BELIEF: { op: 'UPDATE_BELIEF', charId: 'john', belief: { content: 'Test', confidence: 0.8 } },
     SHIFT_RELATIONSHIP: { op: 'SHIFT_RELATIONSHIP', pair: ['john', 'mary'], delta: { dimension: 'trust', change: 0.2 } },
     SEED_CLUE: { op: 'SEED_CLUE', clueId: 'clue1', carrier: 'photograph' },
@@ -62,7 +62,7 @@ describe('Backward Compatibility: StoryCommit ↔ Event Conversion', () => {
   it('should convert legacy commits to events without data loss', () => {
     const legacyCommits: StoryCommit[] = [
       createLegacyCommit(1, [
-        createTestOp('ADD_FACT', { fact: { factId: 'f1', content: 'Scene 1', addedAtTurn: 1 } }),
+        createTestOp('ADD_FACT', { fact: { factId: 'f1', subject: 'Scene', predicate: 'is', object: '1', addedAtTurn: 1 } }),
         createTestOp('UPDATE_BELIEF', { charId: 'john' }),
       ], null),
       createLegacyCommit(2, [

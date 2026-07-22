@@ -185,7 +185,7 @@ describe('Smoke Test: Basic Operations', () => {
     
     try {
       const event = store.append({
-        op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        op: { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',
@@ -210,7 +210,7 @@ describe('Smoke Test: Basic Operations', () => {
     
     try {
       const result = await integration.commit([
-        { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
       ]);
       
       assert.ok(result, 'Should return result');
@@ -226,7 +226,7 @@ describe('Smoke Test: Basic Operations', () => {
     
     try {
       store.append({
-        op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        op: { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',
@@ -286,7 +286,7 @@ describe('Smoke Test: Basic Operations', () => {
     
     const store = createEventStore();
     const event = store.append({
-      op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+      op: { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
       assertions: [],
       derivedFrom: [],
       createdBy: 'user_authored',
@@ -389,7 +389,7 @@ describe('Smoke Test: Basic Performance', () => {
     
     for (let i = 0; i < 100; i++) {
       store.append({
-        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, content: `Fact ${i}`, addedAtTurn: i } },
+        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, subject: 'Test', predicate: 'is', object: `Fact ${i}`, addedAtTurn: i } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',
@@ -414,7 +414,7 @@ describe('Smoke Test: Basic Performance', () => {
     // Add 100 events
     for (let i = 0; i < 100; i++) {
       store.append({
-        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, content: `Fact ${i}`, addedAtTurn: i } },
+        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, subject: 'Test', predicate: 'is', object: `Fact ${i}`, addedAtTurn: i } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',
@@ -441,7 +441,7 @@ describe('Smoke Test: Basic Performance', () => {
     // Add 100 events
     for (let i = 0; i < 100; i++) {
       store.append({
-        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, content: `Fact ${i}`, addedAtTurn: i } },
+        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, subject: 'Test', predicate: 'is', object: `Fact ${i}`, addedAtTurn: i } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',
@@ -476,7 +476,7 @@ describe('Smoke Test: Integration Health', () => {
       });
       
       await integration.commit([
-        { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
       ]);
       
       const events = integration.getAllEvents();
@@ -502,7 +502,7 @@ describe('Smoke Test: Integration Health', () => {
       });
       
       const result = await integration.commit([
-        { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
       ]);
       
       assert.ok(result, 'Integration should work');
@@ -551,7 +551,7 @@ describe('Smoke Test: Documentation Examples Work', () => {
       });
       
       const result = await integration.commit([
-        { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Hero enters', addedAtTurn: 1 } },
+        { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Hero', predicate: 'enters', object: 'scene', addedAtTurn: 1 } },
       ]);
       
       assert.ok(result.success || !result.success, 'Example should run');
@@ -568,7 +568,7 @@ describe('Smoke Test: Documentation Examples Work', () => {
       const store = createEventStore();
       
       store.append({
-        op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } },
+        op: { op: 'ADD_FACT', fact: { factId: 'f1', subject: 'Test', predicate: 'is', object: 'Test', addedAtTurn: 1 } },
         assertions: [],
         derivedFrom: [],
         createdBy: 'user_authored',

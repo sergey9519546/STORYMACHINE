@@ -32,6 +32,7 @@ import {
 } from './entanglement.ts';
 import { buildStoryGraph, analyzeStoryGraph } from '../analyze/story-graph.ts';
 import type { FountainAnalysis } from '../analyze/types.ts';
+import { emptyState, type NarrativeState } from '../state/NarrativeState.ts';
 
 // ── Quantum Narrative Field ──────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export class QuantumNarrativeField {
   constructor(config: Partial<QuantumFieldConfig> = {}) {
     this.config = { ...this.getDefaultConfig(), ...config };
     this.entanglementBuilder = new EntanglementGraphBuilder();
-    this.narrativeState = new NarrativeState();
+    this.narrativeState = emptyState();
   }
   
   // ── State Management ──────────────────────────────────────────────────────────
