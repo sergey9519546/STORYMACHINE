@@ -32,16 +32,16 @@ function buildDecorations(state: EditorState): DecorationSet {
   for (const block of blocks) {
     const cls = BLOCK_CLASSES[block.type];
     if (!cls) continue;
-    const blockLines = block.text.split('\n');
-    for (let offset = 0; offset < blockLines.length; offset++) {
-      const lineNo = block.lineNumber + offset;          // 1-indexed
-      if (lineNo < 1 || lineNo > state.doc.lines) continue;
-      const line = state.doc.line(lineNo);
-      try {
-        builder.add(line.from, line.from, Decoration.line({ class: cls }));
-      } catch {
-        // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
-      }
+
+    // parseFountain splits by '\n', so each block is exactly one line.
+    const lineNo = block.lineNumber;
+    if (lineNo < 1 || lineNo > state.doc.lines) continue;
+
+    const line = state.doc.line(lineNo);
+    try {
+      builder.add(line.from, line.from, Decoration.line({ class: cls }));
+    } catch {
+      // RangeSetBuilder requires strictly ascending from values; skip if out-of-order
     }
   }
 
