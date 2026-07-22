@@ -1,0 +1,4 @@
+Refactor fountain highlight to avoid split allocation and fix duplicate import
+
+Fixes the GitHub Actions failure caused by duplicate import of `ActionType`
+in `server/engine/Stage.ts`.
