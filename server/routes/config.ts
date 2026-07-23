@@ -1,9 +1,9 @@
 import express from 'express';
-import crypto from 'crypto';
 import { generateContent, getModel } from '../engine/ai.ts';
 import { validate, AiConfigSchema, StoryToneSchema } from '../lib/validation.ts';
 import { logger } from '../lib/logger.ts';
 import { applyConfig, getPublicConfig } from '../lib/ai-config.ts';
+import { checkAdminAuth, isLoopbackAddress, timingSafeStringEqual } from '../lib/admin-auth.ts';
 import { instantiatePreset } from '../lib/structure-presets.ts';
 import { sanitizeForPrompt } from '../lib/prompt-utils.ts';
 import { version as buildVersion, commit as buildCommit } from '../lib/build-info.ts';
@@ -63,25 +63,13 @@ router.get('/health', (_req, res) => {
 // NOTE for deployment docs (.env.example, not owned by this pass): document
 // METRICS_TOKEN here loudly — set it in any deployment where a monitoring
 // scraper needs to reach /metrics from off-host.
-function isLoopbackAddress(addr: string | undefined): boolean {
-  if (!addr) return false;
-  const a = addr.replace(/^::ffff:/, '');
-  return a === '127.0.0.1' || a === '::1' || a.startsWith('127.');
-}
-
-function timingSafeStringEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, 'utf8');
-  const bBuf = Buffer.from(b, 'utf8');
-  if (aBuf.length !== bBuf.length) {
-    // Compare against itself so a length mismatch doesn't short-circuit
-    // instantly — reduces (does not eliminate) a length-based timing signal,
-    // same pattern as collab-auth.ts's verifyCollabToken.
-    crypto.timingSafeEqual(aBuf, aBuf);
-    return false;
-  }
-  return crypto.timingSafeEqual(aBuf, bBuf);
-}
-
+//
+// isLoopbackAddress/timingSafeStringEqual/checkAdminAuth now live in
+// server/lib/admin-auth.ts (imported above) so every route that mutates
+// process-global AI-provider config — this file's POST /api/ai-config and
+// POST /api/ai-config/test, plus server/routes/ai-providers.ts's POST
+// /api/ai-providers/switch — shares one gate instead of each route file
+// carrying its own copy that could silently drift out of sync.
 router.get('/metrics', (req, res) => {
   const metricsToken = process.env.METRICS_TOKEN;
   if (metricsToken) {
@@ -107,31 +95,9 @@ router.get('/metrics', (req, res) => {
 // loopback-only until an operator opts into remote config by setting
 // ADMIN_TOKEN, at which point the token is required from every caller,
 // loopback included (a set token means "only holders of this token", not
-// "holders of this token, OR loopback").
+// "holders of this token, OR loopback"). checkAdminAuth itself now lives in
+// server/lib/admin-auth.ts (imported above) — see that module's comment.
 //
-// Uses req.ip rather than /metrics' req.socket.remoteAddress: a config WRITE
-// is a more sensitive operation than a metrics read, and req.socket always
-// reports the immediate peer — behind a reverse proxy (this repo already
-// supports TRUST_PROXY) that peer is the proxy itself, not the real client,
-// which would misidentify a remote attacker as loopback. req.ip resolves the
-// real client through X-Forwarded-For once trust proxy is configured, and
-// falls back to the same raw peer address when it isn't.
-function checkAdminAuth(req: express.Request, res: express.Response): boolean {
-  const adminToken = process.env.ADMIN_TOKEN;
-  if (adminToken) {
-    const auth = req.headers.authorization ?? '';
-    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!provided || !timingSafeStringEqual(provided, adminToken)) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return false;
-    }
-  } else if (!isLoopbackAddress(req.ip)) {
-    res.status(401).json({ error: 'Unauthorized: set ADMIN_TOKEN to configure AI providers remotely' });
-    return false;
-  }
-  return true;
-}
-
 // ── AI provider config routes ─────────────────────────────────────────────
 router.get('/api/ai-config', (_req, res) => {
   const pub = getPublicConfig();
