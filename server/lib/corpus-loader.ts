@@ -111,8 +111,14 @@ export async function loadCorpusVectors(
 ): Promise<StoryVector[]> {
   // Read manifest
   const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  const manifest: Manifest = JSON.parse(manifestRaw);
-  
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(manifestRaw);
+  } catch (err) {
+    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, error: (err as Error).message });
+    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
+  }
+
   // Filter to valid screenplays only (skip errors and zero-scene files)
   const validEntries = manifest.filter(entry => {
     if (entry.error) return false;
@@ -188,8 +194,14 @@ export async function loadCorpusVectors(
 export async function loadSingleVector(slug: string): Promise<StoryVector | null> {
   // Read manifest
   const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  const manifest: Manifest = JSON.parse(manifestRaw);
-  
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(manifestRaw);
+  } catch (err) {
+    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, slug, error: (err as Error).message });
+    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
+  }
+
   // Find entry
   const entry = manifest.find(e => e.slug === slug);
   if (!entry) {
@@ -229,8 +241,14 @@ export async function loadSingleVector(slug: string): Promise<StoryVector | null
  *  @returns Array of slugs */
 export async function getAvailableSlugs(): Promise<string[]> {
   const manifestRaw = await fs.readFile(MANIFEST_PATH, 'utf-8');
-  const manifest: Manifest = JSON.parse(manifestRaw);
-  
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(manifestRaw);
+  } catch (err) {
+    logger.error('corpus_loader_manifest_parse_failed', { manifestPath: MANIFEST_PATH, error: (err as Error).message });
+    throw new Error('corpus manifest is not valid JSON: ' + (err as Error).message);
+  }
+
   return manifest
     .filter(e => !e.error && e.sceneCount && e.sceneCount > 0)
     .map(e => e.slug);
